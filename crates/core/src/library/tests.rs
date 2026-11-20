@@ -1,0 +1,159 @@
+use jiff::civil::date;
+use jiff::tz::TimeZone;
+
+use super::*;
+use crate::game::{Player, Team};
+
+fn zoned(day: i8, hour: i8) -> Zoned {
+    date(2026, 11, day)
+        .at(hour, 55, 1, 0)
+        .to_zoned(TimeZone::UTC)
+        .unwrap()
+}
+
+fn player() -> Player {
+    Player {
+        name: "Me".into(),
+        champion: "Ahri".into(),
+        team: Team::Order,
+        is_bot: false,
+    }
+}
+
+fn meta(id: &str, started_at: Zoned) -> RecordingMeta {
+    RecordingMeta {
+        version: META_VERSION,
+        id: id.into(),
+        started_at,
+        duration_secs: 1800.5,
+        video: "game.mp4".into(),
+        game: GameRecord {
+            info: GameInfo {
+                mode: "CLASSIC".into(),
+                map: Some(11),
+                me: player(),
+                players: vec![player()],
+            },
+            result: GameResult::Win,
+        },
+        events: vec![EventEntry {
+            id: 3,
+            game_secs: 100.0,
+            rec_secs: 112.5,
+            kind: GameEvent::FirstBlood {
+                recipient: "Me".into(),
+            },
+            highlights: vec!["Kill".into()],
+        }],
+        clips: vec![ClipEntry {
+            file: "clips/01-52_Kill.mp4".into(),
+            start_secs: 97.5,
+            end_secs: 117.5,
+            label: "Kill".into(),
+        }],
+        encoder: "NVIDIA H.264".into(),
+        video_format: VideoInfo {
+            width: 1920,
+            height: 1080,
+            fps: 60,
+        },
+    }
+}
+
+#[test]
+fn folder_name_formats_and_sanitises() {
+    assert_eq!(
+        folder_name(zoned(20, 19), "Ahri", "CLASSIC"),
+        "2026-11-20_19-55-01_Ahri_CLASSIC"
+    );
+    assert_eq!(
+        folder_name(zoned(20, 19), "Kai'Sa", "ARAM/Mayhem"),
+        "2026-11-20_19-55-01_KaiSa_ARAMMayhem"
+    );
+    assert_eq!(
+        folder_name(zoned(20, 19), "..", "CLASSIC"),
+        "2026-11-20_19-55-01_Unknown_CLASSIC"
+    );
+}
+
+#[test]
+fn clip_file_name_uses_minutes_and_seconds() {
+    assert_eq!(clip_file_name(754.9, "MyKill"), "12-34_MyKill.mp4");
+    assert_eq!(clip_file_name(5.0, "Kill+Death"), "00-05_Kill-Death.mp4");
+    assert_eq!(clip_file_name(6000.0, "A/B"), "100-00_AB.mp4");
+    assert_eq!(clip_file_name(-3.0, "!!"), "00-00_Clip.mp4");
+}
+
+#[test]
+fn meta_round_trips_through_disk() {
+    let dir = tempfile::tempdir().unwrap();
+    let original = meta("a", zoned(20, 19));
+    write_meta(dir.path(), &original).unwrap();
+    assert_eq!(read_meta(dir.path()).unwrap(), original);
+    assert!(!dir.path().join("game.json.tmp").exists());
+}
+
+#[test]
+fn sidecar_json_has_the_documented_shape() {
+    let json = serde_json::to_value(meta("a", zoned(20, 19))).unwrap();
+    assert_eq!(json["version"], 1);
+    assert_eq!(json["game"]["result"], "win");
+    assert_eq!(json["game"]["mode"], "CLASSIC");
+    assert_eq!(json["game"]["me"]["champion"], "Ahri");
+    assert_eq!(json["events"][0]["kind"]["type"], "first_blood");
+    assert_eq!(json["video_format"]["fps"], 60);
+    assert!(
+        json["started_at"]
+            .as_str()
+            .unwrap()
+            .starts_with("2026-11-20T19:55:01")
+    );
+}
+
+#[test]
+fn write_meta_replaces_an_existing_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut m = meta("a", zoned(20, 19));
+    write_meta(dir.path(), &m).unwrap();
+    m.clips.clear();
+    write_meta(dir.path(), &m).unwrap();
+    assert!(read_meta(dir.path()).unwrap().clips.is_empty());
+}
+
+#[test]
+fn read_meta_rejects_unknown_versions() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut m = meta("a", zoned(20, 19));
+    m.version = 2;
+    write_meta(dir.path(), &m).unwrap();
+    assert!(matches!(
+        read_meta(dir.path()),
+        Err(LibraryError::Version(2))
+    ));
+}
+
+#[test]
+fn scan_sorts_newest_first_and_skips_bad_entries() {
+    let root = tempfile::tempdir().unwrap();
+    for (name, m) in [
+        ("old", meta("old", zoned(18, 10))),
+        ("new", meta("new", zoned(20, 19))),
+        ("mid", meta("mid", zoned(19, 12))),
+    ] {
+        write_meta(&root.path().join(name), &m).unwrap();
+    }
+    let broken = root.path().join("broken");
+    fs::create_dir_all(&broken).unwrap();
+    fs::write(broken.join(META_FILE), "{ not json").unwrap();
+    fs::create_dir_all(root.path().join("empty")).unwrap();
+    fs::write(root.path().join("stray.txt"), "x").unwrap();
+
+    let ids: Vec<_> = scan(root.path()).into_iter().map(|m| m.id).collect();
+    assert_eq!(ids, ["new", "mid", "old"]);
+}
+
+#[test]
+fn scan_of_a_missing_directory_is_empty() {
+    let root = tempfile::tempdir().unwrap();
+    assert!(scan(&root.path().join("nope")).is_empty());
+}
