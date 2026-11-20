@@ -1,5 +1,5 @@
 mod client;
 mod dto;
-mod locator;
+pub mod locator;
 mod parse;
 mod poller;
