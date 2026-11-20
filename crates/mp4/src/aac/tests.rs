@@ -48,3 +48,39 @@ fn long_descriptor_lengths_use_the_expandable_form() {
     assert_eq!(&out[..3], &[0x05, 0x81, 0x48]);
     assert_eq!(out.len(), 3 + 200);
 }
+
+fn adts_frame(payload: &[u8], protected: bool) -> Vec<u8> {
+    let header_len = if protected { 9 } else { 7 };
+    let len = header_len + payload.len();
+    let mut out = vec![
+        0xFF,
+        if protected { 0xF0 } else { 0xF1 },
+        0x4C,
+        0x80 | (len >> 11) as u8 & 3,
+        (len >> 3) as u8,
+        ((len & 7) << 5) as u8 | 0x1F,
+        0xFC,
+    ];
+    out.resize(header_len, 0);
+    out.extend_from_slice(payload);
+    out
+}
+
+#[test]
+fn split_adts_strips_headers_with_and_without_crc() {
+    let mut stream = adts_frame(&[1, 2, 3], false);
+    stream.extend(adts_frame(&[4, 5], true));
+    stream.extend(adts_frame(&[6], false));
+    assert_eq!(split_adts(&stream), [&[1, 2, 3][..], &[4, 5], &[6]]);
+}
+
+#[test]
+fn split_adts_stops_at_truncated_or_invalid_data() {
+    let mut stream = adts_frame(&[1, 2, 3], false);
+    let mut cut = adts_frame(&[9; 10], false);
+    cut.truncate(12);
+    stream.extend(cut);
+    assert_eq!(split_adts(&stream), [&[1, 2, 3][..]]);
+    assert!(split_adts(&[0, 1, 2, 3, 4, 5, 6, 7]).is_empty());
+    assert!(split_adts(&[]).is_empty());
+}

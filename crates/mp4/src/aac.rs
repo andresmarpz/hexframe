@@ -28,6 +28,27 @@ pub fn asc_lc(sample_rate: u32, channels: u16) -> Vec<u8> {
     bits.to_be_bytes()[8 - padded / 8..].to_vec()
 }
 
+pub fn split_adts(data: &[u8]) -> Vec<&[u8]> {
+    let mut frames = Vec::new();
+    let mut pos = 0;
+    while let Some(header) = data.get(pos..pos + 7) {
+        if header[0] != 0xFF || header[1] & 0xF0 != 0xF0 {
+            break;
+        }
+        let protected = header[1] & 1 == 0;
+        let header_len = if protected { 9 } else { 7 };
+        let frame_len = (usize::from(header[3] & 3) << 11)
+            | (usize::from(header[4]) << 3)
+            | usize::from(header[5] >> 5);
+        let Some(frame) = data.get(pos + header_len..pos + frame_len) else {
+            break;
+        };
+        frames.push(frame);
+        pos += frame_len;
+    }
+    frames
+}
+
 fn descriptor(tag: u8, body: &[u8]) -> Vec<u8> {
     let mut length = Vec::new();
     let mut remaining = body.len();

@@ -1,7 +1,9 @@
 mod api;
 mod clipjob;
 mod control;
-mod fake;
+pub mod fake;
 mod library;
 mod ring;
 mod writer;
+
+pub use fake::FakeMediaSource;
