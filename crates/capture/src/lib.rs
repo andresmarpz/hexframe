@@ -10,4 +10,4 @@ mod pacer;
 pub mod probe;
 mod session;
 pub mod vproc;
-mod wgc;
+pub mod wgc;
