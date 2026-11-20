@@ -1,5 +1,6 @@
 [package]
 name = "greyscreen-mp4"
+description = "Pure-Rust fragmented and finalized MP4 writer for greyscreen"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

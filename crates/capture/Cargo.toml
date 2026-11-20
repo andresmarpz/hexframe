@@ -1,5 +1,6 @@
 [package]
 name = "greyscreen-capture"
+description = "Windows Graphics Capture and Media Foundation hardware H.264 encoding for greyscreen"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

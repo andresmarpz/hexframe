@@ -1,5 +1,6 @@
 [package]
 name = "greyscreen"
+description = "Automatic, Vanguard-safe League of Legends gameplay recorder for Windows"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

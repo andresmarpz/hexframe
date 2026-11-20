@@ -1,5 +1,6 @@
 [package]
 name = "greyscreen-cli"
+description = "Command-line diagnostics and test recording tool for greyscreen"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

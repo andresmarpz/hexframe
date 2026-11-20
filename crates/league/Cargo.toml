@@ -1,5 +1,6 @@
 [package]
 name = "greyscreen-league"
+description = "Client for the League of Legends Live Client Data API"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

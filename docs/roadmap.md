@@ -91,7 +91,7 @@ Acceptance:
   - structures → `TeamStructure` and `EnemyStructure`
   - aces → `MyAce`
 - `classify(event, info)` follows the rules in `research/events.md` section 11 exactly. Name matching is case-insensitive, compares after stripping any `#tag`, and also matches the champion name for bots.
-- `structure_team(id: &str) -> Option<Team>`: `T1` is Order, `T2` is Chaos. `parse_bool_loose(&serde_json::Value) -> bool` accepts `"True"`, `"true"` and `true`.
+- `structure_team(id: &str) -> Option<Team>`: `T1` is Order, `T2` is Chaos.
 - Tests: one per `classify` rule, including one kill that yields both MyKill and MyAssist (impossible in game, but the function returns a list), an environment killer, and the structure ids from the research.
 
 ### C3: Session state machine (`core::session`)
@@ -155,7 +155,7 @@ Spec: `research/events.md` sections 1 to 7, 10 and 12.
   - Methods: `gamestats()`, `eventdata()`, `activeplayername()`, `playerlist()`, `replay_playback_ok() -> bool`.
   - Errors are a `thiserror` enum: `Refused`, `NotReady(u16)`, `Bad(String)`.
 - `dto`: serde structs for those responses, with `#[serde(default)]` and the exact field names from the research. Events are a raw `serde_json::Value` map per event.
-- `parse`: `to_game_event(&serde_json::Value) -> GameEvent`, tolerant (unknown name gives `Unknown`, and `Stolen` uses loose parsing from `greyscreen_core::highlight::parse_bool_loose`). Also `to_game_info(activeplayername, playerlist, gamestats) -> Option<GameInfo>`, which finds me per research section 3.
+- `parse`: `to_game_event(&serde_json::Value) -> GameEvent`, tolerant (unknown name gives `Unknown`, and `Stolen` uses a local `loose_bool(&Value) -> bool` that accepts `"True"`, `"true"` and `true`). Also `to_game_info(activeplayername, playerlist, gamestats) -> Option<GameInfo>`, which finds me per research section 3.
 - `poller`: `Poller::spawn(client, locator: Box<dyn GameLocator>, out: Sender<LeagueMsg>) -> PollerHandle` (stop on drop). It runs the state loop in research section 10 using `greyscreen_core::time::mono_now()`:
   - Compute the offset each poll from the midpoint of the `gamestats` request.
   - Map each new event to `TimedEvent.at`, de-dup by `EventID`, and drop events from before `Ready`.
