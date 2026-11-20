@@ -9,5 +9,5 @@ mod h264;
 mod pacer;
 pub mod probe;
 mod session;
-mod vproc;
+pub mod vproc;
 mod wgc;

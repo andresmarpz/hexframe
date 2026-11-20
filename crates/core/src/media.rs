@@ -206,5 +206,17 @@ impl AudioTimeline {
     }
 }
 
+pub fn encode_size(native: (u32, u32), max_height: Option<u32>) -> (u32, u32) {
+    let (width, height) = native;
+    let (width, height) = match max_height {
+        Some(max) if height > max && height > 0 => {
+            let scaled = u64::from(width) * u64::from(max) / u64::from(height);
+            (scaled as u32, max)
+        }
+        _ => (width, height),
+    };
+    (width & !1, height & !1)
+}
+
 #[cfg(test)]
 mod tests;

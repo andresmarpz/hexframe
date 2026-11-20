@@ -201,3 +201,29 @@ fn cumulative_frames_never_go_backwards() {
         last = timeline.frames_out();
     }
 }
+
+#[test]
+fn encode_size_scales_1440p_down_to_1080p() {
+    assert_eq!(encode_size((2560, 1440), Some(1080)), (1920, 1080));
+}
+
+#[test]
+fn encode_size_rounds_odd_sides_down_to_even() {
+    assert_eq!(encode_size((1921, 1081), None), (1920, 1080));
+    assert_eq!(encode_size((1365, 767), Some(721)), (1282, 720));
+}
+
+#[test]
+fn encode_size_keeps_native_without_a_limit() {
+    assert_eq!(encode_size((2560, 1440), None), (2560, 1440));
+}
+
+#[test]
+fn encode_size_keeps_native_when_limit_is_above_it() {
+    assert_eq!(encode_size((1280, 720), Some(1080)), (1280, 720));
+}
+
+#[test]
+fn encode_size_keeps_four_by_three_aspect() {
+    assert_eq!(encode_size((1600, 1200), Some(1080)), (1440, 1080));
+}
