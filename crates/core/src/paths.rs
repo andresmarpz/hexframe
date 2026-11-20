@@ -1,1 +1,31 @@
+use std::path::PathBuf;
 
+const APP_DIR: &str = "Greyscreen";
+
+pub fn config_dir() -> PathBuf {
+    dirs::config_dir().unwrap_or_default().join(APP_DIR)
+}
+
+pub fn logs_dir() -> PathBuf {
+    dirs::data_local_dir()
+        .unwrap_or_default()
+        .join(APP_DIR)
+        .join("logs")
+}
+
+pub fn default_output_dir() -> PathBuf {
+    match dirs::video_dir() {
+        Some(videos) => videos.join(APP_DIR),
+        None => dirs::home_dir()
+            .unwrap_or_default()
+            .join("Videos")
+            .join(APP_DIR),
+    }
+}
+
+pub fn settings_file() -> PathBuf {
+    config_dir().join("settings.json")
+}
+
+#[cfg(test)]
+mod tests;
