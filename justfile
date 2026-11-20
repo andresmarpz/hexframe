@@ -2,6 +2,8 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 win := "x86_64-pc-windows-msvc"
 
+export RUSTC_WRAPPER := env("RUSTC_WRAPPER", `command -v sccache || true`)
+
 default:
     @just --list
 
