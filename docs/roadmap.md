@@ -470,6 +470,34 @@ Spec: `research/ui-rune.md` section 4.
 
 ## Wave 6
 
+### R0: Fast CI
+
+The problem: the Windows job takes over 11 minutes and has never finished. On run 44836869394, clippy took 6m23s, `cargo test` was cancelled after 4 minutes, and the fat-LTO release build never started. There are four causes:
+
+- `rust-cache` only saves after a successful job, and swarm pushes cancel every run, so every run builds about 500 crates cold.
+- The tree is built three times.
+- The release profile uses fat LTO.
+- The Windows runners are slow.
+
+Files: `.github/workflows/ci.yml`, and the root `Cargo.toml` profiles only.
+
+1. Set `with: cache-on-failure: true` on every `Swatinem/rust-cache@v2` step.
+2. Remove `cargo clippy` from the Windows job, because `just ci` already runs Windows clippy through cargo-xwin. Keep fmt and test on Windows, and keep clippy on macOS.
+3. Move the release build and artifact upload into a separate `release` job:
+   - It triggers on `push: tags: ['v*']` and `workflow_dispatch`.
+   - It runs on `windows-latest` and builds `-p greyscreen -p greyscreen-cli`.
+   - It uploads both exes.
+   - Its concurrency group does not cancel.
+4. Add `[profile.ci-release]` with `inherits = "release"`, `lto = "thin"` and `codegen-units = 16`. The `workflow_dispatch` build uses `--profile ci-release`. Tag builds keep `release`.
+5. Pin `crate-ci/typos` to the latest release tag instead of `@v1`.
+6. Keep `cancel-in-progress: true` for the push/PR group.
+
+Acceptance:
+
+- The YAML is valid.
+- Trigger a second run after the first one (which may be cold). The Windows job finishes in under 5 minutes with a cache hit. Report both durations.
+- `just ci` passes.
+
 ### R1: Icon, Windows resources and release build
 
 - Icon: a hexagon frame mark in the purple of `assets/icon.svg` (`#9333ea`), as SVG at `assets/icon.svg` (replacing the letter H). Render PNGs at 16, 32, 48, 256 (`rsvg-convert` or `resvg` CLI) and build `crates/app/assets/greyscreen.ico`.
