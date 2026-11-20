@@ -1,0 +1,23 @@
+[package]
+name = "greyscreen-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+greyscreen-core.workspace = true
+greyscreen-mp4.workspace = true
+greyscreen-league.workspace = true
+crossbeam-channel.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+serde_json.workspace = true
+jiff.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+greyscreen-capture.workspace = true
+
+[lints]
+workspace = true

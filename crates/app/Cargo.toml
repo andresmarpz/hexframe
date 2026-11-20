@@ -1,0 +1,20 @@
+[package]
+name = "greyscreen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+rune.workspace = true
+rune-kit.workspace = true
+greyscreen-core.workspace = true
+greyscreen-engine.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+
+[lints]
+workspace = true
