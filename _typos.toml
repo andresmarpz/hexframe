@@ -2,5 +2,6 @@
 extend-exclude = ["Cargo.lock", "docs/research/**"]
 
 [default.extend-words]
+trak = "trak"
 trun = "trun"
 PN = "PN"
