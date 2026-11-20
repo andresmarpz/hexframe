@@ -1,0 +1,31 @@
+# Greyscreen
+
+League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has the tickets, `docs/research/` has the API details.
+
+## Worker protocol
+
+1. Work in the worktree you were given. Run `git fetch origin && git rebase origin/main` before starting.
+2. Read `AGENTS.md`, `docs/architecture.md`, the ticket and the research sections it names.
+3. Change only the files the ticket lists. If something outside them must change, make the smallest change and say so in your final report.
+4. Do not take design decisions. If the ticket is ambiguous or wrong, pick the option closest to `docs/architecture.md`, and list it under "Deviations" in your report.
+5. `just ci` must pass: fmt, clippy on the host, clippy for Windows through cargo-xwin, and the tests.
+6. Commit with the message `<crate>: <what changed>` (for example `mp4: add fragmented writer`). Then `git fetch origin && git rebase origin/main && just ci && git push origin HEAD:main`. On a push race, repeat the rebase.
+7. Final report, under 15 lines: commit sha, what was built, the tests added, deviations, and anything left unverified.
+
+## Rules for code
+
+- No comments or doc comments, except one line in plain English when a "why" is not obvious. Names carry the meaning. Never mention tickets or files in code.
+- Files stay under 500 lines, excluding tests. Tests go in a sibling `tests.rs` (`#[cfg(test)] mod tests;`) or in `tests/` for integration tests.
+- `unsafe` only in `capture` and the Windows locator, and each block carries a `// SAFETY:` line (clippy `undocumented_unsafe_blocks`).
+- No `unwrap`/`expect` outside tests, except on a mutex lock.
+- Libraries return `thiserror` errors. Binaries use `anyhow`.
+- `just ci` passes before every push. It runs fmt, clippy on macOS and on Windows through cargo-xwin, and the tests.
+
+## Commands
+
+- `just ci`: fmt check, host clippy, typos, Windows clippy through cargo-xwin, tests.
+- `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows.
+- `just dist`: build and zip both exes into `dist/greyscreen-windows-x64.zip`.
+- `just fmt`: format the workspace.
+
+The Mac cannot run Windows code: compile-check it with `just check-win`.

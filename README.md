@@ -2,4 +2,6 @@
 
 # greyscreen
 
-Created in [T3 Code](https://t3.codes).
+League of Legends gameplay recorder for Windows.
+
+Work in progress.

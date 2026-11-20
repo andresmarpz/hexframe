@@ -1,0 +1,6 @@
+[files]
+extend-exclude = ["Cargo.lock", "docs/research/**"]
+
+[default.extend-words]
+trun = "trun"
+PN = "PN"

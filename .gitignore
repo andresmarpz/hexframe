@@ -1,0 +1,9 @@
+/target
+/dist
+**/*.rs.bk
+.DS_Store
+Thumbs.db
+*.pdb
+*.mp4
+/.claude/settings.local.json
+.env
