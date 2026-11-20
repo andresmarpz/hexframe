@@ -7,3 +7,4 @@ Thumbs.db
 *.mp4
 /.claude/settings.local.json
 .env
+/.claude/worktrees/
