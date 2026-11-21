@@ -168,6 +168,56 @@ fn distrusts_first_timestamp_far_from_now() {
 }
 
 #[test]
+fn distrusted_timestamps_reanchor_on_now_past_the_threshold() {
+    let mut timeline = AudioTimeline::new(0, RATE);
+    timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
+    let small = timeline.on_packet_now(Some(1), 220 * MS, frames(10), false);
+    assert_eq!(total(&small), frames(10));
+    assert!(!small.iter().any(|s| matches!(s, Span::Silence(_))));
+    let drifted = timeline.on_packet_now(Some(1), 280 * MS, frames(10), false);
+    assert_eq!(
+        drifted,
+        vec![
+            Span::Silence(frames(60)),
+            Span::Data {
+                skip: 0,
+                take: frames(10)
+            }
+        ]
+    );
+}
+
+#[test]
+fn distrusted_timestamps_drop_frames_when_audio_runs_ahead() {
+    let mut timeline = AudioTimeline::new(0, RATE);
+    timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
+    let spans = timeline.on_packet_now(None, 210 * MS, frames(10), false);
+    assert_eq!(total(&spans), frames(10));
+    let ahead = timeline.on_packet_now(None, 225 * MS, frames(50), false);
+    assert_eq!(
+        ahead,
+        vec![Span::Data {
+            skip: frames(35),
+            take: frames(15)
+        }]
+    );
+}
+
+#[test]
+fn distrusted_jitter_under_the_threshold_is_ignored() {
+    let mut timeline = AudioTimeline::new(0, RATE);
+    timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
+    let spans = timeline.on_packet_now(None, 225 * MS, frames(10), false);
+    assert_eq!(
+        spans,
+        vec![Span::Data {
+            skip: 0,
+            take: frames(10)
+        }]
+    );
+}
+
+#[test]
 fn trusts_first_timestamp_near_now() {
     let mut timeline = AudioTimeline::new(0, RATE);
     let spans = timeline.on_packet_now(Some(100 * MS), 300 * MS, frames(10), false);

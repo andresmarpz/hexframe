@@ -27,16 +27,12 @@ pub(crate) struct AudioPipe {
     capture: Option<AudioCapture>,
     worker: JoinHandle<()>,
     rx: Receiver<AudioMsg>,
+    t0_tx: Sender<Hns>,
     pub(crate) format: AudioFormat,
 }
 
 impl AudioPipe {
-    pub(crate) fn start(
-        target: &CaptureTarget,
-        qpc: QpcMap,
-        t0: Hns,
-        bitrate: u32,
-    ) -> Result<Self, String> {
+    pub(crate) fn start(target: &CaptureTarget, qpc: QpcMap, bitrate: u32) -> Result<Self, String> {
         let (pcm_tx, pcm_rx) = crossbeam_channel::bounded(PCM_QUEUE);
         let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
@@ -59,7 +55,8 @@ impl AudioPipe {
             CaptureTarget::GameWindow { pid, .. } => AudioTarget::Process(pid),
             CaptureTarget::PrimaryMonitor => AudioTarget::System,
         };
-        let capture = match AudioCapture::start(audio_target, qpc, t0, pcm_tx) {
+        let (t0_tx, t0_rx) = crossbeam_channel::bounded(1);
+        let capture = match AudioCapture::start(audio_target, qpc, t0_rx, pcm_tx) {
             Ok(capture) => capture,
             Err(error) => {
                 join(worker);
@@ -70,6 +67,7 @@ impl AudioPipe {
             capture: Some(capture),
             worker,
             rx: msg_rx,
+            t0_tx,
             format: AudioFormat {
                 sample_rate: SAMPLE_RATE,
                 channels: CHANNELS,
@@ -77,6 +75,10 @@ impl AudioPipe {
                 asc,
             },
         })
+    }
+
+    pub(crate) fn begin(&self, t0: Hns) {
+        self.t0_tx.send(t0).ok();
     }
 
     pub(crate) fn drain(&self, sink: &mut Sink) -> u64 {

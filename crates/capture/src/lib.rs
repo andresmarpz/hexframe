@@ -10,6 +10,7 @@ mod pacer;
 pub mod probe;
 mod session;
 pub mod vproc;
+mod watchdog;
 pub mod wgc;
 
 pub use session::WindowsMediaSource;

@@ -12,6 +12,7 @@ use crate::d3d::GpuDevice;
 use crate::h264::{EncodedVideo, H264Encoder, H264Error};
 use crate::pacer::{Pacer, Stats};
 use crate::vproc::{VideoConverter, VprocError};
+use crate::watchdog::Watchdog;
 use crate::wgc::WgcCapture;
 
 const MAX_SOFT_ERRORS: u32 = 120;
@@ -30,6 +31,7 @@ pub(crate) struct Video {
     pub(super) audio: Option<AudioPipe>,
     pub(super) sink: Sink,
     pub(super) pacer: Pacer,
+    pub(super) watchdog: Watchdog,
     pub(super) flags: Flags,
     pub(super) gpu: GpuDevice,
     pub(super) mf: MfGuard,
@@ -67,8 +69,17 @@ impl Video {
         if let Err(error) = unsafe { self.gpu.device.GetDeviceRemovedReason() } {
             return Err(Exit::Lost(format!("graphics device removed: {error}")));
         }
-        self.process_frame()?;
+        let submitting = self.process_frame()?;
         self.drain_video()?;
+        if let Some(reason) = self.sink.take_fault() {
+            return Err(Exit::Failed(reason));
+        }
+        if self
+            .watchdog
+            .stalled(mono_now(), self.sink.encoded(), submitting)
+        {
+            return Err(Exit::Failed("encoder stopped producing frames".into()));
+        }
         if let Some(audio) = &self.audio {
             self.stats.audio += audio.drain(&mut self.sink);
         }
@@ -81,26 +92,26 @@ impl Video {
         Ok(())
     }
 
-    fn process_frame(&mut self) -> Result<(), Exit> {
+    fn process_frame(&mut self) -> Result<bool, Exit> {
         let Some((texture, size, seq)) = self.wgc.latest() else {
-            return Ok(());
+            return Ok(false);
         };
         self.seq = seq;
         match self.encoder.need_input() {
             Ok(true) => {}
             Ok(false) => {
                 self.stats.dropped += 1;
-                return Ok(());
+                return Ok(true);
             }
-            Err(error) => return self.soft("encoder poll", &error, lost_h264(&error)),
+            Err(error) => return self.soft_frame("encoder poll", &error, lost_h264(&error)),
         }
         let frame = match self.converter.convert(&texture, size) {
             Ok(frame) => frame,
             Err(VprocError::Busy) => {
                 self.stats.busy += 1;
-                return Ok(());
+                return Ok(true);
             }
-            Err(error) => return self.soft("convert", &error, lost_vproc(&error)),
+            Err(error) => return self.soft_frame("convert", &error, lost_vproc(&error)),
         };
         if self.flags.keyframe.swap(false, Ordering::AcqRel)
             && let Err(error) = self.encoder.force_keyframe()
@@ -110,11 +121,20 @@ impl Video {
         let (pts, dur) = (self.pacer.pts(), self.pacer.frame_hns());
         if let Err(error) = self.encoder.submit(&frame, pts, dur) {
             self.converter.release(frame.slot);
-            return self.soft("encoder submit", &error, lost_h264(&error));
+            return self.soft_frame("encoder submit", &error, lost_h264(&error));
         }
-        self.sink.submitted(self.pacer.tick());
+        self.sink.submitted(self.pacer.tick(), pts);
         self.soft_errors = 0;
-        Ok(())
+        Ok(true)
+    }
+
+    fn soft_frame(
+        &mut self,
+        what: &str,
+        error: &dyn std::fmt::Display,
+        lost: bool,
+    ) -> Result<bool, Exit> {
+        self.soft(what, error, lost).map(|()| true)
     }
 
     fn drain_video(&mut self) -> Result<(), Exit> {

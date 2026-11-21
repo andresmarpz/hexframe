@@ -141,7 +141,7 @@ impl H264Encoder {
             }
         };
         self.reset_scratch();
-        self.release_through(pts_hns);
+        self.release_oldest();
         let annexb = to_annexb(&raw)?;
         let key = contains_idr(&annexb);
         Ok(EncodedVideo {
@@ -166,12 +166,8 @@ impl H264Encoder {
         }
     }
 
-    fn release_through(&mut self, pts_hns: i64) {
-        while let Some(&(slot, slot_pts)) = self.inflight.front() {
-            if slot_pts > pts_hns {
-                break;
-            }
-            self.inflight.pop_front();
+    fn release_oldest(&mut self) {
+        if let Some((slot, _)) = self.inflight.pop_front() {
             self.releaser.release(slot);
         }
     }

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use greyscreen_core::media::{AudioTimeline, Span};
 use greyscreen_core::time::{Hns, mono_now};
 use wasapi::{
@@ -57,7 +58,7 @@ impl AudioCapture {
     pub fn start(
         target: AudioTarget,
         qpc: QpcMap,
-        t0: Hns,
+        t0: Receiver<Hns>,
         out: Sender<PcmBlock>,
     ) -> Result<Self, AudioError> {
         let stop = Arc::new(AtomicBool::new(false));
@@ -175,7 +176,7 @@ fn notify(ready: &Sender<Result<(), AudioError>>, result: Result<(), AudioError>
 fn run(
     target: AudioTarget,
     qpc: QpcMap,
-    t0: Hns,
+    t0: Receiver<Hns>,
     out: Sender<PcmBlock>,
     stop: Arc<AtomicBool>,
     ready: Sender<Result<(), AudioError>>,
@@ -196,12 +197,24 @@ fn run(
         }
     };
     notify(&ready, Ok(()));
-    capture_loop(&stream, qpc, t0, &out, &stop);
+    if let Some(t0) = wait_for_t0(&t0, &stop) {
+        capture_loop(&stream, qpc, t0, &out, &stop);
+    }
     if let Err(error) = stream.client.stop_stream() {
         tracing::warn!(%error, "stopping audio stream failed");
     }
     if let Err(error) = stream.client.reset_stream() {
         tracing::warn!(%error, "resetting audio stream failed");
+    }
+}
+
+fn wait_for_t0(t0: &Receiver<Hns>, stop: &AtomicBool) -> Option<Hns> {
+    loop {
+        match t0.recv_timeout(Duration::from_millis(50)) {
+            Ok(value) => return Some(value),
+            Err(RecvTimeoutError::Timeout) if !stop.load(Ordering::Acquire) => {}
+            Err(_) => return None,
+        }
     }
 }
 

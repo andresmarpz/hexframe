@@ -147,16 +147,15 @@ impl AudioTimeline {
         frames: usize,
         silent: bool,
     ) -> Vec<Span> {
-        if !self.seen_first {
-            if let Some(first) = ts
-                && (first - now).abs() > Self::FIRST_DISTRUST
-            {
-                self.trust_device_clock = false;
-            }
-            if !self.trust_device_clock {
-                let span = self.hns_for_frames(frames as u64);
-                return self.place(Some(now - span), frames, silent);
-            }
+        if !self.seen_first
+            && let Some(first) = ts
+            && (first - now).abs() > Self::FIRST_DISTRUST
+        {
+            self.trust_device_clock = false;
+        }
+        if !self.trust_device_clock {
+            let span = self.hns_for_frames(frames as u64);
+            return self.place(Some(now - span), frames, silent);
         }
         self.on_packet(ts, frames, silent)
     }

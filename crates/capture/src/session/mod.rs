@@ -1,5 +1,6 @@
 mod audio;
 mod emit;
+mod matching;
 mod setup;
 mod video;
 
@@ -14,7 +15,7 @@ use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource};
 
 const SETUP_TIMEOUT: Duration = Duration::from_secs(5);
-const STOP_TIMEOUT: Duration = Duration::from_secs(5);
+const STOP_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Flags {

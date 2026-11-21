@@ -16,6 +16,7 @@ use crate::d3d::GpuDevice;
 use crate::h264::H264Encoder;
 use crate::pacer::{Pacer, Stats};
 use crate::vproc::VideoConverter;
+use crate::watchdog::Watchdog;
 use crate::wgc::WgcCapture;
 
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(2);
@@ -53,10 +54,9 @@ pub(crate) fn build(
     let encoder = H264Encoder::new(&gpu, size.0, size.1, cfg.fps, &video_cfg)
         .map_err(|e| format!("video encoder failed: {e}"))?
         .with_releaser(converter.releaser());
-    let t0 = mono_now();
     let mut warning = None;
     let audio = if cfg.audio {
-        match AudioPipe::start(target, qpc, t0, cfg.audio_bitrate) {
+        match AudioPipe::start(target, qpc, cfg.audio_bitrate) {
             Ok(audio) => Some(audio),
             Err(message) => {
                 warning = Some(format!("recording without audio: {message}"));
@@ -66,6 +66,10 @@ pub(crate) fn build(
     } else {
         None
     };
+    let t0 = mono_now();
+    if let Some(audio) = &audio {
+        audio.begin(t0);
+    }
     let mut sink = Sink::new(
         out,
         StartInfo {
@@ -90,6 +94,7 @@ pub(crate) fn build(
         audio,
         sink,
         pacer: Pacer::new(t0, cfg.fps),
+        watchdog: Watchdog::new(t0),
         flags,
         gpu,
         mf,

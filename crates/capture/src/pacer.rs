@@ -44,6 +44,9 @@ impl Pacer {
     }
 
     pub(crate) fn resync(&mut self, now: Hns) -> bool {
+        if self.tick == 0 {
+            return false;
+        }
         let late = i128::from(now - self.deadline());
         if late <= MAX_LATE_FRAMES * i128::from(self.frame_hns()) {
             return false;
@@ -139,8 +142,18 @@ mod tests {
     }
 
     #[test]
+    fn first_tick_never_resyncs() {
+        let mut pacer = Pacer::new(0, 60);
+        assert!(!pacer.resync(10 * HNS_PER_SEC));
+        assert_eq!(pacer.tick(), 0);
+        pacer.advance();
+        assert!(pacer.resync(10 * HNS_PER_SEC));
+    }
+
+    #[test]
     fn resync_skips_to_real_time_only_when_far_behind() {
         let mut pacer = Pacer::new(0, 60);
+        pacer.advance();
         assert!(!pacer.resync(2 * pacer.frame_hns()));
         assert!(pacer.resync(HNS_PER_SEC));
         assert_eq!(pacer.pts(), HNS_PER_SEC);

@@ -6,6 +6,7 @@ use greyscreen_core::media::{AudioFormat, MediaEvent, Packet, Track, VideoFormat
 use greyscreen_core::time::Hns;
 use greyscreen_mp4::avc::annexb_to_avcc;
 
+use super::matching::{match_tick, parameter_fault};
 use crate::h264::EncodedVideo;
 
 #[derive(Debug, Clone)]
@@ -26,9 +27,12 @@ pub(crate) struct Sink {
     closed: bool,
     pending: Vec<MediaEvent>,
     out_index: u64,
-    in_flight: VecDeque<u64>,
+    in_flight: VecDeque<(u64, Hns)>,
     last_tick: Option<u64>,
     frame_ticks: i64,
+    parameters: Option<(Vec<u8>, Vec<u8>)>,
+    outputs_without_parameters: u32,
+    fault: Option<String>,
 }
 
 impl Sink {
@@ -44,6 +48,9 @@ impl Sink {
             in_flight: VecDeque::new(),
             last_tick: None,
             frame_ticks,
+            parameters: None,
+            outputs_without_parameters: 0,
+            fault: None,
         }
     }
 
@@ -55,16 +62,18 @@ impl Sink {
         self.out_index
     }
 
-    pub(crate) fn submitted(&mut self, tick: u64) {
-        self.in_flight.push_back(tick);
+    pub(crate) fn take_fault(&mut self) -> Option<String> {
+        self.fault.take()
     }
 
-    fn next_tick(&mut self) -> u64 {
+    pub(crate) fn submitted(&mut self, tick: u64, pts: Hns) {
+        self.in_flight.push_back((tick, pts));
+    }
+
+    fn next_tick(&mut self, output_pts: Hns) -> u64 {
         let fallback = self.last_tick.map_or(0, |last| last + 1);
-        let tick = self
-            .in_flight
-            .pop_front()
-            .map_or(fallback, |tick| tick.max(fallback));
+        let matched = match_tick(&mut self.in_flight, output_pts, self.out_index == 0);
+        let tick = matched.map_or(fallback, |tick| tick.max(fallback));
         self.last_tick = Some(tick);
         tick
     }
@@ -74,6 +83,7 @@ impl Sink {
             return;
         }
         self.started = true;
+        self.parameters = Some((sps.clone(), pps.clone()));
         let event = MediaEvent::Started {
             t0: self.info.t0,
             video: VideoFormat {
@@ -94,16 +104,34 @@ impl Sink {
 
     pub(crate) fn video(&mut self, encoded: &mut Vec<EncodedVideo>) {
         for item in encoded.drain(..) {
+            if self.fault.is_some() {
+                continue;
+            }
             let (sample, info) = annexb_to_avcc(&item.annexb);
-            if !self.started
-                && let (Some(sps), Some(pps)) = (info.sps, info.pps)
-            {
-                self.start(sps, pps);
+            if !self.started {
+                if let (Some(sps), Some(pps)) = (&info.sps, &info.pps) {
+                    self.start(sps.clone(), pps.clone());
+                } else {
+                    self.outputs_without_parameters += 1;
+                }
+            }
+            let known = self
+                .parameters
+                .as_ref()
+                .map(|(sps, pps)| (sps.as_slice(), pps.as_slice()));
+            if let Some(fault) = parameter_fault(
+                known,
+                info.sps.as_deref(),
+                info.pps.as_deref(),
+                self.outputs_without_parameters,
+            ) {
+                self.fault = Some(fault.to_string());
+                continue;
             }
             if sample.is_empty() {
                 continue;
             }
-            let ticks = self.next_tick() as i64 * self.frame_ticks;
+            let ticks = self.next_tick(item.pts_hns) as i64 * self.frame_ticks;
             self.out_index += 1;
             self.packet(Packet {
                 track: Track::Video,
