@@ -7,6 +7,7 @@ pub mod com;
 pub mod crash;
 pub mod d3d;
 pub mod h264;
+pub mod instance;
 mod pacer;
 pub mod probe;
 mod session;

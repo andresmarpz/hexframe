@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT"
@@ -32,16 +32,16 @@ clap = { version = "4", features = ["derive"] }
 tiny_http = "0.12"
 winresource = "0.1"
 png = "0.18"
-rune = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e", features = ["native-file-dialog"] }
-rune-kit = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e", default-features = false }
+rune = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8", features = ["native-file-dialog"] }
+rune-kit = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8", default-features = false }
 
 [patch.crates-io]
-winit             = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e" }
-sctk-adwaita      = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e" }
-parley_engine     = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e" }
-wgpu-hal          = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e" }
-accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e" }
-accesskit_macos   = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e" }
+winit             = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
+sctk-adwaita      = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
+parley_engine     = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
+wgpu-hal          = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
+accesskit_macos   = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

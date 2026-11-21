@@ -18,6 +18,7 @@ use rune::{App, AppSpec};
 
 use ui::Ui;
 
+#[cfg(windows)]
 const SINGLE_INSTANCE_ID: &str = "dev.greyscreen.app";
 
 #[cfg(windows)]
@@ -32,9 +33,16 @@ fn media_source() -> Arc<dyn MediaSource> {
 
 fn main() {
     let headless = rune::is_headless();
-    if !headless && !rune::single_instance(SINGLE_INSTANCE_ID) {
-        return;
-    }
+    #[cfg(windows)]
+    let instance = if headless {
+        None
+    } else {
+        // Rune's single_instance makes live resize lag on Windows, so the app keeps its own.
+        match greyscreen_capture::instance::claim(SINGLE_INSTANCE_ID) {
+            greyscreen_capture::instance::Claim::First(signal) => Some(signal),
+            greyscreen_capture::instance::Claim::AlreadyRunning => return,
+        }
+    };
     let _log_guard = (!headless).then(logging::init).flatten();
     #[cfg(windows)]
     greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
@@ -58,6 +66,14 @@ fn main() {
         (None, None)
     } else {
         let handle = app.handle();
+        #[cfg(windows)]
+        if let Some(signal) = instance {
+            let shown = handle.clone();
+            signal.on_signal(move || {
+                shown.show();
+                shown.focus();
+            });
+        }
         let sink_handle = handle.clone();
         let engine = Engine::start(
             settings.clone(),
