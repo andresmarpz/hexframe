@@ -239,13 +239,24 @@ fn a_decoder_that_fell_behind_on_the_layer_jumps_to_the_clock_instead_of_playing
     assert!(behind < 0.1 || behind > 5.9, "the layer shows {on_layer:.3} s while the clock stands at {:.3} s", clock.position(Instant::now()));
 }
 
-/// Seeks one a frame for a second, as a drag on a seek bar sends them: `to` names each.
+/// `count` seeks spread over a second, as a drag on a seek bar sends them: `to` names each. The
+/// window draws a frame at every refresh in between, so a picture that lands is drawn before the
+/// next seek makes it stale.
 fn storm(rig: &mut Rig, count: u32, fast: bool, to: impl Fn(u32) -> f64) -> Vec<Shot> {
     let mut shots = Vec::new();
+    let step = Duration::from_secs(1) / count;
+    let mut next = Instant::now();
     for i in 0..count {
         if fast { rig.player.seek_fast(to(i)) } else { rig.player.seek(to(i)) }
-        shots.push(rig.frame());
-        std::thread::sleep(Duration::from_secs(1) / count);
+        next += step;
+        loop {
+            shots.push(rig.frame());
+            let left = next.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                break;
+            }
+            std::thread::sleep(REFRESH.min(left));
+        }
     }
     shots
 }
