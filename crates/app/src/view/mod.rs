@@ -80,13 +80,12 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
             .w_full()
             .h_full()
             .fill(k.c.bg_deep)
-            .child(
-                col()
-                    .w_full()
-                    .grow(1.0)
-                    .min_h(0.0)
-                    .child(screen(s, k, cx.titlebar_inset(), review_width)),
-            )
+            .child(col().w_full().grow(1.0).min_h(0.0).child(screen(
+                s,
+                k,
+                cx.titlebar_inset(),
+                review_width,
+            )))
             .children(shell::dock::hover_zone(s))
             .child(shell::dock::layer(s, k)),
     }
@@ -128,7 +127,9 @@ fn clips_screen(s: &Ui, k: &Kit, inset: f32) -> El {
 
 fn games_screen(s: &Ui, k: &Kit, inset: f32, review_width: Option<f32>) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
-        (Detail::Game, Some(review)) => (review_page(s, k, review_width), review::toolbar(review, k)),
+        (Detail::Game, Some(review)) => {
+            (review_page(s, k, review_width), review::toolbar(review, k))
+        }
         (Detail::Live, _) => (
             fixed_content(s, home::page(s, k)),
             Toolbar::new().title("Recording"),

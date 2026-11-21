@@ -404,9 +404,7 @@ pub(super) fn panel(review: &ReviewState, k: &Kit, stacked: bool) -> El {
     } else {
         sized.w(PANEL_WIDTH).h_full().min_h(0.0)
     };
-    let mut panel = sized
-        .child(tabs(review, k))
-        .child(hairline(k));
+    let mut panel = sized.child(tabs(review, k)).child(hairline(k));
     if let Some(banner) = clip_banner(review, k) {
         panel = panel.child(banner).child(hairline(k));
     }
