@@ -362,6 +362,9 @@ impl Decoder {
                         return Ok(());
                     }
                     if let Some((to, g)) = s.seek.take() {
+                        // The clip's end is its last picture's time, not the next loop's start.
+                        let meta = self.facts.meta;
+                        let to = if meta.duration > 0.0 { to.min(meta.duration - meta.frame * 0.5).max(0.0) } else { to };
                         end_due = None;
                         s.frames.clear();
                         s.ended = None;
