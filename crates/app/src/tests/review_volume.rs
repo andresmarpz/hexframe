@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use rune::Runtime;
 
 use super::{rect, refresh, review_runtime, tap};

@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use rune::{Key, Runtime};
 
 use super::{press, press_char, rect, runtime_sized};

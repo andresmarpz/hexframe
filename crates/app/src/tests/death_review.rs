@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use greyscreen_core::library::{read_meta, write_meta};
 use greyscreen_core::review::DeathTag;
 use rune::{Key, Runtime};

@@ -1,4 +1,4 @@
-#![allow(unreachable_pub, dead_code, clippy::unwrap_used, clippy::expect_used)]
+#![allow(unreachable_pub, dead_code, clippy::expect_used, clippy::unwrap_used)]
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

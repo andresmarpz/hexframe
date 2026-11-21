@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};

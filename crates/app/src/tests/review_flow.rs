@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use rune::{Key, Runtime};
 
 use super::{assert_seeks_to, key_review_runtime, press, press_char, refresh, review_runtime, tap};

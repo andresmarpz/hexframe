@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use std::cell::RefCell;
 use std::path::Path;
 

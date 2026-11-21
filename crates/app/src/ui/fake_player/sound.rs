@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use std::cell::{Cell, RefCell};
 
 use rune::{El, PlayerState};

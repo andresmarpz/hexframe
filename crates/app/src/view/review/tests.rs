@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use super::timeline::{drag_target, fraction};
 use crate::ui::seek_target;
 

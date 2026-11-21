@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
-
 use greyscreen_core::settings::NavStyle;
 use greyscreen_core::update::{UpdateInfo, UpdateState};
 use greyscreen_engine::{EngineCmd, EngineStatus};

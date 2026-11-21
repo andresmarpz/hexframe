@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use crossbeam_channel::Receiver;
 use greyscreen_core::keybinds::{Action, KeyCombo};
 use greyscreen_core::settings::Settings;
