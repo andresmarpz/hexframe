@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::GameResult;
+use crate::game::{GameResult, Player};
 
 fn player(name: &str, champion: &str, team: Team) -> Player {
     Player {
@@ -80,16 +80,31 @@ fn an_executed_champion_counts_by_the_victims_team() {
 }
 
 #[test]
-fn bots_answer_to_their_champion_name() {
+fn champion_named_events_split_the_same_way() {
+    assert_eq!(category(kill("Zed", "Ahri", &[])), EventCategory::MyDeaths);
+    assert_eq!(category(kill("Ahri", "Zed", &[])), EventCategory::MyKills);
+    assert_eq!(
+        category(kill("Jinx", "Zed", &["Ahri"])),
+        EventCategory::MyAssists
+    );
+    assert_eq!(
+        category(kill("Jinx", "Zed", &[])),
+        EventCategory::TeammateKills
+    );
+    assert_eq!(
+        category(kill("Lux", "Jinx", &[])),
+        EventCategory::EnemyKills
+    );
+}
+
+#[test]
+fn a_champion_two_players_share_is_not_me() {
     let mut game = info();
-    game.me = Player {
-        name: "Ahri".into(),
-        champion: "Ahri".into(),
-        team: Team::Order,
-        is_bot: true,
-    };
-    let kind = kill("Zed", "Ahri", &[]);
-    assert_eq!(category_of(&kind, &game), EventCategory::MyDeaths);
+    game.players.push(player("Twin#EUW", "Ahri", Team::Chaos));
+    assert_ne!(
+        category_of(&kill("Zed", "Ahri", &[]), &game),
+        EventCategory::MyDeaths
+    );
 }
 
 #[test]

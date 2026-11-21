@@ -1,4 +1,4 @@
-use crate::game::{GameEvent, GameInfo, GameResult, Player, Team, strip_tag};
+use crate::game::{GameEvent, GameInfo, GameResult, Team};
 use crate::settings::ClipSettings;
 
 mod display;
@@ -107,20 +107,8 @@ pub fn structure_team(id: &str) -> Option<Team> {
     })
 }
 
-fn names_match(player: &Player, name: &str) -> bool {
-    let name = strip_tag(name);
-    strip_tag(&player.name).eq_ignore_ascii_case(name)
-        || (player.is_bot && player.champion.eq_ignore_ascii_case(name))
-}
-
 fn team_of(info: &GameInfo, name: &str) -> Option<Team> {
-    if names_match(&info.me, name) {
-        return Some(info.me.team);
-    }
-    info.players
-        .iter()
-        .find(|player| names_match(player, name))
-        .map(|player| player.team)
+    info.player_named(name).map(|player| player.team)
 }
 
 fn objective_highlight(info: &GameInfo, killer: &str, objective: Objective) -> Vec<Highlight> {
@@ -146,13 +134,13 @@ fn classify_kill(
     assisters: &[String],
 ) -> Vec<Highlight> {
     let mut highlights = Vec::new();
-    if names_match(&info.me, killer) {
+    if info.is_me(killer) {
         highlights.push(Highlight::MyKill);
     }
-    if names_match(&info.me, victim) {
+    if info.is_me(victim) {
         highlights.push(Highlight::MyDeath);
     }
-    if assisters.iter().any(|name| names_match(&info.me, name)) {
+    if assisters.iter().any(|name| info.is_me(name)) {
         highlights.push(Highlight::MyAssist);
     }
     if highlights.is_empty() {
@@ -172,10 +160,10 @@ pub fn classify(event: &GameEvent, info: &GameInfo) -> Vec<Highlight> {
             victim,
             assisters,
         } => classify_kill(info, killer, victim, assisters),
-        GameEvent::FirstBlood { recipient } if names_match(&info.me, recipient) => {
+        GameEvent::FirstBlood { recipient } if info.is_me(recipient) => {
             vec![Highlight::MyFirstBlood]
         }
-        GameEvent::Multikill { killer, streak } if names_match(&info.me, killer) => {
+        GameEvent::Multikill { killer, streak } if info.is_me(killer) => {
             vec![Highlight::MyMultikill { streak: *streak }]
         }
         GameEvent::DragonKill {

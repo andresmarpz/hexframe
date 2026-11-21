@@ -1,4 +1,4 @@
-use greyscreen_core::game::{GameEvent, GameResult, Player, Team};
+use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
 use greyscreen_core::library::EventEntry;
 use greyscreen_engine::RecordingEntry;
 use jiff::Zoned;
@@ -17,6 +17,21 @@ fn me() -> Player {
         team: Team::Order,
         is_bot: false,
     }
+}
+
+fn info_of(me: Player, others: &[Player]) -> GameInfo {
+    let mut players = vec![me.clone()];
+    players.extend_from_slice(others);
+    GameInfo {
+        mode: "CLASSIC".into(),
+        map: Some(11),
+        me,
+        players,
+    }
+}
+
+fn info() -> GameInfo {
+    info_of(me(), &[])
 }
 
 fn kill(killer: &str, victim: &str, assisters: &[&str]) -> EventEntry {
@@ -83,7 +98,7 @@ fn kda_counts_kills_deaths_and_assists_for_me() {
         kill("Jinx", "Lux", &["Leona"]),
     ];
     assert_eq!(
-        kda(&events, &me()),
+        kda(&events, &info()),
         Kda {
             kills: 2,
             deaths: 1,
@@ -93,15 +108,31 @@ fn kda_counts_kills_deaths_and_assists_for_me() {
 }
 
 #[test]
-fn kda_of_a_bot_matches_by_champion_name() {
-    let bot = Player {
-        name: "Ahri Bot".into(),
-        champion: "Ahri".into(),
-        team: Team::Order,
-        is_bot: true,
+fn kda_matches_champion_named_events_when_my_champion_is_unique() {
+    let events = vec![
+        kill("Ahri", "Zed", &[]),
+        kill("Zed", "Ahri", &["Lux"]),
+        kill("Zed", "Lux", &["Ahri"]),
+    ];
+    let foe = Player {
+        name: "Foe".into(),
+        champion: "Zed".into(),
+        team: Team::Chaos,
+        is_bot: false,
     };
-    assert_eq!(kda(&[kill("Ahri", "Zed", &[])], &bot).kills, 1);
-    assert_eq!(kda(&[kill("Ahri", "Zed", &[])], &me()).kills, 0);
+    assert_eq!(
+        kda(&events, &info_of(me(), std::slice::from_ref(&foe))),
+        Kda {
+            kills: 1,
+            deaths: 1,
+            assists: 1
+        }
+    );
+    let twin = Player {
+        champion: "Ahri".into(),
+        ..foe
+    };
+    assert_eq!(kda(&events, &info_of(me(), &[twin])), Kda::default());
 }
 
 #[test]
@@ -113,8 +144,8 @@ fn kda_ignores_other_events_and_empty_lists() {
         },
         ..kill("x", "y", &[])
     };
-    assert_eq!(kda(&[other], &me()), Kda::default());
-    assert_eq!(kda(&[], &me()), Kda::default());
+    assert_eq!(kda(&[other], &info()), Kda::default());
+    assert_eq!(kda(&[], &info()), Kda::default());
 }
 
 #[test]

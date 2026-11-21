@@ -48,7 +48,7 @@ pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
                 )
                 .child(text(detail).font(k.ty.small).color(k.c.text_muted)),
         )
-        .child(kda_figures(kda(&entry.meta.events, &game.info.me), k))
+        .child(kda_figures(kda(&entry.meta.events, &game.info), k))
         .child(result_pill(game.result, k))
         .children(deaths_button(entry, k))
         .child(open);

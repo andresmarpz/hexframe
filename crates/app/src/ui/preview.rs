@@ -240,8 +240,8 @@ fn recordings() -> Vec<RecordingEntry> {
         row(215, "Thresh", "CLASSIC", Loss, 31.5, 1_680, 1),
     ];
     for (at, reviewed) in [(0, 2), (3, 1)] {
-        let me = list[at].meta.game.info.me.clone();
-        let ids: Vec<u32> = greyscreen_core::review::deaths(&list[at].meta.events, &me)
+        let info = list[at].meta.game.info.clone();
+        let ids: Vec<u32> = greyscreen_core::review::deaths(&list[at].meta.events, &info)
             .iter()
             .take(reviewed)
             .map(|d| d.event_id)

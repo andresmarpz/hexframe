@@ -92,7 +92,7 @@ fn result_text(result: GameResult, k: &Kit) -> El {
 pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
     let info = &rec.meta.game.info;
     let champion = info.me.champion.as_str();
-    let kda = kda(&rec.meta.events, &info.me);
+    let kda = kda(&rec.meta.events, info);
     let shown = when(&rec.meta.started_at, &Zoned::now());
     let mode = mode_label(&info.mode);
     let result = rec.meta.game.result;

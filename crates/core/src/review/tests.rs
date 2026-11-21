@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::Team;
+use crate::game::{GameInfo, Player, Team};
 
 fn player(name: &str, champion: &str, is_bot: bool) -> Player {
     Player {
@@ -12,6 +12,21 @@ fn player(name: &str, champion: &str, is_bot: bool) -> Player {
 
 fn me() -> Player {
     player("Me#EUW", "Ahri", false)
+}
+
+fn info_of(me: Player, others: &[Player]) -> GameInfo {
+    let mut players = vec![me.clone()];
+    players.extend_from_slice(others);
+    GameInfo {
+        mode: "CLASSIC".into(),
+        map: Some(11),
+        me,
+        players,
+    }
+}
+
+fn info() -> GameInfo {
+    info_of(me(), &[player("Zed Main#EUW", "Zed", false)])
 }
 
 fn kill(id: u32, rec_secs: f64, killer: &str, victim: &str, assisters: &[&str]) -> EventEntry {
@@ -53,7 +68,7 @@ fn deaths_are_the_champion_kills_with_me_as_victim_in_time_order() {
             highlights: Vec::new(),
         },
     ];
-    let found = deaths(&events, &me());
+    let found = deaths(&events, &info());
     let ids: Vec<u32> = found.iter().map(|d| d.event_id).collect();
     assert_eq!(ids, [3, 9]);
     assert_eq!(found[1].killer, "Zed");
@@ -64,14 +79,79 @@ fn deaths_are_the_champion_kills_with_me_as_victim_in_time_order() {
 #[test]
 fn no_deaths_when_i_never_die() {
     let events = vec![kill(1, 10.0, "Me", "Zed", &[])];
-    assert!(deaths(&events, &me()).is_empty());
+    assert!(deaths(&events, &info()).is_empty());
 }
 
 #[test]
-fn bots_are_matched_by_champion_name() {
-    let bot = player("Bot 1", "Ahri", true);
-    let events = vec![kill(1, 10.0, "Zed", "Ahri", &[])];
-    assert_eq!(deaths(&events, &bot).len(), 1);
+fn champion_named_events_are_my_deaths() {
+    let me = player("Dotd", "Volibear", false);
+    let info = info_of(me, &[player("Foe", "Zed", false)]);
+    let events = vec![
+        kill(1, 10.0, "Zed", "Volibear", &[]),
+        kill(2, 20.0, "Volibear", "Zed", &[]),
+    ];
+    assert_eq!(deaths(&events, &info).len(), 1);
+}
+
+#[test]
+fn two_of_my_champion_means_no_champion_match() {
+    let me = player("Dotd", "Volibear", false);
+    let info = info_of(me, &[player("Foe", "Volibear", false)]);
+    let events = vec![kill(1, 10.0, "Zed", "Volibear", &[])];
+    assert!(deaths(&events, &info).is_empty());
+}
+
+#[derive(serde::Deserialize)]
+struct Fixture {
+    game: crate::library::GameRecord,
+    events: Vec<EventEntry>,
+}
+
+fn kiwi() -> Fixture {
+    serde_json::from_str(include_str!("fixtures/kiwi_game.json")).unwrap()
+}
+
+#[test]
+fn a_game_with_champion_named_events_has_my_deaths_in_order() {
+    let fixture = kiwi();
+    let found = deaths(&fixture.events, &fixture.game.info);
+    let ids: Vec<u32> = found.iter().map(|d| d.event_id).collect();
+    assert_eq!(ids, [2, 3, 6]);
+    assert_eq!(killer_label(&found[0].killer, &fixture.game.info), "Yasuo");
+}
+
+#[test]
+fn the_same_game_edited_to_riot_id_names_gives_the_same_deaths() {
+    let mut fixture = kiwi();
+    let names: Vec<(String, String)> = fixture
+        .game
+        .info
+        .players
+        .iter()
+        .map(|p| (p.champion.clone(), format!("{}#EUW", p.name)))
+        .collect();
+    let rename = |name: &mut String| {
+        if let Some((_, riot)) = names.iter().find(|(champion, _)| champion == name) {
+            *name = riot.clone();
+        }
+    };
+    for event in &mut fixture.events {
+        if let GameEvent::ChampionKill {
+            killer,
+            victim,
+            assisters,
+        } = &mut event.kind
+        {
+            rename(killer);
+            rename(victim);
+            assisters.iter_mut().for_each(rename);
+        }
+    }
+    let ids: Vec<u32> = deaths(&fixture.events, &fixture.game.info)
+        .iter()
+        .map(|d| d.event_id)
+        .collect();
+    assert_eq!(ids, [2, 3, 6]);
 }
 
 #[test]
@@ -98,11 +178,13 @@ fn slow_mo_never_starts_before_the_window() {
 
 #[test]
 fn killers_resolve_to_champions_or_a_plain_description() {
-    let players = vec![
+    let players = info_of(
         me(),
-        player("Zed Main#EUW", "Zed", false),
-        player("Bot 2", "LeeSin", true),
-    ];
+        &[
+            player("Zed Main#EUW", "Zed", false),
+            player("Bot 2", "LeeSin", true),
+        ],
+    );
     assert_eq!(killer_label("Zed Main#EUW", &players), "Zed");
     assert_eq!(killer_label("zed main", &players), "Zed");
     assert_eq!(killer_label("LeeSin", &players), "LeeSin");

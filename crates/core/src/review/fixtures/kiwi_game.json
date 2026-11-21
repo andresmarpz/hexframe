@@ -1,0 +1,193 @@
+{
+ "game": {
+  "mode": "KIWI",
+  "map": 12,
+  "me": {
+   "name": "Dotd",
+   "champion": "Volibear",
+   "team": "order",
+   "is_bot": false
+  },
+  "players": [
+   {
+    "name": "Dotd",
+    "champion": "Volibear",
+    "team": "order",
+    "is_bot": false
+   },
+   {
+    "name": "Ally1",
+    "champion": "Ahri",
+    "team": "order",
+    "is_bot": false
+   },
+   {
+    "name": "Ally2",
+    "champion": "Lux",
+    "team": "order",
+    "is_bot": false
+   },
+   {
+    "name": "Ally3",
+    "champion": "Jinx",
+    "team": "order",
+    "is_bot": false
+   },
+   {
+    "name": "Ally4",
+    "champion": "Leona",
+    "team": "order",
+    "is_bot": false
+   },
+   {
+    "name": "Foe1",
+    "champion": "Zed",
+    "team": "chaos",
+    "is_bot": false
+   },
+   {
+    "name": "Foe2",
+    "champion": "LeeSin",
+    "team": "chaos",
+    "is_bot": false
+   },
+   {
+    "name": "Foe3",
+    "champion": "Yasuo",
+    "team": "chaos",
+    "is_bot": false
+   },
+   {
+    "name": "Foe4",
+    "champion": "Caitlyn",
+    "team": "chaos",
+    "is_bot": false
+   },
+   {
+    "name": "Foe5",
+    "champion": "Garen",
+    "team": "chaos",
+    "is_bot": false
+   }
+  ],
+  "result": "win"
+ },
+ "events": [
+  {
+   "id": 1,
+   "game_secs": 100.0,
+   "rec_secs": 108.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Volibear",
+    "victim": "Zed",
+    "assisters": []
+   },
+   "highlights": []
+  },
+  {
+   "id": 2,
+   "game_secs": 200.0,
+   "rec_secs": 208.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Yasuo",
+    "victim": "Volibear",
+    "assisters": [
+     "Zed"
+    ]
+   },
+   "highlights": []
+  },
+  {
+   "id": 3,
+   "game_secs": 300.0,
+   "rec_secs": 308.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Garen",
+    "victim": "Volibear",
+    "assisters": []
+   },
+   "highlights": []
+  },
+  {
+   "id": 4,
+   "game_secs": 400.0,
+   "rec_secs": 408.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Ahri",
+    "victim": "Caitlyn",
+    "assisters": [
+     "Volibear",
+     "Lux"
+    ]
+   },
+   "highlights": []
+  },
+  {
+   "id": 5,
+   "game_secs": 500.0,
+   "rec_secs": 508.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Lux",
+    "victim": "Garen",
+    "assisters": [
+     "Jinx"
+    ]
+   },
+   "highlights": []
+  },
+  {
+   "id": 6,
+   "game_secs": 600.0,
+   "rec_secs": 608.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Minion_T200L0S3",
+    "victim": "Volibear",
+    "assisters": []
+   },
+   "highlights": []
+  },
+  {
+   "id": 7,
+   "game_secs": 700.0,
+   "rec_secs": 708.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Zed",
+    "victim": "Ahri",
+    "assisters": [
+     "LeeSin"
+    ]
+   },
+   "highlights": []
+  },
+  {
+   "id": 8,
+   "game_secs": 800.0,
+   "rec_secs": 808.0,
+   "kind": {
+    "type": "champion_kill",
+    "killer": "Volibear",
+    "victim": "Yasuo",
+    "assisters": [
+     "Leona"
+    ]
+   },
+   "highlights": []
+  },
+  {
+   "id": 9,
+   "game_secs": 900.0,
+   "rec_secs": 908.0,
+   "kind": {
+    "type": "minions_spawning"
+   },
+   "highlights": []
+  }
+ ]
+}

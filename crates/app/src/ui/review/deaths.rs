@@ -45,13 +45,13 @@ impl DeathReviewState {
 }
 
 fn killer_line(death: &Death, review: &ReviewState) -> String {
-    let players = &review.entry.meta.game.info.players;
-    let killer = killer_label(&death.killer, players);
+    let info = &review.entry.meta.game.info;
+    let killer = killer_label(&death.killer, info);
     let mut line = format!("Killed by {killer}");
     let helpers: Vec<String> = death
         .assisters
         .iter()
-        .map(|name| killer_label(name, players))
+        .map(|name| killer_label(name, info))
         .collect();
     match helpers.as_slice() {
         [] => {}
@@ -77,7 +77,7 @@ pub(crate) fn title_line(state: &DeathReviewState, review: &ReviewState) -> Stri
 impl ReviewState {
     pub(crate) fn death_list(&self) -> Vec<Death> {
         let meta = &self.entry.meta;
-        deaths(&meta.events, &meta.game.info.me)
+        deaths(&meta.events, &meta.game.info)
     }
 
     pub(crate) fn death_count(&self) -> usize {

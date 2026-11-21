@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::categories::CategorySet;
-use crate::game::{GameEvent, Player};
+use crate::game::{GameEvent, GameInfo};
 use crate::library::EventEntry;
 
 pub(crate) const WINDOW_BEFORE_SECS: f64 = 12.0;
@@ -89,7 +89,7 @@ impl Death {
     }
 }
 
-pub fn deaths(events: &[EventEntry], me: &Player) -> Vec<Death> {
+pub fn deaths(events: &[EventEntry], info: &GameInfo) -> Vec<Death> {
     let mut found: Vec<Death> = events
         .iter()
         .filter_map(|event| match &event.kind {
@@ -97,7 +97,7 @@ pub fn deaths(events: &[EventEntry], me: &Player) -> Vec<Death> {
                 killer,
                 victim,
                 assisters,
-            } if me.answers_to(victim) => Some(Death {
+            } if info.is_me(victim) => Some(Death {
                 event_id: event.id,
                 game_secs: event.game_secs,
                 rec_secs: event.rec_secs,
@@ -111,8 +111,8 @@ pub fn deaths(events: &[EventEntry], me: &Player) -> Vec<Death> {
     found
 }
 
-pub fn killer_label(name: &str, players: &[Player]) -> String {
-    if let Some(player) = players.iter().find(|p| p.answers_to(name)) {
+pub fn killer_label(name: &str, info: &GameInfo) -> String {
+    if let Some(player) = info.player_named(name) {
         return player.champion.clone();
     }
     let lower = name.to_ascii_lowercase();

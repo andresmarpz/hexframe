@@ -56,7 +56,7 @@ fn games(s: &Ui) -> Vec<Game> {
         .into_iter()
         .map(|rec| {
             let me = &rec.meta.game.info.me;
-            let figures = kda(&rec.meta.events, me);
+            let figures = kda(&rec.meta.events, &rec.meta.game.info);
             Game {
                 id: rec.meta.id.clone(),
                 champion: me.champion.clone(),

@@ -34,7 +34,7 @@ fn duration_label(secs: f64) -> String {
 
 fn stats_line(review: &ReviewState) -> String {
     let meta = &review.entry.meta;
-    let kda = kda(&meta.events, &meta.game.info.me);
+    let kda = kda(&meta.events, &meta.game.info);
     format!(
         "{}/{}/{} · {}",
         kda.kills,

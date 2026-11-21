@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::Player;
 
 fn player(name: &str, champion: &str, team: Team, is_bot: bool) -> Player {
     Player {
@@ -115,9 +116,10 @@ fn name_matching_ignores_case_and_tag() {
 }
 
 #[test]
-fn bots_match_by_champion_name() {
+fn champion_named_events_match_by_champion_name() {
     let mut info = info();
     info.me = player("Bot Ahri", "Ahri", Team::Order, true);
+    info.players[0] = info.me.clone();
     assert_eq!(
         classify(&kill("Ahri", "Chovy", &[]), &info),
         vec![Highlight::MyKill]

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::game::{GameEvent, GameInfo, Player, Team};
+use crate::game::{GameEvent, GameInfo, Team};
 use crate::library::EventEntry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -197,16 +197,13 @@ impl<'de> Deserialize<'de> for CategorySet {
     }
 }
 
-fn team_of(name: &str, players: &[Player]) -> Option<Team> {
-    players
-        .iter()
-        .find(|player| player.answers_to(name))
-        .map(|player| player.team)
+fn team_of(name: &str, info: &GameInfo) -> Option<Team> {
+    info.player_named(name).map(|player| player.team)
 }
 
 fn kill_between_others(killer: &str, victim: &str, info: &GameInfo) -> EventCategory {
-    let team = team_of(killer, &info.players).or_else(|| {
-        team_of(victim, &info.players).map(|team| match team {
+    let team = team_of(killer, info).or_else(|| {
+        team_of(victim, info).map(|team| match team {
             Team::Order => Team::Chaos,
             Team::Chaos => Team::Order,
         })
@@ -219,24 +216,23 @@ fn kill_between_others(killer: &str, victim: &str, info: &GameInfo) -> EventCate
 }
 
 pub fn category_of(kind: &GameEvent, info: &GameInfo) -> EventCategory {
-    let me = &info.me;
     match kind {
         GameEvent::ChampionKill {
             killer,
             victim,
             assisters,
         } => {
-            if me.answers_to(victim) {
+            if info.is_me(victim) {
                 EventCategory::MyDeaths
-            } else if me.answers_to(killer) {
+            } else if info.is_me(killer) {
                 EventCategory::MyKills
-            } else if assisters.iter().any(|name| me.answers_to(name)) {
+            } else if assisters.iter().any(|name| info.is_me(name)) {
                 EventCategory::MyAssists
             } else {
                 kill_between_others(killer, victim, info)
             }
         }
-        GameEvent::Multikill { killer, .. } if me.answers_to(killer) => EventCategory::MyMultikills,
+        GameEvent::Multikill { killer, .. } if info.is_me(killer) => EventCategory::MyMultikills,
         GameEvent::Multikill { .. } => EventCategory::OtherMultikills,
         GameEvent::Ace { .. } => EventCategory::Aces,
         GameEvent::DragonKill { .. } => EventCategory::Dragons,

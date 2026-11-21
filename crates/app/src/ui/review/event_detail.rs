@@ -1,4 +1,4 @@
-use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
+use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Team, strip_tag};
 use greyscreen_core::highlight::structure_team;
 use greyscreen_core::library::EventEntry;
 
@@ -38,27 +38,15 @@ fn line(lead: &str, spans: Vec<Span>) -> Line {
     }
 }
 
-fn strip_tag(name: &str) -> &str {
-    name.rsplit_once('#').map_or(name, |(game, _)| game)
-}
-
 fn same_name(a: &str, b: &str) -> bool {
     strip_tag(a).eq_ignore_ascii_case(strip_tag(b))
 }
 
-fn is_player(player: &Player, name: &str) -> bool {
-    same_name(&player.name, name) || (player.is_bot && player.champion.eq_ignore_ascii_case(name))
-}
-
-fn player_named<'a>(info: &'a GameInfo, name: &str) -> Option<&'a Player> {
-    info.players.iter().find(|player| is_player(player, name))
-}
-
 fn person(info: &GameInfo, name: &str) -> Vec<Span> {
-    if is_player(&info.me, name) {
+    if info.is_me(name) {
         return vec![strong("You")];
     }
-    if let Some(player) = player_named(info, name) {
+    if let Some(player) = info.player_named(name) {
         let mut spans = vec![strong(player.champion.clone())];
         let name = strip_tag(&player.name);
         if !player.is_bot && !name.is_empty() {

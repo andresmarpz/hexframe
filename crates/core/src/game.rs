@@ -23,14 +23,12 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn answers_to(&self, name: &str) -> bool {
-        let strip = |value: &str| {
-            value
-                .rsplit_once('#')
-                .map_or(value.to_owned(), |(game, _)| game.to_owned())
-        };
-        strip(&self.name).eq_ignore_ascii_case(&strip(name))
-            || (self.is_bot && self.champion.eq_ignore_ascii_case(name))
+    pub fn has_name(&self, name: &str) -> bool {
+        strip_tag(&self.name).eq_ignore_ascii_case(strip_tag(name))
+    }
+
+    fn has_champion(&self, name: &str) -> bool {
+        self.champion.eq_ignore_ascii_case(name)
     }
 }
 
@@ -40,6 +38,35 @@ pub struct GameInfo {
     pub map: Option<u32>,
     pub me: Player,
     pub players: Vec<Player>,
+}
+
+impl GameInfo {
+    pub fn player_named(&self, name: &str) -> Option<&Player> {
+        if self.me.has_name(name) {
+            return Some(&self.me);
+        }
+        self.players
+            .iter()
+            .find(|player| player.has_name(name))
+            .or_else(|| self.unique_champion(name))
+    }
+
+    pub fn is_me(&self, name: &str) -> bool {
+        if self.me.has_name(name) {
+            return true;
+        }
+        let named_other = self.players.iter().any(|player| player.has_name(name));
+        !named_other && self.me.has_champion(name) && self.unique_champion(name).is_some()
+    }
+
+    fn unique_champion(&self, name: &str) -> Option<&Player> {
+        let mut matching = self
+            .players
+            .iter()
+            .filter(|player| player.has_champion(name));
+        let first = matching.next()?;
+        matching.next().is_none().then_some(first)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

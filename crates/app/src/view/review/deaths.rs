@@ -42,8 +42,7 @@ pub(super) fn screen(
 
 fn killer_icon(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> Option<El> {
     let death = state.current()?;
-    let players = &review.entry.meta.game.info.players;
-    let player = players.iter().find(|p| p.answers_to(&death.killer))?;
+    let player = review.entry.meta.game.info.player_named(&death.killer)?;
     Some(champion_icon(k, &player.champion, ICON))
 }
 

@@ -1,4 +1,4 @@
-use greyscreen_core::game::{GameEvent, GameResult, Player};
+use greyscreen_core::game::{GameEvent, GameInfo, GameResult};
 use greyscreen_core::highlight::describe_label;
 use greyscreen_core::library::{ClipEntry, EventEntry};
 use greyscreen_core::review::deaths;
@@ -109,7 +109,7 @@ pub(crate) fn recent_games(recordings: &[RecordingEntry], limit: usize) -> Vec<&
     games
 }
 
-pub(crate) fn kda(events: &[EventEntry], me: &Player) -> Kda {
+pub(crate) fn kda(events: &[EventEntry], info: &GameInfo) -> Kda {
     let mut kda = Kda::default();
     for event in events {
         if let GameEvent::ChampionKill {
@@ -118,9 +118,9 @@ pub(crate) fn kda(events: &[EventEntry], me: &Player) -> Kda {
             assisters,
         } = &event.kind
         {
-            kda.kills += u32::from(me.answers_to(killer));
-            kda.deaths += u32::from(me.answers_to(victim));
-            kda.assists += u32::from(assisters.iter().any(|name| me.answers_to(name)));
+            kda.kills += u32::from(info.is_me(killer));
+            kda.deaths += u32::from(info.is_me(victim));
+            kda.assists += u32::from(assisters.iter().any(|name| info.is_me(name)));
         }
     }
     kda
@@ -128,12 +128,12 @@ pub(crate) fn kda(events: &[EventEntry], me: &Player) -> Kda {
 
 pub(crate) fn death_total(rec: &RecordingEntry) -> usize {
     let meta = &rec.meta;
-    deaths(&meta.events, &meta.game.info.me).len()
+    deaths(&meta.events, &meta.game.info).len()
 }
 
 pub(crate) fn review_progress(rec: &RecordingEntry) -> Option<String> {
     let meta = &rec.meta;
-    let list = deaths(&meta.events, &meta.game.info.me);
+    let list = deaths(&meta.events, &meta.game.info);
     (!list.is_empty()).then(|| {
         format!(
             "{} of {} reviewed",
@@ -145,7 +145,7 @@ pub(crate) fn review_progress(rec: &RecordingEntry) -> Option<String> {
 
 pub(crate) fn death_hint(rec: &RecordingEntry) -> Option<String> {
     let meta = &rec.meta;
-    let list = deaths(&meta.events, &meta.game.info.me);
+    let list = deaths(&meta.events, &meta.game.info);
     if list.is_empty() {
         return None;
     }
