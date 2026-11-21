@@ -35,6 +35,15 @@ pub(in crate::view::shell) static GEAR: Icon = Icon {
     ),
 };
 
+pub(in crate::view::shell) static FEEDBACK: Icon = Icon {
+    name: "greyscreen-feedback",
+    view: 16.0,
+    body: concat!(
+        r#"<path d="M3.5 2.5h9A1.75 1.75 0 0 1 14.25 4.25v5.5A1.75 1.75 0 0 1 12.5 11.5H8.4L5.2 14v-2.5H3.5A1.75 1.75 0 0 1 1.75 9.75v-5.5A1.75 1.75 0 0 1 3.5 2.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>"#,
+        r#"<path d="M5.5 5.8h5M5.5 8.2h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>"#
+    ),
+};
+
 pub(super) static SIDEBAR: Icon = Icon {
     name: "greyscreen-sidebar",
     view: 16.0,

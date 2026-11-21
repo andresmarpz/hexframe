@@ -100,6 +100,7 @@ fn start_with_fake(settings: Settings) -> (common::Harness, FakeHotkeys) {
         }),
         settings_path: Some(settings_path.clone()),
         updates: None,
+        feedback: None,
         hotkeys: Some(Box::new(fake.clone())),
     });
     (

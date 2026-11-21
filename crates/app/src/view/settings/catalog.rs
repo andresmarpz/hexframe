@@ -23,6 +23,7 @@ pub(super) enum Row {
     Updates,
     AutoUpdates,
     Logs,
+    Feedback,
     StartWithWindows,
     RiotNotice,
 }
@@ -51,6 +52,7 @@ impl Row {
             Self::Updates => "updates update check install release",
             Self::AutoUpdates => "check for updates automatically auto update",
             Self::Logs => "logs folder report problem support",
+            Self::Feedback => "send feedback report bug idea suggestion contact support",
             Self::StartWithWindows => "start with windows startup login tray",
             Self::RiotNotice => "riot games notice legal trademark endorsed",
         };
@@ -86,7 +88,13 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
         SettingsSection::Storage => vec![Row::Folder, Row::StorageLimit],
         SettingsSection::Keybinds => Action::ALL.iter().map(|a| Row::Bind(*a)).collect(),
         SettingsSection::About => {
-            let mut rows = vec![Row::Version, Row::Updates, Row::AutoUpdates, Row::Logs];
+            let mut rows = vec![
+                Row::Version,
+                Row::Updates,
+                Row::AutoUpdates,
+                Row::Logs,
+                Row::Feedback,
+            ];
             if cfg!(windows) {
                 rows.push(Row::StartWithWindows);
             }

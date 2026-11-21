@@ -4,7 +4,7 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
 use rune::{PointerPress, TextEdit};
 
-use super::{PanelTab, Screen, SettingsSection, Ui, death_review, preview, update};
+use super::{FeedbackPhase, PanelTab, Screen, SettingsSection, Ui, death_review, preview, update};
 
 type Scene = (&'static str, fn(&mut Ui));
 
@@ -41,6 +41,13 @@ fn docked(ui: &mut Ui) {
 fn demo(ui: &mut Ui) {
     home(ui);
     ui.recordings = preview::demo_recordings();
+}
+
+fn feedback(ui: &mut Ui) {
+    home(ui);
+    ui.feedback.open = true;
+    ui.feedback.message =
+        TextEdit::new("The Clip button does nothing when I press F9 during a game.");
 }
 
 pub(crate) const SCENES: &[Scene] = &[
@@ -193,6 +200,24 @@ pub(crate) const SCENES: &[Scene] = &[
             Action::SaveClip,
             "F9 is already used by another app. Choose a different key.".into(),
         )];
+    }),
+    ("feedback", feedback),
+    ("feedback-sending", |ui| {
+        feedback(ui);
+        ui.feedback.email = TextEdit::new("ana@example.com");
+        ui.feedback.phase = FeedbackPhase::Sending;
+    }),
+    ("feedback-sent", |ui| {
+        feedback(ui);
+        ui.feedback.phase = FeedbackPhase::Sent;
+    }),
+    ("feedback-error", |ui| {
+        feedback(ui);
+        ui.feedback.phase = FeedbackPhase::Failed {
+            error: "Couldn't reach Greyscreen. Check your connection and try again.".into(),
+            report: "{}".into(),
+            copied: false,
+        };
     }),
     ("coach-demo", |ui| {
         home(ui);

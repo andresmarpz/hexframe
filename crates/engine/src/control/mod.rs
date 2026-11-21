@@ -19,6 +19,7 @@ use greyscreen_league::LeagueMsg;
 use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
 use crate::delete;
+use crate::feedback::{self, FeedbackConfig};
 use crate::hotkey::{self, HotkeyBackend};
 use crate::library;
 use crate::settings_save::SettingsSaver;
@@ -43,6 +44,7 @@ pub(crate) struct Spec {
     pub(crate) media: Arc<dyn MediaSource>,
     pub(crate) settings_path: Option<PathBuf>,
     pub(crate) updates: Option<UpdateConfig>,
+    pub(crate) feedback: Option<FeedbackConfig>,
     pub(crate) hotkeys: Option<Box<dyn HotkeyBackend>>,
     pub(crate) cmd: Sender<EngineCmd>,
 }
@@ -72,6 +74,7 @@ struct Control {
     test_stop_at: Option<Hns>,
     settings_saver: SettingsSaver,
     updater: Option<UpdateHandle>,
+    feedback: Option<FeedbackConfig>,
     update_busy: bool,
     hotkeys: Box<dyn HotkeyBackend>,
     applied_hotkeys: Vec<(Action, KeyCombo)>,
@@ -118,6 +121,7 @@ impl Control {
             media,
             settings_path,
             updates,
+            feedback,
             hotkeys,
             cmd,
         } = spec;
@@ -126,6 +130,7 @@ impl Control {
             updates.and_then(|config| updater::spawn(config, settings.check_updates, sink.clone()));
         Self {
             updater,
+            feedback,
             update_busy: false,
             settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
             hotkeys: hotkeys.unwrap_or_else(|| hotkey::platform(cmd, sink.clone())),
@@ -210,6 +215,9 @@ impl Control {
             EngineCmd::SaveClipNow => self.save_clip_now(),
             EngineCmd::CheckForUpdates => self.update_cmd(UpdateCmd::Check),
             EngineCmd::InstallUpdate => self.update_cmd(UpdateCmd::Install),
+            EngineCmd::SendFeedback(draft) => {
+                feedback::spawn_send(self.feedback.clone(), draft, self.sink.clone());
+            }
             EngineCmd::GlobalAction(action) => self.global_action(action),
         }
     }

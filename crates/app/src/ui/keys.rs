@@ -26,6 +26,8 @@ impl Ui {
     fn run_action(&mut self, action: Action, tx: &mut Tx) -> bool {
         match action {
             Action::OpenSettings => self.toggle_settings(),
+            Action::SendFeedback if self.in_theater() => return false,
+            Action::SendFeedback => self.open_feedback(tx),
             _ if self.settings_open => return false,
             Action::GoHome => self.go(Screen::Home),
             Action::GoGames => self.go(Screen::Games),
@@ -85,7 +87,8 @@ impl Ui {
             | Action::NextGame
             | Action::FocusPlayer
             | Action::ToggleNav
-            | Action::FocusSearch => return false,
+            | Action::FocusSearch
+            | Action::SendFeedback => return false,
         }
         self.wake_after_key(tx);
         true

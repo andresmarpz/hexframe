@@ -2,6 +2,7 @@ pub(crate) mod champion;
 mod clearable;
 mod clips;
 mod delete;
+mod feedback;
 mod games;
 mod grip;
 mod home;
@@ -38,6 +39,9 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     }
     if theater.is_none() {
         settings::sheet(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));
+    }
+    if theater.is_none() {
+        feedback::dialog(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));
     }
     row_menu::menu(s, &k, &mut layer);
     if let Some(rec) = s.pending_delete_entry() {

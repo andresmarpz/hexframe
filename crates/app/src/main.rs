@@ -18,7 +18,7 @@ use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::updater::UpdateConfig;
-use greyscreen_engine::{Engine, EngineConfig, league_factory_default};
+use greyscreen_engine::{Engine, EngineConfig, FeedbackConfig, league_factory_default};
 use rune::{App, AppSpec, Chrome};
 
 use ui::Ui;
@@ -156,6 +156,7 @@ fn main() {
                 env!("CARGO_PKG_VERSION"),
                 can_install_updates(),
             )),
+            feedback: Some(FeedbackConfig::api(env!("CARGO_PKG_VERSION"))),
             hotkeys: None,
         });
         #[cfg(windows)]

@@ -212,6 +212,7 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `sidebar_collapsed` | `bool` | `false` |
 | `nav_width` | `u32` points, 180 to 320 | `220` |
 | `list_width` | `u32` points, 240 to 440 | `300` |
+| `client_id` | `Option<String>` | `None` (a random UUID is stored the first time feedback is sent) |
 
 Layout: on the Games screen the games list is the first column inside the inset content card, then a hairline divider, then the review (the same in both nav styles). The nav sidebar's edge and the list/review divider drag to resize; double-click a handle resets its default, and the widths clamp to the ranges above and save when the drag ends. The rail (56 points, also forced below 1200 points of window width) is not resizable. Values outside a range are clamped when settings load.
 
@@ -226,6 +227,12 @@ Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Bal
 `greyscreen-league::updates` lists the GitHub releases of `andresmarpz/greyscreen` and downloads `greyscreen.exe`, checking size, the SHA-256 `digest` GitHub reports (skipped when missing) and the `MZ` header. `greyscreen-core::update` holds the pure rules: a build that is a prerelease sees previews and stable releases, a stable build sees stable only, and the newest newer release wins (`preview.N` orders by N, a stable release beats its previews). The running version is the workspace version, so it must equal the release tag without the `v` (`just release` enforces it).
 
 The engine's update thread checks 10 s after start and every 6 hours when "Check for updates automatically" is on, only for the installed copy on Windows and never while a session is not idle. A manual check works anywhere. An installed copy downloads to `%TEMP%\Greyscreen\greyscreen-<tag>.exe`; "Install and restart" launches that file, and the existing installer path asks the running copy to quit and replaces it. A copy that is not installed only links to the release page. `UiMsg::Update(UpdateState)` drives the About card, and `Ui::update_available` holds the pending release for other screens. A downloaded update also shows a toast-style banner at the top centre of every screen and both nav styles, with "Restart to update" and "Later" (hidden until a newer version); it stays hidden while a game is in progress and in theater mode.
+
+## Feedback
+
+"Send feedback" (nav footer, rail, dock, Settings > Updates & About, and the unbound App action `send_feedback`) opens a dialog: kind (Bug, Idea, Other), message (required, 5000 characters), optional email, and "Include recent logs" (on by default). `EngineCmd::SendFeedback(FeedbackDraft)` runs on its own `engine-feedback` thread, which builds the `FeedbackReport` (`greyscreen-core::feedback`), sends it through `FeedbackTransport` (`greyscreen-league::FeedbackClient`, `ureq`) and answers with `UiMsg::Feedback(FeedbackResult)`. A failure carries the same report as JSON for the "Copy report" button.
+
+`POST {API base}/v1/feedback` with header `x-greyscreen-version` and body `{kind: "bug"|"idea"|"other", message, email|null, app_version, os, log_tail|null, client_id}`; answers 202 `{id}`, 400 `{error}`, 429. The base is `greyscreen_core::api::BASE_URL`, or `GREYSCREEN_API_URL`. `log_tail` is the last 300 lines of the newest `greyscreen.log.*`, with the home folder replaced by `~` and the values of `summoner`/`riotId` style fields redacted, and is `null` when the box is not ticked. `client_id` is `Settings.client_id`, not tied to any identity.
 
 ## Rules for code
 

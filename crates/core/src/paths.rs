@@ -6,6 +6,10 @@ pub fn config_dir() -> PathBuf {
     dirs::config_dir().unwrap_or_default().join(APP_DIR)
 }
 
+pub fn home_dir() -> Option<PathBuf> {
+    dirs::home_dir()
+}
+
 pub fn logs_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_default()

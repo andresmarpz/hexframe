@@ -13,6 +13,7 @@ use rune::{PointerPress, TextEdit, Tx};
 mod death_review;
 mod dock;
 pub(crate) mod event_detail;
+mod feedback;
 mod format;
 mod jump;
 pub(crate) mod key_event;
@@ -40,6 +41,7 @@ mod tests;
 
 pub(crate) use death_review::{DeathReviewState, title_line};
 pub(crate) use dock::DockState;
+pub(crate) use feedback::{FeedbackPhase, FeedbackUi, MESSAGE_KEY as FEEDBACK_MESSAGE_KEY};
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
 pub(crate) use panes::{PaneDrag, PaneEdge};
@@ -114,6 +116,7 @@ pub(crate) struct Ui {
     pub update_available: Option<UpdateInfo>,
     pub death_note: TextEdit,
     pub dock: DockState,
+    pub feedback: FeedbackUi,
 }
 
 impl Ui {
@@ -161,6 +164,7 @@ impl Ui {
             update_available: None,
             death_note: TextEdit::new(String::new()),
             dock: DockState::default(),
+            feedback: FeedbackUi::default(),
             settings,
         }
     }
@@ -287,6 +291,7 @@ impl Ui {
             UiMsg::Thumbnail(path) => crate::view::thumb::invalidate(&path),
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
             UiMsg::Update(state) => self.apply_update(state),
+            UiMsg::Feedback(result) => self.apply_feedback(result),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
         }
     }

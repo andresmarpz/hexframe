@@ -3,6 +3,7 @@ mod clipjob;
 mod control;
 mod delete;
 pub mod fake;
+pub mod feedback;
 mod hotkey;
 mod library;
 mod recovery;
@@ -19,4 +20,5 @@ pub use api::{
     reveal,
 };
 pub use fake::FakeMediaSource;
+pub use feedback::{FeedbackConfig, FeedbackTransport};
 pub use hotkey::HotkeyBackend;

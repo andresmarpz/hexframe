@@ -1,7 +1,7 @@
 use rune::{El, Icon, Side, col, el, row};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, State};
 
-use super::icons::{CLIPS, GAMES, GEAR, HOME, LOGO, SIDEBAR};
+use super::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME, LOGO, SIDEBAR};
 use super::{recent, status, storage};
 use crate::ui::{Screen, Ui};
 
@@ -18,6 +18,15 @@ pub(super) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
     if let Some(ring) = storage::ring(s, k) {
         footer = footer.child(row().w_full().h(30.0).center().child(ring));
     }
+    footer = footer.child(cell(
+        k,
+        rail_button(&FEEDBACK, "Send feedback", s.feedback.open)
+            .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.open_feedback(tx))
+            .build(k)
+            .key("nav-feedback")
+            .help_side(Side::Right),
+        s.feedback.open,
+    ));
     footer = footer.child(cell(
         k,
         rail_button(&GEAR, "Settings", s.settings_open)

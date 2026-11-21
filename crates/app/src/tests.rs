@@ -13,6 +13,7 @@ mod death_review;
 mod delete_dialog;
 mod dock;
 mod instant_pages;
+mod feedback;
 mod keybinds;
 mod match_flow;
 mod nav;

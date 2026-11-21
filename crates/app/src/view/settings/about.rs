@@ -15,6 +15,7 @@ pub(super) fn render(s: &Ui, k: &Kit, which: Row) -> El {
         Row::Updates => updates::update_row(s, k),
         Row::AutoUpdates => updates::auto_row(s, k),
         Row::Logs => logs(k),
+        Row::Feedback => feedback(k),
         Row::StartWithWindows => toggle_row(
             k,
             "start-with-windows",
@@ -47,6 +48,22 @@ fn logs(k: &Kit) -> El {
         "logs-row",
         "Logs",
         Some("Attach these when you report a problem."),
+        button,
+    )
+}
+
+fn feedback(k: &Kit) -> El {
+    let button = Button::new("Send feedback")
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Large)
+        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.open_feedback(tx))
+        .build(k)
+        .key("send-feedback");
+    setting_row(
+        k,
+        "feedback-row",
+        "Feedback",
+        Some("Report a bug or share an idea."),
         button,
     )
 }

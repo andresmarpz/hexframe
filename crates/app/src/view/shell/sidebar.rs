@@ -8,7 +8,7 @@ use rune::tok::type_;
 use rune::{El, Icon, ScrollSpec, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, SidebarRow};
 
-use self::icons::{CLIPS, GAMES, GEAR, HOME, LOGO, SIDEBAR};
+use self::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME, LOGO, SIDEBAR};
 use crate::ui::{PaneEdge, Screen, Ui};
 use crate::view::grip::grip;
 
@@ -93,7 +93,13 @@ fn expanded(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
                 .py(PAD - 4.0)
                 .gap(8.0)
                 .child(storage::block(s, k))
-                .child(settings(s, k)),
+                .child(
+                    col()
+                        .w_full()
+                        .gap(2.0)
+                        .child(feedback(s, k))
+                        .child(settings(s, k)),
+                ),
         )
         .child(grip(s, PaneEdge::Nav, "nav-grip", "Resize navigation"))
 }
@@ -144,6 +150,15 @@ fn settings(s: &Ui, k: &Kit) -> El {
         .on_select(|ui: &mut Ui, _| ui.toggle_settings())
         .build(k)
         .key("nav-settings")
+}
+
+fn feedback(s: &Ui, k: &Kit) -> El {
+    SidebarRow::new("Send feedback")
+        .icon(&FEEDBACK)
+        .selected(s.feedback.open)
+        .on_select(|ui: &mut Ui, tx: &mut rune::Tx| ui.open_feedback(tx))
+        .build(k)
+        .key("nav-feedback")
 }
 
 fn wordmark(k: &Kit) -> El {

@@ -1,8 +1,8 @@
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Cursor, El, TextStyle, Transition, col, el, row, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Switch};
+use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, Switch};
 
-use super::sidebar::icons::{CLIPS, GAMES, GEAR, HOME};
+use super::sidebar::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME};
 use crate::ui::{Detail, Screen, Ui, format_clock};
 use crate::view::champion::champion_icon;
 
@@ -63,7 +63,8 @@ fn dock(s: &Ui, k: &Kit) -> El {
         .child(tab(s, k, Screen::Games, "Games", &GAMES, "dock-games"))
         .child(tab(s, k, Screen::Clips, "Clips", &CLIPS, "dock-clips"))
         .child(divider(k))
-        .child(settings_button(s, k));
+        .child(settings_button(s, k))
+        .child(feedback_button(s, k));
     k.elevate(surface, &k.elevation.floating)
 }
 
@@ -110,6 +111,22 @@ fn settings_button(s: &Ui, k: &Kit) -> El {
         .on_press(|ui: &mut Ui| ui.toggle_settings())
         .build(k)
         .key("dock-settings")
+}
+
+fn feedback_button(s: &Ui, k: &Kit) -> El {
+    let variant = if s.feedback.open {
+        IconButtonVariant::Neutral
+    } else {
+        IconButtonVariant::Ghost
+    };
+    IconButton::new(&FEEDBACK)
+        .label("Send feedback")
+        .help("Send feedback")
+        .variant(variant)
+        .control_size(ControlSize::Large)
+        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.open_feedback(tx))
+        .build(k)
+        .key("dock-feedback")
 }
 
 fn record_segment(s: &Ui, k: &Kit) -> El {

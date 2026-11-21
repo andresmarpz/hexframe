@@ -255,6 +255,7 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         | Row::Updates
         | Row::AutoUpdates
         | Row::Logs
+        | Row::Feedback
         | Row::StartWithWindows
         | Row::RiotNotice => about::render(s, k, row),
     }

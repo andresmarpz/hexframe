@@ -142,6 +142,7 @@ pub struct Settings {
     pub sidebar_collapsed: bool,
     pub nav_width: u32,
     pub list_width: u32,
+    pub client_id: Option<String>,
 }
 
 impl Default for Settings {
@@ -164,6 +165,7 @@ impl Default for Settings {
             sidebar_collapsed: false,
             nav_width: NAV_WIDTH.default,
             list_width: LIST_WIDTH.default,
+            client_id: None,
         }
     }
 }

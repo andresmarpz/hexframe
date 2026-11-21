@@ -252,6 +252,7 @@ fn the_card_walks_through_check_download_and_install_with_a_fake_source() {
             interval: Duration::from_secs(3600),
             busy_retry: Duration::from_secs(3600),
         }),
+        feedback: None,
         hotkeys: None,
     });
     let ui = Ui::live(Settings::default(), engine.cmd.clone());

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crossbeam_channel::{Sender, unbounded};
+use greyscreen_core::feedback::{FeedbackDraft, FeedbackResult};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::keybinds::Action;
 use greyscreen_core::library::{self, RecordingMeta};
@@ -13,6 +14,7 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_league::{GameLocator, LeagueMsg, LiveClient, Poller};
 
 use crate::control;
+use crate::feedback::FeedbackConfig;
 use crate::hotkey::HotkeyBackend;
 use crate::updater::UpdateConfig;
 
@@ -33,6 +35,7 @@ pub enum EngineCmd {
     GlobalAction(Action),
     CheckForUpdates,
     InstallUpdate,
+    SendFeedback(FeedbackDraft),
     Shutdown,
 }
 
@@ -76,6 +79,7 @@ pub enum UiMsg {
     Notice { level: NoticeLevel, text: String },
     HotkeyStatus { errors: Vec<(Action, String)> },
     Update(UpdateState),
+    Feedback(FeedbackResult),
     Thumbnail(PathBuf),
 }
 
@@ -108,6 +112,7 @@ pub struct EngineConfig {
     pub sink: UiSink,
     pub settings_path: Option<PathBuf>,
     pub updates: Option<UpdateConfig>,
+    pub feedback: Option<FeedbackConfig>,
     pub hotkeys: Option<Box<dyn HotkeyBackend>>,
 }
 
@@ -136,6 +141,7 @@ impl Engine {
             sink,
             settings_path: Some(paths::settings_file()),
             updates: None,
+            feedback: None,
             hotkeys: None,
         })
     }
@@ -148,6 +154,7 @@ impl Engine {
             sink,
             settings_path,
             updates,
+            feedback,
             hotkeys,
         } = config;
         settings.validate();
@@ -160,6 +167,7 @@ impl Engine {
                 media,
                 settings_path,
                 updates,
+                feedback,
                 hotkeys,
                 cmd: cmd.clone(),
             },
