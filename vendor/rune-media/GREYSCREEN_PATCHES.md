@@ -31,7 +31,7 @@ Upstream: anomalyco/rune#1321, and its note about parked clips.
 
 ## 3. A video's sound reads ahead and leads the clock
 
-Upstream: no issue filed yet. The write-up is "Windows: a video's own sound is silent at 60 fps and on the layer".
+Upstream: anomalyco/rune#1325.
 
 - Problem: the sound output writes about 110 ms ahead of the clock, but the decoder read audio only as far as the video read went: 3 pictures (50 ms at 60 fps), and about one while the layer waits for each picture's time. Every chunk came late and was dropped, so a 60 fps video was silent. Also:
   - With sound on, the end waited for the audio stream's end as well as the video's.
