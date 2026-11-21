@@ -361,7 +361,7 @@ fn configure_session(session: &GraphicsCaptureSession, fps: u32) {
         tracing::warn!(%error, "disable capture border failed");
     }
     let interval = TimeSpan {
-        Duration: HNS_PER_SEC / i64::from(fps.max(1)),
+        Duration: HNS_PER_SEC * 9 / 10 / i64::from(fps.max(1)),
     };
     if let Err(error) = session.SetMinUpdateInterval(interval) {
         tracing::warn!(%error, "set minimum update interval failed");
