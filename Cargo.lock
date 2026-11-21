@@ -1356,7 +1356,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "greyscreen"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-capture",
@@ -1377,7 +1377,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-capture"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-core",
@@ -1390,7 +1390,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-cli"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "anyhow",
  "clap",
@@ -1412,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-core"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "crossbeam-channel",
  "dirs",
@@ -1427,7 +1427,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-engine"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-capture",
@@ -1445,7 +1445,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-league"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-core",
@@ -1462,7 +1462,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-mp4"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "greyscreen-core",
  "thiserror 2.0.21",
@@ -1470,7 +1470,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-thumbs"
-version = "0.1.10-preview.12"
+version = "0.1.11-preview.13"
 dependencies = [
  "image",
  "objc2-av-foundation",
