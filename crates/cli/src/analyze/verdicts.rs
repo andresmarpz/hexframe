@@ -13,6 +13,7 @@ use super::video::VideoReport;
 const KEYFRAME_WARN_SECS: f64 = 5.0;
 const QUEUE_WARN: u64 = 1_000;
 const MIN_SECS_FOR_BITRATE: f64 = 30.0;
+const MIN_HEIGHT_FOR_BITRATE: u32 = 720;
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct Verdict {
@@ -41,7 +42,7 @@ pub(super) fn collect(
         frames(video),
         gaps(video),
         keyframes(video),
-        bitrate(video),
+        bitrate(video, file.height),
     ];
     if let Some(audio) = audio {
         out.push(audio_continuity(audio));

@@ -162,7 +162,10 @@ pub(super) fn findings(health: &RecordingHealth) -> Vec<Finding> {
             ),
         ));
     }
-    let bitrate = if health.avg_bitrate_kbps < MIN_BITRATE_KBPS && health.duration_secs > 30.0 {
+    let bitrate = if health.avg_bitrate_kbps < MIN_BITRATE_KBPS
+        && health.height >= 720
+        && health.duration_secs > 30.0
+    {
         Level::Warn
     } else {
         Level::Ok
