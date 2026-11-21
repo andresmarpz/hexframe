@@ -69,7 +69,7 @@ pub(super) fn play_button(review: &ReviewState, k: &Kit, variant: IconButtonVari
         .variant(variant)
         .control_size(ControlSize::Large)
         .on_press(|ui: &mut Ui| {
-            if let Some(review) = &ui.review {
+            if let Some(review) = &mut ui.review {
                 review.toggle();
             }
         })

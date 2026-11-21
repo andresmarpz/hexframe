@@ -5,6 +5,8 @@ use rune::{El, PlayerState};
 
 use super::review::ReviewPlayer;
 
+pub(crate) mod sim;
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Call {
     Open(PathBuf),
@@ -82,6 +84,10 @@ impl ReviewPlayer for FakePlayer {
         } else {
             PlayerState::Ready
         }
+    }
+
+    fn is_playing(&self) -> bool {
+        PLAYING.get()
     }
 
     fn set_rate(&self, rate: f32) {

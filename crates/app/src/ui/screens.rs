@@ -23,11 +23,9 @@ impl Ui {
         self.recordings.iter().map(|rec| rec.meta.clips.len()).sum()
     }
 
-    fn pause_review(&self) {
-        if let Some(review) = &self.review
-            && review.is_playing()
-        {
-            review.toggle();
+    fn pause_review(&mut self) {
+        if let Some(review) = &mut self.review {
+            review.pause();
         }
     }
 }

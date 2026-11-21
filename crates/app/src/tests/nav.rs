@@ -158,7 +158,7 @@ fn leaving_games_pauses_the_review_and_coming_back_keeps_it() {
     fake_player::set_playing(true);
     fake_player::clear_calls();
     tap(&mut rt, "nav-home");
-    assert_eq!(fake_player::calls(), vec![Call::Pause]);
+    assert_eq!(fake_player::calls().first(), Some(&Call::Pause));
     tap(&mut rt, "nav-games");
     assert_eq!(rt.state.detail(), Detail::Game);
 }

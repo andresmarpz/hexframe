@@ -5,7 +5,6 @@ use crate::ui::Ui;
 
 const MID_DEATH_INDEX: usize = 2;
 const MID_DEATH_OFFSET_SECS: f64 = 0.6;
-const WINDOW_BAR_WIDTH: f32 = 832.0;
 const SUMMARY_BAR_WIDTH: f32 = 580.0;
 
 fn show_in_list(ui: &mut Ui) {
@@ -44,7 +43,6 @@ pub(crate) fn scene_mid(ui: &mut Ui) {
     ui.review_deaths();
     ui.death_go(MID_DEATH_INDEX);
     let Some(review) = &mut ui.review else { return };
-    review.track_width = WINDOW_BAR_WIDTH;
     review.toggle_slow_mo();
     let Some(death) = review.death.as_ref().and_then(|d| d.current()) else {
         return;

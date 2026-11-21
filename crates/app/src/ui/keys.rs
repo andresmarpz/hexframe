@@ -197,8 +197,8 @@ impl Ui {
         }
     }
 
-    fn review_toggle(&self) {
-        if let Some(review) = &self.review {
+    fn review_toggle(&mut self) {
+        if let Some(review) = &mut self.review {
             review.toggle();
         }
     }

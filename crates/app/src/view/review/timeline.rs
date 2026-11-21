@@ -40,6 +40,18 @@ fn centered(x: f32, width: f32, track_width: f32) -> f32 {
     (x - width / 2.0).clamp(0.0, (track_width - width).max(0.0))
 }
 
+pub(super) fn thumb_rail(thumb: El, size: f32, height: f32, progress: f32) -> El {
+    rune::row()
+        .pin(Some(0.0), Some(0.0), Some(0.0), None)
+        .h(height)
+        .px(size / 2.0)
+        .center_y()
+        .instant_changes()
+        .a11y_hidden()
+        .child(el().w_frac(progress).h(height))
+        .child(thumb.ml(-size / 2.0))
+}
+
 fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
     let x = centered(
         marker_x(event.rec_secs, review.duration(), review.track_width),
@@ -73,9 +85,8 @@ fn band(clip: &ClipEntry, review: &ReviewState, k: &Kit) -> El {
         .a11y_hidden()
 }
 
-fn thumb(size: f32, x: f32, k: &Kit) -> El {
+fn thumb(size: f32, k: &Kit) -> El {
     el().size(size, size)
-        .absolute(x, (HEIGHT - size) / 2.0)
         .radius(size / 2.0)
         .fill(Color::WHITE)
         .border(1.0, k.c.border_strong)
@@ -105,10 +116,9 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
                 .w_frac(progress)
                 .h(TRACK_HEIGHT)
                 .radius(TRACK_HEIGHT / 2.0)
-                .fill(k.c.bg_accent),
+                .fill(k.c.bg_accent)
+                .instant_changes(),
         );
-    let width = review.track_width;
-    let at = progress * width;
     let mut line = el()
         .key("timeline")
         .w_full()
@@ -133,10 +143,14 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
             line = line.child(marker(event, review, k));
         }
     }
-    line.child(thumb(THUMB, centered(at, THUMB, width), k).key("timeline-thumb"))
-        .child(
-            thumb(THUMB_HOVER, centered(at, THUMB_HOVER, width), k)
-                .key("timeline-thumb-hover")
-                .group_opacity(0.0, 1.0),
-        )
+    let hover = thumb(THUMB_HOVER, k)
+        .key("timeline-thumb-hover")
+        .group_opacity(0.0, 1.0);
+    line.child(thumb_rail(
+        thumb(THUMB, k).key("timeline-thumb"),
+        THUMB,
+        HEIGHT,
+        progress,
+    ))
+    .child(thumb_rail(hover, THUMB_HOVER, HEIGHT, progress))
 }

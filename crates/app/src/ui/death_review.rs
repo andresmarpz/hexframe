@@ -100,6 +100,12 @@ impl ReviewState {
         self.death.as_ref().is_some_and(|d| d.summary)
     }
 
+    pub(crate) fn death_finished(&self) -> bool {
+        self.death
+            .as_ref()
+            .is_some_and(|d| d.finished && !d.summary)
+    }
+
     pub(crate) fn death_window(&self) -> Option<(f64, f64)> {
         let death = self.death.as_ref()?.current()?;
         Some(death.window(self.duration()))
@@ -183,9 +189,7 @@ impl ReviewState {
         if let Some(state) = &mut self.death {
             state.summary = true;
         }
-        if let Some(player) = &self.player {
-            player.pause();
-        }
+        self.pause();
         self.apply_death_rate(false);
     }
 
@@ -229,12 +233,12 @@ impl ReviewState {
                 normal_rate
             });
         }
-        if playing && time >= end {
-            player.pause();
+        let finish = playing && time >= end && !state.finished;
+        if finish {
             state.finished = true;
-            changed = true;
+            self.pause();
         }
-        changed
+        changed || finish
     }
 }
 

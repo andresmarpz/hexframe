@@ -197,7 +197,7 @@ fn the_skip_buttons_move_five_seconds() {
     let mut rt = review_runtime();
     fake_player::set_time(6.0);
     tap(&mut rt, "review-forward");
-    assert_seeks_to(10.0);
+    assert_seeks_to(9.0);
     fake_player::clear_calls();
     tap(&mut rt, "review-rewind");
     assert_seeks_to(1.0);

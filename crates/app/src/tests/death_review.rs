@@ -381,6 +381,7 @@ fn escape_opens_the_summary_then_closes_the_mode() {
     tap(&mut rt, "death-pip-3");
     tap(&mut rt, "death-tag-no-vision");
     tap(&mut rt, "death-tag-ganked");
+    fake_player::set_playing(true);
     fake_player::clear_calls();
     press(&mut rt, Key::Escape);
     assert!(review(&rt).death_summary_open());

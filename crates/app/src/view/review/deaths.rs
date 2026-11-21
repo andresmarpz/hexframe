@@ -2,6 +2,7 @@ use greyscreen_core::review::DeathTag;
 use rune::{Drag, El, Phase, TextEdit, Tx, col, el, row, text};
 use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit, Switch, TextArea};
 
+use super::timeline::thumb_rail;
 use super::{PAGE_PADDING, icons, play_button, tabular, video_frame};
 use crate::ui::{DeathReviewState, ReviewState, Ui, title_line};
 use crate::view::card;
@@ -113,29 +114,18 @@ fn video(review: &ReviewState, k: &Kit) -> El {
     video_frame(review, k, frame)
 }
 
-fn marker_x(fraction: f64, width: f32, item: f32) -> f32 {
-    (fraction.clamp(0.0, 1.0) as f32 * width - item / 2.0).clamp(0.0, (width - item).max(0.0))
-}
-
 fn window_bar(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {
     let (Some((start, end)), Some(death)) = (review.death_window(), state.current()) else {
         return el().key("death-window");
     };
     let span = (end - start).max(f64::EPSILON);
-    let width = review.track_width;
-    let progress = ((review.time() - start) / span).clamp(0.0, 1.0);
-    let death_at = (death.rec_secs - start) / span;
-    let slow_from = (death.slow_mo_from(review.duration()) - start) / span;
+    let share = |secs: f64| ((secs - start) / span).clamp(0.0, 1.0) as f32;
+    let progress = share(review.time());
     let y = (BAR_HEIGHT - TRACK_HEIGHT) / 2.0;
     let mut bar = el()
         .key("death-window")
         .w_full()
         .h(BAR_HEIGHT)
-        .on_layout(|ui: &mut Ui, rect: [f32; 4]| {
-            if let Some(review) = &mut ui.review {
-                review.track_width = rect[2];
-            }
-        })
         .on_drag(move |ui: &mut Ui, drag: &mut Drag, _| {
             if matches!(drag.phase, Phase::Down | Phase::Move) && drag.w > 0.0 {
                 ui.death_scrub(f64::from(drag.x / drag.w));
@@ -144,49 +134,58 @@ fn window_bar(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {
         .child(
             el().key("death-track")
                 .absolute(0.0, y)
-                .size(width, TRACK_HEIGHT)
+                .w_frac(1.0)
+                .h(TRACK_HEIGHT)
                 .radius(TRACK_HEIGHT / 2.0)
                 .fill(k.c.layer_03),
         );
     if state.slow_mo {
-        let from = marker_x(slow_from, width, 0.0);
+        let from = share(death.slow_mo_from(review.duration()));
         bar = bar.child(
-            el().key("death-slow-zone")
-                .absolute(from, y)
-                .size((width - from).max(0.0), TRACK_HEIGHT)
-                .radius(TRACK_HEIGHT / 2.0)
-                .fill(k.c.warning.icon.alpha(0.55))
-                .a11y_hidden(),
+            row()
+                .absolute(0.0, y)
+                .w_frac(1.0)
+                .h(TRACK_HEIGHT)
+                .a11y_hidden()
+                .child(el().w_frac(from))
+                .child(
+                    el().key("death-slow-zone")
+                        .grow(1.0)
+                        .h(TRACK_HEIGHT)
+                        .radius(TRACK_HEIGHT / 2.0)
+                        .fill(k.c.warning.icon.alpha(0.55)),
+                ),
         );
     }
     bar.child(
         el().key("death-fill")
             .absolute(0.0, y)
-            .size(progress as f32 * width, TRACK_HEIGHT)
+            .w_frac(progress)
+            .h(TRACK_HEIGHT)
             .radius(TRACK_HEIGHT / 2.0)
             .fill(k.c.bg_accent)
+            .instant_changes()
             .a11y_hidden(),
     )
-    .child(
+    .child(thumb_rail(
         el().key("death-marker")
-            .absolute(
-                marker_x(death_at, width, MARKER_WIDTH),
-                (BAR_HEIGHT - MARKER_HEIGHT) / 2.0,
-            )
             .size(MARKER_WIDTH, MARKER_HEIGHT)
             .radius(MARKER_WIDTH / 2.0)
-            .fill(k.c.danger.icon)
-            .a11y_hidden(),
-    )
-    .child(
+            .fill(k.c.danger.icon),
+        MARKER_WIDTH,
+        BAR_HEIGHT,
+        share(death.rec_secs),
+    ))
+    .child(thumb_rail(
         el().key("death-thumb")
-            .absolute(marker_x(progress, width, THUMB), (BAR_HEIGHT - THUMB) / 2.0)
             .size(THUMB, THUMB)
             .radius(THUMB / 2.0)
             .fill(rune::Color::WHITE)
-            .border(1.0, k.c.border_strong)
-            .a11y_hidden(),
-    )
+            .border(1.0, k.c.border_strong),
+        THUMB,
+        BAR_HEIGHT,
+        progress,
+    ))
 }
 
 fn controls(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {

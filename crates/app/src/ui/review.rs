@@ -15,6 +15,7 @@ pub(crate) trait ReviewPlayer: Debug {
     fn time(&self) -> f64;
     fn duration(&self) -> Option<f64>;
     fn state(&self) -> PlayerState;
+    fn is_playing(&self) -> bool;
     fn set_rate(&self, rate: f32);
     fn set_muted(&self, muted: bool);
     fn set_volume(&self, volume: f32);
@@ -44,6 +45,10 @@ impl ReviewPlayer for Player {
 
     fn state(&self) -> PlayerState {
         Player::state(self)
+    }
+
+    fn is_playing(&self) -> bool {
+        Player::is_playing(self)
     }
 
     fn set_rate(&self, rate: f32) {
@@ -167,6 +172,7 @@ pub(crate) struct ReviewState {
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
+const END_GUARD_SECS: f64 = 1.0;
 
 impl ReviewState {
     pub(crate) fn open(entry: RecordingEntry, make: PlayerFactory, sound: Sound) -> Self {
@@ -307,26 +313,38 @@ impl ReviewState {
     }
 
     pub(crate) fn is_playing(&self) -> bool {
-        matches!(
-            self.player.as_ref().map(|p| p.state()),
-            Some(PlayerState::Playing)
-        )
+        self.player.as_ref().is_some_and(|p| p.is_playing())
     }
 
     pub(crate) fn seek(&mut self, secs: f64) {
         if let Some(player) = &self.player {
-            player.seek(secs.clamp(0.0, self.duration()));
+            let last = (self.duration() - END_GUARD_SECS).max(0.0);
+            player.seek(secs.clamp(0.0, last));
+            self.settling = true;
+            if let Some(death) = &mut self.death {
+                death.finished = false;
+            }
+        }
+    }
+
+    pub(crate) fn pause(&mut self) {
+        let Some(player) = &self.player else { return };
+        if player.is_playing() {
+            let at = player.time();
+            player.pause();
+            // Rune on Windows shows an old picture and time after a layered clip pauses.
+            player.seek(at);
             self.settling = true;
         }
     }
 
-    pub(crate) fn toggle(&self) {
-        if let Some(player) = &self.player {
-            if self.is_playing() {
-                player.pause();
-            } else {
-                player.play();
-            }
+    pub(crate) fn toggle(&mut self) {
+        if self.death_finished() {
+            self.replay_death();
+        } else if self.is_playing() {
+            self.pause();
+        } else if let Some(player) = &self.player {
+            player.play();
         }
     }
 
