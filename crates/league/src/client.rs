@@ -46,6 +46,8 @@ impl LiveClient {
             .timeout_connect(Some(connect))
             .timeout_global(Some(global))
             .http_status_as_error(false)
+            .max_idle_connections(0)
+            .max_idle_connections_per_host(0)
             .build();
         Self {
             agent: config.into(),
