@@ -2,6 +2,8 @@
 
 mod icons;
 mod logging;
+mod logo;
+mod setup;
 mod tray;
 mod ui;
 mod view;
@@ -46,25 +48,30 @@ fn can_install_updates() -> bool {
 
 #[cfg(windows)]
 fn install_step() -> Option<greyscreen_capture::install::InstallError> {
-    use greyscreen_core::install::UNINSTALL_FLAG;
+    use greyscreen_core::install::{StartPlan, UNINSTALL_FLAG};
     if std::env::args().any(|arg| arg == UNINSTALL_FLAG) {
         greyscreen_capture::install::uninstall();
         std::process::exit(0);
     }
-    if greyscreen_capture::install::is_installed_copy()
-        || std::env::var_os("GREYSCREEN_NO_INSTALL").is_some()
-    {
-        return None;
-    }
-    match greyscreen_capture::install::install_and_relaunch() {
-        Ok(true) => std::process::exit(0),
-        Ok(false) => None,
-        Err(err) => Some(err),
+    match greyscreen_capture::install::current_start_plan() {
+        StartPlan::RunInPlace => None,
+        StartPlan::ShowSetup => {
+            setup::run();
+            std::process::exit(0)
+        }
+        StartPlan::InstallSilently => match greyscreen_capture::install::install_and_relaunch() {
+            Ok(true) => std::process::exit(0),
+            Ok(false) => None,
+            Err(err) => Some(err),
+        },
     }
 }
 
 fn main() {
     let headless = rune::is_headless();
+    if headless && setup::scene_requested() {
+        return setup::run();
+    }
     #[cfg(windows)]
     let install_error = if headless { None } else { install_step() };
     #[cfg(windows)]

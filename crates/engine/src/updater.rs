@@ -65,7 +65,12 @@ impl UpdateConfig {
             running: running.to_owned(),
             can_install,
             dir: std::env::temp_dir().join(DOWNLOAD_DIR),
-            launch: Box::new(|path| std::process::Command::new(path).spawn().map(drop)),
+            launch: Box::new(|path| {
+                std::process::Command::new(path)
+                    .arg(greyscreen_core::install::UPDATE_FLAG)
+                    .spawn()
+                    .map(drop)
+            }),
             first_check: FIRST_CHECK,
             interval: CHECK_INTERVAL,
             busy_retry: BUSY_RETRY,

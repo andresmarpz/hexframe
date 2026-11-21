@@ -46,15 +46,26 @@ fn run_command_quotes_the_exe_and_starts_hidden() {
 
 #[test]
 fn uninstall_entry_has_the_expected_values() {
-    let values = uninstall_values(Path::new("/p/greyscreen.exe"), Path::new("/p"), "1.2.3", 2049);
+    let values = uninstall_values(
+        Path::new("/p/greyscreen.exe"),
+        Path::new("/p"),
+        "1.2.3",
+        2049,
+        "20261121",
+    );
     assert_eq!(value(&values, "DisplayName"), &text("Greyscreen"));
     assert_eq!(value(&values, "DisplayVersion"), &text("1.2.3"));
     assert_eq!(value(&values, "Publisher"), &text("Greyscreen"));
     assert_eq!(value(&values, "DisplayIcon"), &text("/p/greyscreen.exe"));
     assert_eq!(value(&values, "InstallLocation"), &text("/p"));
+    assert_eq!(value(&values, "InstallDate"), &text("20261121"));
     assert_eq!(
         value(&values, "UninstallString"),
         &text("\"/p/greyscreen.exe\" --uninstall")
+    );
+    assert_eq!(
+        value(&values, "QuietUninstallString"),
+        value(&values, "UninstallString")
     );
     assert_eq!(value(&values, "NoModify"), &RegValue::Number(1));
     assert_eq!(value(&values, "NoRepair"), &RegValue::Number(1));
@@ -63,7 +74,13 @@ fn uninstall_entry_has_the_expected_values() {
 
 #[test]
 fn estimated_size_saturates() {
-    let values = uninstall_values(Path::new("/p/h.exe"), Path::new("/p"), "1", u64::MAX);
+    let values = uninstall_values(
+        Path::new("/p/h.exe"),
+        Path::new("/p"),
+        "1",
+        u64::MAX,
+        "20261121",
+    );
     assert_eq!(value(&values, "EstimatedSize"), &RegValue::Number(u32::MAX));
 }
 
@@ -119,5 +136,67 @@ fn instance_event_names_sit_in_the_local_namespace() {
     assert_eq!(
         instance_event_name("greyscreen", "quit"),
         "Local\\greyscreen.quit"
+    );
+}
+
+#[test]
+fn uninstall_entry_names_are_unique_and_text_values_are_not_empty() {
+    let values = uninstall_values(Path::new("/p/h.exe"), Path::new("/p"), "1", 1, "20261121");
+    let mut names: Vec<_> = values.iter().map(|(name, _)| *name).collect();
+    names.sort_unstable();
+    names.dedup();
+    assert_eq!(names.len(), values.len());
+    assert!(
+        values
+            .iter()
+            .all(|(_, v)| !matches!(v, RegValue::Text(t) if t.is_empty()))
+    );
+}
+
+#[test]
+fn install_date_is_eight_digits() {
+    let date = install_date_today();
+    assert_eq!(date.len(), 8);
+    assert!(date.bytes().all(|b| b.is_ascii_digit()));
+}
+
+#[test]
+fn installed_copy_and_opt_out_run_in_place_without_comparing_files() {
+    let never = || -> bool { unreachable!("must not compare files") };
+    assert_eq!(start_plan(true, false, false, never), StartPlan::RunInPlace);
+    assert_eq!(start_plan(false, true, false, never), StartPlan::RunInPlace);
+}
+
+#[test]
+fn updater_launch_installs_silently_without_comparing_files() {
+    let never = || -> bool { unreachable!("must not compare files") };
+    assert_eq!(
+        start_plan(false, false, true, never),
+        StartPlan::InstallSilently
+    );
+}
+
+#[test]
+fn identical_installed_copy_installs_silently() {
+    assert_eq!(
+        start_plan(false, false, false, || true),
+        StartPlan::InstallSilently
+    );
+}
+
+#[test]
+fn a_download_with_no_matching_installed_copy_shows_setup() {
+    assert_eq!(
+        start_plan(false, false, false, || false),
+        StartPlan::ShowSetup
+    );
+}
+
+#[test]
+fn update_flag_is_not_forwarded_to_the_installed_copy() {
+    let args = ["--hidden", UPDATE_FLAG, "x"].map(OsString::from);
+    assert_eq!(
+        without_update_flag(args),
+        ["--hidden", "x"].map(OsString::from)
     );
 }

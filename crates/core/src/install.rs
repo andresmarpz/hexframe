@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -8,6 +9,8 @@ pub const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 pub const RUN_VALUE: &str = "Greyscreen";
 pub const UNINSTALL_FLAG: &str = "--uninstall";
 pub const HIDDEN_FLAG: &str = "--hidden";
+pub const UPDATE_FLAG: &str = "--update";
+pub const NO_INSTALL_ENV: &str = "GREYSCREEN_NO_INSTALL";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegValue {
@@ -35,11 +38,16 @@ pub fn uninstall_command(exe: &Path) -> String {
     format!("\"{}\" {UNINSTALL_FLAG}", exe.display())
 }
 
+pub fn install_date_today() -> String {
+    jiff::Zoned::now().strftime("%Y%m%d").to_string()
+}
+
 pub fn uninstall_values(
     exe: &Path,
     dir: &Path,
     version: &str,
     size_bytes: u64,
+    install_date: &str,
 ) -> Vec<(&'static str, RegValue)> {
     let text = |value: &str| RegValue::Text(value.to_owned());
     vec![
@@ -48,7 +56,9 @@ pub fn uninstall_values(
         ("Publisher", text("Greyscreen")),
         ("DisplayIcon", text(&exe.display().to_string())),
         ("InstallLocation", text(&dir.display().to_string())),
+        ("InstallDate", text(install_date)),
         ("UninstallString", text(&uninstall_command(exe))),
+        ("QuietUninstallString", text(&uninstall_command(exe))),
         ("NoModify", RegValue::Number(1)),
         ("NoRepair", RegValue::Number(1)),
         (
@@ -74,6 +84,32 @@ pub fn install_plan(installed_exists: bool, installed_matches_running: bool) -> 
         (true, true) => InstallPlan::RelaunchInstalled,
         (true, false) => InstallPlan::QuitAndReplace,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartPlan {
+    RunInPlace,
+    InstallSilently,
+    ShowSetup,
+}
+
+pub fn start_plan(
+    in_install_dir: bool,
+    install_disabled: bool,
+    from_updater: bool,
+    installed_matches_running: impl FnOnce() -> bool,
+) -> StartPlan {
+    if in_install_dir || install_disabled {
+        StartPlan::RunInPlace
+    } else if from_updater || installed_matches_running() {
+        StartPlan::InstallSilently
+    } else {
+        StartPlan::ShowSetup
+    }
+}
+
+pub fn without_update_flag(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {
+    args.into_iter().filter(|arg| arg != UPDATE_FLAG).collect()
 }
 
 pub fn wait_until(timeout: Duration, poll: Duration, mut ready: impl FnMut() -> bool) -> bool {

@@ -5,9 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use greyscreen_core::install::{
-    APP_ID, EXE_NAME, InstallPlan, QUIT_POLL, QUIT_WAIT, RUN_KEY, RUN_VALUE, RegValue,
-    UNINSTALL_KEY, cleanup_command, install_plan, is_inside, run_command, uninstall_values,
-    wait_until,
+    APP_ID, EXE_NAME, InstallPlan, NO_INSTALL_ENV, QUIT_POLL, QUIT_WAIT, RUN_KEY, RUN_VALUE,
+    RegValue, StartPlan, UNINSTALL_KEY, UPDATE_FLAG, cleanup_command, install_date_today,
+    install_plan, is_inside, run_command, start_plan, uninstall_values, wait_until,
+    without_update_flag,
 };
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
 use windows::Win32::Storage::EnhancedStorage::PKEY_AppUserModel_ID;
@@ -38,6 +39,8 @@ pub enum InstallError {
     NoAppData,
     #[error("cannot copy the app to {path}: {source}")]
     Copy { path: PathBuf, source: io::Error },
+    #[error("Greyscreen is still running. Quit it from the tray, then run this file again.")]
+    StillRunning,
     #[error("the shortcut thread stopped")]
     ShortcutThread,
     #[error(transparent)]
@@ -75,50 +78,94 @@ pub fn set_process_app_id() {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Progress {
+    ClosingRunning,
+    Copying,
+}
+
+pub fn current_start_plan() -> StartPlan {
+    let (Ok(exe), Ok(dir)) = (std::env::current_exe(), install_dir()) else {
+        return StartPlan::RunInPlace;
+    };
+    start_plan(
+        is_inside(&exe, &dir),
+        std::env::var_os(NO_INSTALL_ENV).is_some(),
+        std::env::args().any(|arg| arg == UPDATE_FLAG),
+        || files_match(&exe, &dir.join(EXE_NAME)),
+    )
+}
+
+pub fn install(mut progress: impl FnMut(Progress)) -> Result<(), InstallError> {
+    let source = std::env::current_exe()?;
+    let dir = install_dir()?;
+    let target = dir.join(EXE_NAME);
+    fs::create_dir_all(&dir)?;
+    let identical = files_match(&source, &target);
+    let plan = install_plan(target.exists(), identical);
+    if plan == InstallPlan::QuitAndReplace {
+        tracing::info!("an installed copy exists, asking a running one to quit");
+        progress(Progress::ClosingRunning);
+        if crate::instance::request_quit(APP_ID) {
+            tracing::info!("quit signalled, waiting for the installed exe to unlock");
+        }
+        if !wait_until(QUIT_WAIT, QUIT_POLL, || is_writable(&target)) {
+            tracing::warn!("the installed exe is still locked, giving up");
+            return Err(InstallError::StillRunning);
+        }
+        tracing::info!("the installed exe is unlocked");
+    }
+    progress(Progress::Copying);
+    let size = if plan == InstallPlan::RelaunchInstalled {
+        fs::metadata(&target)?.len()
+    } else {
+        fs::copy(&source, &target).map_err(|source| InstallError::Copy {
+            path: target.clone(),
+            source,
+        })?
+    };
+    write_uninstall_entry(&target, &dir, size)?;
+    create_shortcut(&target, &dir)?;
+    tracing::info!("installed");
+    Ok(())
+}
+
 pub fn install_and_relaunch() -> Result<bool, InstallError> {
     let source = std::env::current_exe()?;
     let dir = install_dir()?;
     if is_inside(&source, &dir) {
         return Ok(false);
     }
-    let target = dir.join(EXE_NAME);
-    fs::create_dir_all(&dir)?;
-    let identical = files_match(&source, &target);
-    match install_plan(target.exists(), identical) {
-        InstallPlan::RelaunchInstalled => {
-            tracing::info!("the installed copy is identical, relaunching it");
-            relaunch(&target, &dir)?;
+    if files_match(&source, &dir.join(EXE_NAME)) {
+        tracing::info!("the installed copy is identical, relaunching it");
+        launch_installed(without_update_flag(std::env::args_os().skip(1)))?;
+        return Ok(true);
+    }
+    match install(drop) {
+        Ok(()) => {}
+        Err(InstallError::StillRunning) => {
+            show_still_running();
             return Ok(true);
         }
-        InstallPlan::QuitAndReplace => {
-            tracing::info!("an installed copy exists, asking a running one to quit");
-            if crate::instance::request_quit(APP_ID) {
-                tracing::info!("quit signalled, waiting for the installed exe to unlock");
-            }
-            if !wait_until(QUIT_WAIT, QUIT_POLL, || is_writable(&target)) {
-                tracing::warn!("the installed exe is still locked, giving up");
-                show_still_running();
-                return Ok(true);
-            }
-            tracing::info!("the installed exe is unlocked");
-        }
-        InstallPlan::CopyFresh => {}
+        Err(err) => return Err(err),
     }
-    let size = fs::copy(&source, &target).map_err(|source| InstallError::Copy {
-        path: target.clone(),
-        source,
-    })?;
-    create_shortcut(&target, &dir)?;
-    write_uninstall_entry(&target, &dir, size)?;
-    tracing::info!("installed, relaunching");
-    relaunch(&target, &dir)?;
+    tracing::info!("relaunching the installed copy");
+    launch_installed(without_update_flag(std::env::args_os().skip(1)))?;
     Ok(true)
 }
 
-fn relaunch(target: &Path, dir: &Path) -> io::Result<()> {
-    Command::new(target)
-        .args(std::env::args_os().skip(1))
-        .current_dir(dir)
+pub fn launch_installed(args: impl IntoIterator<Item = std::ffi::OsString>) -> io::Result<()> {
+    let dir = install_dir().map_err(|err| io::Error::other(err.to_string()))?;
+    Command::new(dir.join(EXE_NAME))
+        .args(args)
+        .current_dir(&dir)
+        .spawn()
+        .map(drop)
+}
+
+pub fn launch_here_without_installing() -> io::Result<()> {
+    Command::new(std::env::current_exe()?)
+        .env(NO_INSTALL_ENV, "1")
         .spawn()
         .map(drop)
 }
@@ -204,7 +251,8 @@ pub fn set_start_with_windows(enabled: bool) -> Result<(), InstallError> {
 
 fn write_uninstall_entry(exe: &Path, dir: &Path, size: u64) -> Result<(), InstallError> {
     let key = Key::create(UNINSTALL_KEY)?;
-    for (name, value) in uninstall_values(exe, dir, env!("CARGO_PKG_VERSION"), size) {
+    let date = install_date_today();
+    for (name, value) in uninstall_values(exe, dir, env!("CARGO_PKG_VERSION"), size, &date) {
         key.set(name, &value)?;
     }
     Ok(())
