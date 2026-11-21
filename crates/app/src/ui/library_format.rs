@@ -1,6 +1,7 @@
 use greyscreen_core::game::{GameEvent, GameResult, Player};
 use greyscreen_core::highlight::describe_label;
-use greyscreen_core::library::EventEntry;
+use greyscreen_core::library::{ClipEntry, EventEntry};
+use greyscreen_core::review::deaths;
 use greyscreen_engine::RecordingEntry;
 use jiff::Zoned;
 
@@ -98,6 +99,25 @@ pub(crate) fn kda(events: &[EventEntry], me: &Player) -> Kda {
     kda
 }
 
+pub(crate) fn death_total(rec: &RecordingEntry) -> usize {
+    let meta = &rec.meta;
+    deaths(&meta.events, &meta.game.info.me).len()
+}
+
+pub(crate) fn death_hint(rec: &RecordingEntry) -> Option<String> {
+    let meta = &rec.meta;
+    let list = deaths(&meta.events, &meta.game.info.me);
+    if list.is_empty() {
+        return None;
+    }
+    let total = list.len();
+    let noun = if total == 1 { "death" } else { "deaths" };
+    Some(match meta.review.reviewed_among(&list) {
+        0 => format!("{total} {noun}"),
+        reviewed => format!("{total} {noun} · {reviewed} reviewed"),
+    })
+}
+
 pub(crate) fn total_time(secs: f64) -> String {
     let minutes = (secs.max(0.0) / 60.0).round() as u64;
     match (minutes / 60, minutes % 60) {
@@ -184,6 +204,45 @@ pub(crate) fn week_stats(recordings: &[RecordingEntry], now: &Zoned) -> WeekStat
         }
     }
     stats
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RecentClip<'a> {
+    pub entry: &'a RecordingEntry,
+    pub index: usize,
+    pub clip: &'a ClipEntry,
+}
+
+pub(crate) fn recent_clips(recordings: &[RecordingEntry], limit: usize) -> Vec<RecentClip<'_>> {
+    let mut clips: Vec<(f64, RecentClip<'_>)> = recordings
+        .iter()
+        .flat_map(|entry| {
+            let start = entry.meta.started_at.timestamp().as_second() as f64;
+            entry
+                .meta
+                .clips
+                .iter()
+                .enumerate()
+                .map(move |(index, clip)| {
+                    (start + clip.start_secs, RecentClip { entry, index, clip })
+                })
+        })
+        .collect();
+    clips.sort_by(|a, b| b.0.total_cmp(&a.0));
+    clips
+        .into_iter()
+        .take(limit)
+        .map(|(_, clip)| clip)
+        .collect()
+}
+
+pub(crate) fn game_secs_at(entry: &RecordingEntry, rec_secs: f64) -> f64 {
+    let offset = entry
+        .meta
+        .events
+        .first()
+        .map_or(0.0, |event| event.rec_secs - event.game_secs);
+    (rec_secs - offset).max(0.0)
 }
 
 #[cfg(test)]

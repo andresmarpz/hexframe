@@ -1364,6 +1364,7 @@ dependencies = [
  "greyscreen-core",
  "greyscreen-engine",
  "greyscreen-league",
+ "greyscreen-thumbs",
  "jiff",
  "png 0.18.1",
  "rune",

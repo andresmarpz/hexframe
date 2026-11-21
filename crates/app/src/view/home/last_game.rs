@@ -4,12 +4,12 @@ use rune::{Color, El, TextStyle, col, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::feed::tinted_pill;
-use crate::ui::library_format::{Kda, kda, mode_label};
+use crate::ui::library_format::{Kda, death_total, kda, mode_label};
 use crate::ui::{Ui, format_clock};
-use crate::view::champion::champion_icon;
-use crate::view::{card, hairline};
+use crate::view::thumb;
+use crate::view::{card, hairline, section_header};
 
-const ICON_SIZE: f32 = 40.0;
+const THUMB_WIDTH: f32 = 96.0;
 const TABULAR: &str = "'tnum' 1";
 
 pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
@@ -35,7 +35,7 @@ pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
         .py(14.0)
         .gap(12.0)
         .center_y()
-        .child(champion_icon(k, champion, ICON_SIZE))
+        .child(thumb::game_thumb(k, entry, THUMB_WIDTH))
         .child(
             col()
                 .grow(1.0)
@@ -51,18 +51,29 @@ pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
         )
         .child(kda_figures(kda(&entry.meta.events, &game.info.me), k))
         .child(result_pill(game.result, k))
+        .children(deaths_button(entry, k))
         .child(open);
     card(k)
         .key("last-game-card")
-        .child(
-            row().w_full().h(44.0).px(16.0).center_y().child(
-                text("Last game")
-                    .font(k.ty.body_medium)
-                    .color(k.c.text_base),
-            ),
-        )
+        .child(section_header(k, "Last game"))
         .child(hairline(k))
         .child(summary)
+}
+
+fn deaths_button(entry: &RecordingEntry, k: &Kit) -> Option<El> {
+    let count = death_total(entry);
+    if count == 0 {
+        return None;
+    }
+    let id = entry.meta.id.clone();
+    Some(
+        Button::new(format!("Review deaths ({count})"))
+            .variant(ButtonVariant::Neutral)
+            .control_size(ControlSize::Large)
+            .on_press(move |ui: &mut Ui| ui.review_deaths_of(id.clone()))
+            .build(k)
+            .key("last-game-deaths"),
+    )
 }
 
 fn result_pill(result: GameResult, k: &Kit) -> El {

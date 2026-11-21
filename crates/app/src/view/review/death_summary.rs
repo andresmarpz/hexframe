@@ -2,7 +2,7 @@ use greyscreen_core::review::ReviewSummary;
 use rune::{Color, El, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
-use super::tabular;
+use super::{PAGE_PADDING, tabular};
 use crate::ui::{DeathReviewState, ReviewState, Ui, format_clock};
 use crate::view::{card, hairline, title_style};
 
@@ -21,6 +21,7 @@ pub(super) fn screen(review: &ReviewState, state: &DeathReviewState, k: &Kit) ->
         .w_full()
         .h_full()
         .min_h(0.0)
+        .padding(PAGE_PADDING)
         .items_center()
         .gap(16.0)
         .child(

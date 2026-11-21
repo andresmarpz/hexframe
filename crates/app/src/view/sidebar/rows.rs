@@ -1,15 +1,17 @@
 use greyscreen_core::game::GameResult;
 use greyscreen_engine::{EngineStatus, RecordingEntry};
 use jiff::Zoned;
-use rune::{Cursor, El, TextStyle, col, row, text};
+use rune::{Cursor, El, TextStyle, Tx, col, row, text};
 use rune_kit::Kit;
 
 use super::{ROW_HEIGHT, TABULAR, dot};
 use crate::ui::library_format::{Kda, kda, mode_label, when};
 use crate::ui::{Ui, format_clock};
 use crate::view::champion::champion_icon;
+use crate::view::thumb;
 
 const ICON_SIZE: f32 = 32.0;
+const THUMB_WIDTH: f32 = 72.0;
 const TINT: f32 = 0.1;
 const TINT_SELECTED: f32 = 0.2;
 
@@ -102,6 +104,7 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
         kda.kills, kda.deaths, kda.assists, shown.time
     );
     let id = rec.meta.id.clone();
+    let menu_id = id.clone();
     let name = text(champion.to_owned())
         .font(k.ty.body_medium)
         .color(k.c.text_base)
@@ -112,7 +115,10 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
         .truncate();
     base(k, rec.meta.id.clone(), label, selected)
         .on_press(move |ui: &mut Ui| ui.open_review(id.clone()))
-        .child(champion_icon(k, champion, ICON_SIZE))
+        .on_secondary_press(move |ui: &mut Ui, at, _: &mut Tx| {
+            ui.open_row_menu(menu_id.clone(), at)
+        })
+        .child(thumb::game_thumb(k, rec, THUMB_WIDTH))
         .child(two_lines(
             [grow(name), kda_text(kda, k)],
             [grow(detail), result_text(result, k)],

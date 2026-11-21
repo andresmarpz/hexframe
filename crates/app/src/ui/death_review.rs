@@ -11,7 +11,7 @@ use super::{PlayerFactory, ReviewState, Source, Ui};
 
 #[cfg(test)]
 pub(crate) use fixture::death_entry;
-pub(crate) use scenes::{scene_demo, scene_mid, scene_summary};
+pub(crate) use scenes::{scene_browse, scene_demo, scene_mid, scene_summary};
 
 const ARM_SLACK_SECS: f64 = 0.5;
 

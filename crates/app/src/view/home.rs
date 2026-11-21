@@ -1,4 +1,5 @@
 mod actions;
+mod clips;
 mod feed;
 mod last_game;
 mod week;
@@ -29,6 +30,9 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     let mut page = page;
     if let Some(entry) = &s.last_game {
         page = page.child(last_game::panel(entry, k));
+    }
+    if let Some(recent) = clips::section(s, k) {
+        page = page.child(recent);
     }
     page.child(week::section(s, k, &now))
 }

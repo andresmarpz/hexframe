@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
 use greyscreen_core::highlight::{Highlight, Objective, Structure};
+use greyscreen_core::library::thumb::clip_thumb_file;
 use greyscreen_core::library::{
     ClipEntry, EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo,
 };
@@ -9,7 +10,7 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineStatus, FeedItem, RecordingEntry};
 use jiff::{SignedDuration, Unit, Zoned};
 
-use super::Ui;
+use super::{Ui, preview_thumbs};
 
 pub(super) fn ui() -> Ui {
     let mut ui = Ui::blank(Settings::default());
@@ -21,7 +22,26 @@ pub(super) fn ui() -> Ui {
     ui.feed = feed().into();
     ui.recordings = recordings();
     ui.live_selected = true;
+    if rune::is_headless() {
+        seed_thumbs(&mut ui.recordings);
+    }
     ui
+}
+
+fn seed_thumbs(recordings: &mut [RecordingEntry]) {
+    let root = preview_thumbs::dir();
+    for (game, rec) in recordings.iter_mut().enumerate() {
+        rec.folder = root.join(&rec.meta.id);
+        let seed = game as u32 * 31 + 5;
+        preview_thumbs::write(&rec.folder.join("thumb.jpg"), seed);
+        for (index, clip) in rec.meta.clips.iter().enumerate() {
+            let dest = rec.folder.join(clip_thumb_file(clip));
+            preview_thumbs::write(&dest, seed * 17 + index as u32 * 7 + 3);
+        }
+    }
+    if let Some(first) = recordings.first() {
+        preview_thumbs::copy_playable(&first.folder, first);
+    }
 }
 
 fn player(champion: &str) -> Player {

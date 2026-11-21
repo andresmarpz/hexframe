@@ -11,10 +11,13 @@ use super::tabular;
 use super::timeline::event_color;
 use crate::ui::library_format::{clip_title, humanize};
 use crate::ui::{EventFilter, PanelTab, ReviewState, Source, Ui, format_clock, seek_target};
-use crate::view::{card, hairline};
+use crate::view::{card, hairline, thumb};
 
 pub(super) const PANEL_WIDTH: f32 = 280.0;
 const ROW_HEIGHT: f32 = 34.0;
+const CLIP_ROW_HEIGHT: f32 = 52.0;
+const CLIP_THUMB_WIDTH: f32 = 64.0;
+const CLIP_THUMB_HEIGHT: f32 = 36.0;
 const TAB_HEIGHT: f32 = 40.0;
 const CHIP_HEIGHT: f32 = 24.0;
 const LIST_PAD: f32 = 8.0;
@@ -285,32 +288,41 @@ fn clip_row(index: usize, clip: &ClipEntry, active: bool, review: &ReviewState, 
     let line = row()
         .key(format!("clip-{index}"))
         .w_full()
-        .h(ROW_HEIGHT)
+        .h(CLIP_ROW_HEIGHT)
         .px(12.0)
         .gap(10.0)
         .center_y()
         .hover_group()
         .on_press(move |ui: &mut Ui| ui.play_clip(index))
+        .child(thumb::clip_thumb_small(
+            k,
+            &review.entry,
+            clip,
+            (CLIP_THUMB_WIDTH, CLIP_THUMB_HEIGHT),
+        ))
         .child(
-            el().grow(1.0).min_w(0.0).child(
-                text(clip_title(&clip.label))
-                    .font(if active { k.ty.body_medium } else { k.ty.body })
-                    .color(if active {
-                        k.c.text_accent
-                    } else {
-                        k.c.text_base
-                    })
-                    .truncate(),
-            ),
-        )
-        .child(
-            text(format!(
-                "{} - {}",
-                format_clock(clip.start_secs as u32),
-                format_clock(clip.end_secs as u32)
-            ))
-            .font(tabular(k.ty.small))
-            .color(k.c.text_muted),
+            col()
+                .grow(1.0)
+                .min_w(0.0)
+                .child(
+                    text(clip_title(&clip.label))
+                        .font(if active { k.ty.body_medium } else { k.ty.body })
+                        .color(if active {
+                            k.c.text_accent
+                        } else {
+                            k.c.text_base
+                        })
+                        .truncate(),
+                )
+                .child(
+                    text(format!(
+                        "{} - {}",
+                        format_clock(clip.start_secs as u32),
+                        format_clock(clip.end_secs as u32)
+                    ))
+                    .font(tabular(k.ty.small))
+                    .color(k.c.text_muted),
+                ),
         )
         .child(show);
     k.interactive(mark_active(

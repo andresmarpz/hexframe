@@ -28,7 +28,7 @@ static GEAR: Icon = Icon {
     ),
 };
 
-pub(super) const ROW_HEIGHT: f32 = 56.0;
+pub(super) const ROW_HEIGHT: f32 = 60.0;
 const PULSE_SECS: f64 = 1.4;
 const TABULAR: &str = "'tnum' 1";
 

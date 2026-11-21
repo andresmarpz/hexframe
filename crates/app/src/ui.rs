@@ -8,7 +8,7 @@ use greyscreen_core::update::UpdateInfo;
 use greyscreen_engine::{
     EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg, reveal,
 };
-use rune::{TextEdit, Tx};
+use rune::{PointerPress, TextEdit, Tx};
 use rune_kit::PaneState;
 
 mod death_review;
@@ -20,8 +20,10 @@ mod keybinds;
 mod keys;
 pub(crate) mod library_format;
 mod preview;
+mod preview_thumbs;
 pub(crate) mod recordings_filter;
 mod review;
+mod row_menu;
 mod scenes;
 mod selection;
 mod settings_sheet;
@@ -90,6 +92,7 @@ pub(crate) struct Ui {
     pub elapsed_secs: u32,
     pub stop_confirm_until: Option<f64>,
     pub review: Option<ReviewState>,
+    pub row_menu: Option<(String, PointerPress)>,
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
     pub storage_open: bool,
@@ -134,6 +137,7 @@ impl Ui {
             elapsed_secs: 0,
             stop_confirm_until: None,
             review: None,
+            row_menu: None,
             player_factory: review::rune_player,
             resolution_open: false,
             storage_open: false,
@@ -204,6 +208,11 @@ impl Ui {
         }
     }
 
+    pub(crate) fn open_clip(&mut self, id: String, index: usize) {
+        self.open_review(id);
+        self.play_clip(index);
+    }
+
     pub(crate) fn open_last_game(&mut self) {
         if let Some(entry) = self.last_game.clone() {
             self.open_review_entry(entry);
@@ -267,10 +276,10 @@ impl Ui {
                 self.show_notice(NoticeLevel::Info, text, tx);
             }
             UiMsg::Library(recordings) => self.apply_library(recordings),
+            UiMsg::Thumbnail(path) => crate::view::thumb::invalidate(&path),
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
             UiMsg::Update(state) => self.apply_update(state),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
-            UiMsg::Thumbnail(_) => {}
         }
     }
 

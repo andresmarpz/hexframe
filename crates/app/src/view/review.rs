@@ -208,7 +208,7 @@ pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
 
 fn deaths_button(review: &ReviewState, k: &Kit) -> El {
     let count = review.death_count();
-    if count == 0 || review.player.is_none() {
+    if count == 0 || review.player.is_none() || review.death.is_some() {
         return el();
     }
     Button::new(format!("Review deaths ({count})"))

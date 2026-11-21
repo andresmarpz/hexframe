@@ -2,7 +2,7 @@ use greyscreen_core::review::DeathTag;
 use rune::{Drag, El, Phase, TextEdit, Tx, col, el, row, text};
 use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit, Switch, TextArea};
 
-use super::{icons, play_button, tabular, video_frame};
+use super::{PAGE_PADDING, icons, play_button, tabular, video_frame};
 use crate::ui::{DeathReviewState, ReviewState, Ui, title_line};
 use crate::view::card;
 use crate::view::champion::champion_icon;
@@ -30,6 +30,7 @@ pub(super) fn screen(
         .w_full()
         .h_full()
         .min_h(0.0)
+        .padding(PAGE_PADDING)
         .gap(12.0)
         .child(header(review, state, k))
         .child(video(review, k))

@@ -96,7 +96,7 @@ actions! {
     PreviousDeath => Spec::new("previous_death", "Previous death", Group::Review, Scope::App, &["P"]),
     ReplayDeath => Spec::new("replay_death", "Replay death", Group::Review, Scope::App, &["R"]),
     ToggleFullscreen => Spec::new("toggle_fullscreen", "Toggle fullscreen", Group::Review, Scope::App, &["F"]),
-    ExitFullscreen => Spec::new("exit_fullscreen", "Exit fullscreen or close the game", Group::Review, Scope::App, &["Escape"]).fixed(),
+    ExitFullscreen => Spec::new("exit_fullscreen", "Go back or close the game", Group::Review, Scope::App, &["Escape"]).fixed(),
     OpenSettings => Spec::new("open_settings", "Open settings", Group::General, Scope::App, &["Mod+,"]),
     PreviousGame => Spec::new("previous_game", "Previous game", Group::General, Scope::App, &["Up"]),
     NextGame => Spec::new("next_game", "Next game", Group::General, Scope::App, &["Down"]),

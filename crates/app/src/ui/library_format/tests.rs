@@ -213,3 +213,24 @@ fn clip_titles_use_the_display_title_or_split_the_label() {
     assert_eq!(clip_title("Multikill2"), "Double kill");
     assert_eq!(clip_title("SomethingNew"), "Something new");
 }
+
+#[test]
+fn recent_clips_come_from_the_newest_game_first() {
+    let recordings = Ui::preview().recordings;
+    let clips = recent_clips(&recordings, 6);
+    assert_eq!(clips.len(), 6);
+    assert!(
+        clips
+            .iter()
+            .all(|c| c.entry.meta.id == recordings[0].meta.id)
+    );
+    let starts: Vec<f64> = clips.iter().map(|c| c.clip.start_secs).collect();
+    assert!(starts.windows(2).all(|pair| pair[0] >= pair[1]));
+}
+
+#[test]
+fn game_time_is_recording_time_minus_the_loading_screen() {
+    let recordings = Ui::preview().recordings;
+    assert_eq!(game_secs_at(&recordings[0], 98.0), 90.0);
+    assert_eq!(game_secs_at(&recordings[0], 2.0), 0.0);
+}

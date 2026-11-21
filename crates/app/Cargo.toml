@@ -12,6 +12,7 @@ rune.workspace = true
 rune-kit.workspace = true
 greyscreen-core.workspace = true
 greyscreen-engine.workspace = true
+greyscreen-thumbs.workspace = true
 anyhow.workspace = true
 crossbeam-channel.workspace = true
 jiff.workspace = true

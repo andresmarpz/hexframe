@@ -8,6 +8,14 @@ const MID_DEATH_OFFSET_SECS: f64 = 0.6;
 const WINDOW_BAR_WIDTH: f32 = 832.0;
 const SUMMARY_BAR_WIDTH: f32 = 580.0;
 
+fn show_in_list(ui: &mut Ui) {
+    let Some(review) = &ui.review else { return };
+    let meta = review.entry.meta.clone();
+    if let Some(first) = ui.recordings.first_mut() {
+        first.meta = meta;
+    }
+}
+
 fn open_with_reviews(ui: &mut Ui) {
     ui.open_review_entry(death_entry());
     let Some(review) = &mut ui.review else { return };
@@ -28,6 +36,7 @@ fn open_with_reviews(ui: &mut Ui) {
         "Walked into three of them. Should have waited for the wave.",
     );
     data.set_note(7, "Pushed past river with no ward and Zed missing.");
+    show_in_list(ui);
 }
 
 pub(crate) fn scene_mid(ui: &mut Ui) {
@@ -58,4 +67,21 @@ pub(crate) fn scene_summary(ui: &mut Ui) {
 
 pub(crate) fn scene_demo(ui: &mut Ui) {
     ui.open_review_entry(death_entry());
+    show_in_list(ui);
+}
+
+pub(crate) fn scene_browse(ui: &mut Ui) {
+    let entry = death_entry();
+    let Some(first) = ui.recordings.first_mut() else {
+        return;
+    };
+    let source = entry.folder.join(&entry.meta.video);
+    let target = first.folder.join(&entry.meta.video);
+    if !target.is_file() {
+        drop(std::fs::copy(source, target));
+    }
+    first.meta = entry.meta;
+    for rec in ui.recordings.iter().skip(1) {
+        crate::ui::preview_thumbs::copy_playable(&rec.folder, rec);
+    }
 }

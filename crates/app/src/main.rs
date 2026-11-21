@@ -100,7 +100,10 @@ fn main() {
         min_size: Some((1000.0, 600.0)),
         scenes: ui::SCENES,
         poll: Some(Ui::poll),
-        setup: Some(|_, waker| view::champion::set_waker(waker)),
+        setup: Some(|_, waker| {
+            view::thumb::set_waker(waker.clone());
+            view::champion::set_waker(waker);
+        }),
         on_key: Some(Ui::on_key),
         ..AppSpec::new("Greyscreen", (1180.0, 680.0), Ui::preview, view::root)
     };

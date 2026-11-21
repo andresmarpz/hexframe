@@ -2,11 +2,13 @@ pub(crate) mod champion;
 mod delete;
 mod home;
 mod review;
+mod row_menu;
 mod settings;
 mod sidebar;
+pub(crate) mod thumb;
 
 use greyscreen_engine::NoticeLevel;
-use rune::{Cx, El, ScrollSpec, TextStyle, col, el};
+use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
 use rune_kit::{Kit, SplitView, Toast, ToastRegion, Toolbar};
 
 use crate::ui::{Detail, Ui};
@@ -15,6 +17,7 @@ const PAGE_MAX_WIDTH: f32 = 880.0;
 const PAGE_GUTTER: f32 = 24.0;
 const CARD_RADIUS: f32 = 10.0;
 const SCROLL_FADE: f32 = 28.0;
+const SECTION_HEADER_HEIGHT: f32 = 44.0;
 
 pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let k = Kit::neutral(cx.system_dark());
@@ -30,6 +33,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     if theater.is_none() {
         settings::sheet(s, &k, &mut layer);
     }
+    row_menu::menu(s, &k, &mut layer);
     if let Some(rec) = s.pending_delete_entry() {
         delete::confirm_delete(rec, &k, &mut layer);
     }
@@ -100,6 +104,15 @@ fn card(k: &Kit) -> El {
         .fill(k.c.bg_base)
         .radius(CARD_RADIUS)
         .border(1.0, k.c.border_base)
+}
+
+fn section_header(k: &Kit, title: &str) -> El {
+    row()
+        .w_full()
+        .h(SECTION_HEADER_HEIGHT)
+        .px(16.0)
+        .center_y()
+        .child(text(title).font(k.ty.body_medium).color(k.c.text_base))
 }
 
 fn hairline(k: &Kit) -> El {

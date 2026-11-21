@@ -4,7 +4,7 @@ use rune_kit::Kit;
 
 use crate::ui::Ui;
 use crate::ui::library_format::{WeekStats, total_time, week_stats};
-use crate::view::{card, hairline, title_style};
+use crate::view::{card, hairline, section_header, title_style};
 
 const TABULAR: &str = "'tnum' 1";
 
@@ -12,13 +12,7 @@ pub(super) fn section(s: &Ui, k: &Kit, now: &Zoned) -> El {
     let stats = week_stats(&s.recordings, now);
     card(k)
         .key("this-week")
-        .child(
-            row().w_full().h(44.0).px(16.0).center_y().child(
-                text("This week")
-                    .font(k.ty.body_medium)
-                    .color(k.c.text_base),
-            ),
-        )
+        .child(section_header(k, "This week"))
         .child(hairline(k))
         .child(
             row()

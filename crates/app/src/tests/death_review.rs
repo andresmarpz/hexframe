@@ -6,6 +6,7 @@ use rune::{Key, Runtime};
 
 use super::{card_text, press, press_char, refresh, runtime_with, tap};
 use crate::ui::fake_player::{self, Call};
+use crate::ui::library_format::death_hint;
 use crate::ui::{Detail, Ui, death_entry};
 
 fn death_runtime() -> Runtime<Ui> {
@@ -445,4 +446,20 @@ fn entering_from_a_clip_switches_to_the_full_game() {
     press_char(&mut rt, "d");
     assert_eq!(review(&rt).source, crate::ui::Source::Game);
     assert_eq!(index(&rt), Some(0));
+}
+
+#[test]
+fn the_hint_counts_deaths_and_reviews() {
+    let mut entry = death_entry();
+    assert_eq!(death_hint(&entry).as_deref(), Some("7 deaths"));
+    entry.meta.review.toggle_tag(2, DeathTag::Ganked);
+    entry.meta.review.set_note(9, "greedy");
+    assert_eq!(death_hint(&entry).as_deref(), Some("7 deaths · 2 reviewed"));
+    entry
+        .meta
+        .events
+        .retain(|e| e.id != 3 && e.id != 4 && e.id != 6 && e.id != 7 && e.id != 8 && e.id != 9);
+    assert_eq!(death_hint(&entry).as_deref(), Some("1 death · 1 reviewed"));
+    entry.meta.events.retain(|e| e.id != 2);
+    assert_eq!(death_hint(&entry), None);
 }

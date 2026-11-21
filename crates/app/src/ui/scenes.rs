@@ -1,9 +1,9 @@
 use greyscreen_core::keybinds::Action;
 use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
-use rune::TextEdit;
+use rune::{PointerPress, TextEdit};
 
-use super::{SettingsSection, Ui, death_review, preview, update};
+use super::{PanelTab, SettingsSection, Ui, death_review, preview, update};
 
 type Scene = (&'static str, fn(&mut Ui));
 
@@ -33,7 +33,10 @@ fn demo(ui: &mut Ui) {
 }
 
 pub(crate) const SCENES: &[Scene] = &[
-    ("home", idle),
+    ("home", |ui| {
+        idle(ui);
+        ui.last_game = ui.recordings.first().cloned();
+    }),
     ("demo", demo),
     ("home-first-run", first_run),
     ("idle-off", |ui| {
@@ -132,10 +135,35 @@ pub(crate) const SCENES: &[Scene] = &[
             "F9 is already used by another app. Choose a different key.".into(),
         )];
     }),
+    ("coach-demo", |ui| {
+        idle(ui);
+        death_review::scene_browse(ui);
+    }),
+    ("row-menu", |ui| {
+        idle(ui);
+        if let Some(id) = ui.recordings.first().map(|rec| rec.meta.id.clone()) {
+            ui.open_row_menu(id, PointerPress { x: 140.0, y: 190.0 });
+        }
+    }),
     ("review", game),
-    ("death-review-start", death_review::scene_demo),
-    ("death-review", death_review::scene_mid),
-    ("death-review-summary", death_review::scene_summary),
+    ("review-clips", |ui| {
+        game(ui);
+        if let Some(review) = &mut ui.review {
+            review.tab = PanelTab::Clips;
+        }
+    }),
+    ("death-review-start", |ui| {
+        idle(ui);
+        death_review::scene_demo(ui);
+    }),
+    ("death-review", |ui| {
+        idle(ui);
+        death_review::scene_mid(ui);
+    }),
+    ("death-review-summary", |ui| {
+        idle(ui);
+        death_review::scene_summary(ui);
+    }),
     ("review-theater", |ui| {
         game(ui);
         if let Some(review) = &mut ui.review {
