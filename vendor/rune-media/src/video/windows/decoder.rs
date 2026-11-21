@@ -390,6 +390,15 @@ impl Decoder {
                         // The source seeks with the inbox free: the UI never waits on it, and a
                         // newer seek replaces this one before a picture is read.
                         drop(s);
+                        // Pictures nobody drew are free at once: with every texture held by one,
+                        // nothing would ever signal the release fence and the next copy waits for ever.
+                        if let Some(ring) = &mut self.ring {
+                            for picture in &stale {
+                                if let Pic::Gpu(planes, _) = &picture.picture {
+                                    ring.unread(planes);
+                                }
+                            }
+                        }
                         drop(stale);
                         generation = seek.generation;
                         skip_before = to;

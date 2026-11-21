@@ -28,6 +28,11 @@ pub(super) fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join("qa-bars-60fps.m4v")
 }
 
+/// Whether ffmpeg runs: the long fixture needs it, and a PC without it skips that test.
+pub(super) fn ffmpeg_available() -> bool {
+    std::process::Command::new("ffmpeg").arg("-version").output().is_ok_and(|o| o.status.success())
+}
+
 /// A 10 minute clip like the fixture, its index at the end as in a finished recording, made once
 /// with ffmpeg (on PATH) in the temp folder: 3.5 MB is too much for the repository.
 pub(super) fn long_fixture() -> PathBuf {

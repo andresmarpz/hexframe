@@ -5,6 +5,8 @@ use crate::video::windows::audio::fake;
 /// How far the clock may be from what is heard: under lip-sync's 45 ms.
 const SYNC: f64 = 0.04;
 const SIZE: (u32, u32) = (320, 180);
+/// The fixture has a keyframe at every multiple of this picture number (x264 adds some on its own).
+const KEYFRAME_EVERY: u32 = 32;
 /// The fixture's last picture: 6 s at 60 fps.
 const LAST: u32 = 359;
 /// Beats come once a second, so a window of 2.2 s always holds two.
@@ -284,7 +286,7 @@ fn a_scrub_shows_keyframes_then_plays_on_from_where_it_stops() {
     rig.run(0.5);
     rig.player.pause();
     let shots = storm(&mut rig, 30, true, |i| 0.6 + f64::from(i) * 0.15);
-    let keyframes: Vec<u32> = shots.iter().filter_map(|s| s.picture).filter(|p| *p > 0 && p % 60 == 0).collect();
+    let keyframes: Vec<u32> = shots.iter().filter_map(|s| s.picture).filter(|p| *p > 0 && p % KEYFRAME_EVERY == 0).collect();
     eprintln!("the scrub showed keyframes {keyframes:?}");
     assert!(keyframes.len() >= 3, "the scrub showed keyframes {keyframes:?}");
     assert!(!rig.player.is_playing());
@@ -295,6 +297,10 @@ fn a_scrub_shows_keyframes_then_plays_on_from_where_it_stops() {
 
 #[test]
 fn a_long_seek_lands_as_soon_as_a_short_one() {
+    if !ffmpeg_available() {
+        eprintln!("skipped: ffmpeg is not on PATH, and the long fixture needs it");
+        return;
+    }
     let mut rig = Rig::open(&long_fixture(), true);
     rig.player.play();
     rig.until(5.0, "the first picture", |_, s| s.picture.is_some());
