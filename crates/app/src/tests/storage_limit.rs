@@ -12,6 +12,7 @@ fn settings_runtime() -> (Runtime<Ui>, crossbeam_channel::Receiver<EngineCmd>) {
     let mut rt = Runtime::new(ui, view::root, (960.0, 2600.0), Env::new(true, 1.0));
     rt.frame(0.0);
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-storage");
     (rt, rx)
 }
 

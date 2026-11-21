@@ -2,7 +2,7 @@ use greyscreen_engine::EngineStatus;
 use rune::Runtime;
 
 use super::{nav_rect_of, runtime, settle, tap, visible_texts};
-use crate::ui::{Screen, Ui};
+use crate::ui::{Screen, SettingsSection, Ui};
 
 fn recording_runtime(screen: Screen) -> Runtime<Ui> {
     let mut rt = runtime();
@@ -36,7 +36,7 @@ fn the_sidebar_items_switch_screens() {
 fn the_gear_opens_settings_and_has_a_tooltip_name() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
-    assert_eq!(rt.state.screen, Screen::Settings);
+    assert!(rt.state.settings_open);
     assert!(visible_texts(&rt).iter().any(|t| t == "Settings"));
 }
 
@@ -58,8 +58,10 @@ fn the_indicator_shows_the_elapsed_time_on_recordings_while_recording() {
 }
 
 #[test]
-fn the_indicator_shows_on_settings_and_review_too() {
-    let rt = recording_runtime(Screen::Settings);
+fn the_indicator_shows_under_the_settings_sheet_and_on_review_too() {
+    let mut rt = recording_runtime(Screen::Recordings);
+    rt.update(|ui, _| ui.open_settings(SettingsSection::Recording));
+    settle(&mut rt);
     assert!(rt.find("nav-recording").is_some());
     let mut rt = runtime();
     let entry = rt.state.recordings[0].clone();
@@ -105,7 +107,7 @@ fn the_indicator_follows_the_clock() {
 
 #[test]
 fn clicking_the_indicator_goes_home() {
-    let mut rt = recording_runtime(Screen::Settings);
+    let mut rt = recording_runtime(Screen::Recordings);
     tap(&mut rt, "nav-recording");
     assert_eq!(rt.state.screen, Screen::Home);
     assert!(rt.find("nav-recording").is_none());

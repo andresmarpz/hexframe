@@ -5,21 +5,18 @@ use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 use super::{setting_row, toggle_row};
 use crate::ui::Ui;
 
-pub(super) fn rows(s: &Ui, k: &Kit) -> Vec<El> {
-    vec![
-        update_row(s, k),
-        toggle_row(
-            k,
-            "check-updates",
-            "Check for updates automatically",
-            Some("Look for a newer version every few hours."),
-            s.settings.check_updates,
-            |ui| ui.change(|s| s.check_updates = !s.check_updates),
-        ),
-    ]
+pub(super) fn auto_row(s: &Ui, k: &Kit) -> El {
+    toggle_row(
+        k,
+        "check-updates",
+        "Check for updates automatically",
+        Some("Look for a newer version every few hours."),
+        s.settings.check_updates,
+        |ui| ui.change(|s| s.check_updates = !s.check_updates),
+    )
 }
 
-fn update_row(s: &Ui, k: &Kit) -> El {
+pub(super) fn update_row(s: &Ui, k: &Kit) -> El {
     let (description, action) = describe(s);
     setting_row(
         k,

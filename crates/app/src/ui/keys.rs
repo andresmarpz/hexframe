@@ -24,9 +24,10 @@ impl Ui {
 
     fn run_action(&mut self, action: Action, tx: &mut Tx) -> bool {
         match action {
-            Action::OpenSettings => self.go(Screen::Settings),
+            Action::OpenSettings => self.toggle_settings(),
             Action::GoHome => self.go(Screen::Home),
             Action::GoRecordings => self.go(Screen::Recordings),
+            _ if self.settings_open => return false,
             _ => return self.run_review_action(action, tx),
         }
         true

@@ -1,8 +1,8 @@
-use greyscreen_core::keybinds::{Action, Group, Keymap, Scope};
-use rune::{El, Icon, col, el, row, text};
+use greyscreen_core::keybinds::{Action, Keymap, Scope};
+use rune::{El, Icon, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Keybind, Kit};
 
-use super::{section, setting_row};
+use super::setting_row;
 use crate::ui::Ui;
 use crate::ui::key_event::MAC;
 
@@ -17,26 +17,8 @@ static RESET: Icon = Icon {
     body: r#"<path d="M3.2 8a4.8 4.8 0 1 0 1.5-3.5" stroke="currentColor" fill="none" stroke-linecap="round"/><path d="M3 2.6V5.4H5.8" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"/>"#,
 };
 
-pub(super) fn page(s: &Ui, k: &Kit) -> El {
+pub(super) fn header(s: &Ui, k: &Kit) -> El {
     let keymap = s.settings.keymap();
-    let mut page = col().key("keybinds").w_full().gap(20.0);
-    for group in Group::ALL {
-        let rows: Vec<El> = Action::ALL
-            .iter()
-            .filter(|action| action.group() == group)
-            .map(|action| action_row(s, k, &keymap, *action))
-            .collect();
-        page = page.child(section(
-            k,
-            &format!("keybinds-{}", group.label().to_lowercase()),
-            group.label(),
-            rows,
-        ));
-    }
-    page.child(reset_all(k, &keymap))
-}
-
-fn reset_all(k: &Kit, keymap: &Keymap) -> El {
     let unchanged = Action::ALL.iter().all(|action| keymap.is_default(*action));
     let button = Button::new("Reset all to defaults")
         .variant(ButtonVariant::Neutral)
@@ -45,7 +27,20 @@ fn reset_all(k: &Kit, keymap: &Keymap) -> El {
         .on_press(|ui: &mut Ui| ui.reset_all_bindings())
         .build(k)
         .key("bind-reset-all");
-    row().w_full().justify_end().child(button)
+    row()
+        .w_full()
+        .center_y()
+        .justify_between()
+        .child(
+            text("Click Change, then press the new keys.")
+                .font(k.ty.small)
+                .color(k.c.text_muted),
+        )
+        .child(button)
+}
+
+pub(super) fn bind_row(s: &Ui, k: &Kit, action: Action) -> El {
+    action_row(s, k, &s.settings.keymap(), action)
 }
 
 fn action_row(s: &Ui, k: &Kit, keymap: &Keymap, action: Action) -> El {

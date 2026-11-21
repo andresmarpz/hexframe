@@ -40,6 +40,7 @@ fn the_size_estimate_ends_with_a_period() {
 fn the_about_card_carries_the_riot_notice() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-about");
     assert!(rt.find("riot-notice").is_some());
     assert!(
         visible_texts(&rt)

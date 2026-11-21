@@ -21,6 +21,7 @@ mod preview;
 pub(crate) mod recordings_filter;
 mod review;
 mod scenes;
+mod settings_sheet;
 mod tone;
 mod update;
 
@@ -34,6 +35,7 @@ pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::{RecordingsFilter, ResultFilter, modes_present};
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use scenes::SCENES;
+pub(crate) use settings_sheet::SettingsSection;
 pub(crate) use tone::tone_color;
 pub(crate) use update::UpdateUi;
 
@@ -57,15 +59,7 @@ pub(crate) enum Screen {
     #[default]
     Home,
     Recordings,
-    Settings,
     Review,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum SettingsTab {
-    #[default]
-    General,
-    Keybinds,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +86,9 @@ pub(crate) struct Ui {
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
     pub storage_open: bool,
-    pub settings_tab: SettingsTab,
+    pub settings_open: bool,
+    pub settings_section: SettingsSection,
+    pub settings_search: TextEdit,
     pub rebinding: Option<Action>,
     pub bind_hint: Option<(Action, String)>,
     pub hotkey_errors: Vec<(Action, String)>,
@@ -132,7 +128,9 @@ impl Ui {
             player_factory: review::rune_player,
             resolution_open: false,
             storage_open: false,
-            settings_tab: SettingsTab::General,
+            settings_open: false,
+            settings_section: SettingsSection::Recording,
+            settings_search: TextEdit::default(),
             rebinding: None,
             bind_hint: None,
             hotkey_errors: Vec::new(),
@@ -191,8 +189,8 @@ impl Ui {
     }
 
     pub(crate) fn go(&mut self, screen: Screen) {
+        self.close_settings();
         self.screen = screen;
-        self.stop_rebinding();
         if screen != Screen::Review {
             self.review = None;
         }
@@ -219,6 +217,7 @@ impl Ui {
     }
 
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
+        self.close_settings();
         self.review = Some(ReviewState::open(entry, self.player_factory));
         self.screen = Screen::Review;
     }

@@ -1,0 +1,167 @@
+use greyscreen_core::settings::{Quality, Resolution, resolution_options};
+use greyscreen_engine::EngineStatus;
+use rune::{El, row, text};
+use rune_kit::{Kit, SegmentedControl, Select, SelectAppearance};
+
+use super::catalog::Row;
+use super::{setting_row, toggle_row};
+use crate::ui::{Ui, format_size_rate};
+
+const QUALITIES: [(Quality, &str); 3] = [
+    (Quality::Balanced, "Balanced"),
+    (Quality::High, "High"),
+    (Quality::Max, "Max"),
+];
+const QUALITY_NOTE: &str = "Higher quality uses more disk space.";
+const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
+const FPS_OPTIONS: [u32; 2] = [30, 60];
+const QUALITY_WIDTH: f32 = 252.0;
+const FPS_WIDTH: f32 = 120.0;
+const RESOLUTION_WIDTH: f32 = 180.0;
+const NEXT_GAME: &str =
+    "Recording now. Quality, resolution and frame rate changes apply to your next game.";
+
+pub(super) fn notice(s: &Ui, k: &Kit) -> Option<El> {
+    matches!(s.status, EngineStatus::Recording { .. }).then(|| {
+        row()
+            .key("settings-next-game")
+            .w_full()
+            .px(12.0)
+            .py(8.0)
+            .radius(8.0)
+            .fill(k.c.info.bg)
+            .child(
+                text(NEXT_GAME)
+                    .wrap()
+                    .w_full()
+                    .font(k.ty.small)
+                    .color(k.c.info.fg),
+            )
+    })
+}
+
+pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
+    let settings = &s.settings;
+    match which {
+        Row::RecordGames => toggle_row(
+            k,
+            "auto-record",
+            "Record games",
+            Some("Start recording when a League game starts."),
+            settings.auto_record,
+            |ui| ui.change(|s| s.auto_record = !s.auto_record),
+        ),
+        Row::FullGame => toggle_row(
+            k,
+            "full-game",
+            "Record the full game",
+            Some("Off keeps only highlight clips."),
+            settings.record_full_game,
+            |ui| ui.change(|s| s.record_full_game = !s.record_full_game),
+        ),
+        Row::Quality => {
+            let note = quality_note(s, native_height(&connected_displays()));
+            setting_row(k, "quality-row", "Quality", Some(&note), quality(s, k))
+        }
+        Row::Resolution => setting_row(
+            k,
+            "resolution-row",
+            "Resolution",
+            Some("Larger games are scaled down to this."),
+            resolution(s, k, layer),
+        ),
+        Row::FrameRate => setting_row(
+            k,
+            "fps-row",
+            "Frame rate",
+            Some("60 is smoother, 30 uses less disk space."),
+            fps(s, k),
+        ),
+        Row::Audio => toggle_row(
+            k,
+            "audio",
+            "Record game audio",
+            Some("Records League's own audio. Discord and your microphone aren't recorded."),
+            settings.audio,
+            |ui| ui.change(|s| s.audio = !s.audio),
+        ),
+        _ => toggle_row(
+            k,
+            "capture-cursor",
+            "Show cursor",
+            Some("Include the mouse cursor, as the game draws it."),
+            settings.capture_cursor,
+            |ui| ui.change(|s| s.capture_cursor = !s.capture_cursor),
+        ),
+    }
+}
+
+fn quality(s: &Ui, k: &Kit) -> El {
+    SegmentedControl::new(
+        &QUALITIES.map(|(_, label)| label),
+        QUALITIES.iter().position(|(q, _)| *q == s.settings.quality),
+    )
+    .label("Quality")
+    .width(Some(QUALITY_WIDTH))
+    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
+    .build(k)
+    .key("quality")
+}
+
+fn resolution(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
+    let options = resolution_options(&connected_displays(), s.settings.resolution);
+    let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
+    let current = options
+        .iter()
+        .find(|o| o.resolution == s.settings.resolution)
+        .map(|o| o.label.as_str());
+    Select::new("resolution", &labels)
+        .current(current)
+        .open(s.resolution_open)
+        .appearance(SelectAppearance::Field)
+        .width(RESOLUTION_WIDTH)
+        .label("Resolution")
+        .on_toggle(|ui: &mut Ui| ui.resolution_open = !ui.resolution_open)
+        .on_close(|ui: &mut Ui| ui.resolution_open = false)
+        .on_choose(move |ui: &mut Ui, value: &str, _: &mut rune::Tx| {
+            ui.resolution_open = false;
+            if let Some(option) = options.iter().find(|o| o.label == value) {
+                let resolution = option.resolution;
+                ui.change(|s| s.resolution = resolution);
+            }
+        })
+        .build(k, layer)
+}
+
+fn fps(s: &Ui, k: &Kit) -> El {
+    SegmentedControl::new(
+        &FPS_OPTIONS.map(|f| f.to_string()),
+        FPS_OPTIONS.iter().position(|f| *f == s.settings.fps),
+    )
+    .label("Frame rate")
+    .width(Some(FPS_WIDTH))
+    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]))
+    .build(k)
+    .key("fps")
+}
+
+fn quality_note(s: &Ui, display_height: Option<u32>) -> String {
+    let native_height = display_height.unwrap_or(FALLBACK_NATIVE_HEIGHT);
+    let native = (s.settings.resolution == Resolution::Native).then_some(native_height);
+    let rate = format_size_rate(s.settings.estimated_mb_per_minute(native_height), native);
+    format!("{QUALITY_NOTE} {rate}")
+}
+
+fn native_height(displays: &[(u32, u32)]) -> Option<u32> {
+    displays.iter().map(|&(_, h)| h).filter(|&h| h > 0).max()
+}
+
+#[cfg(windows)]
+fn connected_displays() -> Vec<(u32, u32)> {
+    greyscreen_capture::displays::connected_sizes()
+}
+
+#[cfg(not(windows))]
+fn connected_displays() -> Vec<(u32, u32)> {
+    Vec::new()
+}

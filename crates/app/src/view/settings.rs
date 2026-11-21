@@ -1,105 +1,278 @@
-use greyscreen_core::paths;
-use greyscreen_core::settings::{Quality, Resolution, STORAGE_LIMITS_GB, resolution_options};
-use greyscreen_engine::reveal;
-use rune::{El, FileDialogOptions, col, row, text};
-use rune_kit::{
-    Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, SelectAppearance, Switch,
-    TextInput,
-};
+use greyscreen_core::keybinds::Group;
+use rune::{El, ScrollSpec, col, el, row, text};
+use rune_kit::{Dialog, Kit, SidebarRow, TextInput, glyphs};
 
+mod about;
+mod catalog;
+mod clips;
+mod keybinds;
+mod recording;
+mod storage;
 mod updates;
 
-use super::{card, hairline, page_header};
+use super::{card, hairline};
+use crate::ui::{SettingsSection, Ui};
+use catalog::Row;
 
-use crate::ui::{SettingsTab, Ui, format_size_rate, parse_clip_secs};
+const SHEET_WIDTH: f32 = 760.0;
+const BODY_HEIGHT: f32 = 484.0;
+const NAV_WIDTH: f32 = 188.0;
+const SCROLL_FADE: f32 = 20.0;
+const SUBTITLE: &str = "Changes are saved automatically.";
 
-mod keybinds;
-
-const QUALITIES: [(Quality, &str); 3] = [
-    (Quality::Balanced, "Balanced"),
-    (Quality::High, "High"),
-    (Quality::Max, "Max"),
-];
-const QUALITY_NOTE: &str = "Higher quality uses more disk space.";
-const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
-const FPS_OPTIONS: [u32; 2] = [30, 60];
-const CONTROL_WIDTH: f32 = 220.0;
-const QUALITY_WIDTH: f32 = 252.0;
-const FPS_WIDTH: f32 = 120.0;
-const RESOLUTION_WIDTH: f32 = 200.0;
-const STORAGE_WIDTH: f32 = 140.0;
-const STORAGE_OFF: &str = "Off";
-const STORAGE_LIMIT_NOTE: &str = "Oldest full-game videos are deleted permanently when recordings pass this size. Clips are kept as long as possible.";
-const RIOT_NOTICE: &str = "Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
-
-const TAB_LABELS: [(SettingsTab, &str); 2] = [
-    (SettingsTab::General, "General"),
-    (SettingsTab::Keybinds, "Keybinds"),
-];
-
-pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
-    let body = match s.settings_tab {
-        SettingsTab::General => col()
-            .w_full()
-            .gap(20.0)
-            .child(recording_section(s, k, layer))
-            .child(clips_section(s, k))
-            .child(storage_section(s, k, layer))
-            .child(about_section(s, k)),
-        SettingsTab::Keybinds => keybinds::page(s, k),
+pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
+    if !s.settings_open {
+        return;
+    }
+    let query = s.settings_search.text.trim().to_owned();
+    let mut popups = Vec::new();
+    let content = if query.is_empty() {
+        section_content(s, k, &mut popups, s.settings_section)
+    } else {
+        search_content(s, k, &mut popups, &query)
     };
-    col()
-        .key("settings")
+    let body = col()
+        .key("settings-sheet")
         .w_full()
-        .gap(16.0)
-        .child(page_header(
-            k,
-            "Settings",
-            "Changes are saved automatically.",
-            Some(tab_switcher(s, k)),
-        ))
+        .h(BODY_HEIGHT)
+        .child(search_bar(s, k))
+        .child(hairline(k))
+        .child(
+            row()
+                .w_full()
+                .grow(1.0)
+                .min_h(0.0)
+                .child(nav(s, k, query.is_empty()))
+                .child(el().w(1.0).h_full().fill(k.c.border_muted).a11y_hidden())
+                .child(scroller(content)),
+        );
+    Dialog::new("settings", "Settings")
+        .description(SUBTITLE)
+        .width(SHEET_WIDTH)
+        .fit()
+        .open(true)
+        .on_close(|ui: &mut Ui| ui.close_settings())
         .child(body)
+        .build(k, layer);
+    layer.extend(popups);
 }
 
-fn tab_switcher(s: &Ui, k: &Kit) -> El {
-    SegmentedControl::new(
-        &TAB_LABELS.map(|(_, label)| label),
-        TAB_LABELS
-            .iter()
-            .position(|(tab, _)| *tab == s.settings_tab),
-    )
-    .label("Settings section")
-    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| {
-        ui.settings_tab = TAB_LABELS[i].0;
-        ui.stop_rebinding();
-    })
-    .build(k)
-    .key("settings-tabs")
+fn search_bar(s: &Ui, k: &Kit) -> El {
+    let input = TextInput::new(&s.settings_search)
+        .label("Search settings")
+        .placeholder("Search settings…")
+        .leading_icon(&glyphs::SEARCH)
+        .clear_button()
+        .width(Some(SHEET_WIDTH - 32.0))
+        .on_edit(|ui: &mut Ui| &mut ui.settings_search)
+        .build(k)
+        .key("settings-search");
+    row().w_full().px(16.0).pb(12.0).child(input)
 }
 
-fn section(k: &Kit, key: &str, title: &str, rows: Vec<El>) -> El {
+fn nav(s: &Ui, k: &Kit, active: bool) -> El {
+    let mut list = col()
+        .key("settings-nav")
+        .w(NAV_WIDTH)
+        .h_full()
+        .padding(8.0)
+        .gap(2.0);
+    for section in SettingsSection::ALL {
+        list = list.child(
+            SidebarRow::new(section.label())
+                .selected(active && s.settings_section == section)
+                .on_select(move |ui: &mut Ui, _| ui.pick_settings_section(section))
+                .build(k)
+                .key(format!("settings-nav-{}", section.id())),
+        );
+    }
+    list
+}
+
+fn scroller(content: El) -> El {
+    col()
+        .key("settings-scroll")
+        .grow(1.0)
+        .h_full()
+        .min_w(0.0)
+        .scroll(ScrollSpec {
+            stick_bottom: false,
+        })
+        .scroll_edge_fade(SCROLL_FADE)
+        .child(col().w_full().padding(16.0).gap(12.0).child(content))
+}
+
+fn section_content(s: &Ui, k: &Kit, layer: &mut Vec<El>, section: SettingsSection) -> El {
+    let mut page = col()
+        .key(format!("settings-{}", section.id()))
+        .w_full()
+        .gap(12.0);
+    match section {
+        SettingsSection::Recording => page = page.children(recording::notice(s, k)),
+        SettingsSection::Keybinds => page = page.child(keybinds::header(s, k)),
+        _ => {}
+    }
+    let rows = catalog::rows_in(section);
+    if section == SettingsSection::Keybinds {
+        return page.children(keybind_groups(s, k, layer, &rows));
+    }
+    page.child(group(
+        s,
+        k,
+        layer,
+        format!("{}-card", section.id()),
+        section,
+        &rows,
+    ))
+}
+
+fn keybind_groups(s: &Ui, k: &Kit, layer: &mut Vec<El>, rows: &[Row]) -> Vec<El> {
+    Group::ALL
+        .iter()
+        .map(|g| {
+            let in_group: Vec<Row> = rows
+                .iter()
+                .copied()
+                .filter(|r| matches!(r, Row::Bind(a) if a.group() == *g))
+                .collect();
+            col()
+                .w_full()
+                .gap(8.0)
+                .child(
+                    text(g.label())
+                        .font(k.ty.ui_medium)
+                        .color(k.c.text_muted)
+                        .ml(4.0),
+                )
+                .child(group(
+                    s,
+                    k,
+                    layer,
+                    format!("keybinds-{}", g.label().to_lowercase()),
+                    SettingsSection::Keybinds,
+                    &in_group,
+                ))
+        })
+        .collect()
+}
+
+fn search_content(s: &Ui, k: &Kit, layer: &mut Vec<El>, query: &str) -> El {
+    let found = catalog::search(query);
+    if found.is_empty() {
+        return col()
+            .key("settings-no-results")
+            .w_full()
+            .py(48.0)
+            .items_center()
+            .gap(4.0)
+            .child(
+                text(format!("No settings match “{query}”"))
+                    .font(k.ty.body_medium)
+                    .color(k.c.text_base),
+            )
+            .child(
+                text("Try a different word, like “quality” or “folder”.")
+                    .font(k.ty.small)
+                    .color(k.c.text_muted),
+            );
+    }
+    let mut page = col().key("settings-results").w_full().gap(16.0);
+    for (section, rows) in found {
+        page = page.child(
+            col()
+                .w_full()
+                .gap(8.0)
+                .child(
+                    text(section.label())
+                        .font(k.ty.ui_medium)
+                        .color(k.c.text_muted)
+                        .ml(4.0),
+                )
+                .child(group(
+                    s,
+                    k,
+                    layer,
+                    format!("{}-results", section.id()),
+                    section,
+                    &rows,
+                )),
+        );
+    }
+    page
+}
+
+fn group(
+    s: &Ui,
+    k: &Kit,
+    layer: &mut Vec<El>,
+    key: String,
+    section: SettingsSection,
+    rows: &[Row],
+) -> El {
+    let dimmed = section == SettingsSection::Clips && !s.settings.clips.enabled;
     let mut body = card(k).key(key);
     let last = rows.len().saturating_sub(1);
-    for (i, row) in rows.into_iter().enumerate() {
-        body = body.child(row);
+    for (i, row) in rows.iter().enumerate() {
+        let built = render(s, k, layer, *row);
+        let off = dimmed && matches!(row, Row::Moments | Row::ClipWindow);
+        body = body.child(if off { built.opacity(0.45) } else { built });
         if i < last {
             body = body.child(hairline(k));
         }
     }
-    col()
-        .w_full()
-        .gap(8.0)
-        .child(
-            text(title.to_owned())
-                .font(k.ty.ui_medium)
-                .color(k.c.text_muted)
-                .ml(4.0),
-        )
-        .child(body)
+    body
+}
+
+fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
+    match row {
+        Row::RecordGames
+        | Row::FullGame
+        | Row::Quality
+        | Row::Resolution
+        | Row::FrameRate
+        | Row::Audio
+        | Row::Cursor => recording::render(s, k, layer, row),
+        Row::ClipsEnabled | Row::Moments | Row::ClipWindow | Row::ClipHotkey => {
+            clips::render(s, k, row)
+        }
+        Row::Folder | Row::StorageLimit => storage::render(s, k, layer, row),
+        Row::Bind(action) => keybinds::bind_row(s, k, action),
+        Row::Version
+        | Row::Updates
+        | Row::AutoUpdates
+        | Row::Logs
+        | Row::StartWithWindows
+        | Row::RiotNotice => about::render(s, k, row),
+    }
 }
 
 fn setting_row(k: &Kit, key: &str, label: &str, description: Option<&str>, control: El) -> El {
-    let mut copy = col().gap(2.0).grow(1.0).child(
+    row()
+        .key(key.to_owned())
+        .w_full()
+        .min_h(52.0)
+        .px(16.0)
+        .py(8.0)
+        .gap(16.0)
+        .center_y()
+        .justify_between()
+        .child(copy(k, label, description))
+        .child(control)
+}
+
+fn stacked_row(k: &Kit, key: &str, label: &str, description: Option<&str>, control: El) -> El {
+    col()
+        .key(key.to_owned())
+        .w_full()
+        .px(16.0)
+        .py(12.0)
+        .gap(10.0)
+        .child(copy(k, label, description))
+        .child(control)
+}
+
+fn copy(k: &Kit, label: &str, description: Option<&str>) -> El {
+    let mut copy = col().gap(2.0).grow(1.0).min_w(0.0).child(
         text(label.to_owned())
             .font(k.ty.body_medium)
             .color(k.c.text_base),
@@ -113,17 +286,7 @@ fn setting_row(k: &Kit, key: &str, label: &str, description: Option<&str>, contr
                 .color(k.c.text_muted),
         );
     }
-    row()
-        .key(key)
-        .w_full()
-        .min_h(56.0)
-        .px(16.0)
-        .py(10.0)
-        .gap(16.0)
-        .center_y()
-        .justify_between()
-        .child(copy)
-        .child(control)
+    copy
 }
 
 fn toggle_row(
@@ -134,352 +297,11 @@ fn toggle_row(
     on: bool,
     flip: fn(&mut Ui),
 ) -> El {
-    let switch = Switch::new(on)
+    let switch = rune_kit::Switch::new(on)
         .label(label.to_owned())
         .hide_label()
         .on_toggle(flip)
         .build(k)
         .key(format!("{key}-switch"));
     setting_row(k, key, label, description, switch)
-}
-
-fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
-    let settings = &s.settings;
-    let displays = connected_displays();
-    let quality_note = quality_note(s, native_height(&displays));
-    let quality = SegmentedControl::new(
-        &QUALITIES.map(|(_, label)| label),
-        QUALITIES.iter().position(|(q, _)| *q == settings.quality),
-    )
-    .label("Quality")
-    .width(Some(QUALITY_WIDTH))
-    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
-    .build(k)
-    .key("quality");
-    let options = resolution_options(&displays, settings.resolution);
-    let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
-    let current = options
-        .iter()
-        .find(|o| o.resolution == settings.resolution)
-        .map(|o| o.label.as_str());
-    let resolution = Select::new("resolution", &labels)
-        .current(current)
-        .open(s.resolution_open)
-        .appearance(SelectAppearance::Field)
-        .width(RESOLUTION_WIDTH)
-        .label("Resolution")
-        .on_toggle(|ui: &mut Ui| ui.resolution_open = !ui.resolution_open)
-        .on_close(|ui: &mut Ui| ui.resolution_open = false)
-        .on_choose(move |ui: &mut Ui, value: &str, _: &mut rune::Tx| {
-            ui.resolution_open = false;
-            if let Some(option) = options.iter().find(|o| o.label == value) {
-                let resolution = option.resolution;
-                ui.change(|s| s.resolution = resolution);
-            }
-        })
-        .build(k, layer);
-    let fps = SegmentedControl::new(
-        &FPS_OPTIONS.map(|f| f.to_string()),
-        FPS_OPTIONS.iter().position(|f| *f == settings.fps),
-    )
-    .label("Frame rate")
-    .width(Some(FPS_WIDTH))
-    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]))
-    .build(k)
-    .key("fps");
-    section(
-        k,
-        "recording-card",
-        "Recording",
-        vec![
-            toggle_row(
-                k,
-                "auto-record",
-                "Record games",
-                Some("Start recording when a League game starts."),
-                settings.auto_record,
-                |ui| ui.change(|s| s.auto_record = !s.auto_record),
-            ),
-            toggle_row(
-                k,
-                "full-game",
-                "Record the full game",
-                Some("Off keeps only highlight clips."),
-                settings.record_full_game,
-                |ui| ui.change(|s| s.record_full_game = !s.record_full_game),
-            ),
-            setting_row(k, "quality-row", "Quality", Some(&quality_note), quality),
-            setting_row(
-                k,
-                "resolution-row",
-                "Resolution",
-                Some("Larger games are scaled down to this."),
-                resolution,
-            ),
-            setting_row(
-                k,
-                "fps-row",
-                "Frame rate",
-                Some("60 is smoother, 30 uses less disk space."),
-                fps,
-            ),
-            toggle_row(
-                k,
-                "audio",
-                "Record game audio",
-                Some("Records League's own audio. Discord and your microphone aren't recorded."),
-                settings.audio,
-                |ui| ui.change(|s| s.audio = !s.audio),
-            ),
-            toggle_row(
-                k,
-                "capture-cursor",
-                "Show cursor",
-                Some("Include the mouse cursor, as the game draws it."),
-                settings.capture_cursor,
-                |ui| ui.change(|s| s.capture_cursor = !s.capture_cursor),
-            ),
-        ],
-    )
-}
-
-fn quality_note(s: &Ui, display_height: Option<u32>) -> String {
-    let native_height = display_height.unwrap_or(FALLBACK_NATIVE_HEIGHT);
-    let native = (s.settings.resolution == Resolution::Native).then_some(native_height);
-    let rate = format_size_rate(s.settings.estimated_mb_per_minute(native_height), native);
-    format!("{QUALITY_NOTE} {rate}")
-}
-
-fn native_height(displays: &[(u32, u32)]) -> Option<u32> {
-    displays.iter().map(|&(_, h)| h).filter(|&h| h > 0).max()
-}
-
-#[cfg(windows)]
-fn connected_displays() -> Vec<(u32, u32)> {
-    greyscreen_capture::displays::connected_sizes()
-}
-
-#[cfg(not(windows))]
-fn connected_displays() -> Vec<(u32, u32)> {
-    Vec::new()
-}
-
-fn secs_input(
-    k: &Kit,
-    key: &'static str,
-    label: &str,
-    edit: &rune::TextEdit,
-    pick: for<'a> fn(&'a mut Ui) -> &'a mut rune::TextEdit,
-) -> El {
-    let invalid = parse_clip_secs(&edit.text).is_none();
-    TextInput::new(edit)
-        .label(label.to_owned())
-        .width(Some(88.0))
-        .invalid(invalid)
-        .on_edit(pick)
-        .on_change(|ui: &mut Ui, _: &mut rune::Tx| ui.edit_clip_secs())
-        .build(k)
-        .key(key)
-}
-
-fn clips_section(s: &Ui, k: &Kit) -> El {
-    let clips = &s.settings.clips;
-    let pre = secs_input(k, "pre-secs", "Seconds before", &s.pre_secs, |ui| {
-        &mut ui.pre_secs
-    });
-    let post = secs_input(k, "post-secs", "Seconds after", &s.post_secs, |ui| {
-        &mut ui.post_secs
-    });
-    let rows = vec![
-        toggle_row(
-            k,
-            "clips-enabled",
-            "Save highlight clips",
-            Some("Cut short clips around the moments you pick below."),
-            clips.enabled,
-            |ui| ui.change(|s| s.clips.enabled = !s.clips.enabled),
-        ),
-        setting_row(
-            k,
-            "pre-row",
-            "Before the moment",
-            Some("1 to 120 seconds."),
-            pre,
-        ),
-        setting_row(
-            k,
-            "post-row",
-            "After the moment",
-            Some("1 to 120 seconds."),
-            post,
-        ),
-        toggle_row(k, "clip-kills", "Kills", None, clips.kills, |ui| {
-            ui.change(|s| s.clips.kills = !s.clips.kills)
-        }),
-        toggle_row(k, "clip-deaths", "Deaths", None, clips.deaths, |ui| {
-            ui.change(|s| s.clips.deaths = !s.clips.deaths)
-        }),
-        toggle_row(k, "clip-assists", "Assists", None, clips.assists, |ui| {
-            ui.change(|s| s.clips.assists = !s.clips.assists)
-        }),
-        toggle_row(
-            k,
-            "clip-multikills",
-            "Multikills",
-            None,
-            clips.multikills,
-            |ui| ui.change(|s| s.clips.multikills = !s.clips.multikills),
-        ),
-        toggle_row(
-            k,
-            "clip-objectives",
-            "Objectives",
-            Some("Dragon, Herald, Baron and Voidgrubs."),
-            clips.objectives,
-            |ui| ui.change(|s| s.clips.objectives = !s.clips.objectives),
-        ),
-        toggle_row(
-            k,
-            "clip-structures",
-            "Structures",
-            Some("Turrets and inhibitors."),
-            clips.structures,
-            |ui| ui.change(|s| s.clips.structures = !s.clips.structures),
-        ),
-        toggle_row(k, "clip-aces", "Aces", None, clips.aces, |ui| {
-            ui.change(|s| s.clips.aces = !s.clips.aces)
-        }),
-    ];
-    section(k, "clips-card", "Clips", rows)
-}
-
-fn storage_limit_label(gb: Option<u32>) -> String {
-    gb.map_or_else(|| STORAGE_OFF.to_owned(), |gb| format!("{gb} GB"))
-}
-
-fn storage_limit_select(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
-    let labels: Vec<String> = std::iter::once(None)
-        .chain(STORAGE_LIMITS_GB.map(Some))
-        .map(storage_limit_label)
-        .collect();
-    let names: Vec<&str> = labels.iter().map(String::as_str).collect();
-    let current = storage_limit_label(s.settings.storage_limit_gb);
-    Select::new("storage-limit", &names)
-        .current(Some(current.as_str()))
-        .open(s.storage_open)
-        .appearance(SelectAppearance::Field)
-        .width(STORAGE_WIDTH)
-        .label("Storage limit")
-        .on_toggle(|ui: &mut Ui| ui.storage_open = !ui.storage_open)
-        .on_close(|ui: &mut Ui| ui.storage_open = false)
-        .on_choose(|ui: &mut Ui, value: &str, _: &mut rune::Tx| {
-            ui.storage_open = false;
-            let limit = STORAGE_LIMITS_GB
-                .into_iter()
-                .find(|gb| storage_limit_label(Some(*gb)) == value);
-            ui.change(|s| s.storage_limit_gb = limit);
-        })
-        .build(k, layer)
-}
-
-fn storage_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
-    let change = Button::new("Change")
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
-        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| {
-            let options = FileDialogOptions {
-                title: "Choose the recordings folder".into(),
-                directory: Some(ui.settings.output_dir.clone()),
-                ..Default::default()
-            };
-            tx.open_folder(options, |ui: &mut Ui, answer, _| {
-                if let Ok(Some(dir)) = answer {
-                    ui.change(|s| s.output_dir = dir);
-                }
-            });
-        })
-        .build(k)
-        .key("change-folder");
-    let path = col().w(CONTROL_WIDTH).child(
-        text(s.settings.output_dir.display().to_string())
-            .key("output-dir")
-            .font(k.ty.small)
-            .color(k.c.text_muted)
-            .truncate(),
-    );
-    let open = Button::new("Open")
-        .variant(ButtonVariant::Ghost)
-        .control_size(ControlSize::Large)
-        .on_press(|ui: &mut Ui| ui.reveal_output_dir())
-        .build(k)
-        .key("open-output");
-    let control = row()
-        .gap(12.0)
-        .center_y()
-        .child(path)
-        .child(change)
-        .child(open);
-    section(
-        k,
-        "storage-card",
-        "Storage",
-        vec![
-            setting_row(
-                k,
-                "folder-row",
-                "Recordings folder",
-                Some("Games and clips are saved here."),
-                control,
-            ),
-            setting_row(
-                k,
-                "storage-limit-row",
-                "Storage limit",
-                Some(STORAGE_LIMIT_NOTE),
-                storage_limit_select(s, k, layer),
-            ),
-        ],
-    )
-}
-
-fn about_section(s: &Ui, k: &Kit) -> El {
-    let version = text(format!("Version {}", env!("CARGO_PKG_VERSION")))
-        .key("version")
-        .font(k.ty.body)
-        .color(k.c.text_muted);
-    let logs = Button::new("Open logs folder")
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
-        .on_press(|_: &mut Ui| reveal(&paths::logs_dir()))
-        .build(k)
-        .key("open-logs");
-    let mut rows = vec![setting_row(k, "version-row", "Greyscreen", None, version)];
-    rows.extend(updates::rows(s, k));
-    rows.push(setting_row(
-        k,
-        "logs-row",
-        "Logs",
-        Some("Attach these when you report a problem."),
-        logs,
-    ));
-    if cfg!(windows) {
-        rows.push(toggle_row(
-            k,
-            "start-with-windows",
-            "Start with Windows",
-            Some("Open in the tray when you sign in."),
-            s.start_with_windows,
-            Ui::toggle_start_with_windows,
-        ));
-    }
-    rows.push(
-        row().key("riot-notice").w_full().px(16.0).py(10.0).child(
-            text(RIOT_NOTICE)
-                .wrap()
-                .w_full()
-                .font(k.ty.small)
-                .color(k.c.text_muted),
-        ),
-    );
-    section(k, "about-card", "About", rows)
 }

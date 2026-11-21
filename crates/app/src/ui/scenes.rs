@@ -3,7 +3,7 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
 use rune::TextEdit;
 
-use super::{ResultFilter, Screen, SettingsTab, Ui, preview, update};
+use super::{ResultFilter, Screen, SettingsSection, Ui, preview, update};
 
 type Scene = (&'static str, fn(&mut Ui));
 
@@ -61,27 +61,47 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.screen = Screen::Recordings;
         ui.filter.pending_delete = ui.recordings.get(1).map(|rec| rec.meta.id.clone());
     }),
-    ("settings", |ui| ui.screen = Screen::Settings),
+    ("settings", |ui| open_sheet(ui, SettingsSection::Recording)),
+    ("settings-resolution-open", |ui| {
+        open_sheet(ui, SettingsSection::Recording);
+        ui.resolution_open = true;
+    }),
+    ("settings-clips", |ui| {
+        open_sheet(ui, SettingsSection::Clips)
+    }),
+    ("settings-clips-off", |ui| {
+        ui.settings.clips.enabled = false;
+        open_sheet(ui, SettingsSection::Clips);
+    }),
+    ("settings-storage", |ui| {
+        ui.settings.storage_limit_gb = Some(50);
+        open_sheet(ui, SettingsSection::Storage);
+    }),
+    ("settings-search", |ui| {
+        open_sheet(ui, SettingsSection::Recording);
+        ui.settings_search = TextEdit::new("fps");
+    }),
+    ("settings-about", |ui| {
+        open_sheet(ui, SettingsSection::About)
+    }),
     ("settings-update", |ui| {
-        ui.screen = Screen::Settings;
+        open_sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::Ready(update::preview_info()));
     }),
     ("settings-update-game", |ui| {
-        ui.screen = Screen::Settings;
+        open_sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::Ready(update::preview_info()));
         ui.update.install_when_idle = true;
     }),
     ("settings-update-manual", |ui| {
-        ui.screen = Screen::Settings;
+        open_sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::AvailableManual(update::preview_info()));
     }),
     ("settings-keybinds", |ui| {
-        ui.screen = Screen::Settings;
-        ui.settings_tab = SettingsTab::Keybinds;
+        open_sheet(ui, SettingsSection::Keybinds)
     }),
     ("settings-keybinds-capture", |ui| {
-        ui.screen = Screen::Settings;
-        ui.settings_tab = SettingsTab::Keybinds;
+        open_sheet(ui, SettingsSection::Keybinds);
         ui.rebinding = Some(Action::PlayPause);
         ui.bind_hint = Some((
             Action::PlayPause,
@@ -89,8 +109,7 @@ pub(crate) const SCENES: &[Scene] = &[
         ));
     }),
     ("settings-keybinds-changed", |ui| {
-        ui.screen = Screen::Settings;
-        ui.settings_tab = SettingsTab::Keybinds;
+        open_sheet(ui, SettingsSection::Keybinds);
         ui.settings.keybinds.insert("mute".into(), "N".into());
         ui.hotkey_errors = vec![(
             Action::SaveClip,
@@ -107,3 +126,8 @@ pub(crate) const SCENES: &[Scene] = &[
         }
     }),
 ];
+
+fn open_sheet(ui: &mut Ui, section: SettingsSection) {
+    ui.screen = Screen::Recordings;
+    ui.open_settings(section);
+}

@@ -8,7 +8,7 @@ use rune::{Env, Key, KeyEvent, Modifier, Mods, Runtime};
 
 use super::{key_review_runtime, press_char, settle, tap, visible_texts};
 use crate::ui::fake_player::{self, Call};
-use crate::ui::{Screen, SettingsTab, Ui};
+use crate::ui::{Screen, SettingsSection, Ui};
 use crate::view;
 
 fn keybinds_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
@@ -18,8 +18,7 @@ fn keybinds_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
     rt.frame(0.0);
     rt.on_key = Some(Ui::on_key);
     rt.update(|ui, _| {
-        ui.go(Screen::Settings);
-        ui.settings_tab = SettingsTab::Keybinds;
+        ui.open_settings(SettingsSection::Keybinds);
     });
     rt.frame(1.0 / 60.0);
     rx.try_iter().for_each(drop);
@@ -93,22 +92,16 @@ fn the_page_lists_every_action_under_its_group_with_the_default_keys() {
 }
 
 #[test]
-fn the_tab_switcher_moves_between_general_and_keybinds() {
+fn the_section_list_moves_between_recording_and_keybinds() {
     let (mut rt, _rx) = keybinds_runtime();
     start_rebind(&mut rt, Action::Mute);
-    let (x, y) = rt.find("settings-tabs").expect("tabs");
-    rt.pointer_down(x - 60.0, y);
-    rt.pointer_up(x - 60.0, y);
-    rt.frame(1.0 / 60.0);
-    assert_eq!(rt.state.settings_tab, SettingsTab::General);
+    tap(&mut rt, "settings-nav-recording");
+    assert_eq!(rt.state.settings_section, SettingsSection::Recording);
     assert!(rt.state.rebinding.is_none());
     assert!(rt.find("recording-card").is_some());
-    let (x, y) = rt.find("settings-tabs").expect("tabs");
-    rt.pointer_down(x + 60.0, y);
-    rt.pointer_up(x + 60.0, y);
-    rt.frame(1.0 / 60.0);
-    assert_eq!(rt.state.settings_tab, SettingsTab::Keybinds);
-    assert!(rt.find("keybinds").is_some());
+    tap(&mut rt, "settings-nav-keybinds");
+    assert_eq!(rt.state.settings_section, SettingsSection::Keybinds);
+    assert!(rt.find("settings-keybinds").is_some());
 }
 
 #[test]
@@ -485,7 +478,7 @@ fn a_command_key_press_goes_to_the_binding_with_the_primary_modifier() {
     press_with(&mut rt, Key::Command('2'), primary);
     assert_eq!(rt.state.screen, Screen::Recordings);
     press_with(&mut rt, Key::Command(','), primary);
-    assert_eq!(rt.state.screen, Screen::Settings);
+    assert!(rt.state.settings_open);
 }
 
 #[test]
@@ -531,7 +524,7 @@ fn review_keys_do_nothing_off_the_review_screen() {
     let (mut rt, _rx) = keybinds_runtime();
     press_char(&mut rt, "f");
     press_char(&mut rt, "m");
-    assert_eq!(rt.state.screen, Screen::Settings);
+    assert!(rt.state.settings_open);
     assert!(rt.state.review.is_none());
 }
 

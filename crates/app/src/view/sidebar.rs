@@ -110,7 +110,7 @@ fn item(
 }
 
 fn footer(s: &Ui, k: &Kit) -> El {
-    let on_settings = s.screen == Screen::Settings;
+    let on_settings = s.settings_open;
     let variant = if on_settings {
         IconButtonVariant::Neutral
     } else {
@@ -120,7 +120,7 @@ fn footer(s: &Ui, k: &Kit) -> El {
         .label("Settings")
         .help("Settings")
         .variant(variant)
-        .on_press(|ui: &mut Ui| ui.go(Screen::Settings))
+        .on_press(Ui::toggle_settings)
         .build(k)
         .key("nav-settings");
     let mut bar = row()

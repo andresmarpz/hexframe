@@ -13,6 +13,7 @@ mod match_flow;
 mod nav_settings;
 mod recordings;
 mod review_flow;
+mod settings_sheet;
 mod sidebar;
 mod storage_limit;
 mod update;
@@ -35,6 +36,12 @@ fn live_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
 }
 
 fn tap(rt: &mut Runtime<Ui>, key: &str) {
+    if rt.state.settings_open {
+        rt.update(|_, tx| tx.scroll_into_view(key));
+        for _ in 0..40 {
+            rt.frame(1.0 / 60.0);
+        }
+    }
     let (x, y) = rt.find(key).unwrap_or_else(|| panic!("no element {key}"));
     rt.pointer_down(x, y);
     rt.pointer_up(x, y);
@@ -48,7 +55,9 @@ fn nav_buttons_switch_the_screen() {
     tap(&mut rt, "nav-recordings");
     assert_eq!(rt.state.screen, Screen::Recordings);
     tap(&mut rt, "nav-settings");
-    assert_eq!(rt.state.screen, Screen::Settings);
+    assert!(rt.state.settings_open);
+    rt.update(|ui, _| ui.close_settings());
+    rt.frame(1.0 / 60.0);
     tap(&mut rt, "nav-home");
     assert_eq!(rt.state.screen, Screen::Home);
 }
@@ -619,30 +628,6 @@ fn the_logo_clears_the_window_buttons_on_every_screen() {
         settle(&mut rt);
         assert!(nav_rect_of(&rt, "nav-brand")[0] >= Chrome::DEFAULT.titlebar_inset());
     }
-}
-
-#[test]
-fn the_whole_settings_page_scrolls_under_a_fixed_nav() {
-    let mut rt = runtime();
-    tap(&mut rt, "nav-settings");
-    let heading = nav_rect_of(&rt, "page-header");
-    let nav = nav_rect_of(&rt, "nav");
-    assert!(
-        rt.find("settings-scroll").is_none(),
-        "no inner scroll region"
-    );
-    rt.wheel(480.0, 320.0, -240.0);
-    for _ in 0..30 {
-        rt.frame(1.0 / 60.0);
-    }
-    let moved = nav_rect_of(&rt, "page-header");
-    assert!(
-        moved[1] < heading[1] - 100.0,
-        "the heading scrolled away: {} -> {}",
-        heading[1],
-        moved[1]
-    );
-    assert_eq!(nav_rect_of(&rt, "nav"), nav);
 }
 
 fn visible_texts(rt: &Runtime<Ui>) -> Vec<String> {
