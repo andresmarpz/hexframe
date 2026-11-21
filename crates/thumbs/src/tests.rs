@@ -72,3 +72,33 @@ fn a_missing_video_is_an_error() {
     assert!(write_thumbnail(&dir.path().join("nope.mp4"), 1.0, &dest).is_err());
     assert!(!dest.exists());
 }
+
+fn nv12_plane(width: usize, height: usize, y: u8, u: u8, v: u8) -> Vec<u8> {
+    let mut data = vec![y; width * height];
+    data.extend((0..width * height / 4).flat_map(|_| [u, v]));
+    data
+}
+
+#[test]
+fn limited_range_black_and_white_map_to_the_ends() {
+    let black =
+        crate::nv12::nv12_to_rgba(&nv12_plane(4, 4, 16, 128, 128), 4, 4, (0, 0, 4, 4), false);
+    let white =
+        crate::nv12::nv12_to_rgba(&nv12_plane(4, 4, 235, 128, 128), 4, 4, (0, 0, 4, 4), false);
+    assert_eq!(&black.rgba[..4], &[0, 0, 0, 255]);
+    assert_eq!(&white.rgba[..4], &[255, 255, 255, 255]);
+}
+
+#[test]
+fn red_chroma_gives_a_red_pixel() {
+    let red = crate::nv12::nv12_to_rgba(&nv12_plane(4, 4, 63, 102, 240), 4, 4, (0, 0, 4, 4), false);
+    let [r, g, b, _] = [red.rgba[0], red.rgba[1], red.rgba[2], red.rgba[3]];
+    assert!(r > 220 && g < 40 && b < 40, "{r} {g} {b}");
+}
+
+#[test]
+fn crop_selects_the_requested_window() {
+    let frame =
+        crate::nv12::nv12_to_rgba(&nv12_plane(8, 8, 235, 128, 128), 8, 8, (2, 2, 4, 4), false);
+    assert_eq!((frame.width, frame.height, frame.rgba.len()), (4, 4, 64));
+}

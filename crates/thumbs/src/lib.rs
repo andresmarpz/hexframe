@@ -1,12 +1,18 @@
+#[cfg(any(windows, test))]
+mod nv12;
 mod shape;
 #[cfg(test)]
 mod tests;
 
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(windows)]
+mod windows;
 
 #[cfg(target_os = "macos")]
 use macos as backend;
+#[cfg(windows)]
+use windows as backend;
 
 use std::fs;
 use std::path::Path;
@@ -33,7 +39,7 @@ pub struct Frame {
     pub rgba: Vec<u8>,
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 mod backend {
     use std::path::Path;
 

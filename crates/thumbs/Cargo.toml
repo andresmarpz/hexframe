@@ -19,6 +19,15 @@ objc2-core-graphics = { version = "0.3", default-features = false, features = ["
 objc2-core-media = { version = "0.3", default-features = false, features = ["std", "CMTime"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSError", "NSString", "NSURL"] }
 
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Media_MediaFoundation",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+] }
+
 [dev-dependencies]
 tempfile = "3"
 
