@@ -1,25 +1,17 @@
-<p align="center">
-  <img src="assets/icon.svg" width="72" alt="">
-</p>
-
+<p align="center"><img src="assets/icon.svg" width="72" alt=""></p>
 <h1 align="center">greyscreen</h1>
+<p align="center">Automatic League of Legends recorder for Windows.</p>
 
-<p align="center">
-  Automatic, Vanguard-safe League of Legends gameplay recorder for Windows.
-</p>
-
-greyscreen is a free, open-source League of Legends recorder for Windows written in Rust. It starts recording when a match begins, encodes video directly on your GPU using Windows Graphics Capture and Media Foundation, and captures only the game window and game audio without touching the game process. Match events from Riot's Live Client Data API are plotted on a review timeline and used to cut highlight clips automatically without re-encoding.
+Free, open-source, and written in Rust.
 
 ## Features
 
-- **GPU-only capture and encoding**: Windows Graphics Capture and Media Foundation hardware H.264 keep frames on the GPU, so the FPS cost is near zero.
-- **Game-only video and audio**: Records only the League of Legends window and the game's own audio (WASAPI process loopback). Discord and other apps stay out of your footage.
-- **Safe with Riot Vanguard**: Never injects into, hooks, or reads memory from the game process.
-- **Live event timeline**: Kills, deaths, assists, dragons, barons, heralds, void grubs, towers, inhibitors, multikills, aces, and the win or loss, read from Riot's Live Client Data API.
-- **Automatic highlight clips**: Clips around your kills, deaths, multikills, aces, and objectives, cut without re-encoding. You choose which moments get clipped and how many seconds come before and after.
-- **Crash-safe MP4 files**: Written as fragmented MP4 during the match and finalized at the end. A file left by a crash is repaired on the next launch.
-- **Native GPU-rendered UI**: Built with Rune, with a live event feed, a recordings library, a review player with event markers on a timeline, and settings. Lives in the system tray.
-- **One small exe**: No installer or runtime required.
+- **GPU hardware encoding:** Keeps frames on the GPU with near-zero FPS cost.
+- **Vanguard-safe game capture:** Records only League video and audio without touching the game process.
+- **Automatic event timeline:** Starts and stops with each match, plotting kills and objectives.
+- **Highlight clips:** Cuts clips around chosen moments without re-encoding.
+- **Crash-safe MP4 files:** Saves fragmented recordings and repairs unfinished files after a crash.
+- **One small exe:** Native tray app with no installer or extra runtime.
 
 ## Install
 
