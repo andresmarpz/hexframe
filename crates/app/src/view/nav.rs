@@ -80,7 +80,7 @@ fn recording_elsewhere(s: &Ui) -> bool {
 fn recording_pill(s: &Ui, k: &Kit) -> El {
     let clock = format_clock(s.elapsed_secs);
     let font = rune::TextStyle {
-        features: "'tnum' 1".into(),
+        features: "'tnum' 1",
         ..k.ty.ui_medium
     };
     row()
