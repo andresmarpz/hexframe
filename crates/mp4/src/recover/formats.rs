@@ -1,8 +1,6 @@
 use greyscreen_core::media::{AudioFormat, VideoFormat};
 
 use super::cursor::Cursor;
-use super::fragments::Run;
-use crate::moov::VIDEO_TRACK_ID;
 use crate::reader::{BoxRef, Boxes, boxes};
 use crate::{Mp4Error, Result};
 
@@ -18,9 +16,9 @@ fn child_path(data: &[u8], start: BoxRef, path: &[&[u8; 4]]) -> Option<BoxRef> {
         .try_fold(start, |parent, fourcc| parent.find(data, fourcc))
 }
 
-pub(super) fn read_formats(
+pub(crate) fn read_formats(
     init: &[u8],
-    runs: &[Run],
+    first_video_duration: u32,
 ) -> Result<(VideoFormat, Option<AudioFormat>)> {
     let moov = boxes(init)
         .find(|b| &b.fourcc == b"moov")
@@ -45,13 +43,8 @@ pub(super) fn read_formats(
         }
     }
     let mut video = video.ok_or_else(|| invalid("no video track"))?;
-    let first_duration = runs
-        .iter()
-        .find(|r| r.track_id == VIDEO_TRACK_ID)
-        .and_then(|r| r.samples.first())
-        .map_or(0, |s| s.duration);
-    video.fps = (VideoFormat::TIMESCALE + first_duration / 2)
-        .checked_div(first_duration)
+    video.fps = (VideoFormat::TIMESCALE + first_video_duration / 2)
+        .checked_div(first_video_duration)
         .unwrap_or(0)
         .max(1);
     Ok((video, audio))

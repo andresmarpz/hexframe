@@ -6,6 +6,7 @@ pub(crate) mod bytes;
 pub mod clip;
 pub mod finalize;
 pub mod fragmented;
+pub mod inspect;
 pub mod moov;
 pub mod reader;
 pub mod recover;

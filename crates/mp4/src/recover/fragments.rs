@@ -21,20 +21,20 @@ const TRUN_FLAGS: u32 = 0x400;
 const TRUN_COMPOSITION_OFFSET: u32 = 0x800;
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Sample {
+pub(crate) struct Sample {
     offset: u64,
     size: u32,
-    pub(super) duration: u32,
+    pub(crate) duration: u32,
     sync: bool,
 }
 
 #[derive(Debug)]
-pub(super) struct Run {
-    pub(super) track_id: u32,
-    pub(super) samples: Vec<Sample>,
+pub(crate) struct Run {
+    pub(crate) track_id: u32,
+    pub(crate) samples: Vec<Sample>,
 }
 
-pub(super) fn parse_moof(
+pub(crate) fn parse_moof(
     data: &[u8],
     moof_start: u64,
     mdat_payload: &Range<u64>,
@@ -135,7 +135,7 @@ fn parse_trun(payload: &[u8], tfhd: &Tfhd, next_offset: &mut u64) -> Option<Vec<
     Some(samples)
 }
 
-pub(super) fn build_tables(runs: &[Run]) -> (SampleTables, Chunking) {
+pub(crate) fn build_tables(runs: &[Run]) -> (SampleTables, Chunking) {
     let mut tables = SampleTables::default();
     let mut chunking = Chunking::default();
     for run in runs {
@@ -160,4 +160,11 @@ pub(super) fn build_tables(runs: &[Run]) -> (SampleTables, Chunking) {
         }));
     }
     (tables, chunking)
+}
+
+pub(crate) fn first_video_duration(runs: &[Run]) -> u32 {
+    runs.iter()
+        .find(|r| r.track_id == VIDEO_TRACK_ID)
+        .and_then(|r| r.samples.first())
+        .map_or(0, |s| s.duration)
 }

@@ -5,27 +5,28 @@ use std::path::{Path, PathBuf};
 use crate::finalize::finalize;
 use crate::{Mp4Error, Result};
 
-mod cursor;
-mod formats;
-mod fragments;
+pub(crate) mod cursor;
+pub(crate) mod formats;
+pub(crate) mod fragments;
 
 use formats::read_formats;
-use fragments::{Run, build_tables, parse_moof};
+use fragments::{Run, build_tables, first_video_duration, parse_moof};
 
 const PLACEHOLDER_LEN: u64 = 16;
 const FINALIZED_FREE_LEN: u64 = 8;
 
 #[derive(Debug, Clone, Copy)]
-struct Header {
-    fourcc: [u8; 4],
-    size: u64,
+pub(crate) struct Header {
+    pub(crate) fourcc: [u8; 4],
+    pub(crate) size: u64,
 }
 
-struct Scan {
-    placeholder_offset: u64,
-    init_moov: Vec<u8>,
-    runs: Vec<Run>,
-    good_end: u64,
+pub(crate) struct Scan {
+    pub(crate) placeholder_offset: u64,
+    pub(crate) init_moov: Vec<u8>,
+    pub(crate) runs: Vec<Run>,
+    pub(crate) fragments: u32,
+    pub(crate) good_end: u64,
 }
 
 pub fn recover(part: &Path) -> Result<PathBuf> {
@@ -53,7 +54,7 @@ pub fn recover(part: &Path) -> Result<PathBuf> {
     }
 }
 
-fn already_finalized(part: &Path) -> Result<bool> {
+pub(crate) fn already_finalized(part: &Path) -> Result<bool> {
     let mut file = File::open(part)?;
     let len = file.metadata()?.len();
     let Some(ftyp) = header_at(&mut file, 0, len)?.filter(|h| &h.fourcc == b"ftyp") else {
@@ -75,7 +76,7 @@ fn rebuild(part: &Path) -> Result<()> {
     let mut file = OpenOptions::new().read(true).write(true).open(part)?;
     let scan = scan(&mut file)?;
     file.set_len(scan.good_end)?;
-    let (video, audio) = read_formats(&scan.init_moov, &scan.runs)?;
+    let (video, audio) = read_formats(&scan.init_moov, first_video_duration(&scan.runs))?;
     let (tables, chunking) = build_tables(&scan.runs);
     if tables.video.is_empty() {
         return Err(Mp4Error::Invalid("no complete fragment to recover".into()));
@@ -91,7 +92,7 @@ fn rebuild(part: &Path) -> Result<()> {
     Ok(())
 }
 
-fn header_at(file: &mut File, pos: u64, len: u64) -> Result<Option<Header>> {
+pub(crate) fn header_at(file: &mut File, pos: u64, len: u64) -> Result<Option<Header>> {
     if pos + 8 > len {
         return Ok(None);
     }
@@ -114,7 +115,7 @@ fn header_at(file: &mut File, pos: u64, len: u64) -> Result<Option<Header>> {
     Ok((size >= header_len).then_some(Header { fourcc, size }))
 }
 
-fn read_exact_at(file: &mut File, pos: u64, len: u64) -> Result<Vec<u8>> {
+pub(crate) fn read_exact_at(file: &mut File, pos: u64, len: u64) -> Result<Vec<u8>> {
     file.seek(SeekFrom::Start(pos))?;
     let mut buf =
         vec![0u8; usize::try_from(len).map_err(|_| Mp4Error::Invalid("box too large".into()))?];
@@ -122,7 +123,7 @@ fn read_exact_at(file: &mut File, pos: u64, len: u64) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-fn scan(file: &mut File) -> Result<Scan> {
+pub(crate) fn scan(file: &mut File) -> Result<Scan> {
     let len = file.metadata()?.len();
     let expect = |header: Option<Header>, fourcc: &[u8; 4], pos: u64| {
         header
@@ -152,6 +153,7 @@ fn scan(file: &mut File) -> Result<Scan> {
     let mut pos = moov_offset + moov.size;
     let mut runs = Vec::new();
     let mut good_end = pos;
+    let mut fragments = 0u32;
     while let Some(moof) = header_at(file, pos, len)? {
         if &moof.fourcc != b"moof" || pos + moof.size > len {
             break;
@@ -169,6 +171,7 @@ fn scan(file: &mut File) -> Result<Scan> {
             break;
         };
         runs.append(&mut fragment);
+        fragments += 1;
         pos = mdat_pos + mdat.size;
         good_end = pos;
     }
@@ -176,6 +179,7 @@ fn scan(file: &mut File) -> Result<Scan> {
         placeholder_offset,
         init_moov,
         runs,
+        fragments,
         good_end,
     })
 }
