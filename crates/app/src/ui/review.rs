@@ -3,9 +3,11 @@ pub(crate) mod event_detail;
 mod events;
 pub(crate) mod jump;
 mod player;
+mod scrub;
 mod sound;
+mod trace;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use greyscreen_core::categories::{CategorySet, EventCategory, categorize};
 use greyscreen_engine::RecordingEntry;
@@ -14,6 +16,7 @@ use rune::PlayerState;
 pub(crate) use deaths::{DeathReviewState, title_line};
 pub(crate) use events::EventHover;
 pub(crate) use player::{PlayerFactory, ReviewPlayer, rune_player};
+pub(crate) use scrub::Scrub;
 pub(crate) use sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +61,15 @@ pub(crate) struct ReviewState {
     pub volume_hover: VolumeHover,
     pub drawer: bool,
     pub death: Option<DeathReviewState>,
+    pub scrub: Option<Scrub>,
+    /// The app clock at the last poll.
+    pub clock: f64,
+    pub file: PathBuf,
+    pub watch: trace::Watch,
+}
+
+fn open_player(path: &Path, make: PlayerFactory) -> Option<Box<dyn ReviewPlayer>> {
+    path.is_file().then(|| trace::traced(path, make(path)))
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
@@ -71,7 +83,7 @@ impl ReviewState {
         default_filter: CategorySet,
     ) -> Self {
         let path = entry.folder.join(&entry.meta.video);
-        let player = path.is_file().then(|| make(&path));
+        let player = open_player(&path, make);
         if let Some(player) = &player {
             player.play();
         }
@@ -103,6 +115,10 @@ impl ReviewState {
             volume_hover: VolumeHover::default(),
             drawer: false,
             death: None,
+            scrub: None,
+            clock: 0.0,
+            file: path,
+            watch: trace::Watch::default(),
         };
         review.apply_audio();
         review.fall_back_to_first_clip(make);
@@ -194,6 +210,9 @@ impl ReviewState {
     }
 
     pub(crate) fn time(&self) -> f64 {
+        if let Some(scrub) = &self.scrub {
+            return scrub.target;
+        }
         self.player.as_ref().map_or(0.0, |p| p.time())
     }
 
@@ -252,7 +271,9 @@ impl ReviewState {
 
     fn swap(&mut self, source: Source, path: &Path, make: PlayerFactory) {
         self.source = source;
-        self.player = path.is_file().then(|| make(path));
+        self.scrub = None;
+        self.file = path.to_owned();
+        self.player = open_player(path, make);
         if let Some(player) = &self.player {
             player.play();
         }
@@ -274,7 +295,16 @@ impl ReviewState {
         if self.settling && !active && time == self.shown_time {
             self.settling = false;
         }
-        active || self.settling
+        active || self.settling || self.scrubbing() || player.seeking()
+    }
+
+    pub(crate) fn tick(&mut self, clock: f64) {
+        self.clock = clock;
+        self.scrub_tick(clock);
+        if let Some(player) = &self.player {
+            self.watch
+                .check(clock, player.as_ref(), self.scrub.is_some(), &self.file);
+        }
     }
 
     pub(crate) fn changed_since_shown(&mut self) -> bool {

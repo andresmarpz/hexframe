@@ -61,10 +61,10 @@ fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
         .size(MARKER_WIDTH, MARKER_HEIGHT)
         .center()
         .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)))
-        .on_drag(|ui: &mut Ui, drag: &mut Drag, _| {
-            if drag.phase == Phase::Move {
-                ui.review_scrub(drag.window_point()[0]);
-            }
+        .on_drag(|ui: &mut Ui, drag: &mut Drag, _| match drag.phase {
+            Phase::Move => ui.review_scrub(drag.window_point()[0]),
+            Phase::Up => ui.review_scrub_end(),
+            Phase::Down => {}
         })
         .child(
             el().size(DOT, DOT)
@@ -142,10 +142,9 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
                 review.timeline_rect = rect;
             }
         })
-        .on_drag(move |ui: &mut Ui, drag: &mut Drag, _| {
-            if matches!(drag.phase, Phase::Down | Phase::Move) {
-                ui.review_seek(drag_target(drag.x, drag.w, duration));
-            }
+        .on_drag(move |ui: &mut Ui, drag: &mut Drag, _| match drag.phase {
+            Phase::Down | Phase::Move => ui.review_scrub_to(drag_target(drag.x, drag.w, duration)),
+            Phase::Up => ui.review_scrub_end(),
         })
         .child(track);
     if review.source == Source::Game {

@@ -243,8 +243,20 @@ impl Ui {
             if width > 0.0 {
                 let secs =
                     f64::from(((window_x - left) / width).clamp(0.0, 1.0)) * review.duration();
-                review.seek(secs);
+                review.scrub_to(secs);
             }
+        }
+    }
+
+    pub(crate) fn review_scrub_to(&mut self, secs: f64) {
+        if let Some(review) = &mut self.review {
+            review.scrub_to(secs);
+        }
+    }
+
+    pub(crate) fn review_scrub_end(&mut self) {
+        if let Some(review) = &mut self.review {
+            review.scrub_end();
         }
     }
 

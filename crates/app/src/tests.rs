@@ -33,6 +33,7 @@ mod review_health;
 mod review_markers;
 mod review_narrow;
 mod review_volume;
+mod scrub;
 mod search_clear;
 mod selection;
 mod settings_sheet;

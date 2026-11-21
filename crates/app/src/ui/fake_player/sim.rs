@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::path::Path;
 
 use rune::{El, PlayerState};
@@ -11,6 +12,7 @@ pub(crate) struct Media {
     pub duration: f64,
     pub pictures_end: f64,
     pub seek_latency: f64,
+    pub fast_latency: f64,
     pub layered: bool,
 }
 
@@ -20,6 +22,7 @@ impl Media {
             duration,
             pictures_end: duration,
             seek_latency: 0.0,
+            fast_latency: 0.0,
             layered: false,
         }
     }
@@ -32,6 +35,15 @@ enum Run {
     Ended,
 }
 
+/// A seek the player still works on. Every seek runs to the end, in order: the worst a player
+/// can do with a storm of them.
+#[derive(Debug, Clone, Copy)]
+struct Pending {
+    to: f64,
+    left: f64,
+    fast: bool,
+}
+
 #[derive(Debug, Clone)]
 struct Sim {
     media: Media,
@@ -40,7 +52,7 @@ struct Sim {
     position: f64,
     reported: f64,
     picture: f64,
-    seek: Option<(f64, f64)>,
+    seeks: VecDeque<Pending>,
     muted: bool,
     volume: f32,
 }
@@ -58,7 +70,7 @@ pub(crate) fn simulate(media: Media) {
         position: 0.0,
         reported: 0.0,
         picture: 0.0,
-        seek: None,
+        seeks: VecDeque::new(),
         muted: true,
         volume: 1.0,
     }));
@@ -85,7 +97,7 @@ pub(crate) fn picture() -> f64 {
 }
 
 pub(crate) fn landed() -> bool {
-    with(|sim| sim.seek.is_none())
+    with(|sim| sim.seeks.is_empty())
 }
 
 impl Sim {
@@ -95,15 +107,16 @@ impl Sim {
     }
 
     fn advance(&mut self, secs: f64) {
-        if let Some((to, left)) = self.seek {
-            let left = left - secs;
-            if left > 0.0 {
-                self.seek = Some((to, left));
-            } else {
-                let at = to.min(self.media.pictures_end);
-                self.seek = None;
-                self.position = at;
-                self.show(at);
+        if !self.seeks.is_empty() {
+            let mut budget = secs;
+            while let Some(front) = self.seeks.front_mut() {
+                if front.left > budget {
+                    front.left -= budget;
+                    return;
+                }
+                budget -= front.left;
+                let done = self.seeks.pop_front().expect("a pending seek");
+                self.land(done);
             }
             return;
         }
@@ -130,24 +143,39 @@ impl Sim {
         }
     }
 
+    fn land(&mut self, seek: Pending) {
+        let at = if seek.fast { seek.to.floor() } else { seek.to };
+        let at = at.min(self.media.pictures_end);
+        self.position = at;
+        self.picture = at;
+        if self.seeks.is_empty() {
+            self.reported = at;
+        }
+    }
+
     fn pause(&mut self) {
         if self.run != Run::Playing {
             return;
         }
         self.run = Run::Paused;
-        if self.seek.is_none() {
+        if self.seeks.is_empty() {
             self.show(self.position.min(self.media.pictures_end));
         }
     }
 
-    fn seek(&mut self, secs: f64) {
+    fn seek(&mut self, secs: f64, fast: bool) {
         let to = secs.clamp(0.0, self.media.duration);
         self.reported = to;
-        self.seek = Some((to, self.media.seek_latency));
+        let left = if fast {
+            self.media.fast_latency
+        } else {
+            self.media.seek_latency
+        };
+        self.seeks.push_back(Pending { to, left, fast });
         if self.run == Run::Ended {
             self.run = Run::Paused;
         }
-        if self.media.seek_latency <= 0.0 {
+        if left <= 0.0 {
             self.advance(0.0);
         }
     }
@@ -155,17 +183,17 @@ impl Sim {
     fn play(&mut self) {
         match self.run {
             Run::Playing => return,
-            Run::Ended => self.seek(0.0),
+            Run::Ended => self.seek(0.0, false),
             Run::Paused => {}
         }
         self.run = Run::Playing;
-        if self.seek.is_none() {
+        if self.seeks.is_empty() {
             self.show(self.position.min(self.media.pictures_end));
         }
     }
 
     fn time(&self) -> f64 {
-        if self.run == Run::Playing && self.seek.is_none() {
+        if self.run == Run::Playing && self.seeks.is_empty() {
             self.position
         } else {
             self.reported
@@ -197,7 +225,16 @@ impl ReviewPlayer for SimPlayer {
 
     fn seek(&self, secs: f64) {
         record(Call::Seek(secs));
-        with(|sim| sim.seek(secs));
+        with(|sim| sim.seek(secs, false));
+    }
+
+    fn seek_fast(&self, secs: f64) {
+        record(Call::SeekFast(secs));
+        with(|sim| sim.seek(secs, true));
+    }
+
+    fn seeking(&self) -> bool {
+        with(|sim| !sim.seeks.is_empty())
     }
 
     fn time(&self) -> f64 {

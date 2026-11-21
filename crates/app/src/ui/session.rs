@@ -172,6 +172,7 @@ impl Ui {
         }
         changed |= self.sync_dock(clock);
         if let Some(review) = &mut self.review {
+            review.tick(clock);
             changed |= review.death_tick();
             changed |= review.changed_since_shown();
             changed |= review.hide_idle_controls(clock);
