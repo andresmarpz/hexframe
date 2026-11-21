@@ -54,13 +54,12 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
             .h_full()
             .fill(k.c.bg_deep)
             .child(shell::sidebar::panel(s, k, cx.titlebar_inset()))
-            .child(
-                col()
-                    .grow(1.0)
-                    .min_w(0.0)
-                    .h_full()
-                    .child(screen(s, k, cx, 0.0)),
-            ),
+            .child(col().grow(1.0).min_w(0.0).h_full().child(screen(
+                s,
+                k,
+                cx,
+                shell::sidebar::lights_overhang(s, cx.titlebar_inset()),
+            ))),
         NavStyle::Dock => col()
             .key("window")
             .w_full()

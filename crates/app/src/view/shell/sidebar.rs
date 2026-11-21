@@ -1,3 +1,4 @@
+mod collapsed;
 pub(super) mod icons;
 mod recent;
 mod status;
@@ -5,17 +6,34 @@ mod storage;
 
 use rune::tok::type_;
 use rune::{El, Icon, ScrollSpec, col, el, row, text};
-use rune_kit::{Kit, SidebarRow};
+use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, SidebarRow};
 
-use self::icons::{CLIPS, GAMES, GEAR, HOME, LOGO};
+use self::icons::{CLIPS, GAMES, GEAR, HOME, LOGO, SIDEBAR};
 use crate::ui::{Screen, Ui};
 
 pub(in crate::view) const WIDTH: f32 = 220.0;
 const BRAND_HEIGHT: f32 = 48.0;
 const LIGHTS_HEIGHT: f32 = 40.0;
 const PAD: f32 = 12.0;
+const TRAFFIC_LIGHT_GAP: f32 = 12.0;
 
 pub(in crate::view) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
+    if s.settings.sidebar_collapsed {
+        collapsed::panel(s, k, titlebar_inset)
+    } else {
+        expanded(s, k, titlebar_inset)
+    }
+}
+
+pub(in crate::view) fn lights_overhang(s: &Ui, titlebar_inset: f32) -> f32 {
+    if s.settings.sidebar_collapsed {
+        (titlebar_inset + TRAFFIC_LIGHT_GAP - collapsed::WIDTH).max(0.0)
+    } else {
+        0.0
+    }
+}
+
+fn expanded(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
     let list = col()
         .key("nav-list")
         .role("list")
@@ -58,7 +76,7 @@ pub(in crate::view) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
         .h_full()
         .min_h(0.0)
         .fill(k.c.bg_deep)
-        .child(brand(k, titlebar_inset))
+        .child(brand(s, k, titlebar_inset))
         .child(col().w_full().px(PAD).pb(10.0).child(status::block(s, k)))
         .child(middle(s, k, list))
         .child(
@@ -130,11 +148,29 @@ fn wordmark(k: &Kit) -> El {
         .child(text("Greyscreen").font(type_::SECTION).color(k.c.text_base))
 }
 
-fn brand(k: &Kit, titlebar_inset: f32) -> El {
+fn collapse_button(s: &Ui, k: &Kit) -> El {
+    IconButton::new(&SIDEBAR)
+        .label("Collapse sidebar")
+        .help(format!("Collapse sidebar ({})", s.nav_shortcut()))
+        .variant(IconButtonVariant::GhostMuted)
+        .control_size(ControlSize::Small)
+        .on_press(|ui: &mut Ui| ui.toggle_nav())
+        .build(k)
+        .key("nav-collapse")
+}
+
+fn brand(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
+    let top = row().key("nav-top").w_full().window_drag().center_y();
     if titlebar_inset > 0.0 {
         return col()
             .w_full()
-            .child(el().w_full().h(LIGHTS_HEIGHT).window_drag().a11y_hidden())
+            .child(
+                top.h(LIGHTS_HEIGHT)
+                    .pl(titlebar_inset + TRAFFIC_LIGHT_GAP)
+                    .pr(PAD)
+                    .child(el().grow(1.0).a11y_hidden())
+                    .child(collapse_button(s, k)),
+            )
             .child(
                 row()
                     .w_full()
@@ -145,11 +181,13 @@ fn brand(k: &Kit, titlebar_inset: f32) -> El {
                     .child(wordmark(k)),
             );
     }
-    row()
-        .w_full()
-        .h(BRAND_HEIGHT)
-        .px(PAD + 4.0)
-        .center_y()
-        .window_drag()
+    top.h(BRAND_HEIGHT)
+        .pl(PAD + 4.0)
+        .pr(PAD)
         .child(wordmark(k))
+        .child(el().grow(1.0).a11y_hidden())
+        .child(collapse_button(s, k))
 }
+
+#[cfg(test)]
+mod tests;

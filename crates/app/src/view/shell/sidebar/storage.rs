@@ -1,7 +1,9 @@
-use rune::{El, TextStyle, col, row, text};
-use rune_kit::{Kit, Progress};
+use rune::{El, Side, TextStyle, col, row, text};
+use rune_kit::{Kit, Progress, ProgressCircle};
 
 use crate::ui::{LibraryTotals, Ui, format_size};
+
+const RING_SIZE: f32 = 22.0;
 
 fn limit_label(s: &Ui) -> Option<String> {
     s.settings.storage_limit_gb.map(|gb| format!("{gb} GB"))
@@ -59,4 +61,20 @@ pub(super) fn block(s: &Ui, k: &Kit) -> El {
         );
     }
     block
+}
+
+pub(super) fn ring(s: &Ui, k: &Kit) -> Option<El> {
+    let totals = LibraryTotals::of(&s.recordings);
+    let used = totals.used_fraction(s.settings.storage_limit_bytes())?;
+    let tip = description(s, &totals);
+    Some(
+        row()
+            .key("nav-storage")
+            .label(tip.clone())
+            .help(tip)
+            .help_side(Side::Right)
+            .size(40.0, 28.0)
+            .center()
+            .child(ProgressCircle::new(used).size(RING_SIZE).build(k)),
+    )
 }

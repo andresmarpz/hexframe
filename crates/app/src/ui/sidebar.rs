@@ -1,4 +1,8 @@
+use greyscreen_core::keybinds::Action;
 use greyscreen_engine::RecordingEntry;
+
+use super::Ui;
+use super::key_event::MAC;
 
 pub(crate) const RECENT_LIMIT: usize = 5;
 
@@ -17,6 +21,20 @@ impl LibraryTotals {
     pub(crate) fn used_fraction(&self, limit_bytes: Option<u64>) -> Option<f32> {
         let limit = limit_bytes.filter(|limit| *limit > 0)?;
         Some((self.bytes as f64 / limit as f64).clamp(0.0, 1.0) as f32)
+    }
+}
+
+impl Ui {
+    pub(crate) fn toggle_nav(&mut self) {
+        self.change(|s| s.sidebar_collapsed = !s.sidebar_collapsed);
+    }
+
+    pub(crate) fn nav_shortcut(&self) -> String {
+        self.settings
+            .keymap()
+            .bindings(Action::ToggleNav)
+            .first()
+            .map_or_else(|| "unbound".to_owned(), |combo| combo.display(MAC))
     }
 }
 

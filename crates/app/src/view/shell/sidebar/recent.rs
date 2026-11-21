@@ -1,7 +1,7 @@
 use greyscreen_core::game::GameResult;
 use greyscreen_core::highlight::Tone;
 use jiff::Zoned;
-use rune::{El, el};
+use rune::{Cursor, El, Side, col, el, row};
 use rune_kit::{Kit, SidebarRow, SidebarSection};
 
 use crate::ui::library_format::{ago, kda, recent_games};
@@ -12,6 +12,9 @@ const AVATAR_SIZE: f32 = 16.0;
 const ROW_HEIGHT: f32 = 44.0;
 const TICK_WIDTH: f32 = 3.0;
 const TICK_HEIGHT: f32 = 20.0;
+const CELL_HEIGHT: f32 = 42.0;
+const CELL_TARGET: f32 = 40.0;
+const CELL_ICON: f32 = 28.0;
 
 struct Game {
     id: String,
@@ -94,4 +97,44 @@ pub(super) fn section(s: &Ui, k: &Kit) -> Option<El> {
             .rows(games.iter().map(|game| list_row(game, k)))
             .build(k),
     )
+}
+
+fn rail_cell(game: &Game, k: &Kit) -> El {
+    let id = game.id.clone();
+    let tip = format!(
+        "{} · {} {} · {} ago",
+        game.champion,
+        game.result_word(),
+        game.score,
+        game.ago
+    );
+    let mut target = row()
+        .key(format!("nav-game-{}", game.id))
+        .role("button")
+        .label(format!("Review {} game, {tip}", game.champion))
+        .help(tip)
+        .help_side(Side::Right)
+        .focusable(true)
+        .size(CELL_TARGET, CELL_TARGET)
+        .center()
+        .radius(k.radius.md)
+        .hover(k.c.hover)
+        .cursor(Cursor::Pointer)
+        .on_press(move |ui: &mut Ui| ui.open_review(id.clone()))
+        .child(champion_icon(k, &game.champion, CELL_ICON));
+    if game.active {
+        target = target.fill(k.c.pressed);
+    }
+    row().w_full().h(CELL_HEIGHT).center().child(target).child(
+        game.tick(k)
+            .absolute(0.0, (CELL_HEIGHT - TICK_HEIGHT) / 2.0),
+    )
+}
+
+pub(super) fn rail(s: &Ui, k: &Kit) -> El {
+    col()
+        .key("nav-recent")
+        .w_full()
+        .gap(2.0)
+        .children(games(s).iter().map(|game| rail_cell(game, k)))
 }

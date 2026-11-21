@@ -38,3 +38,12 @@ pub(in crate::view::shell) static GEAR: Icon = Icon {
         r#"<circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.25"/>"#
     ),
 };
+
+pub(super) static SIDEBAR: Icon = Icon {
+    name: "greyscreen-sidebar",
+    view: 16.0,
+    body: concat!(
+        r#"<rect x="1.75" y="2.5" width="12.5" height="11" rx="2.25" fill="none" stroke="currentColor" stroke-width="1.5"/>"#,
+        r#"<path d="M6 2.7v10.6" fill="none" stroke="currentColor" stroke-width="1.5"/>"#
+    ),
+};

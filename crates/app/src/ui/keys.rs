@@ -1,5 +1,6 @@
 use greyscreen_core::keybinds::{Action, Scope};
 use greyscreen_core::library::EventEntry;
+use greyscreen_core::settings::NavStyle;
 use rune::{KeyEvent, Tx};
 
 use super::jump::{next_target, previous_target};
@@ -33,6 +34,8 @@ impl Ui {
                 self.go(Screen::Games);
                 tx.focus("filter-champion", true);
             }
+            Action::ToggleNav if self.settings.nav_style == NavStyle::Sidebar => self.toggle_nav(),
+            Action::ToggleNav => return false,
             Action::ToggleSidebar if self.screen == Screen::Games => self.sidebar.toggle(),
             Action::ToggleSidebar => return false,
             Action::PreviousGame | Action::NextGame if self.screen != Screen::Games => {
@@ -84,6 +87,7 @@ impl Ui {
             | Action::NextGame
             | Action::FocusPlayer
             | Action::ToggleSidebar
+            | Action::ToggleNav
             | Action::FocusSearch => return false,
         }
         self.wake_after_key(tx);

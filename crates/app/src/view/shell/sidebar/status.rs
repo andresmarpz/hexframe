@@ -1,11 +1,12 @@
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{Color, Cursor, El, LoopSpec, TextStyle, col, el, row, text};
+use rune::{Color, Cursor, El, LoopSpec, Side, TextStyle, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::{Screen, Ui, format_clock};
 
 const BLOCK_HEIGHT: f32 = 52.0;
 const DOT_SIZE: f32 = 8.0;
+const DOT_TARGET: f32 = 36.0;
 const PULSE_SECS: f64 = 1.6;
 const PULSE_LOW: f32 = 0.4;
 
@@ -138,4 +139,23 @@ pub(super) fn block(s: &Ui, k: &Kit) -> El {
         );
     }
     block
+}
+
+pub(super) fn dot_button(s: &Ui, k: &Kit) -> El {
+    let st = status(s, k);
+    let tip = summary(&st);
+    row()
+        .key("nav-status")
+        .role("button")
+        .label(format!("Recorder: {tip}. Go to Home"))
+        .help(tip)
+        .help_side(Side::Right)
+        .focusable(true)
+        .size(DOT_TARGET, DOT_TARGET)
+        .center()
+        .radius(k.radius.lg)
+        .hover(k.c.hover)
+        .cursor(Cursor::Pointer)
+        .on_press(|ui: &mut Ui| ui.go(Screen::Home))
+        .child(dot(&st))
 }
