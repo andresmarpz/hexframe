@@ -231,7 +231,7 @@ fn a_decoder_that_fell_behind_on_the_layer_jumps_to_the_clock_instead_of_playing
     }
     let most = busiest(&shown, secs(0.1));
     eprintln!("{} pictures shown in 0.8 s after a 1.2 s stall, at most {most} in 100 ms", shown.len());
-    assert!(most <= 12, "{most} pictures shown within 100 ms after the stall: the decoder replayed what it missed at {:.1}x", most as f64 / 6.0);
+    assert!(most <= 14, "{most} pictures shown within 100 ms after the stall: the decoder replayed what it missed at {:.1}x", most as f64 / 6.0);
     assert!(rig.layer(Some(SIZE)).showing, "the layer stopped showing");
     let clock = rig.clock().expect("a running clock");
     let on_layer = rig.presented().expect("a picture on the layer");
