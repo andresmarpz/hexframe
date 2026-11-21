@@ -25,13 +25,7 @@ fn capture_checks() -> ExitCode {
     use greyscreen_capture::h264::H264Encoder;
     use greyscreen_capture::probe;
 
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_max_level(tracing::Level::INFO)
-        .init();
-    if let Err(err) = probe::init_process() {
-        println!("dpi awareness: {err}");
-    }
+    crate::init_windows();
     print!("{}", probe::system_report());
     let result = (|| -> anyhow::Result<String> {
         let _com = ComGuard::mta()?;
@@ -39,16 +33,76 @@ fn capture_checks() -> ExitCode {
         let gpu = GpuDevice::for_primary_monitor()?;
         Ok(H264Encoder::probe(&gpu)?)
     })();
-    match result {
+    let encoder_ok = match result {
         Ok(name) => {
             println!("encoder: {name}");
-            ExitCode::SUCCESS
+            true
         }
         Err(err) => {
             println!("encoder: FAILED {err:#}");
-            ExitCode::FAILURE
+            false
+        }
+    };
+    let capture_ok = match capture_test() {
+        Ok((frames, width, height)) => {
+            println!("capture: OK, {frames} frames, {width}x{height}");
+            true
+        }
+        Err(reason) => {
+            println!("capture: FAILED {reason}");
+            false
+        }
+    };
+    if encoder_ok && capture_ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+#[cfg(windows)]
+fn capture_test() -> Result<(u64, u32, u32), String> {
+    use std::time::{Duration, Instant};
+
+    use greyscreen_capture::WindowsMediaSource;
+    use greyscreen_core::media::{CaptureTarget, MediaEvent, MediaSource, Track};
+
+    const TEST_DURATION: Duration = Duration::from_secs(2);
+
+    let mut cfg = Settings::default().capture_config(2160);
+    cfg.fps = 30;
+    cfg.audio = false;
+    let (tx, rx) = crossbeam_channel::bounded(1024);
+    let session = WindowsMediaSource::new().start(CaptureTarget::PrimaryMonitor, cfg, tx)?;
+    let deadline = Instant::now() + TEST_DURATION;
+    let mut size = None;
+    let mut frames = 0u64;
+    let mut failure = None;
+    while let Some(left) = deadline.checked_duration_since(Instant::now()) {
+        match rx.recv_timeout(left) {
+            Ok(MediaEvent::Started { video, .. }) => size = Some((video.width, video.height)),
+            Ok(MediaEvent::Packet(p)) if p.track == Track::Video => frames += 1,
+            Ok(MediaEvent::Failed(message)) => {
+                failure = Some(message);
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => break,
         }
     }
+    let stopper = std::thread::spawn(move || session.stop());
+    while !stopper.is_finished() {
+        rx.recv_timeout(Duration::from_millis(50)).ok();
+    }
+    stopper.join().ok();
+    if let Some(message) = failure {
+        return Err(message);
+    }
+    let (width, height) = size.ok_or("no Started event within 2 s")?;
+    if frames == 0 {
+        return Err("no frames received".into());
+    }
+    Ok((frames, width, height))
 }
 
 #[cfg(not(windows))]

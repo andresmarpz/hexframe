@@ -1,5 +1,7 @@
 mod doctor;
 mod fake_league;
+mod record;
+mod recover;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -16,7 +18,20 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     Doctor,
-    Record,
+    Record {
+        #[arg(long)]
+        seconds: f64,
+        #[arg(long, default_value = "greyscreen-test.mp4")]
+        out: PathBuf,
+        #[arg(long)]
+        window: Option<String>,
+        #[arg(long, default_value_t = 60)]
+        fps: u32,
+        #[arg(long, default_value_t = 1080)]
+        height: u32,
+        #[arg(long)]
+        no_audio: bool,
+    },
     FakeLeague {
         #[arg(long, default_value_t = 2999)]
         port: u16,
@@ -25,7 +40,9 @@ enum Command {
         #[arg(long)]
         script: Option<PathBuf>,
     },
-    Recover,
+    Recover {
+        path: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -37,10 +54,22 @@ fn main() -> ExitCode {
             script,
         } => finish(run_fake_league(port, speed, script)),
         Command::Doctor => doctor::run(),
-        Command::Record | Command::Recover => {
-            eprintln!("not implemented yet");
-            ExitCode::from(2)
-        }
+        Command::Record {
+            seconds,
+            out,
+            window,
+            fps,
+            height,
+            no_audio,
+        } => record::run(&record::Args {
+            seconds,
+            out,
+            window,
+            fps,
+            height,
+            audio: !no_audio,
+        }),
+        Command::Recover { path } => finish(recover::run(&path)),
     }
 }
 
@@ -59,5 +88,19 @@ fn finish(result: anyhow::Result<()>) -> ExitCode {
             eprintln!("error: {e:#}");
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn init_windows() {
+    use tracing_subscriber::EnvFilter;
+
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(filter)
+        .init();
+    if let Err(err) = greyscreen_capture::probe::init_process() {
+        eprintln!("dpi awareness: {err}");
     }
 }

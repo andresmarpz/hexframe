@@ -1363,6 +1363,7 @@ dependencies = [
  "tiny_http",
  "tracing",
  "tracing-subscriber",
+ "windows",
 ]
 
 [[package]]
