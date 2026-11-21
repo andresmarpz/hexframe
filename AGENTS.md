@@ -1,6 +1,6 @@
 # Greyscreen
 
-League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done and what is next, `docs/research/` has the API details.
+League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done, GitHub issues have what is next, `docs/research/` has the API details.
 
 Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback clients), `capture` (Windows only), `engine` (threads and I/O), `thumbs` (OS thumbnails), `app` (the Rune UI and the setup window), `cli` and `qa` (the headless QA runner, `docs/qa.md`). `docs/architecture.md` has the dependency direction.
 
@@ -13,6 +13,12 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 5. `just check` must pass: fmt, clippy on the host and the tests. Run `just ci` (adds typos and Windows clippy through cargo-xwin) only when you touch Windows-only code (`capture`, `thumbs`, `cfg(windows)`) or before a release. Real Windows builds and tests are run by the orchestrator on the Windows PC.
 6. Commit with the message `<crate>: <what changed>` (for example `mp4: add fragmented writer`). Then `git fetch origin && git rebase origin/main && just check && git push origin HEAD:main`. On a push race, repeat the rebase.
 7. Final report, under 15 lines: commit sha, what was built, the tests added, deviations, and anything left unverified.
+
+## Issues
+
+- Open work is a GitHub issue on `andresmarpz/greyscreen`. Run `gh` with `GH_TOKEN=$(gh auth token --user andresmarpz)`.
+- Labels: `bug` or `enhancement`, an area (`capture`, `engine`, `app`, `backend`, `web`), `needs-windows` (needs a run on the Windows PC), `needs-andres` (waits on Andres).
+- Put `Fixes #N` in the commit body that completes an issue. File a new issue for work you find and do not do.
 
 ## Rules for code
 
