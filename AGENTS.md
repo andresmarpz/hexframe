@@ -42,6 +42,8 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 - `just web-check`: `astro check` and a website build.
 - Pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock` deploy the website by themselves through Vercel's Git integration (https://greyscreen-lake.vercel.app); other pushes are skipped.
 - `just web-deploy`: manual fallback, a local authenticated build published to Vercel production, then a URL check. `just release` runs it.
+- `just api-dev`: run the backend (`apps/api`, Cloudflare Worker on Effect and Alchemy) locally in workerd with emulated R2 and D1. No Cloudflare account needed.
+- `just api-test`, `just api-check`: backend tests, and typecheck plus tests. They are not part of `just ci`. See `apps/api/README.md` for deploys.
 - `just web-tokens`: regenerate the website's theme tokens from Rune's neutral kit.
 - `just web-screens`: render the app scenes into `apps/web/public/screens`.
 

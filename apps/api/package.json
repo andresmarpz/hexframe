@@ -1,0 +1,28 @@
+{
+  "name": "@greyscreen/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "alchemy dev --env-file local.env",
+    "deploy": "alchemy deploy",
+    "login": "alchemy profile edit --add Cloudflare",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@alchemy.run/cloudflare": "2.0.0-beta.87",
+    "@effect/platform-bun": "4.1.5",
+    "@effect/platform-node": "4.1.5",
+    "alchemy": "2.0.0-beta.87",
+    "effect": "4.1.5"
+  },
+  "devDependencies": {
+    "@alchemy.run/test": "2.0.0-beta.87",
+    "@cloudflare/workers-types": "^5.20261121.1",
+    "@effect/vitest": "4.1.5",
+    "@types/node": "24",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  }
+}

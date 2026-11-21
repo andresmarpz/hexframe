@@ -14,3 +14,4 @@ node_modules
 /apps/web/dist
 /apps/web/.astro
 .vercel
+/apps/api/.alchemy
