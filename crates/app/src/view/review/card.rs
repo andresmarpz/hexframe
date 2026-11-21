@@ -5,7 +5,7 @@ use rune_kit::{Kit, Placement, popover};
 
 use super::tabular;
 use crate::ui::Ui;
-use crate::ui::event_detail::{Detail, Line, Span, describe};
+use crate::ui::review::event_detail::{Detail, Line, Span, describe};
 
 const HOVER_DELAY: Duration = Duration::from_millis(150);
 const ANCHOR_GAP: f32 = 8.0;

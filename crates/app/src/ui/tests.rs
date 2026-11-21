@@ -2,7 +2,7 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::{ClipEntry, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg};
 use rune::Tx;
 
-use super::jump::{next_target, previous_target};
+use super::review::jump::{next_target, previous_target};
 use super::{FEED_CAP, Ui, format_size_rate};
 
 fn ui() -> Ui {

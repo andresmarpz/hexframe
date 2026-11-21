@@ -11,6 +11,7 @@ mod row_menu;
 mod settings;
 mod shell;
 pub(crate) mod thumb;
+mod tone;
 mod update_banner;
 
 use greyscreen_core::settings::NavStyle;

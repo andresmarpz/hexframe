@@ -24,7 +24,7 @@ fn kill(killer: &str, victim: &str, assisters: &[&str]) -> GameEvent {
 }
 
 pub(crate) fn death_entry() -> RecordingEntry {
-    let mut entry = crate::ui::preview::review_entry();
+    let mut entry = super::review_entry();
     let meta = &mut entry.meta;
     meta.video = DEATH_VIDEO.into();
     meta.duration_secs = DEATH_VIDEO_SECS;

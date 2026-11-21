@@ -37,7 +37,7 @@ fn main() {
     }
     let spec = AppSpec {
         min_size: Some((1000.0, 600.0)),
-        scenes: ui::SCENES,
+        scenes: ui::scene_list(),
         poll: Some(Ui::poll),
         setup: Some(|_, waker| {
             view::thumb::set_waker(waker.clone());

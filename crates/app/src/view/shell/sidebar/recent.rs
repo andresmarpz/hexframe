@@ -5,8 +5,9 @@ use rune::{Cursor, El, Side, col, el, row};
 use rune_kit::{Kit, SidebarRow, SidebarSection};
 
 use crate::ui::library::format::{ago, kda, recent_games};
-use crate::ui::{RECENT_LIMIT, Screen, Ui, tone_color};
+use crate::ui::{RECENT_LIMIT, Screen, Ui};
 use crate::view::champion::champion_icon;
+use crate::view::tone::tone_color;
 
 const AVATAR_SIZE: f32 = 16.0;
 const ROW_HEIGHT: f32 = 44.0;

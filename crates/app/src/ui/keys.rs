@@ -6,7 +6,7 @@ use greyscreen_core::library::EventEntry;
 use greyscreen_core::settings::NavStyle;
 use rune::{KeyEvent, Tx};
 
-use super::jump::{next_target, previous_target};
+use super::review::jump::{next_target, previous_target};
 use super::{Detail, EventFilter, PanelTab, Screen, Source, Ui, VolumeHover};
 
 pub(crate) use event::MAC;

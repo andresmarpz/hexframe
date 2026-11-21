@@ -72,12 +72,3 @@ impl Ui {
         }
     }
 }
-
-pub(super) fn preview_info() -> greyscreen_core::update::UpdateInfo {
-    greyscreen_core::update::UpdateInfo {
-        tag: "v0.2.0".into(),
-        prerelease: false,
-        size: 24_000_000,
-        notes_url: greyscreen_core::update::notes_url("v0.2.0"),
-    }
-}

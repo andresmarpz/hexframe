@@ -1,7 +1,7 @@
 use greyscreen_core::review::DeathTag;
 
-use super::fixture::death_entry;
 use crate::ui::Ui;
+use crate::ui::preview::death_entry;
 
 const MID_DEATH_INDEX: usize = 2;
 const MID_DEATH_OFFSET_SECS: f64 = 0.6;
@@ -38,7 +38,7 @@ fn open_with_reviews(ui: &mut Ui) {
     show_in_list(ui);
 }
 
-pub(crate) fn scene_mid(ui: &mut Ui) {
+pub(super) fn mid(ui: &mut Ui) {
     open_with_reviews(ui);
     ui.review_deaths();
     ui.death_go(MID_DEATH_INDEX);
@@ -54,7 +54,7 @@ pub(crate) fn scene_mid(ui: &mut Ui) {
     }
 }
 
-pub(crate) fn scene_summary(ui: &mut Ui) {
+pub(super) fn summary(ui: &mut Ui) {
     open_with_reviews(ui);
     ui.review_deaths();
     ui.death_finish();
@@ -63,12 +63,12 @@ pub(crate) fn scene_summary(ui: &mut Ui) {
     }
 }
 
-pub(crate) fn scene_demo(ui: &mut Ui) {
+pub(super) fn demo(ui: &mut Ui) {
     ui.open_review_entry(death_entry());
     show_in_list(ui);
 }
 
-pub(crate) fn scene_browse(ui: &mut Ui) {
+pub(super) fn browse(ui: &mut Ui) {
     let entry = death_entry();
     let Some(first) = ui.recordings.first_mut() else {
         return;
@@ -80,6 +80,6 @@ pub(crate) fn scene_browse(ui: &mut Ui) {
     }
     first.meta = entry.meta;
     for rec in ui.recordings.iter().skip(1) {
-        crate::ui::preview_thumbs::copy_playable(&rec.folder, rec);
+        crate::ui::preview::copy_playable(&rec.folder, rec);
     }
 }

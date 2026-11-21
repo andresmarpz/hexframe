@@ -6,7 +6,7 @@ use std::path::Path;
 use rune::{El, PlayerState};
 
 use super::{Call, record, sound};
-use crate::ui::paired_sound::PairedSound;
+use crate::ui::review::paired_sound::PairedSound;
 use crate::ui::review::ReviewPlayer;
 
 const HALF_FRAME: f64 = 1.0 / 120.0;

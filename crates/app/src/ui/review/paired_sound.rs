@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use rune::{El, PlayerState};
 
-use super::review::ReviewPlayer;
+use super::ReviewPlayer;
 
 const DRIFT_SECS: f64 = 0.15;
 const STILL_SECS: f64 = 0.25;

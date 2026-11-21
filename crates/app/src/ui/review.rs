@@ -1,108 +1,21 @@
-use std::fmt::Debug;
+mod deaths;
+pub(crate) mod event_detail;
+mod events;
+pub(crate) mod jump;
+#[cfg(any(windows, test))]
+pub(crate) mod paired_sound;
+mod player;
+mod sound;
+
 use std::path::Path;
 
-use greyscreen_core::library::EventEntry;
 use greyscreen_engine::RecordingEntry;
-use rune::{El, Player, PlayerState, SurfaceFit};
+use rune::PlayerState;
 
-use super::death_review::DeathReviewState;
-use super::review_sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
-
-pub(crate) trait ReviewPlayer: Debug {
-    fn play(&self);
-    fn pause(&self);
-    fn seek(&self, secs: f64);
-    fn time(&self) -> f64;
-    fn duration(&self) -> Option<f64>;
-    fn state(&self) -> PlayerState;
-    fn is_playing(&self) -> bool;
-    fn set_rate(&self, rate: f32);
-    fn set_muted(&self, muted: bool);
-    fn set_volume(&self, volume: f32);
-    fn show(&self, frame: El) -> El;
-    fn follow(&self, _clock: f64) {}
-}
-
-fn log_call(player: &Player, call: std::fmt::Arguments) {
-    let kind = if player.is_audio() { "sound" } else { "video" };
-    tracing::debug!(
-        target: crate::logging::PLAYBACK_TARGET,
-        "{kind} {call} at {:.3} ({:?})",
-        Player::time(player),
-        Player::state(player)
-    );
-}
-
-impl ReviewPlayer for Player {
-    fn play(&self) {
-        log_call(self, format_args!("play"));
-        Player::play(self);
-    }
-
-    fn pause(&self) {
-        log_call(self, format_args!("pause"));
-        Player::pause(self);
-    }
-
-    fn seek(&self, secs: f64) {
-        log_call(self, format_args!("seek {secs:.3}"));
-        Player::seek(self, secs);
-    }
-
-    fn time(&self) -> f64 {
-        Player::time(self)
-    }
-
-    fn duration(&self) -> Option<f64> {
-        Player::duration(self)
-    }
-
-    fn state(&self) -> PlayerState {
-        Player::state(self)
-    }
-
-    fn is_playing(&self) -> bool {
-        Player::is_playing(self)
-    }
-
-    fn set_rate(&self, rate: f32) {
-        log_call(self, format_args!("rate {rate}"));
-        Player::set_rate(self, rate);
-    }
-
-    fn set_muted(&self, muted: bool) {
-        log_call(self, format_args!("muted {muted}"));
-        Player::set_muted(self, muted);
-    }
-
-    fn set_volume(&self, volume: f32) {
-        log_call(self, format_args!("volume {volume:.2}"));
-        Player::set_volume(self, volume);
-    }
-
-    fn show(&self, frame: El) -> El {
-        frame.video(self, SurfaceFit::Fit)
-    }
-}
-
-pub(crate) type PlayerFactory = fn(&Path) -> Box<dyn ReviewPlayer>;
-
-#[cfg(not(windows))]
-pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
-    let player = Player::file(path);
-    player.set_muted(false);
-    Box::new(player)
-}
-
-#[cfg(windows)]
-pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
-    let sound = Player::audio(path);
-    sound.preload();
-    Box::new(super::paired_sound::PairedSound::new(
-        Box::new(Player::file(path)),
-        Box::new(sound),
-    ))
-}
+pub(crate) use deaths::{DeathReviewState, title_line};
+pub(crate) use events::{EventFilter, EventHover};
+pub(crate) use player::{PlayerFactory, ReviewPlayer, rune_player};
+pub(crate) use sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Source {
@@ -117,62 +30,6 @@ pub(crate) enum PanelTab {
     #[default]
     Events,
     Clips,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum EventFilter {
-    #[default]
-    All,
-    Deaths,
-    Kills,
-    Objectives,
-}
-
-impl EventFilter {
-    pub(crate) const EVERY: [EventFilter; 4] = [
-        EventFilter::All,
-        EventFilter::Deaths,
-        EventFilter::Kills,
-        EventFilter::Objectives,
-    ];
-
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            EventFilter::All => "All",
-            EventFilter::Deaths => "Deaths",
-            EventFilter::Kills => "Kills",
-            EventFilter::Objectives => "Objectives",
-        }
-    }
-
-    pub(crate) fn matches(self, event: &EventEntry) -> bool {
-        let any = |wanted: fn(&str) -> bool| event.highlights.iter().any(|h| wanted(h));
-        match self {
-            EventFilter::All => true,
-            EventFilter::Deaths => any(|h| h == "MyDeath"),
-            EventFilter::Kills => any(is_kill_label),
-            EventFilter::Objectives => any(is_objective_label),
-        }
-    }
-}
-
-fn is_kill_label(label: &str) -> bool {
-    matches!(label, "MyKill" | "MyAssist" | "FirstBlood" | "Ace") || label.starts_with("Multikill")
-}
-
-fn is_objective_label(label: &str) -> bool {
-    let label = label.strip_prefix("Enemy").unwrap_or(label);
-    matches!(
-        label,
-        "Baron" | "Dragon" | "Herald" | "VoidGrub" | "Turret" | "Inhibitor"
-    )
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct EventHover {
-    pub event_id: u32,
-    pub anchor: String,
-    pub theater: bool,
 }
 
 #[derive(Debug)]
@@ -250,26 +107,6 @@ impl ReviewState {
         if !self.is_playing() {
             self.seek(self.time() + direction * FRAME_SECS);
         }
-    }
-
-    pub(crate) fn shown_events(&self) -> impl Iterator<Item = &EventEntry> {
-        let filter = self.filter;
-        self.entry
-            .meta
-            .events
-            .iter()
-            .filter(move |e| filter.matches(e))
-    }
-
-    pub(crate) fn active_event(&self) -> Option<u32> {
-        if self.source != Source::Game {
-            return None;
-        }
-        let now = self.time();
-        self.shown_events()
-            .filter(|e| e.rec_secs <= now)
-            .max_by(|a, b| a.rec_secs.total_cmp(&b.rec_secs))
-            .map(|e| e.id)
     }
 
     pub(crate) fn active_clip(&self) -> Option<usize> {
@@ -403,36 +240,6 @@ impl ReviewState {
         self.shown_time = 0.0;
         self.settling = false;
         self.hovered = None;
-    }
-
-    pub(crate) fn hover_event(&mut self, event_id: u32, anchor: &str, inside: bool) {
-        if inside {
-            self.hovered = Some(EventHover {
-                event_id,
-                anchor: anchor.to_owned(),
-                theater: self.theater,
-            });
-        } else if self
-            .hovered
-            .as_ref()
-            .is_some_and(|h| h.event_id == event_id && h.anchor == anchor)
-        {
-            self.hovered = None;
-        }
-    }
-
-    pub(crate) fn hovered_event(&self) -> Option<(&EventEntry, &str)> {
-        let hover = self
-            .hovered
-            .as_ref()
-            .filter(|h| h.theater == self.theater)?;
-        let event = self
-            .entry
-            .meta
-            .events
-            .iter()
-            .find(|e| e.id == hover.event_id)?;
-        Some((event, hover.anchor.as_str()))
     }
 
     pub(crate) fn follow_player(&self, clock: f64) {

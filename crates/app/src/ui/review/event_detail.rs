@@ -2,7 +2,7 @@ use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
 use greyscreen_core::highlight::structure_team;
 use greyscreen_core::library::EventEntry;
 
-use super::format_clock;
+use crate::ui::format_clock;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Span {

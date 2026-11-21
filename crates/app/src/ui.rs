@@ -10,47 +10,39 @@ use greyscreen_engine::{
 };
 use rune::{PointerPress, TextEdit, Tx};
 
-mod death_review;
-pub(crate) mod event_detail;
 mod feedback;
 mod format;
-mod jump;
 mod keys;
 pub(crate) mod library;
 mod preview;
-mod preview_thumbs;
-mod review;
-mod review_sound;
+pub(crate) mod review;
 mod scenes;
 mod settings_sheet;
 mod shell;
-mod tone;
 mod update;
 
 #[cfg(test)]
 pub(crate) mod fake_player;
-#[cfg(any(windows, test))]
-mod paired_sound;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use death_review::{DeathReviewState, title_line};
 pub(crate) use feedback::{FeedbackPhase, FeedbackUi, MESSAGE_KEY as FEEDBACK_MESSAGE_KEY};
 pub(crate) use format::{format_clock, format_size, format_size_rate};
-pub(crate) use jump::seek_target;
 pub(crate) use keys::MAC;
 pub(crate) use library::{Detail, ListItem, RecordingsFilter};
-pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
-pub(crate) use review_sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
-pub(crate) use scenes::SCENES;
+pub(crate) use review::jump::seek_target;
+pub(crate) use review::{
+    DeathReviewState, EventFilter, NORMAL_SPEED, PanelTab, PlayerFactory, ReviewState, SPEEDS,
+    Sound, Source, VolumeHover, title_line,
+};
+pub(crate) use scenes::all as scene_list;
 pub(crate) use settings_sheet::SettingsSection;
 pub(crate) use shell::{DockState, LibraryTotals, PaneDrag, PaneEdge, RECENT_LIMIT, Screen};
-pub(crate) use tone::tone_color;
 pub(crate) use update::UpdateUi;
 
 #[cfg(test)]
 pub(crate) fn death_entry() -> RecordingEntry {
-    death_review::death_entry()
+    preview::death_entry()
 }
 
 #[cfg(test)]

@@ -1,3 +1,6 @@
+mod death;
+mod thumbs;
+
 use std::path::PathBuf;
 
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
@@ -10,7 +13,10 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineStatus, FeedItem, RecordingEntry};
 use jiff::{SignedDuration, Unit, Zoned};
 
-use super::{Screen, Ui, preview_thumbs};
+use super::{Screen, Ui};
+
+pub(super) use death::death_entry;
+pub(super) use thumbs::copy_playable;
 
 pub(super) fn ui() -> Ui {
     let mut ui = Ui::blank(Settings::default());
@@ -30,18 +36,18 @@ pub(super) fn ui() -> Ui {
 }
 
 fn seed_thumbs(recordings: &mut [RecordingEntry]) {
-    let root = preview_thumbs::dir();
+    let root = thumbs::dir();
     for (game, rec) in recordings.iter_mut().enumerate() {
         rec.folder = root.join(&rec.meta.id);
         let seed = game as u32 * 31 + 5;
-        preview_thumbs::write(&rec.folder.join("thumb.jpg"), seed);
+        thumbs::write(&rec.folder.join("thumb.jpg"), seed);
         for (index, clip) in rec.meta.clips.iter().enumerate() {
             let dest = rec.folder.join(clip_thumb_file(clip));
-            preview_thumbs::write(&dest, seed * 17 + index as u32 * 7 + 3);
+            thumbs::write(&dest, seed * 17 + index as u32 * 7 + 3);
         }
     }
     if let Some(first) = recordings.first() {
-        preview_thumbs::copy_playable(&first.folder, first);
+        thumbs::copy_playable(&first.folder, first);
     }
 }
 
@@ -372,4 +378,13 @@ pub(super) fn review_entry() -> RecordingEntry {
         },
     ];
     entry
+}
+
+pub(super) fn update_info() -> greyscreen_core::update::UpdateInfo {
+    greyscreen_core::update::UpdateInfo {
+        tag: "v0.2.0".into(),
+        prerelease: false,
+        size: 24_000_000,
+        notes_url: greyscreen_core::update::notes_url("v0.2.0"),
+    }
 }

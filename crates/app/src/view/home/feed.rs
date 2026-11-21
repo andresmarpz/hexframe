@@ -5,7 +5,8 @@ use greyscreen_engine::FeedItem;
 use rune::{Color, El, GrowthSpec, ScrollSpec, TextStyle, col, el, row, text};
 use rune_kit::Kit;
 
-use crate::ui::{Ui, format_clock, tone_color};
+use crate::ui::{Ui, format_clock};
+use crate::view::tone::tone_color;
 use crate::view::{card, hairline};
 
 const ROW_HEIGHT: f32 = 36.0;
