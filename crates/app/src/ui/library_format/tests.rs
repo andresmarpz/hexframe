@@ -234,3 +234,28 @@ fn game_time_is_recording_time_minus_the_loading_screen() {
     assert_eq!(game_secs_at(&recordings[0], 98.0), 90.0);
     assert_eq!(game_secs_at(&recordings[0], 2.0), 0.0);
 }
+
+#[test]
+fn ago_is_a_short_age() {
+    let now = at("2026-11-21T12:00:00+00:00[UTC]");
+    let age = |text: &str| ago(&at(text), &now);
+    assert_eq!(age("2026-11-21T11:59:40+00:00[UTC]"), "now");
+    assert_eq!(age("2026-11-21T11:55:00+00:00[UTC]"), "5m");
+    assert_eq!(age("2026-11-21T09:00:00+00:00[UTC]"), "3h");
+    assert_eq!(age("2026-11-19T12:00:00+00:00[UTC]"), "2d");
+    assert_eq!(age("2026-11-01T12:00:00+00:00[UTC]"), "2w");
+}
+
+#[test]
+fn recent_games_are_newest_first_and_capped() {
+    let mut recordings = Ui::preview().recordings;
+    recordings.reverse();
+    let shown = recent_games(&recordings, 5);
+    assert_eq!(shown.len(), 5);
+    let stamps: Vec<_> = shown
+        .iter()
+        .map(|r| r.meta.started_at.timestamp())
+        .collect();
+    assert!(stamps.windows(2).all(|pair| pair[0] >= pair[1]));
+    assert_eq!(shown[0].meta.id, Ui::preview().recordings[0].meta.id);
+}

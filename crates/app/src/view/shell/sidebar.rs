@@ -1,8 +1,10 @@
 pub(super) mod icons;
+mod recent;
 mod status;
+mod storage;
 
 use rune::tok::type_;
-use rune::{El, Icon, col, el, row, text};
+use rune::{El, Icon, ScrollSpec, col, el, row, text};
 use rune_kit::{Kit, SidebarRow};
 
 use self::icons::{CLIPS, GAMES, GEAR, HOME, LOGO};
@@ -58,15 +60,33 @@ pub(in crate::view) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
         .fill(k.c.bg_deep)
         .child(brand(k, titlebar_inset))
         .child(col().w_full().px(PAD).pb(10.0).child(status::block(s, k)))
-        .child(col().w_full().grow(1.0).min_h(0.0).child(list))
+        .child(middle(s, k, list))
         .child(
             col()
                 .key("nav-footer")
                 .w_full()
                 .px(PAD - 4.0)
                 .py(PAD - 4.0)
+                .gap(8.0)
+                .child(storage::block(s, k))
                 .child(settings(s, k)),
         )
+}
+
+fn middle(s: &Ui, k: &Kit, list: El) -> El {
+    let mut body = col().w_full().gap(12.0).child(list);
+    if let Some(recent) = recent::section(s, k) {
+        body = body.child(col().w_full().px(PAD - 4.0).focus_group().child(recent));
+    }
+    col()
+        .key("nav-middle")
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
+        .scroll(ScrollSpec {
+            stick_bottom: false,
+        })
+        .child(body)
 }
 
 fn count(n: usize) -> Option<usize> {

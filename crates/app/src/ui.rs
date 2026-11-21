@@ -28,6 +28,7 @@ mod scenes;
 mod screens;
 mod selection;
 mod settings_sheet;
+mod sidebar;
 mod tone;
 mod update;
 
@@ -45,6 +46,7 @@ pub(crate) use scenes::SCENES;
 pub(crate) use screens::Screen;
 pub(crate) use selection::{Detail, ListItem};
 pub(crate) use settings_sheet::SettingsSection;
+pub(crate) use sidebar::{LibraryTotals, RECENT_LIMIT};
 pub(crate) use tone::tone_color;
 pub(crate) use update::UpdateUi;
 
