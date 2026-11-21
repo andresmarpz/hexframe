@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+exclude = ["vendor"]
 
 [workspace.package]
 version = "0.1.10-preview.12"
@@ -45,6 +46,9 @@ parley_engine     = { git = "https://github.com/anomalyco/rune", rev = "eb9f1104
 wgpu-hal          = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
 accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
 accesskit_macos   = { git = "https://github.com/anomalyco/rune", rev = "eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8" }
+
+[patch."https://github.com/anomalyco/rune"]
+rune-media = { path = "vendor/rune-media" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
