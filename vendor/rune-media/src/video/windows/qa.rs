@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+mod seeks;
 mod tests;
 mod window;
 
@@ -28,33 +29,71 @@ pub(super) fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join("qa-bars-60fps.m4v")
 }
 
-/// Whether ffmpeg runs: the long fixture needs it, and a PC without it skips that test.
-pub(super) fn ffmpeg_available() -> bool {
-    std::process::Command::new("ffmpeg").arg("-version").output().is_ok_and(|o| o.status.success())
+/// ffmpeg: `GREYSCREEN_QA_FFMPEG` (a full path), else the one on PATH.
+fn ffmpeg_program() -> std::ffi::OsString {
+    std::env::var_os("GREYSCREEN_QA_FFMPEG").filter(|p| !p.is_empty()).unwrap_or_else(|| "ffmpeg".into())
 }
 
-/// A 10 minute clip like the fixture, its index at the end as in a finished recording, made once
-/// with ffmpeg (on PATH) in the temp folder: 3.5 MB is too much for the repository.
-pub(super) fn long_fixture() -> PathBuf {
-    let path = std::env::temp_dir().join("rune-media-qa-bars-10min.m4v");
-    if path.exists() {
-        return path;
-    }
+/// Whether ffmpeg runs: the long fixtures need it, and a PC without it skips those tests.
+pub(super) fn ffmpeg_available() -> bool {
+    std::process::Command::new(ffmpeg_program()).arg("-version").output().is_ok_and(|o| o.status.success())
+}
+
+fn ffmpeg(args: &[&std::ffi::OsStr]) {
+    let ran = std::process::Command::new(ffmpeg_program()).args(["-v", "error", "-y"]).args(args).status();
+    assert!(ran.is_ok_and(|s| s.success()), "the long fixtures need ffmpeg (GREYSCREEN_QA_FFMPEG or PATH)");
+}
+
+/// The fixture's bars at 160x90 for `secs`: ten bars spell each picture's number.
+fn bars_video(secs: u32) -> String {
+    format!("color=c=black:s=160x90:r=60:d={secs},format=yuv420p,geq=lum='if(mod(floor(N/pow(2\\,floor(X*10/W)))\\,2)\\,235\\,16)':cb=128:cr=128")
+}
+
+/// The fixture's sound for `secs`: a beat at each whole second over a low tone.
+fn beats_audio(secs: u32) -> String {
     let delay = 0.021_333_333;
-    let video = "color=c=black:s=160x90:r=60:d=600,format=yuv420p,geq=lum='if(mod(floor(N/pow(2\\,floor(X*10/W)))\\,2)\\,235\\,16)':cb=128:cr=128";
-    let audio = format!("aevalsrc=exprs='0.1*sin(2*PI*220*(t+{delay}))+0.8*sin(2*PI*1000*(t+{delay}))*lt(mod(t+{delay}\\,1)\\,0.05)':s=48000:c=stereo:d=600");
+    format!("aevalsrc=exprs='0.1*sin(2*PI*220*(t+{delay}))+0.8*sin(2*PI*1000*(t+{delay}))*lt(mod(t+{delay}\\,1)\\,0.05)':s=48000:c=stereo:d={secs}")
+}
+
+/// Encodes `video` with `codec` and `audio` as AAC into `path`, its index at the end as in a
+/// finished recording.
+fn make_fixture(path: &Path, video: &str, audio: &str, codec: &[&str]) {
     let (encoded, partial) = (path.with_extension("encoded.m4v"), path.with_extension("part.m4v"));
-    let ffmpeg = |args: &[&std::ffi::OsStr]| {
-        let ran = std::process::Command::new("ffmpeg").args(["-v", "error", "-y"]).args(args).status();
-        assert!(ran.is_ok_and(|s| s.success()), "the long fixture needs ffmpeg on PATH");
-    };
-    let encode = ["-f", "lavfi", "-i", video, "-f", "lavfi", "-i", &audio, "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", "60", "-bf", "0", "-crf", "35", "-c:a", "aac", "-b:a", "24k", "-shortest"];
-    ffmpeg(&[encode.map(std::ffi::OsStr::new).as_slice(), &[encoded.as_os_str()]].concat());
+    let inputs = ["-f", "lavfi", "-i", video, "-f", "lavfi", "-i", audio];
+    let sound = ["-c:a", "aac", "-b:a", "24k", "-shortest"];
+    let encode: Vec<&std::ffi::OsStr> = [inputs.as_slice(), codec, sound.as_slice()].concat().into_iter().map(std::ffi::OsStr::new).chain([encoded.as_os_str()]).collect();
+    ffmpeg(&encode);
     // As in `make-qa-bars.sh`, without the move to the front: the index stays at the end.
     let copy = ["-c", "copy", "-use_editlist", "0", "-avoid_negative_ts", "disabled"];
     ffmpeg(&[&[std::ffi::OsStr::new("-i"), encoded.as_os_str()], copy.map(std::ffi::OsStr::new).as_slice(), &[partial.as_os_str()]].concat());
     let _ = std::fs::remove_file(&encoded);
-    std::fs::rename(&partial, &path).expect("the long fixture");
+    std::fs::rename(&partial, path).expect("the long fixture");
+}
+
+/// A 10 minute clip like the fixture, made once with ffmpeg in the temp folder: 3.5 MB is too
+/// much for the repository.
+pub(super) fn long_fixture() -> PathBuf {
+    let path = std::env::temp_dir().join("rune-media-qa-bars-10min.m4v");
+    if !path.exists() {
+        let codec = ["-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", "60", "-bf", "0", "-crf", "35"];
+        make_fixture(&path, &bars_video(600), &beats_audio(600), &codec);
+    }
+    path
+}
+
+/// The length of `recording_fixture`, in seconds.
+pub(super) const RECORDING_SECS: u32 = 240;
+
+/// A clip shaped like a Greyscreen recording: 2560x1440 at 60 fps, H.264 High with a keyframe every
+/// second and no B-frames, AAC sound, 4 minutes. The fixture's bars, scaled up, name each picture.
+/// Made once with ffmpeg in the temp folder.
+pub(super) fn recording_fixture() -> PathBuf {
+    let path = std::env::temp_dir().join("rune-media-qa-bars-4min-1440p.m4v");
+    if !path.exists() {
+        let video = format!("{},scale=2560:1440:flags=neighbor", bars_video(RECORDING_SECS));
+        let codec = ["-c:v", "libx264", "-preset", "superfast", "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", "60", "-keyint_min", "60", "-sc_threshold", "0", "-bf", "0", "-crf", "40"];
+        make_fixture(&path, &video, &beats_audio(RECORDING_SECS), &codec);
+    }
     path
 }
 
