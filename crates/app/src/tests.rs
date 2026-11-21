@@ -22,6 +22,7 @@ mod selection;
 mod settings_sheet;
 mod storage_limit;
 mod update;
+mod update_banner;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
     runtime_sized(ui, (1180.0, 680.0))

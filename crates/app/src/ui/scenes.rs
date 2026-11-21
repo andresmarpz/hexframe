@@ -144,6 +144,14 @@ pub(crate) const SCENES: &[Scene] = &[
         sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::Ready(update::preview_info()));
     }),
+    ("update-ready", |ui| {
+        home(ui);
+        ui.apply_update(UpdateState::Ready(update::preview_info()));
+    }),
+    ("update-ready-dock", |ui| {
+        docked(ui);
+        ui.apply_update(UpdateState::Ready(update::preview_info()));
+    }),
     ("settings-update-game", |ui| {
         sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::Ready(update::preview_info()));

@@ -8,6 +8,7 @@ mod row_menu;
 mod settings;
 mod shell;
 pub(crate) mod thumb;
+mod update_banner;
 
 use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::NoticeLevel;
@@ -39,6 +40,9 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     row_menu::menu(s, &k, &mut layer);
     if let Some(rec) = s.pending_delete_entry() {
         delete::confirm_delete(rec, &k, &mut layer);
+    }
+    if let Some(banner) = update_banner::layer(s, &k) {
+        layer.push(banner);
     }
     if let Some((notice, _)) = &s.notice {
         layer.push(toast(notice, &k));
