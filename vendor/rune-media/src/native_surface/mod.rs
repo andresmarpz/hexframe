@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 #[path = "tests.rs"]
-mod gpu_tests;
+pub(crate) mod gpu_tests;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(test)]

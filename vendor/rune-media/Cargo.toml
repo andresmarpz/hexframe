@@ -13,6 +13,9 @@ metal-backend = ["rune-gpu/metal-backend"]
 # decoding it in Rust (symphonia, opuscule) and handing AVPlayer the PCM. Off, those clips
 # fail at once with a clear message.
 ogg-audio = ["dep:symphonia", "dep:opuscule"]
+# Windows: the real-player tests (`video::windows::qa`). Sound plays into a test device and never
+# reaches a speaker; the build has no WASAPI output at all.
+qa = ["windows/Win32_Graphics_DirectComposition", "windows-sys/Win32_Foundation", "windows-sys/Win32_Graphics_Gdi", "windows-sys/Win32_System_LibraryLoader", "windows-sys/Win32_UI_WindowsAndMessaging"]
 
 [dependencies]
 bytemuck = { version = "1.25", features = ["derive"] }

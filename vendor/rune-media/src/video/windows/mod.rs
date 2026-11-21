@@ -19,6 +19,8 @@ mod gpu;
 mod layer;
 mod machine;
 mod mf;
+#[cfg(all(test, feature = "qa"))]
+mod qa;
 mod still;
 mod vsync;
 

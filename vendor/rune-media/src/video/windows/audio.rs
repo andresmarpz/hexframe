@@ -9,15 +9,17 @@
 use super::ahead::{self, Read};
 use super::machine::Anchor;
 use super::mf::Sound;
+use endpoint::Endpoint;
 use rune_core::time::Instant;
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
-use windows::Win32::Media::Audio::*;
 use windows::Win32::Media::MediaFoundation::IMFSample;
-use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize};
-use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
+
+mod endpoint;
+#[cfg(feature = "qa")]
+pub(super) mod fake;
 
 /// The device's buffer: long enough to ride out a busy decoder, short enough to react.
 const BUFFER: Duration = Duration::from_millis(100);
@@ -155,10 +157,10 @@ impl Output {
             .spawn(move || {
                 // SAFETY: COM for this thread, matched below.
                 let com = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok();
-                match Stream::new(sound) {
-                    Ok(stream) => {
+                match endpoint(sound) {
+                    Ok(device) => {
                         let _ = ready.send(Ok(()));
-                        stream.run(&thread_queue, &thread_clock, sound);
+                        run(&device, &thread_queue, &thread_clock, sound);
                     }
                     Err(e) => {
                         let _ = ready.send(Err(e));
@@ -237,161 +239,101 @@ fn samples(sample: &IMFSample) -> Option<Vec<f32>> {
     }
 }
 
-struct Stream {
-    client: IAudioClient,
-    render: IAudioRenderClient,
-    event: HANDLE,
-    frames: u32,
-    latency: Duration,
-    /// The device's position counter and its ticks per second, when it has one.
-    position: Option<(IAudioClock, u64)>,
+/// The stream the sound plays on: the default output device, or the test device with `qa`.
+#[cfg(not(feature = "qa"))]
+fn endpoint(sound: Sound) -> Result<endpoint::Wasapi, String> {
+    endpoint::Wasapi::new(sound)
 }
 
-impl Stream {
-    fn new(sound: Sound) -> Result<Self, String> {
-        // SAFETY: COM calls on this thread's objects; the format describes interleaved float.
-        unsafe {
-            let devices: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| e.message())?;
-            let device = devices.GetDefaultAudioEndpoint(eRender, eConsole).map_err(|_| "no sound output device".to_string())?;
-            let client: IAudioClient = device.Activate(CLSCTX_ALL, None).map_err(|e| e.message())?;
-            let block = 4 * sound.channels;
-            let format = WAVEFORMATEX {
-                wFormatTag: 3, // WAVE_FORMAT_IEEE_FLOAT
-                nChannels: sound.channels,
-                nSamplesPerSec: sound.rate,
-                nAvgBytesPerSec: sound.rate * u32::from(block),
-                nBlockAlign: block,
-                wBitsPerSample: 32,
-                cbSize: 0,
-            };
-            let flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
-            client.Initialize(AUDCLNT_SHAREMODE_SHARED, flags, BUFFER.as_nanos() as i64 / 100, 0, &format, None).map_err(|e| e.message())?;
-            let event = CreateEventW(None, false, false, None).map_err(|e| e.message())?;
-            client.SetEventHandle(event).map_err(|e| e.message())?;
-            let render: IAudioRenderClient = client.GetService().map_err(|e| e.message())?;
-            let frames = client.GetBufferSize().map_err(|e| e.message())?;
-            let latency = Duration::from_nanos(client.GetStreamLatency().unwrap_or(0).max(0) as u64 * 100);
-            let position = client.GetService::<IAudioClock>().ok().and_then(|c| c.GetFrequency().ok().filter(|f| *f > 0).map(|f| (c, f)));
-            Ok(Self { client, render, event, frames, latency, position })
-        }
-    }
-
-    /// When the next sample written will be heard. Running, from the device's position: what
-    /// was written and not yet played is still to come. Else from the buffer, the stream's
-    /// latency and `bias`, the error earlier starts found in that estimate.
-    fn heard(&self, now: Instant, written: u64, padding: u32, rate: f64, running: bool, bias: f64) -> Instant {
-        let buffered = (self.latency.as_secs_f64() + f64::from(padding) / rate + bias).max(0.0);
-        let from_buffer = now + Duration::from_secs_f64(buffered);
-        let Some((clock, frequency)) = self.position.as_ref().filter(|_| running) else { return from_buffer };
-        let (mut position, mut counter) = (0u64, 0u64);
-        // SAFETY: reads into locals from this stream's clock.
-        if unsafe { clock.GetPosition(&mut position, Some(&mut counter)) }.is_err() {
-            return from_buffer;
-        }
-        let played = position as f64 / *frequency as f64;
-        let age = performance_seconds() - counter as f64 / 1e7;
-        let wait = written as f64 / rate - played - age;
-        if (0.0..=buffered + POSITION_SLACK).contains(&wait) { now + Duration::from_secs_f64(wait) } else { from_buffer }
-    }
-
-    fn run(&self, queue: &Queue, clock: &Clock, sound: Sound) {
-        let channels = usize::from(sound.channels);
-        let rate = f64::from(sound.rate);
-        let mut started = false;
-        // Frames written since the stream started, and how far the sound runs from the clock.
-        let mut written = 0u64;
-        let mut drift = 0.0;
-        // When the stream last started, the clock it last played to, and the start estimate's error.
-        let mut since: Option<Instant> = None;
-        let mut last: Option<Anchor> = None;
-        let mut bias = 0.0;
-        loop {
-            if !started {
-                // Stopped: sleep until the clock runs, not on the device's period.
-                clock.wait_while_stopped(Duration::from_secs(1));
-            }
-            // SAFETY: a wait on this stream's own event.
-            let woke = started && unsafe { WaitForSingleObject(self.event, 20) } == WAIT_OBJECT_0;
-            if queue.lock().stop {
-                break;
-            }
-            let anchor = clock.get().filter(|a| (a.rate - 1.0).abs() < 1e-6);
-            let Some(anchor) = anchor else {
-                if started {
-                    // SAFETY: stops and empties this stream.
-                    unsafe {
-                        let _ = self.client.Stop();
-                        let _ = self.client.Reset();
-                    }
-                    started = false;
-                    written = 0;
-                    let mut feed = queue.lock();
-                    // The device's unplayed sound is gone: a reader reads it again, unless a
-                    // seek already cleared the queue.
-                    if let (Some(_), Some(last)) = (feed.cursor.take(), last) {
-                        feed.seek = Some(last.position(Instant::now()) - REREAD);
-                        drop(feed);
-                        queue.room.notify_all();
-                    }
-                }
-                drift = 0.0;
-                continue;
-            };
-            last = Some(anchor);
-            if started && !woke {
-                continue;
-            }
-            // SAFETY: buffer calls on this stream; the device buffer holds `free` frames.
-            let off = unsafe {
-                let padding = self.client.GetCurrentPadding().unwrap_or(self.frames);
-                let free = self.frames.saturating_sub(padding);
-                if free == 0 {
-                    continue;
-                }
-                let Ok(data) = self.render.GetBuffer(free) else { continue };
-                let out = std::slice::from_raw_parts_mut(data.cast::<f32>(), free as usize * channels);
-                let heard = self.heard(Instant::now(), written, padding, rate, started, bias);
-                let off = fill(&mut queue.lock(), out, channels, rate, anchor.position(heard));
-                let _ = self.render.ReleaseBuffer(free, 0);
-                written += u64::from(free);
-                if !started {
-                    started = self.client.Start().is_ok();
-                    since = Some(Instant::now());
-                }
-                off
-            };
-            queue.room.notify_all();
-            match off {
-                Some(off) => {
-                    drift += (off - drift) * SMOOTH;
-                    if drift.abs() > NUDGE {
-                        clock.nudge(anchor, drift);
-                        if since.is_some_and(|t| t.elapsed() < SETTLE) {
-                            bias -= drift;
-                        }
-                        drift = 0.0;
-                    }
-                }
-                None => drift = 0.0,
-            }
-        }
-        // SAFETY: stops this stream and closes its event.
-        unsafe {
-            let _ = self.client.Stop();
-            let _ = CloseHandle(self.event);
-        }
-    }
+/// The stream the sound plays on: the default output device, or the test device with `qa`.
+#[cfg(feature = "qa")]
+fn endpoint(sound: Sound) -> Result<fake::Fake, String> {
+    Ok(fake::Fake::new(sound))
 }
 
-/// The performance counter now, in seconds: the clock the device's position is stamped with.
-fn performance_seconds() -> f64 {
-    let (mut count, mut frequency) = (0i64, 0i64);
-    // SAFETY: plain reads of the performance counter into locals.
-    unsafe {
-        windows_sys::Win32::System::Performance::QueryPerformanceCounter(&mut count);
-        windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency);
+/// When the next sample written will be heard. Running, from the device's position: what was
+/// written and not yet played is still to come. Else from the buffer, the stream's latency and
+/// `bias`, the error earlier starts found in that estimate.
+fn heard(device: &impl Endpoint, now: Instant, written: u64, padding: u32, rate: f64, running: bool, bias: f64) -> Instant {
+    let buffered = (device.latency().as_secs_f64() + f64::from(padding) / rate + bias).max(0.0);
+    let from_buffer = now + Duration::from_secs_f64(buffered);
+    let Some((played, age)) = running.then(|| device.played()).flatten() else { return from_buffer };
+    let wait = written as f64 / rate - played - age;
+    if (0.0..=buffered + POSITION_SLACK).contains(&wait) { now + Duration::from_secs_f64(wait) } else { from_buffer }
+}
+
+fn run(device: &impl Endpoint, queue: &Queue, clock: &Clock, sound: Sound) {
+    let channels = usize::from(sound.channels);
+    let rate = f64::from(sound.rate);
+    let mut started = false;
+    // Frames written since the stream started, and how far the sound runs from the clock.
+    let mut written = 0u64;
+    let mut drift = 0.0;
+    // When the stream last started, the clock it last played to, and the start estimate's error.
+    let mut since: Option<Instant> = None;
+    let mut last: Option<Anchor> = None;
+    let mut bias = 0.0;
+    loop {
+        if !started {
+            // Stopped: sleep until the clock runs, not on the device's period.
+            clock.wait_while_stopped(Duration::from_secs(1));
+        }
+        let woke = started && device.wait(Duration::from_millis(20));
+        if queue.lock().stop {
+            break;
+        }
+        let anchor = clock.get().filter(|a| (a.rate - 1.0).abs() < 1e-6);
+        let Some(anchor) = anchor else {
+            if started {
+                device.halt();
+                started = false;
+                written = 0;
+                let mut feed = queue.lock();
+                // The device's unplayed sound is gone: a reader reads it again, unless a
+                // seek already cleared the queue.
+                if let (Some(_), Some(last)) = (feed.cursor.take(), last) {
+                    feed.seek = Some(last.position(Instant::now()) - REREAD);
+                    drop(feed);
+                    queue.room.notify_all();
+                }
+            }
+            drift = 0.0;
+            continue;
+        };
+        last = Some(anchor);
+        if started && !woke {
+            continue;
+        }
+        let padding = device.padding().unwrap_or(device.frames());
+        let free = device.frames().saturating_sub(padding);
+        if free == 0 {
+            continue;
+        }
+        let Some(mut out) = device.lease(free) else { continue };
+        let at = heard(device, Instant::now(), written, padding, rate, started, bias);
+        let off = fill(&mut queue.lock(), &mut out, channels, rate, anchor.position(at));
+        drop(out);
+        device.release(free);
+        written += u64::from(free);
+        if !started {
+            started = device.start();
+            since = Some(Instant::now());
+        }
+        queue.room.notify_all();
+        match off {
+            Some(off) => {
+                drift += (off - drift) * SMOOTH;
+                if drift.abs() > NUDGE {
+                    clock.nudge(anchor, drift);
+                    if since.is_some_and(|t| t.elapsed() < SETTLE) {
+                        bias -= drift;
+                    }
+                    drift = 0.0;
+                }
+            }
+            None => drift = 0.0,
+        }
     }
-    count as f64 / frequency.max(1) as f64
 }
 
 /// Writes `out` with the sound from media time `want` on. Within `SLOP` of the last write's

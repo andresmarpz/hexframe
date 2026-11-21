@@ -1,6 +1,6 @@
 # Greyscreen's patches to rune-media
 
-Base: Rune `eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8`, `crates/rune-media`. Every change is in the Windows video path (`src/video/windows`). Each change is a commit titled `vendor: rune-media ...` (a patch, then its follow-up fixes), so each can go upstream as its own pull request.
+Base: Rune `eb9f11047bbe2b3927ad4b65ffcf7bfef4d3deb8`, `crates/rune-media`. Every change is in the Windows video path (`src/video/windows`), apart from test helpers and the `qa` feature (section 4). Each change is a commit titled `vendor: rune-media ...` (a patch, then its follow-up fixes), so each can go upstream as its own pull request.
 
 Besides the code, `Cargo.toml` has its `workspace = true` fields made concrete, the other Rune crates come from git at the base rev, and a `[patch.crates-io]` for Rune's `wgpu-hal` lets the crate test on its own. Upstream PRs leave those out.
 
@@ -45,6 +45,22 @@ Upstream: no issue filed yet. The write-up is "Windows: a video's own sound is s
   - `mod.rs`: until the clip opens, the decoder keeps the sound it was asked for.
 - Files: `ahead.rs` (new), `audio.rs` (with tests in `audio/tests.rs`), `decoder.rs`, `machine.rs`, `mod.rs`.
 
+## 4. Real-player tests that nobody notices (`qa` feature)
+
+Upstream: none. Test-only, except for the sound output's split below.
+
+- Problem: the bugs above lived in the real Media Foundation player (the layer, WASAPI timing, seeks), which headless runs never open. Checking it meant driving the app on a person's PC: real input, focus changes and sound out loud.
+- Change:
+  - `audio.rs`: the sound loop runs against an `Endpoint` (`audio/endpoint.rs`): `Wasapi` is the old stream, with the same calls in the same order (the stop and the event's close moved into its `Drop`). The timing (device position to heard time, nudges, bias, stops and re-reads) is untouched and shared.
+  - `audio/fake.rs`, with `qa` only: a test device in place of WASAPI. It takes sound on a 10 ms period from a 100 ms buffer at the clip's rate, keeps what it played and when it was heard, and reports a 10 ms latency while its position lags 30 ms, so the start's estimate is wrong and the nudges must fix it. A `qa` build has no WASAPI output at all: nothing can reach a speaker. It doesn't cover a real device's latency, position reports, period or a device change.
+  - `qa.rs`, `qa/tests.rs`: the real player on a headless wgpu D3D12 device (`note_device`), so pictures decode on the GPU into the shared ring. Each frame pulls the clip and draws it with Rune's surface pipeline into an offscreen texture that is read back. The fixture's pictures carry their frame number as ten black or white bars, so each drawn picture is checked against `Player::time`. Sound is checked for level, for the time each beat (a tone at each whole second) is heard against the clock, and for silence when paused or not at 1x. Tests: play, sound in sync, pause and resume, seeks (paused, playing, past the end), 2x, and the layer: it presents with sound in sync, and a pause there shows the paused picture when the window takes the pictures back.
+  - `qa/window.rs`: the layer's window, by `RUNE_MEDIA_QA_WINDOW`. `none` (default): the layer's surface is on no visual. `hidden`: a cloaked 1x1 tool window, never shown, whose DirectComposition target shows the layer. `cloaked`: the same window shown with `SW_SHOWNOACTIVATE` after `DWMWA_CLOAK` reads back, which Microsoft documents as "not visible to the user" and "still composed by DWM". It fails, and shows nothing, if the cloak doesn't take or the foreground window changes.
+  - `audio/fake/tests.rs`: the sound loop on the test device alone: what is heard follows the clock once the start settles, and a pause stops it and asks the reader for what the device dropped.
+  - `native_surface/tests.rs`: the offscreen GPU helpers are `pub(crate)` for the player tests.
+  - `fixtures/qa-bars-60fps.m4v` (73 KB, `.m4v` because the repo ignores `*.mp4`): 6 s, 320x180, 60 fps H.264, 48 kHz stereo AAC. Made with `ffmpeg -f lavfi -i "color=c=black:s=320x180:r=60:d=6,format=yuv420p,geq=lum='if(mod(floor(N/pow(2\,floor(X*10/W)))\,2)\,235\,16)':cb=128:cr=128" -f lavfi -i "aevalsrc=exprs='0.1*sin(2*PI*220*t)+0.8*sin(2*PI*1000*t)*lt(mod(t\,1)\,0.05)':s=48000:c=stereo:d=6" -c:v libx264 -profile:v high -pix_fmt yuv420p -g 60 -bf 2 -crf 30 -c:a aac -b:a 64k -movflags +faststart -shortest qa-bars-60fps.m4v`.
+- Run on Windows, from the repo root: `cargo test --manifest-path vendor/rune-media/Cargo.toml --target-dir target/vendor --features qa --lib video::windows -- --test-threads=1 --nocapture`. Keep the `video::windows` filter: the tests turn on playback for the whole process, which other headless tests in the crate don't expect.
+- Files: `Cargo.toml` (`qa` feature), `audio.rs`, `audio/endpoint.rs`, `audio/fake.rs`, `audio/fake/tests.rs`, `qa.rs`, `qa/tests.rs`, `qa/window.rs`, `mod.rs`, `native_surface/mod.rs`, `native_surface/tests.rs`, `fixtures/`.
+
 ## Known gaps
 
 - A clip with sound that nobody draws (window minimised, scrolled away) keeps its sound and clock running while its decoder waits with a full picture queue. Drawn again, the pictures stall and the clock goes back to the newest picture, so some sound plays twice. Upstream behaves the same; seeking the decoder to the clock would fix it.
@@ -52,4 +68,4 @@ Upstream: no issue filed yet. The write-up is "Windows: a video's own sound is s
 
 ## Not verified on the Mac
 
-The Mac only compile-checks the Windows path (`cargo xwin check --tests`). The Windows tests (`machine/tests.rs`, `audio/tests.rs`, `ahead.rs`) and the behaviour itself need a Windows run.
+The Mac only compile-checks the Windows path (`cargo xwin check --tests`, and with `--features qa`). The Windows tests (`machine/tests.rs`, `audio/tests.rs`, `ahead.rs`, and with `qa` the player tests in `qa/tests.rs` and `audio/fake/tests.rs`) and the behaviour itself need a Windows run. For the layer, that run must also show whether a composition swap chain keeps presenting with no window (`none`), under a never-shown window (`hidden`) and under a cloaked one (`cloaked`), and that the cloaked window never shows, never takes focus and has no taskbar button.

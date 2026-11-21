@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) const NO_CLIP: [f32; 4] = [-1e6, -1e6, 1e6, 1e6];
-pub(super) const OFFSCREEN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+pub(crate) const OFFSCREEN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
 static GPU_INIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// On Windows DX12, running the heavy compute overlap workload beside other GPU tests triggers
@@ -10,7 +10,7 @@ static GPU_INIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
 #[cfg(target_os = "windows")]
 static GPU_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-pub(super) struct Gpu {
+pub(crate) struct Gpu {
     pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -51,7 +51,7 @@ impl Gpu {
         }
     }
 
-    pub(super) fn headless_wgpu() -> Self {
+    pub(crate) fn headless_wgpu() -> Self {
         static INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
         let instance = INSTANCE.get_or_init(|| {
             let _serial = GPU_INIT.lock().unwrap_or_else(|e| e.into_inner());
@@ -161,7 +161,7 @@ fn a_replaced_callback_is_dropped_outside_the_surfaces_lock() {
     assert_eq!(*freed.lock().unwrap(), [true, true], "a callback dropped while the lock was held");
 }
 
-pub(super) fn draw(surface: &NativeSurface, rect: [f32; 4]) -> SurfaceDraw {
+pub(crate) fn draw(surface: &NativeSurface, rect: [f32; 4]) -> SurfaceDraw {
     SurfaceDraw {
         surface: surface.clone(),
         fit: SurfaceFit::Fit,
@@ -173,7 +173,7 @@ pub(super) fn draw(surface: &NativeSurface, rect: [f32; 4]) -> SurfaceDraw {
         opacity: 1.0,
     }
 }
-pub(super) fn render(gpu: &Gpu, renderer: &mut SurfaceRenderer, draws: &[SurfaceDraw], size: (u32, u32)) -> Vec<u8> {
+pub(crate) fn render(gpu: &Gpu, renderer: &mut SurfaceRenderer, draws: &[SurfaceDraw], size: (u32, u32)) -> Vec<u8> {
     let (completed, completion) = std::sync::mpsc::channel();
     for d in draws {
         let completed = completed.clone();
