@@ -372,6 +372,8 @@ impl Decoder {
         let mut keyframe = false;
         // When the last picture was handled without dropping it.
         let mut handled_at = Instant::now();
+        // The last reason the decoder waited, for `RUNE_VIDEO_LOG`.
+        let mut waits: Option<(bool, bool, bool, bool)> = None;
         loop {
             // Take the UI's asks, then wait for room in the queue and a free texture.
             {
@@ -405,10 +407,14 @@ impl Decoder {
                         epoch = 0.0;
                         (skipped, delivered, retried, keyframe) = (None, false, false, seek.fast);
                         handled_at = Instant::now();
+                        let began = Instant::now();
                         mf::seek(&self.reader, to)?;
                         self.reopen_streams();
                         if let Some(o) = &self.output {
                             o.seek(to);
+                        }
+                        if logging() {
+                            log!("seek to {to:.3} (generation {generation}, fast {}) took {} us", seek.fast, began.elapsed().as_micros());
                         }
                         s = pipe.lock();
                         continue;
@@ -436,7 +442,12 @@ impl Decoder {
                     let texture = self.ring.as_ref().is_none_or(Ring::free);
                     let sound_full = self.output.as_ref().is_some_and(Output::full);
                     if !ended && room && texture && !(sound_full && !self.video_open) {
+                        waits = None;
                         break;
+                    }
+                    if logging() && waits != Some((ended, room, texture, sound_full)) {
+                        log!("decoder waits: ended {ended}, room {room}, texture {texture}, sound full {sound_full}");
+                        waits = Some((ended, room, texture, sound_full));
                     }
                     let touched = s.touched.unwrap_or(waiting_since);
                     let playing_sound = self.output.as_ref().is_some_and(|o| !o.idle());
@@ -461,7 +472,11 @@ impl Decoder {
                     waiting_since = waiting_since.max(touched);
                 }
             }
+            let began = Instant::now();
             let mut read = mf::read(&self.reader, MF_SOURCE_READER_ANY_STREAM.0 as u32)?;
+            if logging() && began.elapsed() > Duration::from_millis(200) {
+                log!("a read took {} ms", began.elapsed().as_millis());
+            }
             if read.flags & MF_SOURCE_READERF_ERROR.0 != 0 {
                 return Err("the decoder stopped with an error".into());
             }
@@ -486,6 +501,9 @@ impl Decoder {
                         delivered = true;
                         pipe.lock().touched = Some(Instant::now());
                     } else {
+                        if logging() && !delivered {
+                            log!("first picture of generation {generation} at {:.3}", epoch + read.time);
+                        }
                         (delivered, keyframe) = (true, false);
                         handled_at = Instant::now();
                         let (picture, texture) = self.picture(&sample)?;

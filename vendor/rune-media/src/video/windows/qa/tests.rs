@@ -287,8 +287,8 @@ fn a_scrub_shows_keyframes_then_plays_on_from_where_it_stops() {
     rig.player.pause();
     let shots = storm(&mut rig, 30, true, |i| 0.6 + f64::from(i) * 0.15);
     let keyframes: Vec<u32> = shots.iter().filter_map(|s| s.picture).filter(|p| *p > 0 && p % KEYFRAME_EVERY == 0).collect();
-    eprintln!("the scrub showed keyframes {keyframes:?}");
-    assert!(keyframes.len() >= 3, "the scrub showed keyframes {keyframes:?}");
+    eprintln!("the scrub showed keyframes {keyframes:?} among pictures {:?}", shots.iter().map(|s| s.picture).collect::<Vec<_>>());
+    assert!(keyframes.len() >= 3, "the scrub showed keyframes {keyframes:?} among pictures {:?}", shots.iter().map(|s| s.picture).collect::<Vec<_>>());
     assert!(!rig.player.is_playing());
     rig.player.seek(3.3);
     rig.player.play();
