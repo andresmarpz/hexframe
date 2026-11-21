@@ -15,6 +15,10 @@ pub enum RegValue {
     Number(u32),
 }
 
+pub fn instance_event_name(id: &str, kind: &str) -> String {
+    format!("Local\\{id}.{kind}")
+}
+
 pub fn is_inside(exe: &Path, dir: &Path) -> bool {
     lowercase(exe).starts_with(lowercase(dir))
 }

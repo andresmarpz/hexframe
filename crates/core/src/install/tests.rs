@@ -109,3 +109,15 @@ fn wait_until_gives_up_after_the_timeout() {
     });
     assert!(!ready);
 }
+
+#[test]
+fn instance_event_names_sit_in_the_local_namespace() {
+    assert_eq!(
+        instance_event_name("greyscreen", "show"),
+        "Local\\greyscreen.show"
+    );
+    assert_eq!(
+        instance_event_name("greyscreen", "quit"),
+        "Local\\greyscreen.quit"
+    );
+}

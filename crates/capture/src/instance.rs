@@ -4,6 +4,8 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::HSTRING;
 
+use greyscreen_core::install::instance_event_name;
+
 #[derive(Debug)]
 pub struct InstanceSignal {
     event: isize,
@@ -17,9 +19,9 @@ pub enum Claim {
 }
 
 pub fn claim(name: &str) -> Claim {
-    let name = HSTRING::from(format!("Local\\{name}.show"));
+    let show_name = HSTRING::from(instance_event_name(name, "show"));
     // SAFETY: the name outlives the call and no security attributes are passed.
-    let event = match unsafe { CreateEventW(None, false, false, &name) } {
+    let event = match unsafe { CreateEventW(None, false, false, &show_name) } {
         Ok(event) => event,
         Err(error) => {
             tracing::warn!(%error, "cannot create the single-instance event");
@@ -38,7 +40,7 @@ pub fn claim(name: &str) -> Claim {
         }
         return Claim::AlreadyRunning;
     }
-    let quit_name = HSTRING::from(format!("Local\\{name}.quit"));
+    let quit_name = HSTRING::from(instance_event_name(name, "quit"));
     // SAFETY: the name outlives the call and no security attributes are passed.
     let quit_event = match unsafe { CreateEventW(None, false, false, &quit_name) } {
         Ok(handle) => handle.0 as isize,
@@ -54,7 +56,7 @@ pub fn claim(name: &str) -> Claim {
 }
 
 fn open_quit_event(id: &str) -> Option<HANDLE> {
-    let name = HSTRING::from(format!("Local\\{id}.quit"));
+    let name = HSTRING::from(instance_event_name(id, "quit"));
     // SAFETY: the name outlives the call; a failed open means no instance runs.
     unsafe { OpenEventW(EVENT_MODIFY_STATE, false, &name) }.ok()
 }
