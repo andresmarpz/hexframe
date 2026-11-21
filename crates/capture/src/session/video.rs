@@ -112,6 +112,7 @@ impl Video {
             self.converter.release(frame.slot);
             return self.soft("encoder submit", &error, lost_h264(&error));
         }
+        self.sink.submitted(self.pacer.tick());
         self.soft_errors = 0;
         Ok(())
     }

@@ -31,6 +31,10 @@ impl Pacer {
         self.t0 + self.offset(self.tick)
     }
 
+    pub(crate) fn tick(&self) -> u64 {
+        self.tick
+    }
+
     pub(crate) fn pts(&self) -> Hns {
         self.offset(self.tick)
     }

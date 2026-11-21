@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
@@ -25,6 +26,8 @@ pub(crate) struct Sink {
     closed: bool,
     pending: Vec<MediaEvent>,
     out_index: u64,
+    in_flight: VecDeque<u64>,
+    last_tick: Option<u64>,
     frame_ticks: i64,
 }
 
@@ -38,6 +41,8 @@ impl Sink {
             closed: false,
             pending: Vec::new(),
             out_index: 0,
+            in_flight: VecDeque::new(),
+            last_tick: None,
             frame_ticks,
         }
     }
@@ -48,6 +53,20 @@ impl Sink {
 
     pub(crate) fn encoded(&self) -> u64 {
         self.out_index
+    }
+
+    pub(crate) fn submitted(&mut self, tick: u64) {
+        self.in_flight.push_back(tick);
+    }
+
+    fn next_tick(&mut self) -> u64 {
+        let fallback = self.last_tick.map_or(0, |last| last + 1);
+        let tick = self
+            .in_flight
+            .pop_front()
+            .map_or(fallback, |tick| tick.max(fallback));
+        self.last_tick = Some(tick);
+        tick
     }
 
     pub(crate) fn start(&mut self, sps: Vec<u8>, pps: Vec<u8>) {
@@ -84,7 +103,7 @@ impl Sink {
             if sample.is_empty() {
                 continue;
             }
-            let ticks = self.out_index as i64 * self.frame_ticks;
+            let ticks = self.next_tick() as i64 * self.frame_ticks;
             self.out_index += 1;
             self.packet(Packet {
                 track: Track::Video,
