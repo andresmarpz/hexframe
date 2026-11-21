@@ -190,8 +190,8 @@ fn clicking_the_button_again_cancels() {
 fn leaving_settings_cancels_the_capture() {
     let (mut rt, _rx) = settings_runtime();
     start_capture(&mut rt);
-    tap(&mut rt, "nav-status");
-    assert_eq!(rt.state.screen, Screen::Status);
+    tap(&mut rt, "nav-home");
+    assert_eq!(rt.state.screen, Screen::Home);
     assert!(!rt.state.hotkey_capture);
 }
 
