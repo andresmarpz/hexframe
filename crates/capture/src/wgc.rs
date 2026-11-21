@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::CaptureTarget;
+use greyscreen_core::media::capture_min_update_interval_hns;
 use greyscreen_core::tear::{Arrival, CopyWaits, HoldBack, Wait};
 use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
 use windows::Foundation::{TimeSpan, TypedEventHandler};
@@ -81,6 +82,7 @@ struct Shared {
 pub struct WgcOptions {
     pub fps: u32,
     pub cursor: bool,
+    pub display_hz: u32,
 }
 
 pub struct WgcCapture {
@@ -437,7 +439,11 @@ fn create_item(target: &CaptureTarget) -> windows::core::Result<GraphicsCaptureI
 }
 
 fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) -> bool {
-    let WgcOptions { fps, cursor } = options;
+    let WgcOptions {
+        fps,
+        cursor,
+        display_hz,
+    } = options;
     tracing::info!(cursor, "graphics capture cursor");
     if let Err(error) = session.SetIsCursorCaptureEnabled(cursor) {
         tracing::warn!(%error, cursor, "set cursor capture failed");
@@ -452,8 +458,13 @@ fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) -> b
         }
     };
     let interval = TimeSpan {
-        Duration: HNS_PER_SEC * 9 / 10 / i64::from(fps.max(1)),
+        Duration: capture_min_update_interval_hns(fps, display_hz),
     };
+    tracing::info!(
+        interval_ms = interval.Duration as f64 / 10_000.0,
+        display_hz,
+        "graphics capture update interval"
+    );
     if let Err(error) = session.SetMinUpdateInterval(interval) {
         tracing::warn!(%error, "set minimum update interval failed");
     }

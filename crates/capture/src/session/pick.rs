@@ -6,7 +6,7 @@ use greyscreen_core::encoder::{self, Candidate, EncoderKind};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, encode_size};
 use greyscreen_core::problem::NO_FRAMES;
 
-use super::Flags;
+use super::{Flags, facts};
 use crate::adapters;
 use crate::client_area::ClientArea;
 use crate::clock::QpcMap;
@@ -106,6 +106,7 @@ fn build_on(
         WgcOptions {
             fps: cfg.fps,
             cursor: cfg.cursor,
+            display_hz: facts::display_hz(target),
         },
     )
     .map_err(|e| Failure::Setup(format!("screen capture failed to start: {e}")))?;

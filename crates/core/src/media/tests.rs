@@ -299,3 +299,33 @@ fn bitrate_scales_down_to_a_smaller_encode_size() {
     assert_eq!(scaled.quality, Some(70));
     assert_eq!(cfg.for_encode_size(3840, 2160), cfg);
 }
+
+fn delivered_period_hns(fps: u32, hz: u32) -> i64 {
+    let interval = capture_min_update_interval_hns(fps, hz);
+    let refresh = 10_000_000 / i64::from(hz);
+    (interval + refresh - 1) / refresh * refresh
+}
+
+#[test]
+fn capture_interval_keeps_60_fps_on_144_hz() {
+    assert!(delivered_period_hns(60, 144) <= 10_000_000 / 60);
+    assert!(capture_min_update_interval_hns(60, 144) > 0);
+}
+
+#[test]
+fn capture_interval_keeps_target_rate_on_other_displays() {
+    assert_eq!(capture_min_update_interval_hns(60, 60), 0);
+    assert!(delivered_period_hns(30, 144) <= 10_000_000 / 30);
+    assert!(delivered_period_hns(60, 240) <= 10_000_000 / 60);
+}
+
+#[test]
+fn capture_interval_without_refresh_rate_is_nine_tenths_of_a_frame() {
+    assert_eq!(capture_min_update_interval_hns(60, 0), 150_000);
+    assert_eq!(capture_min_update_interval_hns(30, 0), 300_000);
+}
+
+#[test]
+fn capture_interval_never_exceeds_nine_tenths_of_a_frame() {
+    assert_eq!(capture_min_update_interval_hns(60, 1000), 150_000);
+}

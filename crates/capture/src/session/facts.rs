@@ -74,6 +74,10 @@ fn monitor_for(target: &CaptureTarget) -> HMONITOR {
     }
 }
 
+pub(super) fn display_hz(target: &CaptureTarget) -> u32 {
+    display_mode(target).map_or(0, |mode| mode.hz)
+}
+
 fn display_mode(target: &CaptureTarget) -> Option<DisplayMode> {
     let monitor = monitor_for(target);
     let mut info = MONITORINFOEXW::default();

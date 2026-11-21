@@ -248,5 +248,17 @@ pub fn encode_size(native: (u32, u32), max_height: Option<u32>) -> (u32, u32) {
     (width & !1, height & !1)
 }
 
+const REFRESH_MARGIN_HNS: i64 = 5_000;
+
+pub fn capture_min_update_interval_hns(fps: u32, display_hz: u32) -> i64 {
+    let fps = i64::from(fps.max(1));
+    let cap = HNS_PER_SEC * 9 / 10 / fps;
+    if display_hz == 0 {
+        return cap;
+    }
+    let refresh = HNS_PER_SEC / i64::from(display_hz);
+    (HNS_PER_SEC / fps - refresh - REFRESH_MARGIN_HNS).clamp(0, cap)
+}
+
 #[cfg(test)]
 mod tests;
