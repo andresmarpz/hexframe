@@ -12,7 +12,6 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 thiserror.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6"
 objc2-av-foundation = { version = "0.3", default-features = false, features = ["std", "AVAsset", "AVAssetImageGenerator", "objc2-core-foundation", "objc2-core-graphics", "objc2-core-media"] }
 objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes"] }
 objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
