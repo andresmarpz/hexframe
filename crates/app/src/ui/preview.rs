@@ -201,7 +201,7 @@ fn recordings() -> Vec<RecordingEntry> {
             clips,
         })
     };
-    vec![
+    let mut list = vec![
         row(2, "Ahri", "CLASSIC", Win, 33.2, 1_820, 6),
         row(4, "Ahri", "CLASSIC", Loss, 28.8, 1_540, 3),
         row(27, "Yasuo", "ARAM", Win, 19.1, 1_010, 9),
@@ -210,7 +210,22 @@ fn recordings() -> Vec<RecordingEntry> {
         row(76, "Ahri", "ARAM", Win, 17.9, 940, 4),
         row(190, "Viego", "CLASSIC", Unknown, 22.3, 1_190, 2),
         row(215, "Thresh", "CLASSIC", Loss, 31.5, 1_680, 1),
-    ]
+    ];
+    for (at, reviewed) in [(0, 2), (3, 1)] {
+        let me = list[at].meta.game.info.me.clone();
+        let ids: Vec<u32> = greyscreen_core::review::deaths(&list[at].meta.events, &me)
+            .iter()
+            .take(reviewed)
+            .map(|d| d.event_id)
+            .collect();
+        for id in ids {
+            list[at]
+                .meta
+                .review
+                .toggle_tag(id, greyscreen_core::review::DeathTag::NoVision);
+        }
+    }
+    list
 }
 
 pub(super) fn demo_recordings() -> Vec<RecordingEntry> {

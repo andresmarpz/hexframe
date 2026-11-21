@@ -19,10 +19,15 @@ thread_local! {
     static CALLS: RefCell<Vec<Call>> = const { RefCell::new(Vec::new()) };
     static TIME: Cell<f64> = const { Cell::new(0.0) };
     static PLAYING: Cell<bool> = const { Cell::new(false) };
+    static DURATION: Cell<f64> = const { Cell::new(10.0) };
 }
 
 pub(crate) fn set_playing(playing: bool) {
     PLAYING.set(playing);
+}
+
+pub(crate) fn set_duration(secs: f64) {
+    DURATION.set(secs);
 }
 
 pub(crate) fn set_time(secs: f64) {
@@ -67,7 +72,7 @@ impl ReviewPlayer for FakePlayer {
     }
 
     fn duration(&self) -> Option<f64> {
-        Some(10.0)
+        Some(DURATION.get())
     }
 
     fn state(&self) -> PlayerState {

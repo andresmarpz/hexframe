@@ -26,6 +26,7 @@ greyscreen-capture.workspace = true
 
 [dev-dependencies]
 greyscreen-league.workspace = true
+tempfile = "3"
 
 [build-dependencies]
 winresource.workspace = true

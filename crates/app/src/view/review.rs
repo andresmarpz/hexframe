@@ -1,4 +1,6 @@
 mod card;
+mod death_summary;
+mod deaths;
 mod icons;
 mod panel;
 mod theater;
@@ -13,7 +15,8 @@ use greyscreen_engine::reveal;
 use jiff::Zoned;
 use rune::{Color, El, PlayerState, TextStyle, Tx, col, el, row, text};
 use rune_kit::{
-    Badge, BadgeVariant, ControlSize, IconButton, IconButtonVariant, Kit, Toolbar, glyphs,
+    Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
+    Toolbar, glyphs,
 };
 
 use super::champion::champion_icon;
@@ -83,7 +86,18 @@ pub(super) fn clock_text(review: &ReviewState, k: &Kit, color: Color) -> El {
         .color(color)
 }
 
-pub(super) fn page(review: &ReviewState, k: &Kit) -> El {
+pub(super) fn page(s: &Ui, k: &Kit) -> El {
+    let Some(review) = &s.review else {
+        return col().key("review").w_full().h_full();
+    };
+    match &review.death {
+        Some(state) if state.summary => death_summary::screen(review, state, k),
+        Some(state) => deaths::screen(review, state, &s.death_note, k),
+        None => screen(review, k),
+    }
+}
+
+fn screen(review: &ReviewState, k: &Kit) -> El {
     col()
         .key("review")
         .w_full()
@@ -187,8 +201,23 @@ pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
         );
     Toolbar::new()
         .leading(line)
+        .trailing(deaths_button(review, k))
         .trailing(folder)
         .trailing(delete)
+}
+
+fn deaths_button(review: &ReviewState, k: &Kit) -> El {
+    let count = review.death_count();
+    if count == 0 || review.player.is_none() {
+        return el();
+    }
+    Button::new(format!("Review deaths ({count})"))
+        .variant(ButtonVariant::Submit)
+        .control_size(ControlSize::Regular)
+        .shortcut("D")
+        .on_press(|ui: &mut Ui| ui.review_deaths())
+        .build(k)
+        .key("review-deaths")
 }
 
 fn player_column(review: &ReviewState, k: &Kit) -> El {

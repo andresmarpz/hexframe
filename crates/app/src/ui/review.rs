@@ -5,6 +5,8 @@ use greyscreen_core::library::EventEntry;
 use greyscreen_engine::RecordingEntry;
 use rune::{El, Player, PlayerState, SurfaceFit};
 
+use super::death_review::DeathReviewState;
+
 pub(crate) trait ReviewPlayer: Debug {
     fn play(&self);
     fn pause(&self);
@@ -154,6 +156,7 @@ pub(crate) struct ReviewState {
     pub speed: usize,
     pub muted: bool,
     pub drawer: bool,
+    pub death: Option<DeathReviewState>,
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
@@ -182,6 +185,7 @@ impl ReviewState {
             speed: NORMAL_SPEED,
             muted: false,
             drawer: false,
+            death: None,
         };
         review.apply_audio();
         review.fall_back_to_first_clip(make);

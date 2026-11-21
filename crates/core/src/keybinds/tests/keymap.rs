@@ -46,7 +46,7 @@ fn overrides_replace_defaults_and_none_unbinds() {
     let keymap = Keymap::from_overrides(&overrides(&[
         ("save_clip", "Ctrl+Shift+K"),
         ("mute", "None"),
-        ("play_pause", "P"),
+        ("play_pause", "Y"),
     ]));
     assert_eq!(
         keymap.global(),
@@ -56,7 +56,7 @@ fn overrides_replace_defaults_and_none_unbinds() {
     assert_eq!(keymap.action_for(Scope::App, &combo("M")), None);
     assert_eq!(keymap.action_for(Scope::App, &combo("Space")), None);
     assert_eq!(
-        keymap.action_for(Scope::App, &combo("P")),
+        keymap.action_for(Scope::App, &combo("Y")),
         Some(Action::PlayPause)
     );
 }
@@ -73,7 +73,7 @@ fn unknown_ids_and_bad_values_are_ignored_and_missing_ones_use_defaults() {
 
 #[test]
 fn store_keeps_only_changes_and_unknown_ids() {
-    let mut map = overrides(&[("teleport", "T"), ("mute", "N")]);
+    let mut map = overrides(&[("teleport", "T"), ("mute", "Y")]);
     let mut keymap = Keymap::from_overrides(&map);
     keymap.bind(Action::SaveClip, None).unwrap();
     keymap.reset(Action::Mute);
@@ -158,7 +158,7 @@ fn conflicts_found_in_a_hand_edited_file_are_reported_for_both_actions() {
 #[test]
 fn reset_one_and_reset_all_restore_the_defaults() {
     let mut keymap = Keymap::defaults();
-    keymap.bind(Action::Mute, Some(combo("N"))).unwrap();
+    keymap.bind(Action::Mute, Some(combo("Y"))).unwrap();
     keymap.bind(Action::SaveClip, None).unwrap();
     keymap.reset(Action::Mute);
     assert!(keymap.is_default(Action::Mute));

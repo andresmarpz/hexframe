@@ -1368,6 +1368,7 @@ dependencies = [
  "png 0.18.1",
  "rune",
  "rune-kit",
+ "tempfile",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

@@ -3,7 +3,7 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
 use rune::TextEdit;
 
-use super::{SettingsSection, Ui, preview, update};
+use super::{SettingsSection, Ui, death_review, preview, update};
 
 type Scene = (&'static str, fn(&mut Ui));
 
@@ -133,6 +133,9 @@ pub(crate) const SCENES: &[Scene] = &[
         )];
     }),
     ("review", game),
+    ("death-review-start", death_review::scene_demo),
+    ("death-review", death_review::scene_mid),
+    ("death-review-summary", death_review::scene_summary),
     ("review-theater", |ui| {
         game(ui);
         if let Some(review) = &mut ui.review {

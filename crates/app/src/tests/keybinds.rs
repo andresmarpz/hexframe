@@ -123,13 +123,13 @@ fn pressing_change_waits_for_keys() {
 fn the_next_key_becomes_the_binding_and_reaches_the_engine() {
     let (mut rt, rx) = keybinds_runtime();
     start_rebind(&mut rt, Action::Mute);
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     assert!(rt.state.rebinding.is_none());
-    assert_eq!(bindings(&rt, Action::Mute), vec![combo("N")]);
-    assert!(has_text(&rt, "N"));
+    assert_eq!(bindings(&rt, Action::Mute), vec![combo("Y")]);
+    assert!(has_text(&rt, "Y"));
     assert!(rt.find("bind-reset-mute").is_some());
     let sent = last_applied(&rx).expect("settings sent");
-    assert_eq!(sent.keybinds.get("mute").map(String::as_str), Some("N"));
+    assert_eq!(sent.keybinds.get("mute").map(String::as_str), Some("Y"));
 }
 
 #[test]
@@ -183,8 +183,8 @@ fn backspace_clears_the_binding() {
     let sent = last_applied(&rx).expect("settings sent");
     assert_eq!(sent.keybinds.get("mute").map(String::as_str), Some("none"));
     start_rebind(&mut rt, Action::Mute);
-    press_char(&mut rt, "n");
-    assert_eq!(bindings(&rt, Action::Mute), vec![combo("N")]);
+    press_char(&mut rt, "y");
+    assert_eq!(bindings(&rt, Action::Mute), vec![combo("Y")]);
 }
 
 #[test]
@@ -196,8 +196,8 @@ fn a_taken_key_is_refused_with_a_note_and_capture_goes_on() {
     assert_eq!(bindings(&rt, Action::Mute), vec![combo("M")]);
     assert!(has_text(&rt, "F is already used by Toggle fullscreen."));
     assert!(rx.try_recv().is_err());
-    press_char(&mut rt, "n");
-    assert_eq!(bindings(&rt, Action::Mute), vec![combo("N")]);
+    press_char(&mut rt, "y");
+    assert_eq!(bindings(&rt, Action::Mute), vec![combo("Y")]);
     assert!(!has_prefix(&rt, "F is already"));
 }
 
@@ -283,7 +283,7 @@ fn leaving_settings_cancels_the_capture() {
 fn keys_are_not_captured_unless_asked() {
     let (mut rt, rx) = keybinds_runtime();
     press_key(&mut rt, Key::Function(10));
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     assert_eq!(rt.state.settings.keymap(), Settings::default().keymap());
     assert!(rx.try_recv().is_err());
 }
@@ -309,7 +309,7 @@ fn the_reset_button_restores_one_default() {
 fn reset_all_restores_every_default_and_is_off_when_nothing_changed() {
     let (mut rt, _rx) = keybinds_runtime();
     start_rebind(&mut rt, Action::Mute);
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     start_rebind(&mut rt, Action::SaveClip);
     press_key(&mut rt, Key::Backspace);
     tap(&mut rt, "bind-reset-all");
@@ -327,7 +327,7 @@ fn a_rebind_keeps_ids_this_version_does_not_know() {
         ui.settings.keybinds.insert("teleport".into(), "T".into());
     });
     start_rebind(&mut rt, Action::Mute);
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     assert_eq!(
         rt.state
             .settings
@@ -373,11 +373,11 @@ fn a_failed_global_registration_shows_a_note_on_its_row_until_it_clears() {
 fn a_rebound_review_key_works_and_the_old_one_does_not() {
     let mut rt = key_review_runtime();
     rt.update(|ui, _| {
-        ui.settings.keybinds.insert("mute".into(), "N".into());
+        ui.settings.keybinds.insert("mute".into(), "Y".into());
     });
     press_char(&mut rt, "m");
     assert!(fake_player::calls().is_empty());
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     assert_eq!(fake_player::calls(), vec![Call::Muted(true)]);
 }
 
@@ -397,7 +397,7 @@ fn an_unbound_review_key_does_nothing() {
 fn rebinding_in_the_page_changes_what_the_review_keys_do() {
     let (mut rt, _rx) = keybinds_runtime();
     start_rebind(&mut rt, Action::Mute);
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     rt.update(|ui, _| {
         ui.close_settings();
         ui.player_factory = fake_player::factory;
@@ -406,7 +406,7 @@ fn rebinding_in_the_page_changes_what_the_review_keys_do() {
     rt.frame(1.0 / 60.0);
     rt.frame(2.0 / 60.0);
     fake_player::clear_calls();
-    press_char(&mut rt, "n");
+    press_char(&mut rt, "y");
     assert_eq!(fake_player::calls(), vec![Call::Muted(true)]);
 }
 

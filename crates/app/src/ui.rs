@@ -11,6 +11,7 @@ use greyscreen_engine::{
 use rune::{TextEdit, Tx};
 use rune_kit::PaneState;
 
+mod death_review;
 pub(crate) mod event_detail;
 mod format;
 mod jump;
@@ -32,6 +33,7 @@ pub(crate) mod fake_player;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use death_review::{DeathReviewState, title_line};
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::RecordingsFilter;
@@ -41,6 +43,11 @@ pub(crate) use selection::{Detail, ListItem};
 pub(crate) use settings_sheet::SettingsSection;
 pub(crate) use tone::tone_color;
 pub(crate) use update::UpdateUi;
+
+#[cfg(test)]
+pub(crate) fn death_entry() -> RecordingEntry {
+    death_review::death_entry()
+}
 
 #[cfg(test)]
 pub(crate) fn review_entry() -> RecordingEntry {
@@ -98,6 +105,7 @@ pub(crate) struct Ui {
     pub post_secs: TextEdit,
     pub update: UpdateUi,
     pub update_available: Option<UpdateInfo>,
+    pub death_note: TextEdit,
 }
 
 impl Ui {
@@ -141,6 +149,7 @@ impl Ui {
             post_secs: TextEdit::new(settings.clips.post_secs.to_string()),
             update: UpdateUi::default(),
             update_available: None,
+            death_note: TextEdit::new(String::new()),
             settings,
         }
     }
@@ -323,6 +332,7 @@ impl Ui {
             tx.wake_after(TICK);
         }
         if let Some(review) = &mut self.review {
+            changed |= review.death_tick();
             changed |= review.changed_since_shown();
             changed |= review.hide_idle_controls(clock);
             if review.needs_ticks() {

@@ -41,7 +41,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
-        (Detail::Game, Some(review)) => (review::page(review, k), review::toolbar(review, k)),
+        (Detail::Game, Some(review)) => (review::page(s, k), review::toolbar(review, k)),
         (Detail::Live, _) => (
             fixed_content(home::page(s, k)),
             Toolbar::new().title("Recording"),

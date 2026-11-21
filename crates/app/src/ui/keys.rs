@@ -42,6 +42,11 @@ impl Ui {
             return false;
         }
         let theater = self.in_theater();
+        let leaving_theater = theater && action == Action::ExitFullscreen;
+        if !leaving_theater && self.run_death_action(action) {
+            self.wake_after_key(tx);
+            return true;
+        }
         match action {
             Action::ExitFullscreen if theater => self.set_theater(false, tx),
             Action::ExitFullscreen => self.show_welcome(),
@@ -56,7 +61,11 @@ impl Ui {
             Action::Mute => self.review_mute(),
             Action::SpeedDown => self.review_step_speed(-1),
             Action::SpeedUp => self.review_step_speed(1),
-            Action::SaveClip
+            Action::ReviewDeaths
+            | Action::NextDeath
+            | Action::PreviousDeath
+            | Action::ReplayDeath
+            | Action::SaveClip
             | Action::OpenSettings
             | Action::PreviousGame
             | Action::NextGame
@@ -64,11 +73,15 @@ impl Ui {
             | Action::ToggleSidebar
             | Action::FocusSearch => return false,
         }
+        self.wake_after_key(tx);
+        true
+    }
+
+    fn wake_after_key(&mut self, tx: &mut Tx) {
         if let Some(review) = &mut self.review {
             review.wake_controls(tx.clock());
         }
         self.sync_full_screen(tx);
-        true
     }
 
     pub(crate) fn in_theater(&self) -> bool {

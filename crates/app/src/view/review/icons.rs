@@ -36,6 +36,12 @@ pub(super) static ARROW_LEFT: Icon = Icon {
     body: r#"<path d="M13 8H3M7 4 3 8l4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#,
 };
 
+pub(super) static ARROW_RIGHT: Icon = Icon {
+    name: "greyscreen-arrow-right",
+    view: 16.0,
+    body: r#"<path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#,
+};
+
 pub(super) static REWIND: Icon = Icon {
     name: "greyscreen-rewind",
     view: 16.0,
