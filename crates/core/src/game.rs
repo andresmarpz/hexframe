@@ -17,6 +17,18 @@ pub struct Player {
     pub is_bot: bool,
 }
 
+impl Player {
+    pub fn answers_to(&self, name: &str) -> bool {
+        let strip = |value: &str| {
+            value
+                .rsplit_once('#')
+                .map_or(value.to_owned(), |(game, _)| game.to_owned())
+        };
+        strip(&self.name).eq_ignore_ascii_case(&strip(name))
+            || (self.is_bot && self.champion.eq_ignore_ascii_case(name))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GameInfo {
     pub mode: String,

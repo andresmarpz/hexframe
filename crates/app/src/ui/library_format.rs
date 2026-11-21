@@ -66,17 +66,6 @@ pub(crate) fn when(at: &Zoned, now: &Zoned) -> When {
     When { day, time }
 }
 
-fn same_player(player: &Player, name: &str) -> bool {
-    let strip = |value: &str| {
-        value
-            .rsplit_once('#')
-            .map_or(value.to_owned(), |(game, _)| game.to_owned())
-    };
-    let name = strip(name);
-    strip(&player.name).eq_ignore_ascii_case(&name)
-        || (player.is_bot && player.champion.eq_ignore_ascii_case(&name))
-}
-
 pub(crate) fn kda(events: &[EventEntry], me: &Player) -> Kda {
     let mut kda = Kda::default();
     for event in events {
@@ -86,9 +75,9 @@ pub(crate) fn kda(events: &[EventEntry], me: &Player) -> Kda {
             assisters,
         } = &event.kind
         {
-            kda.kills += u32::from(same_player(me, killer));
-            kda.deaths += u32::from(same_player(me, victim));
-            kda.assists += u32::from(assisters.iter().any(|name| same_player(me, name)));
+            kda.kills += u32::from(me.answers_to(killer));
+            kda.deaths += u32::from(me.answers_to(victim));
+            kda.assists += u32::from(assisters.iter().any(|name| me.answers_to(name)));
         }
     }
     kda
