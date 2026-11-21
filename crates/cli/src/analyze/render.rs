@@ -165,6 +165,16 @@ fn diagnostics(out: &mut String, diag: &DiagReport) {
     if let Some(mem) = diag.mem_mb_max {
         line!(out, "  Greyscreen memory peak {mem} MB");
     }
+    if diag.seconds_with_focus_info > 0 {
+        line!(
+            out,
+            "  Game not in front for {} of {} seconds; seconds with drops: {} in the background, {} in front",
+            diag.seconds_in_background,
+            diag.seconds_with_focus_info,
+            diag.drop_seconds_in_background,
+            diag.drop_seconds_in_foreground,
+        );
+    }
 }
 
 pub(super) fn clock(secs: f64) -> String {

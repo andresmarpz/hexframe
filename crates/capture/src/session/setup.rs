@@ -107,7 +107,12 @@ pub(crate) fn build(
         com,
         scratch: Vec::new(),
         stats: Stats::new(),
-        sampler: cfg.diagnostics.then(ProcessSampler::new),
+        sampler: cfg.diagnostics.then(|| {
+            ProcessSampler::new(match target {
+                CaptureTarget::GameWindow { hwnd, .. } => Some(*hwnd),
+                CaptureTarget::PrimaryMonitor => None,
+            })
+        }),
         seq: 0,
         last_seq: 0,
         soft_errors: 0,

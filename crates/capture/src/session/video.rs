@@ -120,6 +120,7 @@ impl Video {
             let (cpu, mem) = sampler.sample();
             self.stats.c.cpu_pct = cpu;
             self.stats.c.mem_mb = mem;
+            self.stats.c.foreground = sampler.target_in_foreground();
         }
         let snapshot = self.stats.take_snapshot(mono_now());
         self.sink.stats(snapshot);

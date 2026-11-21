@@ -92,6 +92,7 @@ pub struct CaptureStats {
     pub pcm_queue: u32,
     pub cpu_pct: Option<f32>,
     pub mem_mb: Option<u32>,
+    pub foreground: Option<bool>,
 }
 
 const NVIDIA_VENDOR: u32 = 0x10DE;

@@ -298,3 +298,28 @@ fn an_hour_long_file_analyzes_in_well_under_a_second() {
     assert_eq!(report.video.frames, 216_000);
     assert!(elapsed.as_secs_f64() < 1.0, "took {elapsed:?}");
 }
+
+#[test]
+fn diagnostics_split_drop_seconds_by_game_focus() {
+    let diag = diag::summarize(
+        r#"{"type":"second","t":1.0,"dropped":0,"foreground":true}
+{"type":"second","t":2.0,"dropped":3,"foreground":false}
+{"type":"second","t":3.0,"dropped":0,"foreground":false}
+{"type":"second","t":4.0,"dropped":1,"foreground":false}
+{"type":"second","t":5.0,"dropped":2,"foreground":true}
+{"type":"second","t":6.0,"dropped":4}
+"#,
+    );
+    assert_eq!(diag.seconds, 6);
+    assert_eq!(diag.seconds_with_focus_info, 5);
+    assert_eq!(diag.seconds_in_background, 3);
+    assert_eq!(diag.drop_seconds_in_background, 2);
+    assert_eq!(diag.drop_seconds_in_foreground, 1);
+}
+
+#[test]
+fn diagnostics_without_focus_info_report_no_focus_counts() {
+    let diag = diag::summarize("{\"type\":\"second\",\"t\":1.0,\"dropped\":2}\n");
+    assert_eq!(diag.seconds_with_focus_info, 0);
+    assert_eq!(diag.drop_seconds_in_background, 0);
+}

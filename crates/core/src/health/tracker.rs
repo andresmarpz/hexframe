@@ -31,6 +31,8 @@ pub struct DiagSample {
     pub queue_pcm: u32,
     pub cpu_pct: Option<f32>,
     pub mem_mb: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreground: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -168,6 +170,7 @@ impl HealthTracker {
             queue_pcm: stats.pcm_queue,
             cpu_pct: stats.cpu_pct,
             mem_mb: stats.mem_mb,
+            foreground: stats.foreground,
         }
     }
 

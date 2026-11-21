@@ -1,8 +1,9 @@
 use std::time::Instant;
 
-use windows::Win32::Foundation::FILETIME;
+use windows::Win32::Foundation::{FILETIME, HWND};
 use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
+use windows::Win32::UI::WindowsAndMessaging::{GA_ROOTOWNER, GetAncestor, GetForegroundWindow};
 
 const BYTES_PER_MB: u64 = 1024 * 1024;
 
@@ -10,14 +11,33 @@ const BYTES_PER_MB: u64 = 1024 * 1024;
 pub(crate) struct ProcessSampler {
     last_wall: Instant,
     last_cpu: Option<u64>,
+    target: Option<HWND>,
 }
 
 impl ProcessSampler {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(target: Option<isize>) -> Self {
         Self {
             last_wall: Instant::now(),
             last_cpu: cpu_time_hns(),
+            target: target.map(|hwnd| HWND(hwnd as *mut core::ffi::c_void)),
         }
+    }
+
+    pub(crate) fn target_in_foreground(&self) -> Option<bool> {
+        let target = self.target?;
+        // SAFETY: both calls only read window state and accept any handle value.
+        let (front, front_owner, target_owner) = unsafe {
+            let front = GetForegroundWindow();
+            (
+                front,
+                GetAncestor(front, GA_ROOTOWNER),
+                GetAncestor(target, GA_ROOTOWNER),
+            )
+        };
+        if front.0.is_null() {
+            return Some(false);
+        }
+        Some(front == target || (!target_owner.0.is_null() && front_owner == target_owner))
     }
 
     pub(crate) fn sample(&mut self) -> (Option<f32>, Option<u32>) {

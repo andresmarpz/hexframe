@@ -374,7 +374,7 @@ Verdicts (`greyscreen-core::health::verdict`, shared by the popover and the anal
 With `Settings.recording_diagnostics` on, `CaptureConfig.diagnostics` is true. Capture then sends one `MediaEvent::Setup(CaptureSetup)` after `Started`, and fills the CPU and memory gauges. The engine opens `diagnostics.jsonl` in the game folder. A `diag-writer` thread owns the file behind a `BufWriter` and a bounded channel: the control thread only does `try_send`, and a full queue drops the line, so a slow disk never stalls recording. Every line is one JSON object with a `type`:
 
 - `setup` (first line): `adapter`, `driver_version` (the DXGI user-mode driver version, with the NVIDIA panel number in brackets), `display_width`, `display_height`, `display_hz` (the monitor's current mode), `window_width`, `window_height` (the game's client area), `frame_width`, `frame_height` (the captured frame), `crop_left`, `crop_top`, `crop_width`, `crop_height`, `encode_width`, `encode_height`, `fps`, `encoder`, `bitrate`, `peak`, `quality`, `gop_frames`, `audio`.
-- `second` (one per second): `t` (seconds since capture start), `captured`, `encoded`, `dropped`, `repeated` (all counts for that second), `encode_ms_max`, `step_ms_max`, `torn` (frames dropped by the torn frame check), `copy_wait_ms_max`, `audio_packets` (total), `av_skew_ms` (audio end minus video end as the engine has received them), `queue_writer` (packets waiting for the file writer, of 4096), `queue_media` (events waiting for the engine), `queue_encoder`, `queue_pcm`, `cpu_pct`, `mem_mb` (both absent when Windows refuses the read).
+- `second` (one per second): `t` (seconds since capture start), `captured`, `encoded`, `dropped`, `repeated` (all counts for that second), `encode_ms_max`, `step_ms_max`, `torn` (frames dropped by the torn frame check), `copy_wait_ms_max`, `audio_packets` (total), `av_skew_ms` (audio end minus video end as the engine has received them), `queue_writer` (packets waiting for the file writer, of 4096), `queue_media` (events waiting for the engine), `queue_encoder`, `queue_pcm`, `cpu_pct`, `mem_mb` (both absent when Windows refuses the read), `foreground` (true when the captured game window, or a window with the same root owner, is the foreground window when the second is sampled; absent for monitor capture).
 
 GPU encoder load is not recorded: Windows exposes it only through performance counters, which cost more than this log may.
 
@@ -388,7 +388,7 @@ GPU encoder load is not recorded: Windows exposes it only through performance co
 - Keyframes: count and interval (min, average, max), bad without any, warning above 5 s.
 - Bitrate: average, min and max over 10 s windows (all windows in `--json`).
 - Audio continuity: packets, samples against the timeline, gaps with timestamps. A/V duration: audio minus video at the end.
-- From `game.json`: every `health` finding. From `diagnostics.jsonl`: seconds with drops, slowest encode and capture step, deepest queues, CPU and memory peaks, the setup facts.
+- From `game.json`: every `health` finding. From `diagnostics.jsonl`: seconds with drops, slowest encode and capture step, deepest queues, CPU and memory peaks, the seconds the game was not the foreground window and how many of the seconds with drops fell in the background against the foreground (also in `--json`; omitted from the text when the log has no `foreground`), the setup facts.
 
 The analysis is one pass over about 400 thousand sample rows, well under a second for a one-hour file; a test checks that.
 

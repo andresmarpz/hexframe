@@ -21,6 +21,10 @@ pub(crate) struct DiagReport {
     pub cpu_pct_max: Option<f64>,
     pub cpu_pct_avg: Option<f64>,
     pub mem_mb_max: Option<u64>,
+    pub seconds_with_focus_info: u64,
+    pub seconds_in_background: u64,
+    pub drop_seconds_in_background: u64,
+    pub drop_seconds_in_foreground: u64,
     pub bad_lines: u64,
 }
 
@@ -47,6 +51,10 @@ pub(crate) fn summarize(text: &str) -> DiagReport {
         cpu_pct_max: None,
         cpu_pct_avg: None,
         mem_mb_max: None,
+        seconds_with_focus_info: 0,
+        seconds_in_background: 0,
+        drop_seconds_in_background: 0,
+        drop_seconds_in_foreground: 0,
         bad_lines: 0,
     };
     let mut cpu_sum = 0.0;
@@ -100,6 +108,15 @@ fn add_second(report: &mut DiagReport, line: &Value, cpu_sum: &mut f64, cpu_n: &
         report.cpu_pct_max = Some(report.cpu_pct_max.unwrap_or(0.0).max(cpu));
         *cpu_sum += cpu;
         *cpu_n += 1;
+    }
+    if let Some(foreground) = line["foreground"].as_bool() {
+        report.seconds_with_focus_info += 1;
+        report.seconds_in_background += u64::from(!foreground);
+        match (foreground, dropped > 0) {
+            (false, true) => report.drop_seconds_in_background += 1,
+            (true, true) => report.drop_seconds_in_foreground += 1,
+            _ => {}
+        }
     }
     if let Some(mem) = line["mem_mb"].as_u64() {
         report.mem_mb_max = Some(report.mem_mb_max.unwrap_or(0).max(mem));
