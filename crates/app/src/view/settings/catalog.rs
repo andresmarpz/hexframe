@@ -11,6 +11,7 @@ pub(super) enum Row {
     FrameRate,
     Audio,
     Cursor,
+    NavStyle,
     ClipsEnabled,
     Moments,
     ClipWindow,
@@ -36,6 +37,7 @@ impl Row {
             Self::FrameRate => "frame rate fps 30 60 smooth",
             Self::Audio => "audio sound game audio microphone discord",
             Self::Cursor => "cursor mouse pointer",
+            Self::NavStyle => "navigation style layout sidebar dock menu tabs",
             Self::ClipsEnabled => "save highlight clips auto clips",
             Self::Moments => {
                 "moments kills deaths assists multikills objectives structures aces dragon baron herald turrets"
@@ -73,6 +75,7 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
             Row::FrameRate,
             Row::Audio,
             Row::Cursor,
+            Row::NavStyle,
         ],
         SettingsSection::Clips => vec![
             Row::ClipsEnabled,

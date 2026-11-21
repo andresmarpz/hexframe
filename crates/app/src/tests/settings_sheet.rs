@@ -266,3 +266,60 @@ fn a_second_escape_closes_the_sheet() {
     press_escape(&mut rt);
     assert!(!rt.state.settings_open);
 }
+
+fn pick_nav_style(rt: &mut rune::Runtime<crate::ui::Ui>, dock: bool) {
+    rt.update(|_, tx| tx.scroll_into_view("nav-style".to_owned()));
+    settle(rt);
+    let (x, y) = rt.find("nav-style").expect("nav-style");
+    let x = if dock { x + 30.0 } else { x - 30.0 };
+    rt.pointer_down(x, y);
+    rt.pointer_up(x, y);
+    settle(rt);
+}
+
+#[test]
+fn the_navigation_style_row_is_the_last_row_of_recording() {
+    let mut rt = open_sheet();
+    tap(&mut rt, "settings-nav-recording");
+    assert!(rt.find("nav-style-row").is_some());
+    assert!(rt.find("nav-style").is_some());
+}
+
+#[test]
+fn searching_dock_finds_the_navigation_style_row() {
+    let mut rt = open_sheet();
+    tap(&mut rt, "settings-nav-storage");
+    type_search(&mut rt, "dock");
+    assert!(rt.find("nav-style-row").is_some());
+    assert!(rt.find("quality-row").is_none());
+}
+
+#[test]
+fn picking_dock_swaps_the_shell_live_and_picking_sidebar_swaps_it_back() {
+    use greyscreen_core::settings::NavStyle;
+    let mut rt = open_sheet();
+    assert!(rt.find("nav").is_some());
+    assert!(rt.find("dock").is_none());
+    pick_nav_style(&mut rt, true);
+    assert_eq!(rt.state.settings.nav_style, NavStyle::Dock);
+    assert!(rt.state.settings_open);
+    assert!(rt.find("dock").is_some());
+    assert!(rt.find("nav").is_none());
+    pick_nav_style(&mut rt, false);
+    assert_eq!(rt.state.settings.nav_style, NavStyle::Sidebar);
+    assert!(rt.find("nav").is_some());
+    assert!(rt.find("dock").is_none());
+}
+
+#[test]
+fn the_navigation_style_choice_reaches_the_engine() {
+    use greyscreen_core::settings::NavStyle;
+    use greyscreen_engine::EngineCmd;
+    let (mut rt, rx) = super::live_runtime();
+    tap(&mut rt, "nav-settings");
+    pick_nav_style(&mut rt, true);
+    let Ok(EngineCmd::ApplySettings(sent)) = rx.try_recv() else {
+        panic!("no ApplySettings sent");
+    };
+    assert_eq!(sent.nav_style, NavStyle::Dock);
+}

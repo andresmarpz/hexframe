@@ -240,7 +240,8 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         | Row::Resolution
         | Row::FrameRate
         | Row::Audio
-        | Row::Cursor => recording::render(s, k, layer, row),
+        | Row::Cursor
+        | Row::NavStyle => recording::render(s, k, layer, row),
         Row::ClipsEnabled | Row::Moments | Row::ClipWindow | Row::ClipHotkey => {
             clips::render(s, k, row)
         }
