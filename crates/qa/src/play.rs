@@ -80,7 +80,7 @@ impl Judge {
         if !golden.is_file() {
             let snap = if self.update {
                 adopt(&actual, &golden)?;
-                Snap::Updated
+                Snap::Added
             } else {
                 Snap::New
             };

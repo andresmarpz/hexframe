@@ -2,6 +2,9 @@ use std::path::Path;
 
 use crate::outcome::{CaseOutcome, Shot};
 
+#[cfg(test)]
+mod tests;
+
 pub(crate) struct Totals {
     pub(crate) cases: usize,
     pub(crate) failed: usize,
@@ -15,12 +18,7 @@ pub(crate) fn totals(outcomes: &[CaseOutcome]) -> Totals {
         new: outcomes
             .iter()
             .flat_map(|c| &c.checks)
-            .filter(|c| {
-                matches!(
-                    c.shot.as_ref().map(|s| &s.snap),
-                    Some(crate::outcome::Snap::New)
-                )
-            })
+            .filter(|c| c.shot.as_ref().is_some_and(|s| s.snap.is_new()))
             .count(),
     }
 }

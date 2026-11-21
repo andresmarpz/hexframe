@@ -7,6 +7,8 @@ const SYNC: f64 = 0.04;
 const SIZE: (u32, u32) = (320, 180);
 /// The fixture's last picture: 6 s at 60 fps.
 const LAST: u32 = 359;
+/// Beats come once a second, so a window of 2.2 s always holds two.
+const LAYER_RUN: f64 = 2.7;
 
 fn secs(d: f64) -> Duration {
     Duration::from_secs_f64(d)
@@ -160,12 +162,12 @@ fn the_layer_plays_with_sound_and_a_pause_there_holds_its_picture() {
     fake::take();
     let layered = Instant::now();
     let presented = rig.presented();
-    rig.run_with(2.0, |rig, _| {
+    rig.run_with(LAYER_RUN, |rig, _| {
         assert!(rig.layer(Some(SIZE)).showing, "the layer stopped showing");
     });
     let heard = fake::take();
     let moved = rig.presented().zip(presented).map(|(now, then)| now - then);
-    assert!(moved.is_some_and(|m| m > 1.7), "the layer presented {moved:?} s of pictures in 2 s with window {:?}; with none, nothing takes the layer's frames", window::mode());
+    assert!(moved.is_some_and(|m| m > LAYER_RUN - 0.3), "the layer presented {moved:?} s of pictures in {LAYER_RUN} s with window {:?}; with none, nothing takes the layer's frames", window::mode());
     let level = rms(&heard, layered + secs(0.2), Instant::now());
     assert!(level > 0.05, "the sound was silent on the layer: rms {level:.4}");
     assert_in_sync(&rig, &heard, layered + secs(0.5), "on the layer");

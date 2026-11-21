@@ -6,6 +6,7 @@ pub(crate) enum Snap {
     Changed { ratio: f64 },
     Resized,
     New,
+    Added,
     Updated,
     Unchecked(&'static str),
 }
@@ -15,12 +16,17 @@ impl Snap {
         matches!(self, Snap::Changed { .. } | Snap::Resized)
     }
 
+    pub(crate) fn is_new(&self) -> bool {
+        matches!(self, Snap::New | Snap::Added)
+    }
+
     pub(crate) fn word(&self) -> String {
         match self {
             Snap::Matched { ratio } => format!("matches ({:.3}% off)", ratio * 100.0),
             Snap::Changed { ratio } => format!("changed ({:.3}% of pixels)", ratio * 100.0),
             Snap::Resized => "size changed".into(),
             Snap::New => "new, no golden yet".into(),
+            Snap::Added => "golden added".into(),
             Snap::Updated => "golden updated".into(),
             Snap::Unchecked(why) => format!("not compared: {why}"),
         }

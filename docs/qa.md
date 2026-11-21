@@ -19,6 +19,7 @@ What Greyscreen adds:
 Run it:
 
 - Mac or Windows: `just qa`. `just qa --only settings` runs some cases; `just qa --update` writes this OS's goldens; `just qa --library "D:\Videos\Greyscreen"` uses a real library.
+- Goldens outside the repo: `--goldens <dir>` (default `qa/goldens/<os>`) reads and writes the snapshots there, so a PC can keep its own, for example `target\debug\greyscreen-qa.exe --goldens C:\Users\andres\dev\greyscreen-diag\goldens --update` once, then the same command without `--update`. The run says how many snapshots were new: with `--update`, goldens that did not exist yet count as new too.
 - Without `just` on Windows: `cargo build -p greyscreen -p greyscreen-cli -p greyscreen-qa` then `target\debug\greyscreen-qa.exe`.
 - A new flow: add a JSON file, run `just qa --update`, look at the snapshots in the report, commit them.
 
