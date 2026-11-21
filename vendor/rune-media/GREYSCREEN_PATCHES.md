@@ -82,6 +82,14 @@ Upstream: no issue filed yet.
 - Change: on the layer, a picture more than `LAYER_LATE` (50 ms) past its time on the clock is decoded but not copied or presented, so the layer jumps to the clock. The layer still shows a picture at least every `LAYER_GAP` (250 ms), so a decoder slower than the clip still moves. A fast seek's first picture and a seek's own landing are never dropped (no clock runs for them yet).
 - Files: `decoder.rs` (`late_for_layer`), test `a_decoder_that_fell_behind_on_the_layer_jumps_to_the_clock_instead_of_playing_fast` in `qa/tests.rs` (it holds the decoder's lock for 1.2 s, then counts the pictures shown per 100 ms; it needs a Windows run, with and without the change).
 
+## 7. A seek storm no longer starves the decoder of textures
+
+Upstream: no issue filed yet.
+
+- Problem: a texture of the ring is free again only when Rune's draw of its picture signals the release fence. A picture that is thrown away without a draw never does. During a burst of seeks the decoder is a few seeks behind the window, so the window threw away every picture it decoded as stale. After six of them (the ring's size) no texture was free, no draw came to release one, and the decoder waited for ever for the picture of the last seek until the 2 s restart.
+- Change: the window hands the textures of pictures it drops as stale to the decoder (`Inbox::unread`, `Inbox::drop_stale`), which frees them at once, and the decoder does the same for the queue a seek flushes. A slot is freed only if it still holds that picture (`Ring::unread` takes the fence value it was written with). The layer path already freed its dropped pictures this way.
+- Files: `decoder.rs`, `gpu.rs`, `mod.rs`. Tests: `a_storm_of_seeks_while_playing_plays_on_from_the_last` and `a_scrub_shows_keyframes_then_plays_on_from_where_it_stops` in `qa/tests.rs` (both failed before, with the log showing `decoder waits: ... texture false` after the first seeks). The scrub test now names the fixture's keyframe spacing (every 32 pictures), and a PC without ffmpeg skips the long-seek test.
+
 ## Known gaps
 
 - A clip with sound that nobody draws (window minimised, scrolled away) keeps its sound and clock running while its decoder waits with a full picture queue. Drawn again, the pictures stall and the clock goes back to the newest picture, so some sound plays twice. Upstream behaves the same; seeking the decoder to the clock would fix it.

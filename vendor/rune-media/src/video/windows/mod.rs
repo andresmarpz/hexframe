@@ -479,8 +479,8 @@ impl Native {
         }
         let picked = {
             let mut inbox = pipe.lock();
-            while inbox.frames.front().is_some_and(|f| f.generation != generation) {
-                inbox.frames.pop_front();
+            if inbox.drop_stale(generation) {
+                pipe.poke();
             }
             match self.phase {
                 Phase::Buffering { .. } => inbox.frames.pop_front(),
@@ -516,8 +516,8 @@ impl Native {
         let frame = self.facts.map_or(1.0 / 30.0, |f| f.meta.frame);
         let held = {
             let mut inbox = pipe.lock();
-            while inbox.frames.front().is_some_and(|f| f.generation != generation) {
-                inbox.frames.pop_front();
+            if inbox.drop_stale(generation) {
+                pipe.poke();
             }
             let mut held = None;
             while inbox.frames.front().is_some_and(|f| f.pts <= at) {

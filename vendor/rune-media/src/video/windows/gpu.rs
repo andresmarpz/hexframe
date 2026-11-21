@@ -205,8 +205,8 @@ impl Ring {
 
     /// A picture that never reached Rune (its layer showed it instead): its slot is free once the
     /// last reference goes, with no read of Rune's to wait for.
-    pub(super) fn unread(&mut self, planes: &Arc<DecodedPlanes>) {
-        if let Some(slot) = self.slots.iter_mut().find(|s| Arc::ptr_eq(&s.planes, planes)) {
+    pub(super) fn unread(&mut self, planes: &Arc<DecodedPlanes>, value: u64) {
+        if let Some(slot) = self.slots.iter_mut().find(|s| Arc::ptr_eq(&s.planes, planes) && s.value == value) {
             slot.value = 0;
         }
     }

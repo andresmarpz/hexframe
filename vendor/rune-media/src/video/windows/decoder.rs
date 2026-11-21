@@ -57,6 +57,9 @@ pub(super) struct Inbox {
     pub touched: Option<Instant>,
     pub news: Vec<News>,
     pub frames: VecDeque<Decoded>,
+    /// Pictures the window threw away undrawn (a seek made them stale): the decoder frees their
+    /// textures, since no read of Rune's will.
+    pub unread: Vec<(Arc<DecodedPlanes>, u64)>,
     /// The generation whose last picture is in the queue: the clip ended there.
     pub ended: Option<u32>,
     /// The window shows the clip on its own layer at this size (device pixels): while the clock
@@ -120,6 +123,21 @@ pub(super) enum Pic {
 pub(super) struct Pipe {
     inbox: Mutex<Inbox>,
     wake: Condvar,
+}
+
+impl Inbox {
+    /// Drops the pictures at the front of the queue that belong to another generation, handing
+    /// their textures to the decoder; whether any went.
+    pub(super) fn drop_stale(&mut self, generation: u32) -> bool {
+        let mut dropped = false;
+        while self.frames.front().is_some_and(|f| f.generation != generation) {
+            if let Some(Decoded { picture: Pic::Gpu(planes, value), .. }) = self.frames.pop_front() {
+                self.unread.push((planes, value));
+            }
+            dropped = true;
+        }
+        dropped
+    }
 }
 
 impl Pipe {
@@ -382,6 +400,14 @@ impl Decoder {
                     if s.stop {
                         return Ok(());
                     }
+                    if !s.unread.is_empty() {
+                        let unread = std::mem::take(&mut s.unread);
+                        if let Some(ring) = &mut self.ring {
+                            for (planes, value) in &unread {
+                                ring.unread(planes, *value);
+                            }
+                        }
+                    }
                     if let Some(seek) = s.seek.take() {
                         // The clip's end is its last picture's time, not the next loop's start.
                         let meta = self.facts.meta;
@@ -396,8 +422,8 @@ impl Decoder {
                         // nothing would ever signal the release fence and the next copy waits for ever.
                         if let Some(ring) = &mut self.ring {
                             for picture in &stale {
-                                if let Pic::Gpu(planes, _) = &picture.picture {
-                                    ring.unread(planes);
+                                if let Pic::Gpu(planes, value) = &picture.picture {
+                                    ring.unread(planes, *value);
                                 }
                             }
                         }
@@ -524,8 +550,8 @@ impl Decoder {
                             // others' textures are free at once (Rune never read them). Presenting
                             // counts as being drawn, so the decoder doesn't park.
                             while s.frames.len() > 1 {
-                                if let Some(Decoded { picture: Pic::Gpu(planes, _), .. }) = s.frames.pop_front() {
-                                    unread.push(planes);
+                                if let Some(Decoded { picture: Pic::Gpu(planes, value), .. }) = s.frames.pop_front() {
+                                    unread.push((planes, value));
                                 }
                             }
                             s.touched = Some(Instant::now());
@@ -533,8 +559,8 @@ impl Decoder {
                         }
                         drop(s);
                         if let Some(ring) = &mut self.ring {
-                            for planes in &unread {
-                                ring.unread(planes);
+                            for (planes, value) in &unread {
+                                ring.unread(planes, *value);
                             }
                         }
                         drop(unread);
