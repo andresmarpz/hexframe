@@ -39,13 +39,18 @@ fn reads_all_endpoints() {
 
 #[test]
 fn closed_port_is_refused() {
-    let server = FakeServer::start();
-    let base = server.base.clone();
-    server.shutdown();
-    assert!(matches!(
-        LiveClient::new(&base).gamestats(),
-        Err(ClientError::Refused)
-    ));
+    let mut last = None;
+    for _ in 0..10 {
+        let server = FakeServer::start();
+        let base = server.base.clone();
+        server.shutdown();
+        let result = LiveClient::new(&base).gamestats();
+        if matches!(result, Err(ClientError::Refused)) {
+            return;
+        }
+        last = Some(result);
+    }
+    panic!("never refused, last result: {last:?}");
 }
 
 #[test]

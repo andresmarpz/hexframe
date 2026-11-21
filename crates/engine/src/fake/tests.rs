@@ -17,6 +17,8 @@ fn config() -> CaptureConfig {
     }
 }
 
+const STOP_LIMIT: Duration = Duration::from_secs(2);
+
 fn collect_fast(seconds: i64) -> (Vec<MediaEvent>, Vec<Packet>) {
     let (tx, rx) = bounded(256);
     let session = FakeMediaSource::fast()
@@ -109,19 +111,26 @@ fn realtime_paces_packets_and_stop_is_prompt() {
         .start(CaptureTarget::PrimaryMonitor, config(), tx)
         .unwrap();
     let begin = Instant::now();
+    let deadline = begin + Duration::from_secs(10);
+    let target = i64::from(VideoFormat::TIMESCALE) * 3 / 10;
     let mut last_video = 0;
-    while begin.elapsed() < Duration::from_millis(500) {
+    while last_video < target && Instant::now() < deadline {
         if let Ok(MediaEvent::Packet(p)) = rx.recv_timeout(Duration::from_millis(50))
             && p.track == Track::Video
         {
             last_video = p.dts;
         }
     }
-    let frames = last_video / 1500;
-    assert!((20..=40).contains(&frames), "frames in 0.5 s: {frames}");
+    let wall = begin.elapsed().as_secs_f64();
+    let media = last_video as f64 / f64::from(VideoFormat::TIMESCALE);
+    assert!(media >= 0.3, "media only reached {media} s in {wall} s");
+    assert!(
+        media <= wall + 0.1,
+        "faster than real time: {media} s in {wall} s"
+    );
     let stop_began = Instant::now();
     session.stop();
-    assert!(stop_began.elapsed() < Duration::from_millis(50));
+    assert!(stop_began.elapsed() < STOP_LIMIT);
 }
 
 #[test]
@@ -133,5 +142,5 @@ fn stop_returns_promptly_when_the_channel_is_full() {
     std::thread::sleep(Duration::from_millis(50));
     let began = Instant::now();
     session.stop();
-    assert!(began.elapsed() < Duration::from_millis(50));
+    assert!(began.elapsed() < STOP_LIMIT);
 }

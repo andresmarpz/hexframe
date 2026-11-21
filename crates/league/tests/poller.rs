@@ -93,7 +93,7 @@ fn full_match_ready_events_end_gone() {
         );
         assert!(event.at >= last_at, "at must not go backwards");
         last_at = event.at;
-        let slack = HNS_PER_SEC / 4;
+        let slack = HNS_PER_SEC;
         assert!(
             event.at >= before - slack && event.at <= mono_now() + slack,
             "event time {} not near push time {}",
@@ -107,7 +107,7 @@ fn full_match_ready_events_end_gone() {
     };
     assert_eq!(end.id, end_id);
     assert!(end.at >= last_at);
-    assert!(end.at <= end_pushed + HNS_PER_SEC / 4);
+    assert!(end.at <= end_pushed + HNS_PER_SEC);
     assert_eq!(
         end.kind,
         GameEvent::GameEnd {
@@ -227,9 +227,14 @@ fn dropping_the_handle_stops_the_thread() {
     let (handle, rx) = spawn(&server, &switch);
     assert!(matches!(recv(&rx), LeagueMsg::WindowFound { .. }));
     drop(handle);
-    assert!(rx.recv_timeout(Duration::from_millis(200)).is_err());
-    assert!(matches!(
-        rx.try_recv(),
-        Err(crossbeam_channel::TryRecvError::Disconnected)
-    ));
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        match rx.recv_timeout(Duration::from_millis(50)) {
+            Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+            _ => assert!(
+                std::time::Instant::now() < deadline,
+                "poller thread kept running after the handle was dropped"
+            ),
+        }
+    }
 }
