@@ -1,10 +1,10 @@
 use std::f32::consts::PI;
 
-use rune::{Color, El, Tx, col, el, row, text};
+use rune::{Color, El, Tx, col, el, row};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit};
 
-use super::{icons, timeline, video_frame};
-use crate::ui::{ReviewState, Ui, format_clock};
+use super::{clock_text, icons, play_button, timeline, video_frame};
+use crate::ui::{ReviewState, Ui};
 
 const BAR_PAD_X: f32 = 24.0;
 const BAR_PAD_TOP: f32 = 64.0;
@@ -41,22 +41,7 @@ pub(crate) fn screen(review: &ReviewState) -> El {
 }
 
 fn bar(review: &ReviewState, k: &Kit) -> El {
-    let play = if review.is_playing() {
-        IconButton::new(&icons::PAUSE).label("Pause").help("Pause")
-    } else {
-        IconButton::new(&icons::PLAY).label("Play").help("Play")
-    };
-    let play = play
-        .variant(IconButtonVariant::Ghost)
-        .control_size(ControlSize::Large)
-        .shortcut("Space")
-        .on_press(|ui: &mut Ui| {
-            if let Some(review) = &ui.review {
-                review.toggle();
-            }
-        })
-        .build(k)
-        .key("review-play");
+    let play = play_button(review, k, IconButtonVariant::Ghost);
     let exit = IconButton::new(&icons::SHRINK)
         .label("Exit theater")
         .help("Exit theater")
@@ -66,11 +51,6 @@ fn bar(review: &ReviewState, k: &Kit) -> El {
         .on_press_tx(|ui: &mut Ui, tx: &mut Tx| ui.set_theater(false, tx))
         .build(k)
         .key("theater-exit");
-    let clock = format!(
-        "{} / {}",
-        format_clock(review.time() as u32),
-        format_clock(review.duration() as u32)
-    );
     let scrim = [
         (0.0, Color::BLACK.alpha(0.0)),
         (0.6, Color::BLACK.alpha(SCRIM_ALPHA * 0.6)),
@@ -89,12 +69,7 @@ fn bar(review: &ReviewState, k: &Kit) -> El {
                 .gap(12.0)
                 .center_y()
                 .child(play)
-                .child(
-                    text(clock)
-                        .key("review-clock")
-                        .font(k.ty.body)
-                        .color(k.c.text_base),
-                )
+                .child(clock_text(review, k, k.c.text_base))
                 .child(timeline::timeline(review, k))
                 .child(exit),
         )

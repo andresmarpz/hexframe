@@ -405,3 +405,161 @@ fn changing_quality_updates_the_size_estimate() {
     assert_eq!(rt.state.settings.quality, Quality::Max);
     assert_ne!(size_estimate_text(&rt), before);
 }
+
+fn rect(rt: &Runtime<Ui>, key: &str) -> [f32; 4] {
+    rt.presented(key)
+        .unwrap_or_else(|| panic!("no presented {key}"))
+        .0
+}
+
+fn refresh(rt: &mut Runtime<Ui>) {
+    rt.update(|_, _| {});
+    rt.frame(1.0 / 60.0);
+}
+
+fn play_button_rects(rt: &mut Runtime<Ui>) -> ([f32; 4], [f32; 4]) {
+    fake_player::set_playing(false);
+    refresh(rt);
+    let paused = rect(rt, "review-play");
+    fake_player::set_playing(true);
+    refresh(rt);
+    let playing = rect(rt, "review-play");
+    fake_player::set_playing(false);
+    (paused, playing)
+}
+
+#[test]
+fn the_play_button_keeps_its_size_while_playing_and_paused() {
+    let mut rt = review_runtime();
+    let (paused, playing) = play_button_rects(&mut rt);
+    assert_eq!(paused, playing);
+    assert_eq!(paused[2], paused[3], "square");
+}
+
+#[test]
+fn the_theater_play_button_keeps_its_size_while_playing_and_paused() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "f");
+    let (paused, playing) = play_button_rects(&mut rt);
+    assert_eq!(paused, playing);
+    assert_eq!(paused[2], paused[3], "square");
+}
+
+fn clock_width_at(rt: &mut Runtime<Ui>, secs: f64) -> f32 {
+    fake_player::set_time(secs);
+    refresh(rt);
+    rect(rt, "review-clock")[2]
+}
+
+#[test]
+fn the_time_readout_keeps_its_width_as_the_digits_change() {
+    let mut rt = review_runtime();
+    let zero = clock_width_at(&mut rt, 0.0);
+    assert_eq!(zero, clock_width_at(&mut rt, 1.0));
+    assert_eq!(zero, clock_width_at(&mut rt, 7.0));
+    assert_eq!(zero, clock_width_at(&mut rt, 71.0));
+    fake_player::set_time(0.0);
+}
+
+#[test]
+fn the_theater_time_readout_keeps_its_width_as_the_digits_change() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "f");
+    let zero = clock_width_at(&mut rt, 0.0);
+    assert_eq!(zero, clock_width_at(&mut rt, 1.0));
+    assert_eq!(zero, clock_width_at(&mut rt, 8.0));
+    assert_eq!(zero, clock_width_at(&mut rt, 71.0));
+    fake_player::set_time(0.0);
+}
+
+fn hover(rt: &mut Runtime<Ui>, key: &str) {
+    rt.frame(0.5);
+    rt.frame(0.5);
+    let (x, y) = rt.find(key).unwrap_or_else(|| panic!("no element {key}"));
+    rt.pointer_move(x, y);
+    rt.frame(0.0);
+}
+
+fn hover_away(rt: &mut Runtime<Ui>) {
+    rt.pointer_move(2.0, 2.0);
+    rt.frame(0.0);
+}
+
+fn card_text(rt: &Runtime<Ui>) -> String {
+    rt.accessibility_tree()
+        .nodes
+        .iter()
+        .flat_map(|(_, node)| [node.label(), node.value()])
+        .flatten()
+        .map(str::to_owned)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn hovering_a_marker_shows_the_event_card_after_a_delay_and_leaving_hides_it() {
+    let mut rt = review_runtime();
+    assert!(rt.find("event-card").is_none());
+    hover(&mut rt, "marker-5");
+    rt.frame(0.1);
+    assert!(rt.find("event-card").is_none(), "not before 150 ms");
+    rt.frame(0.1);
+    assert!(rt.find("event-card").is_some());
+    let text = card_text(&rt);
+    for expected in ["Lee Sin", "killed", "You"] {
+        assert!(text.contains(expected), "{expected} missing in {text}");
+    }
+    let card = rect(&rt, "event-card");
+    let marker = rect(&rt, "marker-5");
+    assert!(
+        card[1] + card[3] <= marker[1] + 1.0,
+        "card sits above its marker"
+    );
+    hover_away(&mut rt);
+    rt.frame(0.5);
+    assert!(rt.find("event-card").is_none());
+}
+
+#[test]
+fn hovering_a_turret_marker_decodes_the_structure() {
+    let mut rt = review_runtime();
+    hover(&mut rt, "marker-4");
+    rt.frame(0.2);
+    assert!(card_text(&rt).contains("Red mid"), "{}", card_text(&rt));
+}
+
+#[test]
+fn hovering_an_event_row_shows_the_card_beside_the_panel() {
+    let mut rt = review_runtime();
+    hover(&mut rt, "event-8");
+    rt.frame(0.2);
+    assert!(rt.find("event-card").is_some());
+    let card = rect(&rt, "event-card");
+    let row = rect(&rt, "event-8");
+    assert!(
+        card[0] + card[2] <= row[0] + 1.0,
+        "card sits left of the row"
+    );
+    hover_away(&mut rt);
+    rt.frame(0.5);
+    assert!(rt.find("event-card").is_none());
+}
+
+#[test]
+fn a_passing_pointer_shows_no_card() {
+    let mut rt = review_runtime();
+    hover(&mut rt, "marker-5");
+    rt.frame(0.05);
+    hover_away(&mut rt);
+    rt.frame(0.5);
+    assert!(rt.find("event-card").is_none());
+}
+
+#[test]
+fn the_event_card_also_shows_in_theater() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "f");
+    hover(&mut rt, "marker-8");
+    rt.frame(0.2);
+    assert!(rt.find("event-card").is_some());
+}

@@ -8,6 +8,7 @@ use greyscreen_engine::{
 };
 use rune::{TextEdit, Tx};
 
+pub(crate) mod event_detail;
 mod format;
 mod jump;
 mod keys;

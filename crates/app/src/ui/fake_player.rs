@@ -16,6 +16,11 @@ pub(crate) enum Call {
 thread_local! {
     static CALLS: RefCell<Vec<Call>> = const { RefCell::new(Vec::new()) };
     static TIME: Cell<f64> = const { Cell::new(0.0) };
+    static PLAYING: Cell<bool> = const { Cell::new(false) };
+}
+
+pub(crate) fn set_playing(playing: bool) {
+    PLAYING.set(playing);
 }
 
 pub(crate) fn set_time(secs: f64) {
@@ -64,7 +69,11 @@ impl ReviewPlayer for FakePlayer {
     }
 
     fn state(&self) -> PlayerState {
-        PlayerState::Ready
+        if PLAYING.get() {
+            PlayerState::Playing
+        } else {
+            PlayerState::Ready
+        }
     }
 
     fn show(&self, frame: El) -> El {

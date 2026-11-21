@@ -1,3 +1,4 @@
+mod card;
 mod icons;
 mod panel;
 mod theater;
@@ -7,7 +8,7 @@ mod timeline;
 mod tests;
 
 use greyscreen_core::game::GameResult;
-use rune::{Color, El, PlayerState, Tx, col, el, row, text};
+use rune::{Color, El, PlayerState, TextStyle, Tx, col, el, row, text};
 use rune_kit::{
     Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
 };
@@ -18,7 +19,49 @@ use crate::ui::{ReviewState, Screen, Ui, format_clock, format_date};
 const VIDEO_RATIO: f32 = 16.0 / 9.0;
 const NO_VIDEO: &str = "No video for this game";
 
+pub(super) use card::hover_card;
 pub(super) use theater::screen as theater;
+
+pub(super) fn tabular(style: TextStyle) -> TextStyle {
+    if style.features.is_empty() {
+        style.features("'tnum' 1")
+    } else {
+        style
+    }
+}
+
+fn play_button(review: &ReviewState, k: &Kit, variant: IconButtonVariant) -> El {
+    let (icon, name) = if review.is_playing() {
+        (&icons::PAUSE, "Pause")
+    } else {
+        (&icons::PLAY, "Play")
+    };
+    IconButton::new(icon)
+        .label(name)
+        .help(name)
+        .shortcut("Space")
+        .variant(variant)
+        .control_size(ControlSize::Large)
+        .on_press(|ui: &mut Ui| {
+            if let Some(review) = &ui.review {
+                review.toggle();
+            }
+        })
+        .build(k)
+        .key("review-play")
+}
+
+fn clock_text(review: &ReviewState, k: &Kit, color: Color) -> El {
+    let clock = format!(
+        "{} / {}",
+        format_clock(review.time() as u32),
+        format_clock(review.duration() as u32)
+    );
+    text(clock)
+        .key("review-clock")
+        .font(tabular(k.ty.body))
+        .color(color)
+}
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
     match &s.review {
@@ -126,17 +169,7 @@ fn video_frame(review: &ReviewState, k: &Kit, frame: El) -> El {
 }
 
 fn controls(review: &ReviewState, k: &Kit) -> El {
-    let label = if review.is_playing() { "Pause" } else { "Play" };
-    let play = Button::new(label)
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Regular)
-        .on_press(|ui: &mut Ui| {
-            if let Some(review) = &ui.review {
-                review.toggle();
-            }
-        })
-        .build(k)
-        .key("review-play");
+    let play = play_button(review, k, IconButtonVariant::Neutral);
     let theater = IconButton::new(&icons::EXPAND)
         .label("Theater")
         .help("Theater")
@@ -146,11 +179,6 @@ fn controls(review: &ReviewState, k: &Kit) -> El {
         .on_press_tx(|ui: &mut Ui, tx: &mut Tx| ui.set_theater(true, tx))
         .build(k)
         .key("review-theater");
-    let clock = format!(
-        "{} / {}",
-        format_clock(review.time() as u32),
-        format_clock(review.duration() as u32)
-    );
     row()
         .key("review-controls")
         .w_full()
@@ -158,11 +186,6 @@ fn controls(review: &ReviewState, k: &Kit) -> El {
         .center_y()
         .child(play)
         .child(theater)
-        .child(
-            text(clock)
-                .key("review-clock")
-                .font(k.ty.body)
-                .color(k.c.text_muted),
-        )
+        .child(clock_text(review, k, k.c.text_muted))
         .child(timeline::timeline(review, k))
 }

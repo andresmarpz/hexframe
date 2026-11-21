@@ -4,6 +4,8 @@ use greyscreen_core::library::{ClipEntry, EventEntry};
 use rune::{El, GrowthSpec, ScrollSpec, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
+use super::card::hoverable;
+use super::tabular;
 use super::timeline::{category, color};
 use crate::ui::{ReviewState, Source, Ui, format_clock, seek_target};
 use crate::view::{card, hairline};
@@ -53,8 +55,9 @@ fn event_row(event: &EventEntry, k: &Kit) -> El {
         .size(8.0, 8.0)
         .radius(4.0)
         .fill(color(k, category(&event.highlights)));
+    let key = format!("event-{}", event.id);
     let line = row()
-        .key(format!("event-{}", event.id))
+        .key(key.clone())
         .w_full()
         .h(ROW_HEIGHT)
         .px(12.0)
@@ -64,7 +67,7 @@ fn event_row(event: &EventEntry, k: &Kit) -> El {
         .child(dot)
         .child(
             text(format_clock(event.rec_secs as u32))
-                .font(k.ty.small)
+                .font(tabular(k.ty.small))
                 .color(k.c.text_muted),
         )
         .child(
@@ -75,7 +78,7 @@ fn event_row(event: &EventEntry, k: &Kit) -> El {
                     .truncate(),
             ),
         );
-    k.interactive(line)
+    k.interactive(hoverable(line, event.id, key))
 }
 
 fn events_list(review: &ReviewState, k: &Kit) -> El {
@@ -133,7 +136,7 @@ fn clip_row(index: usize, clip: &ClipEntry, active: bool, k: &Kit) -> El {
                 format_clock(clip.start_secs as u32),
                 format_clock(clip.end_secs as u32)
             ))
-            .font(k.ty.small)
+            .font(tabular(k.ty.small))
             .color(k.c.text_muted),
         );
     k.interactive(line)

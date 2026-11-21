@@ -2,7 +2,7 @@ use greyscreen_core::library::EventEntry;
 use rune::{Color, Drag, El, Phase, el};
 use rune_kit::Kit;
 
-use super::panel::event_label;
+use super::card::hoverable;
 use crate::ui::{ReviewState, Source, Ui, seek_target};
 
 const HEIGHT: f32 = 28.0;
@@ -64,13 +64,15 @@ fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
     let x = marker_x(event.rec_secs, review.duration(), review.track_width) - MARKER_WIDTH / 2.0;
     let x = x.clamp(0.0, (review.track_width - MARKER_WIDTH).max(0.0));
     let rec_secs = event.rec_secs;
-    el().key(format!("marker-{}", event.id))
+    let key = format!("marker-{}", event.id);
+    let marker = el()
+        .key(key.clone())
         .size(MARKER_WIDTH, MARKER_HEIGHT)
         .absolute(x, (HEIGHT - MARKER_HEIGHT) / 2.0)
         .radius(2.0)
         .fill(color(k, category(&event.highlights)))
-        .help(event_label(event))
-        .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)))
+        .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)));
+    hoverable(marker, event.id, key)
 }
 
 pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {

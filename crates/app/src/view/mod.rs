@@ -22,6 +22,9 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
         Some(review) => review::theater(review),
         None => window(s, &k, &mut layer),
     };
+    if let Some(card) = review::hover_card(s, &k) {
+        layer.push(card);
+    }
     if let Some((notice, _)) = &s.notice {
         layer.push(toast(notice, &k));
     }

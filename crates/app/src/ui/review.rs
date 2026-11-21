@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::path::Path;
 
+use greyscreen_core::library::EventEntry;
 use greyscreen_engine::RecordingEntry;
 use rune::{El, Player, PlayerState, SurfaceFit};
 
@@ -58,6 +59,13 @@ pub(crate) enum Source {
     Clip(usize),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EventHover {
+    pub event_id: u32,
+    pub anchor: String,
+    pub theater: bool,
+}
+
 #[derive(Debug)]
 pub(crate) struct ReviewState {
     pub entry: RecordingEntry,
@@ -70,6 +78,7 @@ pub(crate) struct ReviewState {
     pub theater: bool,
     pub controls_visible: bool,
     pub last_move: f64,
+    pub hovered: Option<EventHover>,
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
@@ -92,6 +101,7 @@ impl ReviewState {
             theater: false,
             controls_visible: true,
             last_move: 0.0,
+            hovered: None,
         }
     }
 
@@ -104,6 +114,7 @@ impl ReviewState {
         let idle = clock - self.last_move >= CONTROLS_HIDE_SECS;
         if self.theater && self.controls_visible && self.is_playing() && idle {
             self.controls_visible = false;
+            self.hovered = None;
             return true;
         }
         false
@@ -176,6 +187,37 @@ impl ReviewState {
         self.shown_state = None;
         self.shown_time = 0.0;
         self.settling = false;
+        self.hovered = None;
+    }
+
+    pub(crate) fn hover_event(&mut self, event_id: u32, anchor: &str, inside: bool) {
+        if inside {
+            self.hovered = Some(EventHover {
+                event_id,
+                anchor: anchor.to_owned(),
+                theater: self.theater,
+            });
+        } else if self
+            .hovered
+            .as_ref()
+            .is_some_and(|h| h.event_id == event_id && h.anchor == anchor)
+        {
+            self.hovered = None;
+        }
+    }
+
+    pub(crate) fn hovered_event(&self) -> Option<(&EventEntry, &str)> {
+        let hover = self
+            .hovered
+            .as_ref()
+            .filter(|h| h.theater == self.theater)?;
+        let event = self
+            .entry
+            .meta
+            .events
+            .iter()
+            .find(|e| e.id == hover.event_id)?;
+        Some((event, hover.anchor.as_str()))
     }
 
     pub(crate) fn needs_ticks(&mut self) -> bool {
