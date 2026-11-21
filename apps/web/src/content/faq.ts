@@ -38,7 +38,7 @@ export const faqGroups: FaqGroup[] = [
         id: "fps",
         q: "Does it cost FPS?",
         a: [
-          "Greyscreen encodes video on your graphics card's hardware H.264 encoder, not on the CPU, so the cost should be small. We have not measured it on many PCs yet, so we cannot give you a number.",
+          "Greyscreen encodes video on your graphics card's hardware H.264 encoder, not on the CPU, so the cost should be small. If your GPU has no working encoder, it falls back to Windows' software encoder, which uses more CPU. We have not measured it on many PCs yet, so we cannot give you a number.",
           "If your FPS drops, lower the quality or the frame rate in Settings > Recording (for example Balanced at 30 fps). After a game, the Recording health button in the review toolbar shows dropped frames and sound gaps. If it looks bad, tell us with Send feedback and name your GPU.",
         ],
       },
@@ -125,7 +125,7 @@ export const faqGroups: FaqGroup[] = [
         id: "no-encoder",
         q: "No video encoder found",
         a: [
-          "Greyscreen needs a GPU with hardware H.264 encoding. Update your graphics driver and check that the GPU is enabled in Device Manager. Virtual machines and remote desktop sessions usually have no hardware encoder.",
+          "Greyscreen tries your GPU's hardware H.264 encoder first and then Windows' software encoder. If neither works, update your graphics driver, check that the GPU is enabled in Device Manager, and make sure Windows has its Media Feature Pack (N editions of Windows ship without it). Virtual machines and remote desktop sessions usually have no hardware encoder.",
           "To see what Greyscreen finds, run greyscreen-cli doctor (greyscreen-cli.exe is on the Download page) and send the output with Send feedback.",
         ],
       },

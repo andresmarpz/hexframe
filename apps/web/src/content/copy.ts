@@ -171,7 +171,7 @@ export const download = {
   requirementsTitle: "Requirements",
   requirements: [
     "Windows 10 (version 2004 or newer) or Windows 11, 64-bit",
-    "A GPU with hardware H.264 encoding. Most NVIDIA, AMD and Intel GPUs from the last several years have one. Tested mostly on NVIDIA so far.",
+    "A GPU with hardware H.264 encoding is recommended. Most NVIDIA, AMD and Intel GPUs from the last several years have one. Without it, Greyscreen falls back to Windows' software encoder at up to 1080p 30 fps, which uses more CPU. Tested mostly on NVIDIA so far.",
     "League of Legends set to Borderless or Windowed. Windows cannot capture exclusive Fullscreen.",
   ],
   smartScreenTitle: "Windows may warn you",
