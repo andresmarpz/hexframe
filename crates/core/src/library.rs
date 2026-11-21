@@ -6,6 +6,7 @@ use jiff::Zoned;
 use serde::{Deserialize, Serialize};
 
 use crate::game::{GameEvent, GameInfo, GameResult};
+use crate::review::ReviewData;
 
 pub const META_FILE: &str = "game.json";
 pub const META_VERSION: u32 = 1;
@@ -63,6 +64,8 @@ pub struct RecordingMeta {
     pub clips: Vec<ClipEntry>,
     pub encoder: String,
     pub video_format: VideoInfo,
+    #[serde(default, skip_serializing_if = "ReviewData::is_empty")]
+    pub review: ReviewData,
 }
 
 fn sanitize(text: &str, fallback: &str) -> String {
@@ -114,6 +117,12 @@ pub fn read_meta(dir: &Path) -> Result<RecordingMeta, LibraryError> {
         return Err(LibraryError::Version(meta.version));
     }
     Ok(meta)
+}
+
+pub fn write_review(dir: &Path, review: &ReviewData) -> Result<(), LibraryError> {
+    let mut meta = read_meta(dir)?;
+    meta.review = review.clone();
+    write_meta(dir, &meta)
 }
 
 pub fn scan(output_dir: &Path) -> Vec<RecordingMeta> {

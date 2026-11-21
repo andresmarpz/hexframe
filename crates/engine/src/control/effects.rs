@@ -254,6 +254,7 @@ impl Control {
                 height: started.video.height,
                 fps: started.video.fps,
             },
+            review: Default::default(),
         };
         let rate = started.audio.as_ref().map_or(48_000, |a| a.sample_rate);
         let mut recording = Recording {

@@ -57,6 +57,7 @@ fn meta(id: &str, started_at: Zoned) -> RecordingMeta {
             height: 1080,
             fps: 60,
         },
+        review: Default::default(),
     }
 }
 
@@ -156,4 +157,65 @@ fn scan_sorts_newest_first_and_skips_bad_entries() {
 fn scan_of_a_missing_directory_is_empty() {
     let root = tempfile::tempdir().unwrap();
     assert!(scan(&root.path().join("nope")).is_empty());
+}
+
+#[test]
+fn an_unreviewed_sidecar_has_no_review_section() {
+    let json = serde_json::to_value(meta("a", zoned(20, 19))).unwrap();
+    assert!(json.get("review").is_none());
+}
+
+#[test]
+fn a_sidecar_from_before_reviews_still_reads() {
+    let mut json = serde_json::to_value(meta("a", zoned(20, 19))).unwrap();
+    json.as_object_mut().unwrap().remove("review");
+    let read: RecordingMeta = serde_json::from_value(json).unwrap();
+    assert!(read.review.is_empty());
+}
+
+#[test]
+fn tags_and_notes_persist_in_the_sidecar() {
+    use crate::review::DeathTag;
+
+    let dir = tempfile::tempdir().unwrap();
+    let original = meta("a", zoned(20, 19));
+    write_meta(dir.path(), &original).unwrap();
+
+    let mut review = ReviewData::default();
+    review.toggle_tag(3, DeathTag::NoVision);
+    review.toggle_tag(3, DeathTag::Ganked);
+    review.set_note(3, "No ward in river");
+    write_review(dir.path(), &review).unwrap();
+
+    let read = read_meta(dir.path()).unwrap();
+    assert_eq!(read.review, review);
+    assert_eq!(read.events, original.events);
+    assert_eq!(read.clips, original.clips);
+
+    let raw: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(META_FILE)).unwrap()).unwrap();
+    assert_eq!(raw["review"]["deaths"][0]["event_id"], 3);
+    assert_eq!(raw["review"]["deaths"][0]["tags"][0], "no_vision");
+    assert_eq!(raw["review"]["deaths"][0]["note"], "No ward in river");
+}
+
+#[test]
+fn clearing_every_review_removes_the_section_again() {
+    let dir = tempfile::tempdir().unwrap();
+    write_meta(dir.path(), &meta("a", zoned(20, 19))).unwrap();
+    let mut review = ReviewData::default();
+    review.toggle_tag(3, crate::review::DeathTag::Ganked);
+    write_review(dir.path(), &review).unwrap();
+    review.toggle_tag(3, crate::review::DeathTag::Ganked);
+    write_review(dir.path(), &review).unwrap();
+    let raw: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(META_FILE)).unwrap()).unwrap();
+    assert!(raw.get("review").is_none());
+}
+
+#[test]
+fn write_review_fails_without_a_sidecar() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(write_review(dir.path(), &ReviewData::default()).is_err());
+    assert!(!dir.path().join(META_FILE).exists());
 }

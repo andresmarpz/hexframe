@@ -187,7 +187,7 @@ UI commands ──EngineCmd────┘          └─> UiMsg sink -> AppHan
 %LOCALAPPDATA%\Greyscreen\logs\greyscreen.log.YYYY-MM-DD
 ```
 
-The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 3339), `duration_secs`, `video` (relative path), `game` (`GameInfo` + `result`), `events` (`[{ id, game_secs, rec_secs, kind, highlights }]`), `clips` (`[{ file, start_secs, end_secs, label }]`), `encoder` (string), `video_format` (`width`, `height`, `fps`).
+The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 3339), `duration_secs`, `video` (relative path), `game` (`GameInfo` + `result`), `events` (`[{ id, game_secs, rec_secs, kind, highlights }]`), `clips` (`[{ file, start_secs, end_secs, label }]`), `encoder` (string), `video_format` (`width`, `height`, `fps`). It may also hold `review` (`{ deaths: [{ event_id, tags, note }] }`, tags in snake_case from `core::review::DeathTag`). `review` is left out while nothing is tagged or noted, and older sidecars without it still read.
 
 ## Settings (`core::settings`, serde with `#[serde(default)]`)
 

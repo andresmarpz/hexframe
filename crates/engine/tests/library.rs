@@ -89,6 +89,7 @@ fn leftover_part(output: &Path, name: &str, media: &Media, finish: bool) -> Path
             height: media.video.height,
             fps: media.video.fps,
         },
+        review: Default::default(),
     };
     library::write_meta(&folder, &meta).expect("sidecar");
     folder

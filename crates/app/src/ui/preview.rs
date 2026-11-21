@@ -182,6 +182,7 @@ fn entry(row: Row) -> RecordingEntry {
                 height: 1080,
                 fps: 60,
             },
+            review: Default::default(),
         },
     }
 }

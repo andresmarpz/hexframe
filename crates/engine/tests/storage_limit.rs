@@ -56,6 +56,7 @@ fn old_game(output: &Path, id: &str, day: u32, video_bytes: u64) {
             height: 1080,
             fps: 60,
         },
+        review: Default::default(),
     };
     library::write_meta(&folder, &meta).expect("meta");
     fs::write(folder.join("clips/01-00_Kill.mp4"), b"clip").expect("clip");
