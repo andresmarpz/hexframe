@@ -1,0 +1,224 @@
+{
+  "modes": [
+    {
+      "id": "CLASSIC",
+      "name": "Summoner's Rift",
+      "source": "riot"
+    },
+    {
+      "id": "ODIN",
+      "name": "Dominion",
+      "source": "riot"
+    },
+    {
+      "id": "ARAM",
+      "name": "ARAM",
+      "source": "riot"
+    },
+    {
+      "id": "TUTORIAL",
+      "name": "Tutorial",
+      "source": "riot"
+    },
+    {
+      "id": "URF",
+      "name": "URF",
+      "source": "riot"
+    },
+    {
+      "id": "DOOMBOTSTEEMO",
+      "name": "Doom Bots",
+      "source": "riot"
+    },
+    {
+      "id": "ONEFORALL",
+      "name": "One for All",
+      "source": "riot"
+    },
+    {
+      "id": "ASCENSION",
+      "name": "Ascension",
+      "source": "riot"
+    },
+    {
+      "id": "FIRSTBLOOD",
+      "name": "Snowdown Showdown",
+      "source": "riot"
+    },
+    {
+      "id": "KINGPORO",
+      "name": "Legend of the Poro King",
+      "source": "riot"
+    },
+    {
+      "id": "SIEGE",
+      "name": "Nexus Siege",
+      "source": "riot"
+    },
+    {
+      "id": "ASSASSINATE",
+      "name": "Blood Hunt",
+      "source": "riot"
+    },
+    {
+      "id": "ARSR",
+      "name": "All Random Summoner's Rift",
+      "source": "riot"
+    },
+    {
+      "id": "DARKSTAR",
+      "name": "Dark Star",
+      "source": "riot"
+    },
+    {
+      "id": "STARGUARDIAN",
+      "name": "Star Guardian",
+      "source": "riot"
+    },
+    {
+      "id": "PROJECT",
+      "name": "PROJECT: Hunters",
+      "source": "riot"
+    },
+    {
+      "id": "GAMEMODEX",
+      "name": "Nexus Blitz",
+      "source": "riot"
+    },
+    {
+      "id": "ODYSSEY",
+      "name": "Odyssey: Extraction",
+      "source": "riot"
+    },
+    {
+      "id": "NEXUSBLITZ",
+      "name": "Nexus Blitz",
+      "source": "riot"
+    },
+    {
+      "id": "ULTBOOK",
+      "name": "Ultimate Spellbook",
+      "source": "riot"
+    },
+    {
+      "id": "SWIFTPLAY",
+      "name": "Swiftplay",
+      "source": "riot"
+    },
+    {
+      "id": "BRAWL",
+      "name": "Brawl",
+      "source": "riot"
+    },
+    {
+      "id": "PRACTICETOOL",
+      "name": "Practice Tool",
+      "source": "community"
+    },
+    {
+      "id": "CHERRY",
+      "name": "Arena",
+      "source": "community"
+    },
+    {
+      "id": "KIWI",
+      "name": "ARAM Mayhem",
+      "source": "observed",
+      "note": "seen on map 12 in a 2026-11-21 recording; Riot's list has no entry"
+    }
+  ],
+  "maps": [
+    {
+      "id": 1,
+      "name": "Summoner's Rift",
+      "source": "riot"
+    },
+    {
+      "id": 2,
+      "name": "Summoner's Rift",
+      "source": "riot"
+    },
+    {
+      "id": 3,
+      "name": "The Proving Grounds",
+      "source": "riot"
+    },
+    {
+      "id": 4,
+      "name": "Twisted Treeline",
+      "source": "riot"
+    },
+    {
+      "id": 8,
+      "name": "The Crystal Scar",
+      "source": "riot"
+    },
+    {
+      "id": 10,
+      "name": "Twisted Treeline",
+      "source": "riot"
+    },
+    {
+      "id": 11,
+      "name": "Summoner's Rift",
+      "source": "riot"
+    },
+    {
+      "id": 12,
+      "name": "Howling Abyss",
+      "source": "riot",
+      "turret_tiers": {
+        "2": "inner",
+        "3": "outer",
+        "4": "nexus",
+        "5": "nexus"
+      },
+      "note": "turret tiers read from the kill order of one recording on 2026-11-21"
+    },
+    {
+      "id": 14,
+      "name": "Butcher's Bridge",
+      "source": "riot"
+    },
+    {
+      "id": 16,
+      "name": "Cosmic Ruins",
+      "source": "riot"
+    },
+    {
+      "id": 18,
+      "name": "Valoran City Park",
+      "source": "riot"
+    },
+    {
+      "id": 19,
+      "name": "Substructure 43",
+      "source": "riot"
+    },
+    {
+      "id": 20,
+      "name": "Crash Site",
+      "source": "riot"
+    },
+    {
+      "id": 21,
+      "name": "Nexus Blitz",
+      "source": "riot"
+    },
+    {
+      "id": 22,
+      "name": "Convergence",
+      "source": "riot"
+    },
+    {
+      "id": 30,
+      "name": "Rings of Wrath",
+      "source": "riot"
+    },
+    {
+      "id": 35,
+      "name": "The Bandlewood",
+      "source": "riot"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ use crossbeam_channel::{bounded, never};
 use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
 use greyscreen_core::encoder;
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
+use greyscreen_core::gamedata;
 use greyscreen_core::health::HealthTracker;
 use greyscreen_core::highlight::classify;
 use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
@@ -137,6 +138,7 @@ impl Control {
         };
         let rec_secs = recording.file_secs(event.at);
         let highlights = classify(&event.kind, &recording.meta.game.info);
+        gamedata::report_unmapped_event(&event.kind, &recording.meta.game.info);
         if rec_secs >= 0.0 {
             recording.meta.events.push(EventEntry {
                 id: event.id,
@@ -268,6 +270,7 @@ impl Control {
             .ok_or_else(|| "capture started without formats".to_owned())?;
         let started_at = Zoned::now();
         let info = game.unwrap_or_else(meta::manual_game);
+        gamedata::report_unmapped_game(&info);
         let folder = meta::create_folder(&self.settings.output_dir, started_at.clone(), &info)
             .map_err(|err| format!("{}: {err}", greyscreen_core::problem::FOLDER_UNUSABLE))?;
         let writer = self.spawn_writer(&folder, &started);

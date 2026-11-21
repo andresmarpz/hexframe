@@ -1,5 +1,5 @@
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Team, strip_tag};
-use greyscreen_core::highlight::structure_team;
+use greyscreen_core::gamedata::{is_structure_id, structure_label};
 use greyscreen_core::library::EventEntry;
 
 use crate::ui::format_clock;
@@ -22,8 +22,6 @@ pub(crate) struct Detail {
     pub time: String,
     pub lines: Vec<Line>,
 }
-
-const HOWLING_ABYSS: u32 = 12;
 
 fn strong(text: impl Into<String>) -> Span {
     Span::Strong(text.into())
@@ -59,8 +57,8 @@ fn person(info: &GameInfo, name: &str) -> Vec<Span> {
     if name.starts_with("Minion_") {
         return vec![strong("Minions")];
     }
-    if let Some(structure) = structure_name(name, info.map) {
-        return vec![strong(structure)];
+    if is_structure_id(name) {
+        return vec![strong(structure_label(name, info.map))];
     }
     vec![strong(name)]
 }
@@ -69,86 +67,6 @@ fn side(team: Team) -> &'static str {
     match team {
         Team::Order => "Blue",
         Team::Chaos => "Red",
-    }
-}
-
-fn lane(code: &str) -> Option<&'static str> {
-    match code {
-        "L" => Some("top"),
-        "C" => Some("mid"),
-        "R" => Some("bot"),
-        _ => None,
-    }
-}
-
-fn turret_tier(lane_code: &str, number: &str) -> Option<&'static str> {
-    let n: u8 = number.parse().ok()?;
-    match (lane_code, n) {
-        ("C", 5) | ("L" | "R", 3) => Some("outer turret"),
-        ("C", 4) | ("L" | "R", 2) => Some("inner turret"),
-        ("C", 3) | ("L" | "R", 1) => Some("inhibitor turret"),
-        ("C", 1 | 2) => Some("nexus turret"),
-        _ => None,
-    }
-}
-
-fn named_structure(parts: &[&str], team: Team, map: Option<u32>) -> Option<String> {
-    let [kind, _, _lane, position, ..] = parts else {
-        return None;
-    };
-    let position: u8 = position.strip_prefix('P')?.parse().ok()?;
-    let side = side(team);
-    match *kind {
-        "Inhib" => Some(format!("{side} inhibitor")),
-        "Turret" if map == Some(HOWLING_ABYSS) => match position {
-            3 => Some(format!("{side} outer turret")),
-            2 => Some(format!("{side} inner turret")),
-            4 | 5 => Some(format!("{side} nexus turret")),
-            _ => Some(format!("{side} turret")),
-        },
-        "Turret" => Some(format!("{side} turret")),
-        _ => None,
-    }
-}
-
-pub(crate) fn structure_name(id: &str, map: Option<u32>) -> Option<String> {
-    let team = structure_team(id)?;
-    let parts: Vec<&str> = id.split('_').collect();
-    match parts.as_slice() {
-        [_, team_part, ..]
-            if team_part.starts_with("TOrder") || team_part.starts_with("TChaos") =>
-        {
-            named_structure(&parts, team, map)
-        }
-        ["Turret", _, "C", number @ ("01" | "02"), ..] => {
-            turret_tier("C", number).map(|tier| format!("{} {tier}", side(team)))
-        }
-        ["Turret", _, lane_code, number, ..] => {
-            let place = lane(lane_code)?;
-            let tier = turret_tier(lane_code, number)?;
-            Some(format!("{} {place} {tier}", side(team)))
-        }
-        ["Barracks", _, code] => {
-            let place = lane(code.get(..1)?)?;
-            Some(format!("{} {place} inhibitor", side(team)))
-        }
-        _ => None,
-    }
-}
-
-fn structure_label(id: &str, info: &GameInfo) -> String {
-    structure_name(id, info.map).unwrap_or_else(|| generic_structure(id))
-}
-
-fn generic_structure(id: &str) -> String {
-    let kind = match id.split('_').next() {
-        Some("Turret") => "Turret",
-        Some("Inhib" | "Barracks") => "Inhibitor",
-        _ => "Structure",
-    };
-    match structure_team(id) {
-        Some(team) => format!("{} {}", side(team), kind.to_ascii_lowercase()),
-        None => kind.to_owned(),
     }
 }
 
@@ -222,7 +140,10 @@ fn structure_credit(
     info: &GameInfo,
 ) -> (Vec<Span>, Vec<Line>) {
     (
-        vec![strong(format!("{} destroyed", structure_label(id, info)))],
+        vec![strong(format!(
+            "{} destroyed",
+            structure_label(id, info.map)
+        ))],
         credit(info, "Killed by", killer, assisters),
     )
 }
@@ -271,14 +192,14 @@ pub(crate) fn describe(
         GameEvent::InhibRespawningSoon { inhib } => (
             vec![strong(format!(
                 "{} respawning soon",
-                structure_label(inhib, info)
+                structure_label(inhib, info.map)
             ))],
             Vec::new(),
         ),
         GameEvent::InhibRespawned { inhib } => (
             vec![strong(format!(
                 "{} respawned",
-                structure_label(inhib, info)
+                structure_label(inhib, info.map)
             ))],
             Vec::new(),
         ),

@@ -1,7 +1,7 @@
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
 use greyscreen_core::library::EventEntry;
 
-use super::{Detail, Span, describe, streak_kills, structure_name};
+use super::{Detail, Span, describe, streak_kills};
 
 fn player(name: &str, champion: &str, team: Team) -> Player {
     Player {
@@ -141,53 +141,7 @@ fn a_multikill_with_fewer_recorded_kills_lists_what_exists() {
 }
 
 #[test]
-fn live_client_structure_names_decode_to_side_lane_and_tier() {
-    let name = |id: &str| structure_name(id, Some(11));
-    assert_eq!(
-        name("Turret_T1_R_03_A").as_deref(),
-        Some("Blue bot outer turret")
-    );
-    assert_eq!(
-        name("Turret_T2_L_02_A").as_deref(),
-        Some("Red top inner turret")
-    );
-    assert_eq!(
-        name("Turret_T2_L_01_A").as_deref(),
-        Some("Red top inhibitor turret")
-    );
-    assert_eq!(
-        name("Turret_T1_C_05_A").as_deref(),
-        Some("Blue mid outer turret")
-    );
-    assert_eq!(
-        name("Turret_T1_C_04_A").as_deref(),
-        Some("Blue mid inner turret")
-    );
-    assert_eq!(
-        name("Turret_T2_C_03_A").as_deref(),
-        Some("Red mid inhibitor turret")
-    );
-    assert_eq!(
-        name("Turret_T2_C_01_A").as_deref(),
-        Some("Red nexus turret")
-    );
-    assert_eq!(name("Barracks_T2_L1").as_deref(), Some("Red top inhibitor"));
-    assert_eq!(
-        name("Barracks_T1_C1").as_deref(),
-        Some("Blue mid inhibitor")
-    );
-    assert_eq!(
-        name("Barracks_T1_R1").as_deref(),
-        Some("Blue bot inhibitor")
-    );
-}
-
-#[test]
-fn unknown_structure_names_stay_raw() {
-    assert_eq!(structure_name("Turret_T9_Q_03_A", Some(11)), None);
-    assert_eq!(structure_name("Turret_T1_Q_03_A", Some(11)), None);
-    assert_eq!(structure_name("Turret_T1_L_09_A", Some(11)), None);
-    assert_eq!(structure_name("Nexus_T1", Some(11)), None);
+fn unknown_structures_get_a_plain_label_not_the_raw_id() {
     let event = entry(
         1,
         5.0,
@@ -208,39 +162,6 @@ fn aram_info() -> GameInfo {
         map: Some(12),
         ..info()
     }
-}
-
-#[test]
-fn howling_abyss_structure_ids_decode_to_side_and_tier() {
-    let name = |id: &str| structure_name(id, Some(12));
-    assert_eq!(
-        name("Turret_TChaos_L1_P3_671196429_0").as_deref(),
-        Some("Red outer turret")
-    );
-    assert_eq!(
-        name("Turret_TChaos_L1_P2_620863572_0").as_deref(),
-        Some("Red inner turret")
-    );
-    assert_eq!(
-        name("Turret_TOrder_L1_P4_587308334_0").as_deref(),
-        Some("Blue nexus turret")
-    );
-    assert_eq!(
-        name("Turret_TChaos_L1_P5_637641191_0").as_deref(),
-        Some("Red nexus turret")
-    );
-    assert_eq!(
-        name("Inhib_TChaos_L1_P1_2432143522_0").as_deref(),
-        Some("Red inhibitor")
-    );
-}
-
-#[test]
-fn modern_structure_ids_on_other_maps_name_only_the_side() {
-    assert_eq!(
-        structure_name("Turret_TOrder_L1_P3_671196429_0", Some(11)).as_deref(),
-        Some("Blue turret")
-    );
 }
 
 #[test]

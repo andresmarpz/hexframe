@@ -1,4 +1,5 @@
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult};
+use greyscreen_core::gamedata::mode_name;
 use greyscreen_core::highlight::describe_label;
 use greyscreen_core::library::{ClipEntry, EventEntry};
 use greyscreen_core::review::deaths;
@@ -30,15 +31,7 @@ impl When {
 }
 
 pub(crate) fn mode_label(mode: &str) -> String {
-    match mode.to_ascii_uppercase().as_str() {
-        "CLASSIC" => "Summoner's Rift".into(),
-        "ARAM" => "ARAM".into(),
-        "KIWI" => "ARAM Mayhem".into(),
-        "PRACTICETOOL" => "Practice Tool".into(),
-        "CHERRY" => "Arena".into(),
-        "URF" => "URF".into(),
-        _ => title_case(mode),
-    }
+    mode_name(mode).map_or_else(|| title_case(mode), str::to_owned)
 }
 
 fn title_case(raw: &str) -> String {

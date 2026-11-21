@@ -56,7 +56,8 @@ fn modes_are_named_for_people() {
     assert_eq!(mode_label("PRACTICETOOL"), "Practice Tool");
     assert_eq!(mode_label("CHERRY"), "Arena");
     assert_eq!(mode_label("URF"), "URF");
-    assert_eq!(mode_label("ONEFORALL"), "Oneforall");
+    assert_eq!(mode_label("ONEFORALL"), "One for All");
+    assert_eq!(mode_label("SOME_NEW_MODE"), "Some New Mode");
     assert_eq!(mode_label("NEXUS_BLITZ"), "Nexus Blitz");
     assert_eq!(mode_label(""), "");
 }

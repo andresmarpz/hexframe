@@ -7,6 +7,7 @@ pub mod encoder;
 pub mod export;
 pub mod feedback;
 pub mod game;
+pub mod gamedata;
 pub mod health;
 pub mod highlight;
 pub mod install;
