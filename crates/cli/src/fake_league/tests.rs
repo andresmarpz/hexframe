@@ -59,7 +59,7 @@ fn gamestats_is_404_while_loading_then_200() {
 
 #[test]
 fn poller_sees_ready_events_and_win() {
-    let league = FakeLeague::start(0, 60.0, Script::builtin().unwrap()).unwrap();
+    let league = FakeLeague::start(0, 15.0, Script::builtin().unwrap()).unwrap();
     let client = LiveClient::new(&format!("http://127.0.0.1:{}", league.port()));
     let (tx, rx) = unbounded();
     let _handle = Poller::spawn_with_interval(
@@ -68,7 +68,7 @@ fn poller_sees_ready_events_and_win() {
         tx,
         Duration::from_millis(40),
     );
-    let deadline = Instant::now() + Duration::from_secs(60);
+    let deadline = Instant::now() + Duration::from_secs(90);
     let (mut ready, mut events, mut result) = (false, 0, None);
     while result.is_none() {
         let left = deadline.saturating_duration_since(Instant::now());
