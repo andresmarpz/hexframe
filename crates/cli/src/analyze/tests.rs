@@ -323,3 +323,33 @@ fn diagnostics_without_focus_info_report_no_focus_counts() {
     assert_eq!(diag.seconds_with_focus_info, 0);
     assert_eq!(diag.drop_seconds_in_background, 0);
 }
+
+#[test]
+fn diagnostics_summarize_gpu_load_and_drops_under_saturation() {
+    let diag = diag::summarize(
+        r#"{"type":"second","t":1.0,"dropped":0,"gpu_3d_pct":50.0,"gpu_3d_self_pct":2.0,"gpu_encode_pct":10.0}
+{"type":"second","t":2.0,"dropped":4,"gpu_3d_pct":99.0,"gpu_3d_self_pct":4.0,"gpu_encode_pct":30.0}
+{"type":"second","t":3.0,"dropped":1,"gpu_3d_pct":60.0,"gpu_3d_self_pct":0.0}
+{"type":"second","t":4.0,"dropped":2}
+"#,
+    );
+    let gpu = diag.gpu.expect("gpu");
+    assert_eq!(gpu.seconds, 3);
+    assert_eq!(gpu.busy_3d_avg, (50.0 + 99.0 + 60.0) / 3.0);
+    assert_eq!(gpu.busy_3d_peak, 99.0);
+    assert_eq!(gpu.seconds_3d_saturated, 1);
+    assert_eq!(gpu.own_3d_avg, 2.0);
+    assert_eq!(gpu.own_3d_peak, 4.0);
+    assert_eq!(gpu.encode_avg, Some(20.0));
+    assert_eq!(gpu.encode_peak, Some(30.0));
+    assert_eq!(gpu.drop_seconds, 2);
+    assert_eq!(gpu.drop_seconds_3d_saturated, 1);
+}
+
+#[test]
+fn diagnostics_without_gpu_fields_report_no_gpu() {
+    let diag = diag::summarize("{\"type\":\"second\",\"t\":1.0,\"dropped\":2}\n");
+    assert!(diag.gpu.is_none());
+    let json = serde_json::to_value(&diag).expect("json");
+    assert!(json.get("gpu").is_none());
+}

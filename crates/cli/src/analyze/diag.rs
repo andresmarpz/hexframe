@@ -26,6 +26,32 @@ pub(crate) struct DiagReport {
     pub drop_seconds_in_background: u64,
     pub drop_seconds_in_foreground: u64,
     pub bad_lines: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu: Option<GpuReport>,
+}
+
+const GPU_SATURATED_PCT: f64 = 95.0;
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct GpuReport {
+    pub seconds: u64,
+    pub busy_3d_avg: f64,
+    pub busy_3d_peak: f64,
+    pub seconds_3d_saturated: u64,
+    pub own_3d_avg: f64,
+    pub own_3d_peak: f64,
+    pub encode_avg: Option<f64>,
+    pub encode_peak: Option<f64>,
+    pub drop_seconds: u64,
+    pub drop_seconds_3d_saturated: u64,
+}
+
+#[derive(Default)]
+struct GpuSums {
+    busy: f64,
+    own: f64,
+    encode: f64,
+    encode_n: u64,
 }
 
 pub(crate) fn read(path: &Path) -> Option<DiagReport> {
@@ -56,7 +82,9 @@ pub(crate) fn summarize(text: &str) -> DiagReport {
         drop_seconds_in_background: 0,
         drop_seconds_in_foreground: 0,
         bad_lines: 0,
+        gpu: None,
     };
+    let mut gpu_sums = GpuSums::default();
     let mut cpu_sum = 0.0;
     let mut cpu_n = 0u32;
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
@@ -66,14 +94,48 @@ pub(crate) fn summarize(text: &str) -> DiagReport {
         };
         match value["type"].as_str() {
             Some("setup") => report.setup = Some(value),
-            Some("second") => add_second(&mut report, &value, &mut cpu_sum, &mut cpu_n),
+            Some("second") => {
+                add_second(&mut report, &value, &mut cpu_sum, &mut cpu_n);
+                add_gpu(&mut report, &value, &mut gpu_sums);
+            }
             _ => report.bad_lines += 1,
+        }
+    }
+    if let Some(gpu) = &mut report.gpu {
+        let seconds = gpu.seconds as f64;
+        gpu.busy_3d_avg = gpu_sums.busy / seconds;
+        gpu.own_3d_avg = gpu_sums.own / seconds;
+        if gpu_sums.encode_n > 0 {
+            gpu.encode_avg = Some(gpu_sums.encode / gpu_sums.encode_n as f64);
         }
     }
     if cpu_n > 0 {
         report.cpu_pct_avg = Some(cpu_sum / f64::from(cpu_n));
     }
     report
+}
+
+fn add_gpu(report: &mut DiagReport, line: &Value, sums: &mut GpuSums) {
+    let Some(busy) = line["gpu_3d_pct"].as_f64() else {
+        return;
+    };
+    let own = line["gpu_3d_self_pct"].as_f64().unwrap_or(0.0);
+    let dropped = line["dropped"].as_u64().unwrap_or(0) > 0;
+    let saturated = busy >= GPU_SATURATED_PCT;
+    let gpu = report.gpu.get_or_insert_with(GpuReport::default);
+    gpu.seconds += 1;
+    sums.busy += busy;
+    sums.own += own;
+    gpu.busy_3d_peak = gpu.busy_3d_peak.max(busy);
+    gpu.own_3d_peak = gpu.own_3d_peak.max(own);
+    gpu.seconds_3d_saturated += u64::from(saturated);
+    gpu.drop_seconds += u64::from(dropped);
+    gpu.drop_seconds_3d_saturated += u64::from(dropped && saturated);
+    if let Some(encode) = line["gpu_encode_pct"].as_f64() {
+        sums.encode += encode;
+        sums.encode_n += 1;
+        gpu.encode_peak = Some(gpu.encode_peak.unwrap_or(0.0).max(encode));
+    }
 }
 
 fn add_second(report: &mut DiagReport, line: &Value, cpu_sum: &mut f64, cpu_n: &mut u32) {

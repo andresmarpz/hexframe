@@ -11,6 +11,7 @@ use super::pick::{self, Stage};
 use super::video::Video;
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
+use crate::d3d::luid_u64;
 use crate::pacer::{Pacer, Stats};
 use crate::procstats::ProcessSampler;
 use crate::watchdog::Watchdog;
@@ -59,6 +60,7 @@ pub(crate) fn build(
     } else {
         None
     };
+    let adapter_luid = luid_u64(gpu.adapter_luid);
     let t0 = mono_now();
     if let Some(audio) = &audio {
         audio.begin(t0);
@@ -108,10 +110,13 @@ pub(crate) fn build(
         scratch: Vec::new(),
         stats: Stats::new(),
         sampler: cfg.diagnostics.then(|| {
-            ProcessSampler::new(match target {
-                CaptureTarget::GameWindow { hwnd, .. } => Some(*hwnd),
-                CaptureTarget::PrimaryMonitor => None,
-            })
+            ProcessSampler::new(
+                match target {
+                    CaptureTarget::GameWindow { hwnd, .. } => Some(*hwnd),
+                    CaptureTarget::PrimaryMonitor => None,
+                },
+                Some(adapter_luid),
+            )
         }),
         seq: 0,
         last_seq: 0,

@@ -33,6 +33,14 @@ pub struct DiagSample {
     pub mem_mb: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreground: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_3d_pct: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_3d_self_pct: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_encode_pct: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_copy_pct: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -171,6 +179,10 @@ impl HealthTracker {
             cpu_pct: stats.cpu_pct,
             mem_mb: stats.mem_mb,
             foreground: stats.foreground,
+            gpu_3d_pct: stats.gpu_3d_pct,
+            gpu_3d_self_pct: stats.gpu_3d_self_pct,
+            gpu_encode_pct: stats.gpu_encode_pct,
+            gpu_copy_pct: stats.gpu_copy_pct,
         }
     }
 

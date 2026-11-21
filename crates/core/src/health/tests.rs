@@ -302,3 +302,64 @@ fn torn_frames_and_copy_waits_reach_samples_health_and_findings() {
     assert_eq!(capture(&health), Some(Level::Warn));
     assert_eq!(capture(&RecordingHealth::default()), None);
 }
+
+#[test]
+fn gpu_instance_names_parse() {
+    let name = "pid_1234_luid_0x00000000_0x0000D1B2_phys_0_eng_0_engtype_3D";
+    let parsed = gpu::parse_instance(name).expect("parsed");
+    assert_eq!(parsed.pid, 1234);
+    assert_eq!(parsed.luid, 0xD1B2);
+    assert_eq!(parsed.engine, "0_eng_0");
+    assert_eq!(parsed.kind, "3D");
+    let high = "pid_7_luid_0x00000001_0x0000D1B2_phys_0_eng_3_engtype_VideoEncode";
+    let parsed = gpu::parse_instance(high).expect("parsed");
+    assert_eq!(parsed.luid, 0x1_0000_D1B2);
+    assert_eq!(parsed.kind, "VideoEncode");
+    assert!(gpu::parse_instance("garbage").is_none());
+    assert!(gpu::parse_instance("pid_x_luid_0x0_0x1_phys_0_eng_0_engtype_3D").is_none());
+}
+
+#[test]
+fn gpu_usage_sums_per_engine_and_filters_by_adapter() {
+    let samples = [
+        (
+            "pid_10_luid_0x00000000_0x0000AAAA_phys_0_eng_0_engtype_3D",
+            60.0,
+        ),
+        (
+            "pid_20_luid_0x00000000_0x0000AAAA_phys_0_eng_0_engtype_3D",
+            30.0,
+        ),
+        (
+            "pid_20_luid_0x00000000_0x0000AAAA_phys_0_eng_1_engtype_3D",
+            10.0,
+        ),
+        (
+            "pid_20_luid_0x00000000_0x0000AAAA_phys_0_eng_2_engtype_VideoEncode",
+            12.0,
+        ),
+        (
+            "pid_10_luid_0x00000000_0x0000AAAA_phys_0_eng_2_engtype_VideoEncode",
+            8.0,
+        ),
+        (
+            "pid_20_luid_0x00000000_0x0000AAAA_phys_0_eng_3_engtype_Copy",
+            70.0,
+        ),
+        (
+            "pid_10_luid_0x00000000_0x0000AAAA_phys_0_eng_3_engtype_Copy",
+            50.0,
+        ),
+        (
+            "pid_10_luid_0x00000000_0x0000BBBB_phys_0_eng_0_engtype_3D",
+            99.0,
+        ),
+    ];
+    let usage = gpu::summarize(samples, Some(0xAAAA), 20);
+    assert_eq!(usage.busy_3d_pct, 90.0);
+    assert_eq!(usage.self_3d_pct, 30.0);
+    assert_eq!(usage.encode_pct, 20.0);
+    assert_eq!(usage.copy_pct, 100.0);
+    let all = gpu::summarize(samples, None, 20);
+    assert_eq!(all.busy_3d_pct, 99.0);
+}

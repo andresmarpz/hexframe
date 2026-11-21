@@ -1,5 +1,7 @@
 use std::time::Instant;
 
+use crate::gpu_usage::GpuUsageSampler;
+use greyscreen_core::health::CaptureStats;
 use windows::Win32::Foundation::{FILETIME, HWND};
 use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
@@ -12,15 +14,25 @@ pub(crate) struct ProcessSampler {
     last_wall: Instant,
     last_cpu: Option<u64>,
     target: Option<HWND>,
+    gpu: GpuUsageSampler,
 }
 
 impl ProcessSampler {
-    pub(crate) fn new(target: Option<isize>) -> Self {
+    pub(crate) fn new(target: Option<isize>, adapter_luid: Option<u64>) -> Self {
         Self {
             last_wall: Instant::now(),
             last_cpu: cpu_time_hns(),
             target: target.map(|hwnd| HWND(hwnd as *mut core::ffi::c_void)),
+            gpu: GpuUsageSampler::start(adapter_luid),
         }
+    }
+
+    pub(crate) fn fill_gpu(&self, stats: &mut CaptureStats) {
+        let usage = self.gpu.latest();
+        stats.gpu_3d_pct = usage.map(|u| u.busy_3d_pct);
+        stats.gpu_3d_self_pct = usage.map(|u| u.self_3d_pct);
+        stats.gpu_encode_pct = usage.map(|u| u.encode_pct);
+        stats.gpu_copy_pct = usage.map(|u| u.copy_pct);
     }
 
     pub(crate) fn target_in_foreground(&self) -> Option<bool> {

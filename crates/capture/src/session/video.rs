@@ -121,6 +121,7 @@ impl Video {
             self.stats.c.cpu_pct = cpu;
             self.stats.c.mem_mb = mem;
             self.stats.c.foreground = sampler.target_in_foreground();
+            sampler.fill_gpu(&mut self.stats.c);
         }
         let snapshot = self.stats.take_snapshot(mono_now());
         self.sink.stats(snapshot);

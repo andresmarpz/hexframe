@@ -93,6 +93,10 @@ pub struct CaptureStats {
     pub cpu_pct: Option<f32>,
     pub mem_mb: Option<u32>,
     pub foreground: Option<bool>,
+    pub gpu_3d_pct: Option<f32>,
+    pub gpu_3d_self_pct: Option<f32>,
+    pub gpu_encode_pct: Option<f32>,
+    pub gpu_copy_pct: Option<f32>,
 }
 
 const NVIDIA_VENDOR: u32 = 0x10DE;

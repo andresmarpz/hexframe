@@ -11,6 +11,7 @@ pub mod crash;
 pub mod d3d;
 pub mod displays;
 mod frame_copy;
+mod gpu_usage;
 pub mod h264;
 pub mod hotkey;
 pub mod install;

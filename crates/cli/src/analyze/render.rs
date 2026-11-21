@@ -162,6 +162,25 @@ fn diagnostics(out: &mut String, diag: &DiagReport) {
             "  Greyscreen CPU {avg:.0}% average, {max:.0}% peak (100% is one core)"
         );
     }
+    if let Some(gpu) = &diag.gpu {
+        let encoder = match (gpu.encode_avg, gpu.encode_peak) {
+            (Some(avg), Some(peak)) => format!(", encoder {avg:.0}% average, {peak:.0}% peak"),
+            _ => String::new(),
+        };
+        line!(
+            out,
+            "  GPU 3D busy {:.0}% average, {:.0}% peak, {} of {} seconds at 95% or more; Greyscreen's own 3D share {:.0}% average, {:.0}% peak{}; seconds with drops: {} of {} at 95% or more",
+            gpu.busy_3d_avg,
+            gpu.busy_3d_peak,
+            gpu.seconds_3d_saturated,
+            gpu.seconds,
+            gpu.own_3d_avg,
+            gpu.own_3d_peak,
+            encoder,
+            gpu.drop_seconds_3d_saturated,
+            gpu.drop_seconds,
+        );
+    }
     if let Some(mem) = diag.mem_mb_max {
         line!(out, "  Greyscreen memory peak {mem} MB");
     }

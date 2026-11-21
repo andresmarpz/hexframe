@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::time::Hns;
 
+pub mod gpu;
 mod stats;
 mod tracker;
 pub mod verdict;
