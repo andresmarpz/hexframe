@@ -1,0 +1,45 @@
+---
+import { getCollection, render } from "astro:content";
+import Base from "../layouts/Base.astro";
+import { changelog, site } from "../content/copy";
+
+const entries = (await getCollection("changelog")).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime() || b.data.version.localeCompare(a.data.version, "en", { numeric: true }),
+);
+const rendered = await Promise.all(entries.map(async (entry) => ({ entry, Content: (await render(entry)).Content })));
+const format = (date: Date) =>
+  date.toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+---
+
+<Base title={`${changelog.title} — ${site.name}`} description={changelog.intro}>
+  <section class="page-head">
+    <div class="container narrow">
+      <h1>{changelog.title}</h1>
+      <p class="lead">{changelog.intro}</p>
+    </div>
+  </section>
+
+  <section class="section tight">
+    <div class="container narrow">
+      <ol class="releases">
+        {
+          rendered.map(({ entry, Content }) => (
+            <li class="release">
+              <div class="release-meta">
+                <h2 class="h3">
+                  v{entry.data.version}
+                  {entry.data.version.includes("-") && <span class="pill">Preview</span>}
+                </h2>
+                <time datetime={entry.data.date.toISOString().slice(0, 10)}>{format(entry.data.date)}</time>
+              </div>
+              <div class="card release-body">
+                <p class="release-title">{entry.data.title}</p>
+                <Content />
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+</Base>

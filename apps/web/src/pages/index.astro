@@ -1,0 +1,147 @@
+---
+import Frame from "../components/Frame.astro";
+import Icon from "../components/Icon.astro";
+import Base from "../layouts/Base.astro";
+import {
+  closing,
+  downloadUrl,
+  faq,
+  features,
+  githubUrl,
+  hero,
+  howItWorks,
+  review,
+  safe,
+  trust,
+} from "../content/copy";
+---
+
+<Base>
+  <section class="hero">
+    <div class="container">
+      <div class="hero-text reveal">
+        <h1>{hero.headline}</h1>
+        <p class="lead">{hero.subheadline}</p>
+        <div class="actions">
+          <a class="btn btn-primary" href={downloadUrl}>
+            <Icon name="download" size={18} />
+            {hero.primaryCta}
+          </a>
+          <a class="btn btn-secondary" href={githubUrl}>{hero.secondaryCta}</a>
+        </div>
+      </div>
+      <ul class="trust reveal" aria-label="Highlights">
+        {trust.map((item) => <li>{item}</li>)}
+      </ul>
+      <div class="hero-shot reveal">
+        <Frame src="/screens/recording.png" alt={hero.screenAlt} eager />
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features" aria-labelledby="features-title">
+    <div class="container">
+      <h2 id="features-title" class="visually-hidden">Features</h2>
+      <ul class="grid features">
+        {
+          features.map((feature) => (
+            <li class="card">
+              <span class="icon-tile">
+                <Icon name={feature.icon} />
+              </span>
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="how-it-works" aria-labelledby="how-title">
+    <div class="container">
+      <h2 id="how-title">{howItWorks.title}</h2>
+      <ol class="grid steps">
+        {
+          howItWorks.steps.map((step, i) => (
+            <li class="card step">
+              <span class="step-number">{String(i + 1).padStart(2, "0")}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="review" aria-labelledby="review-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="review-title">{review.title}</h2>
+        <p class="lead">{review.intro}</p>
+      </div>
+      <Frame src="/screens/review.png" alt={review.reviewAlt} />
+      <ul class="points">
+        {
+          review.points.map((point) => (
+            <li>
+              <h3>{point.title}</h3>
+              <p>{point.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <Frame src="/screens/recordings.png" alt={review.recordingsAlt} />
+    </div>
+  </section>
+
+  <section class="section" id="safe" aria-labelledby="safe-title">
+    <div class="container">
+      <div class="card safe">
+        <h2 id="safe-title">{safe.title}</h2>
+        <ul class="safe-points">
+          {
+            safe.points.map((point) => (
+              <li>
+                <span class="check"><Icon name="check" size={16} /></span>
+                <div>
+                  <h3>{point.title}</h3>
+                  <p>{point.body}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-title">
+    <div class="container narrow">
+      <h2 id="faq-title">{faq.title}</h2>
+      <div class="faq">
+        {
+          faq.items.map((item) => (
+            <details>
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section cta-section" aria-labelledby="cta-title">
+    <div class="container">
+      <div class="card cta">
+        <h2 id="cta-title">{closing.headline}</h2>
+        <a class="btn btn-primary" href={downloadUrl}>
+          <Icon name="download" size={18} />
+          {closing.button}
+        </a>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,30 @@
+---
+import GitHubButton from "./GitHubButton";
+import Logo from "./Logo.astro";
+import { githubUrl, nav, repo, site } from "../content/copy";
+
+interface Props {
+  path: string;
+}
+
+const { path } = Astro.props;
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="/" aria-label={`${site.name} home`}>
+      <Logo size={24} />
+      <span>{site.name}</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      {
+        nav.map((item) => (
+          <a href={item.href} aria-current={item.href === path ? "page" : undefined}>
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+    <GitHubButton client:idle repo={repo} href={githubUrl} />
+  </div>
+</header>

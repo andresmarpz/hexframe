@@ -1,0 +1,12 @@
+---
+import mark from "../assets/brand/logo-mark.svg?raw";
+
+interface Props {
+  size?: number;
+}
+
+const { size = 24 } = Astro.props;
+const sized = mark.replace("<svg ", `<svg width="${size}" height="${size}" aria-hidden="true" focusable="false" `);
+---
+
+<span class="logo-mark" set:html={sized} />

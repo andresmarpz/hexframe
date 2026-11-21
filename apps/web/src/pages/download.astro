@@ -1,0 +1,59 @@
+---
+import Frame from "../components/Frame.astro";
+import Icon from "../components/Icon.astro";
+import ReleaseInfo from "../components/ReleaseInfo";
+import Base from "../layouts/Base.astro";
+import { withCode } from "../lib/inline-code";
+import { cliDownloadUrl, download, downloadUrl, releasesUrl, repo, site } from "../content/copy";
+
+---
+
+<Base title={`${download.title} — ${site.name}`} description={download.intro}>
+  <section class="page-head">
+    <div class="container narrow">
+      <h1>{download.title}</h1>
+      <p class="lead" set:html={withCode(download.intro)} />
+      <div class="actions">
+        <a class="btn btn-primary" href={downloadUrl}>
+          <Icon name="download" size={18} />
+          {download.button}
+        </a>
+        <a class="btn btn-secondary" href={releasesUrl}>{download.allReleases}</a>
+      </div>
+      <ReleaseInfo client:idle repo={repo} />
+    </div>
+  </section>
+
+  <section class="section tight">
+    <div class="container narrow stack">
+      <div class="card">
+        <h2 class="h3">{download.requirementsTitle}</h2>
+        <ul class="list">
+          {download.requirements.map((item) => <li>{item}</li>)}
+        </ul>
+      </div>
+
+      <div class="card notice">
+        <h2 class="h3">{download.smartScreenTitle}</h2>
+        <p>{download.smartScreen}</p>
+      </div>
+
+      <div class="card">
+        <h2 class="h3">{download.firstRunTitle}</h2>
+        <ol class="list numbered">
+          {download.firstRun.map((item) => <li set:html={withCode(item)} />)}
+        </ol>
+      </div>
+
+      <Frame src="/screens/settings.png" alt={download.firstRunAlt} />
+
+      <div class="card">
+        <h2 class="h3">{download.cliTitle}</h2>
+        <p set:html={withCode(download.cliBody)} />
+        <p class="actions-inline">
+          <a class="btn btn-secondary" href={cliDownloadUrl}>{download.cliButton}</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>

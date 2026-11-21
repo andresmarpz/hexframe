@@ -1,0 +1,24 @@
+---
+import Logo from "./Logo.astro";
+import { githubUrl, nav, releasesUrl, site } from "../content/copy";
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="/" aria-label={`${site.name} home`}>
+          <Logo size={24} />
+          <span>{site.name}</span>
+        </a>
+        <p>{site.tagline}</p>
+      </div>
+      <nav class="footer-nav" aria-label="Footer">
+        {nav.map((item) => <a href={item.href}>{item.label}</a>)}
+        <a href={githubUrl}>GitHub</a>
+        <a href={releasesUrl}>Releases</a>
+      </nav>
+    </div>
+    <p class="riot-notice">{site.riotNotice}</p>
+  </div>
+</footer>

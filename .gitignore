@@ -10,3 +10,6 @@ Thumbs.db
 /.claude/worktrees/
 !crates/*/fixtures/*.mp4
 /target-*
+node_modules
+/apps/web/dist
+/apps/web/.astro

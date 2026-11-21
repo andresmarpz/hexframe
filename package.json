@@ -1,0 +1,5 @@
+{
+  "name": "greyscreen",
+  "private": true,
+  "workspaces": ["apps/*"]
+}

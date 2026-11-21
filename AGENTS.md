@@ -28,6 +28,11 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 - `just release <tag> "<notes>"`: runs `just ci`, builds and publishes a GitHub release from the Mac. GitHub Actions has no minutes to spare, so releases never go through CI. A tag with a dash is a prerelease.
 - `just dist`: build both exes and copy them with `README.txt` into `dist/` as separate files.
 - `just fmt`: format the workspace.
+- `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
+- `just web-build`: build the website into `apps/web/dist`.
+- `just web-check`: `astro check` and a website build.
+- `just web-tokens`: regenerate the website's theme tokens from Rune's neutral kit.
+- `just web-screens`: render the app scenes into `apps/web/public/screens`.
 
 The Mac cannot run Windows code: compile-check it with `just check-win`.
 

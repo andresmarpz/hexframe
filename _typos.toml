@@ -1,5 +1,5 @@
 [files]
-extend-exclude = ["Cargo.lock", "docs/research/**"]
+extend-exclude = ["Cargo.lock", "bun.lock", "docs/research/**", "apps/web/dist/**"]
 
 [default.extend-words]
 trak = "trak"

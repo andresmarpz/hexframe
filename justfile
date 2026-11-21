@@ -32,6 +32,27 @@ dist: build-win
 
 ci: lint check-win test
 
+web-tokens:
+    cargo run -q --locked -p greyscreen --example export_tokens > apps/web/src/styles/rune-tokens.css
+
+# HOME points at /Users/Shared so the Recordings subtitle shows a neutral path, not the real user.
+web-screens:
+    cargo build -q --locked -p greyscreen
+    mkdir -p apps/web/public/screens "/Users/Shared/Library/Application Support/Greyscreen"
+    ln -sfn "$HOME/Library/Application Support/Greyscreen/cache" "/Users/Shared/Library/Application Support/Greyscreen/cache"
+    for scene in recording last-game recordings review review-theater settings; do HOME=/Users/Shared target/debug/greyscreen --snap apps/web/public/screens/$scene.png --scene $scene --scale 2 --theme dark || echo "skipped $scene"; done
+    rm "/Users/Shared/Library/Application Support/Greyscreen/cache"
+    rmdir "/Users/Shared/Library/Application Support/Greyscreen" "/Users/Shared/Library/Application Support" /Users/Shared/Library
+
+web-dev:
+    cd apps/web && bun run dev
+
+web-build:
+    cd apps/web && bun run build
+
+web-check:
+    cd apps/web && bun run check && bun run build
+
 # Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
 # A tag with a dash (v0.2.0-preview.1) becomes a prerelease.
 release tag notes="": ci dist
