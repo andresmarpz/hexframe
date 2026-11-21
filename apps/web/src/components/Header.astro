@@ -2,12 +2,14 @@
 import GitHubButton from "./GitHubButton";
 import Logo from "./Logo.astro";
 import { githubUrl, nav, repo, site } from "../content/copy";
+import { getStars } from "../lib/github-build";
 
 interface Props {
   path: string;
 }
 
 const { path } = Astro.props;
+const stars = await getStars();
 ---
 
 <header class="site-header">
@@ -24,6 +26,6 @@ const { path } = Astro.props;
         ))
       }
     </nav>
-    <GitHubButton client:idle repo={repo} href={githubUrl} />
+    <GitHubButton client:idle repo={repo} href={githubUrl} initialStars={stars} />
   </div>
 </header>

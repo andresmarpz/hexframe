@@ -1,10 +1,10 @@
 ---
 import Frame from "../components/Frame.astro";
+import DownloadButton from "../components/DownloadButton";
 import Icon from "../components/Icon.astro";
 import Base from "../layouts/Base.astro";
 import {
   closing,
-  downloadUrl,
   faq,
   features,
   githubUrl,
@@ -14,6 +14,9 @@ import {
   safe,
   trust,
 } from "../content/copy";
+import { getDownloads } from "../lib/github-build";
+
+const downloads = await getDownloads();
 ---
 
 <Base>
@@ -23,10 +26,9 @@ import {
         <h1>{hero.headline}</h1>
         <p class="lead">{hero.subheadline}</p>
         <div class="actions">
-          <a class="btn btn-primary" href={downloadUrl}>
-            <Icon name="download" size={18} />
+          <DownloadButton client:idle initial={downloads} file="app" className="btn btn-primary" icon>
             {hero.primaryCta}
-          </a>
+          </DownloadButton>
           <a class="btn btn-secondary" href={githubUrl}>{hero.secondaryCta}</a>
         </div>
       </div>
@@ -136,10 +138,9 @@ import {
     <div class="container">
       <div class="card cta">
         <h2 id="cta-title">{closing.headline}</h2>
-        <a class="btn btn-primary" href={downloadUrl}>
-          <Icon name="download" size={18} />
+        <DownloadButton client:idle initial={downloads} file="app" className="btn btn-primary" icon>
           {closing.button}
-        </a>
+        </DownloadButton>
       </div>
     </div>
   </section>

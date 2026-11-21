@@ -1,10 +1,13 @@
 ---
 import Frame from "../components/Frame.astro";
-import Icon from "../components/Icon.astro";
+import DownloadButton from "../components/DownloadButton";
 import ReleaseInfo from "../components/ReleaseInfo";
 import Base from "../layouts/Base.astro";
 import { withCode } from "../lib/inline-code";
-import { cliDownloadUrl, download, downloadUrl, releasesUrl, repo, site } from "../content/copy";
+import { download, releasesUrl, site } from "../content/copy";
+import { getDownloads } from "../lib/github-build";
+
+const downloads = await getDownloads();
 
 ---
 
@@ -14,13 +17,12 @@ import { cliDownloadUrl, download, downloadUrl, releasesUrl, repo, site } from "
       <h1>{download.title}</h1>
       <p class="lead" set:html={withCode(download.intro)} />
       <div class="actions">
-        <a class="btn btn-primary" href={downloadUrl}>
-          <Icon name="download" size={18} />
+        <DownloadButton client:idle initial={downloads} file="app" className="btn btn-primary" icon>
           {download.button}
-        </a>
+        </DownloadButton>
         <a class="btn btn-secondary" href={releasesUrl}>{download.allReleases}</a>
       </div>
-      <ReleaseInfo client:idle repo={repo} />
+      <ReleaseInfo client:idle initial={downloads} />
     </div>
   </section>
 
@@ -51,7 +53,9 @@ import { cliDownloadUrl, download, downloadUrl, releasesUrl, repo, site } from "
         <h2 class="h3">{download.cliTitle}</h2>
         <p set:html={withCode(download.cliBody)} />
         <p class="actions-inline">
-          <a class="btn btn-secondary" href={cliDownloadUrl}>{download.cliButton}</a>
+          <DownloadButton client:idle initial={downloads} file="cli" className="btn btn-secondary">
+            {download.cliButton}
+          </DownloadButton>
         </p>
       </div>
     </div>

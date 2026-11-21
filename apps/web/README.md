@@ -1,6 +1,6 @@
 # Greyscreen website
 
-Static marketing site: Astro 5, React islands for the GitHub star count and the latest release, plain CSS.
+Static marketing site: Astro, React islands for the GitHub star count and the download links, plain CSS.
 
 ## Run
 
@@ -14,6 +14,10 @@ just web-build    # build into apps/web/dist
 ```
 
 `bun run preview` in `apps/web` serves the built site. Set `SITE_URL` to the public address before building, so canonical links and the sitemap are right.
+
+## GitHub data
+
+The build reads the repo's releases and star count from the GitHub API (`src/lib/github-build.ts`), so the static HTML already has the newest release that carries `greyscreen.exe`, with its version, date and size. If no release has it, the buttons link to the newest release page, then to `/releases`. The islands refresh the same data in the browser (sessionStorage, 10 minutes) and never replace good data with worse. The `just web-*` build recipes pass a token from `gh` for the `andresmarpz` account: unauthenticated builds hit the 60 requests per hour limit. `just release` redeploys the site, which refreshes the links.
 
 ## Where things live
 

@@ -737,6 +737,15 @@ time,
   font-size: 0.875rem;
 }
 
+.release-link {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.release-info .pill {
+  margin-left: 4px;
+}
+
 .pill {
   padding: 2px 8px;
   border: 1px solid var(--info-border);

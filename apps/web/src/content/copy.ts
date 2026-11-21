@@ -2,8 +2,6 @@
 export const repo = "andresmarpz/greyscreen";
 export const githubUrl = `https://github.com/${repo}`;
 export const releasesUrl = `${githubUrl}/releases`;
-export const downloadUrl = `${githubUrl}/releases/latest/download/greyscreen.exe`;
-export const cliDownloadUrl = `${githubUrl}/releases/latest/download/greyscreen-cli.exe`;
 
 export const site = {
   name: "Greyscreen",

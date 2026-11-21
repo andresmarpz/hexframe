@@ -68,14 +68,14 @@ web-dev:
     cd apps/web && bun run dev
 
 web-build:
-    cd apps/web && bun run build
+    export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && bun run build
 
 web-check:
-    cd apps/web && bun run check && bun run build
+    export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && bun run check && bun run build
 
 # Builds the site and publishes it to Vercel production at https://greyscreen-lake.vercel.app.
 web-deploy:
-    cd apps/web && SITE_URL=https://greyscreen-lake.vercel.app bun run build
+    export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && SITE_URL=https://greyscreen-lake.vercel.app bun run build
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy apps/web/dist --prod --yes
 
 # Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
