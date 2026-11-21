@@ -14,6 +14,7 @@ mod nav_settings;
 mod recordings;
 mod review_flow;
 mod sidebar;
+mod update;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
     let mut rt = Runtime::new(ui, view::root, (1180.0, 680.0), Env::new(true, 1.0));

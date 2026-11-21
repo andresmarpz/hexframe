@@ -7,6 +7,8 @@ use rune_kit::{
     TextInput,
 };
 
+mod updates;
+
 use super::{card, hairline, page_header};
 
 use crate::ui::{Ui, format_size_estimate, parse_clip_secs};
@@ -500,16 +502,15 @@ fn about_section(s: &Ui, k: &Kit) -> El {
         .on_press(|_: &mut Ui| reveal(&paths::logs_dir()))
         .build(k)
         .key("open-logs");
-    let mut rows = vec![
-        setting_row(k, "version-row", "Greyscreen", None, version),
-        setting_row(
-            k,
-            "logs-row",
-            "Logs",
-            Some("Attach these when you report a problem."),
-            logs,
-        ),
-    ];
+    let mut rows = vec![setting_row(k, "version-row", "Greyscreen", None, version)];
+    rows.extend(updates::rows(s, k));
+    rows.push(setting_row(
+        k,
+        "logs-row",
+        "Logs",
+        Some("Attach these when you report a problem."),
+        logs,
+    ));
     if cfg!(windows) {
         rows.push(toggle_row(
             k,

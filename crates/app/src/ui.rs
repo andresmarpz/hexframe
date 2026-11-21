@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use crossbeam_channel::Sender;
 use greyscreen_core::settings::Settings;
+use greyscreen_core::update::{UpdateInfo, UpdateState};
 use greyscreen_engine::{
     EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg, reveal,
 };
@@ -18,6 +19,7 @@ mod preview;
 pub(crate) mod recordings_filter;
 mod review;
 mod tone;
+mod update;
 
 #[cfg(test)]
 pub(crate) mod fake_player;
@@ -29,6 +31,7 @@ pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::{RecordingsFilter, ResultFilter, modes_present};
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use tone::tone_color;
+pub(crate) use update::UpdateUi;
 
 #[cfg(test)]
 pub(crate) fn review_entry() -> RecordingEntry {
@@ -92,6 +95,19 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.filter.pending_delete = ui.recordings.get(1).map(|rec| rec.meta.id.clone());
     }),
     ("settings", |ui| ui.screen = Screen::Settings),
+    ("settings-update", |ui| {
+        ui.screen = Screen::Settings;
+        ui.apply_update(UpdateState::Ready(update::preview_info()));
+    }),
+    ("settings-update-game", |ui| {
+        ui.screen = Screen::Settings;
+        ui.apply_update(UpdateState::Ready(update::preview_info()));
+        ui.update.install_when_idle = true;
+    }),
+    ("settings-update-manual", |ui| {
+        ui.screen = Screen::Settings;
+        ui.apply_update(UpdateState::AvailableManual(update::preview_info()));
+    }),
     ("settings-hotkey", |ui| {
         ui.screen = Screen::Settings;
         ui.hotkey_capture = true;
@@ -161,6 +177,8 @@ pub(crate) struct Ui {
     pub start_with_windows: bool,
     pub pre_secs: TextEdit,
     pub post_secs: TextEdit,
+    pub update: UpdateUi,
+    pub update_available: Option<UpdateInfo>,
 }
 
 impl Ui {
@@ -198,6 +216,8 @@ impl Ui {
             start_with_windows: false,
             pre_secs: TextEdit::new(settings.clips.pre_secs.to_string()),
             post_secs: TextEdit::new(settings.clips.post_secs.to_string()),
+            update: UpdateUi::default(),
+            update_available: None,
             settings,
         }
     }
@@ -332,6 +352,7 @@ impl Ui {
             }
             UiMsg::Library(recordings) => self.recordings = recordings,
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
+            UiMsg::Update(state) => self.apply_update(state),
             UiMsg::HotkeyStatus { error } => self.hotkey_error = error,
         }
     }
@@ -357,6 +378,7 @@ impl Ui {
             self.stop_confirm_until = None;
         }
         self.status = status;
+        self.install_if_idle();
     }
 
     pub(crate) fn show_notice(&mut self, level: NoticeLevel, text: String, tx: &mut Tx) {

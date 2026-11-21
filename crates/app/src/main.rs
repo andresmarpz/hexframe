@@ -15,7 +15,8 @@ use greyscreen_core::install::HIDDEN_FLAG;
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
-use greyscreen_engine::{Engine, league_factory_default};
+use greyscreen_engine::updater::UpdateConfig;
+use greyscreen_engine::{Engine, EngineConfig, league_factory_default};
 use rune::{App, AppSpec};
 
 use ui::Ui;
@@ -31,6 +32,16 @@ fn media_source() -> Arc<dyn MediaSource> {
 #[cfg(not(windows))]
 fn media_source() -> Arc<dyn MediaSource> {
     Arc::new(greyscreen_engine::FakeMediaSource::new())
+}
+
+#[cfg(windows)]
+fn can_install_updates() -> bool {
+    greyscreen_capture::install::is_installed_copy()
+}
+
+#[cfg(not(windows))]
+fn can_install_updates() -> bool {
+    false
 }
 
 #[cfg(windows)]
@@ -119,12 +130,17 @@ fn main() {
             );
         }
         let sink_handle = handle.clone();
-        let engine = Engine::start(
-            settings.clone(),
-            media_source(),
-            league_factory_default(),
-            Box::new(move |msg| sink_handle.update(move |ui: &mut Ui, tx| ui.apply(msg, tx))),
-        );
+        let engine = Engine::start_with(EngineConfig {
+            settings: settings.clone(),
+            media: media_source(),
+            league: league_factory_default(),
+            sink: Box::new(move |msg| sink_handle.update(move |ui: &mut Ui, tx| ui.apply(msg, tx))),
+            settings_path: Some(paths::settings_file()),
+            updates: Some(UpdateConfig::github(
+                env!("CARGO_PKG_VERSION"),
+                can_install_updates(),
+            )),
+        });
         #[cfg(windows)]
         if install_error.is_some() {
             handle.update(|ui: &mut Ui, tx| {

@@ -212,6 +212,12 @@ Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Bal
 
 `greyscreen-cli record` takes `--preset`, `--rc quality|vbr`, `--quality N`, `--bitrate MBPS`, `--peak MBPS` and `--height H` to override the config for A/B tests.
 
+## Updates
+
+`greyscreen-league::updates` lists the GitHub releases of `andresmarpz/greyscreen` and downloads `greyscreen.exe`, checking size, the SHA-256 `digest` GitHub reports (skipped when missing) and the `MZ` header. `greyscreen-core::update` holds the pure rules: a build that is a prerelease sees previews and stable releases, a stable build sees stable only, and the newest newer release wins (`preview.N` orders by N, a stable release beats its previews). The running version is the workspace version, so it must equal the release tag without the `v` (`just release` enforces it).
+
+The engine's update thread checks 10 s after start and every 6 hours when "Check for updates automatically" is on, only for the installed copy on Windows and never while a session is not idle. A manual check works anywhere. An installed copy downloads to `%TEMP%\Greyscreen\greyscreen-<tag>.exe`; "Install and restart" launches that file, and the existing installer path asks the running copy to quit and replaces it. A copy that is not installed only links to the release page. `UiMsg::Update(UpdateState)` drives the About card, and `Ui::update_available` holds the pending release for other screens.
+
 ## Rules for code
 
 - No comments or doc comments, except one line in plain English when a "why" is not obvious. Names carry the meaning. Never mention tickets or files in code.

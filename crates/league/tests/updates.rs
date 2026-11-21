@@ -10,10 +10,11 @@ use sha2::{Digest, Sha256};
 use tiny_http::{Response, Server};
 
 type Handler = Box<dyn Fn(&str) -> (u16, Vec<u8>) + Send>;
+type Seen = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
 struct FakeGithub {
     base: String,
-    seen: Arc<Mutex<Vec<(String, Option<String>)>>>,
+    seen: Seen,
     server: Arc<Server>,
     thread: Option<JoinHandle<()>>,
 }
