@@ -70,3 +70,8 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = "symbols"
+
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
