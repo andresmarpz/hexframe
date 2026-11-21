@@ -117,3 +117,17 @@ fn up_and_down_still_move_between_games_in_the_death_review() {
     assert_ne!(rt.state.selected_id(), Some(id.as_str()));
     assert!(!rt.state.review.as_ref().unwrap().death_active());
 }
+
+#[test]
+fn a_game_row_shows_how_many_deaths_are_reviewed() {
+    let mut rt = browsing();
+    let has = |rt: &Runtime<Ui>, wanted: &str| {
+        super::visible_texts(rt)
+            .iter()
+            .any(|t| t.starts_with("Ahri") && t.ends_with(wanted))
+    };
+    assert!(has(&rt, "0 of 7 reviewed"));
+    rt.update(|ui, _| ui.recordings[0].meta.review.set_note(2, "late"));
+    settle(&mut rt);
+    assert!(has(&rt, "1 of 7 reviewed"));
+}

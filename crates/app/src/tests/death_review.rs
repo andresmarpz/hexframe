@@ -6,7 +6,7 @@ use rune::{Key, Runtime};
 
 use super::{card_text, press, press_char, refresh, runtime_with, tap};
 use crate::ui::fake_player::{self, Call};
-use crate::ui::library_format::death_hint;
+use crate::ui::library_format::{death_hint, review_progress};
 use crate::ui::{Detail, Ui, death_entry};
 
 fn death_runtime() -> Runtime<Ui> {
@@ -462,4 +462,16 @@ fn the_hint_counts_deaths_and_reviews() {
     assert_eq!(death_hint(&entry).as_deref(), Some("1 death · 1 reviewed"));
     entry.meta.events.retain(|e| e.id != 2);
     assert_eq!(death_hint(&entry), None);
+}
+
+#[test]
+fn review_progress_reads_k_of_n_and_hides_without_deaths() {
+    let mut entry = death_entry();
+    assert_eq!(review_progress(&entry).as_deref(), Some("0 of 7 reviewed"));
+    entry.meta.review.toggle_tag(2, DeathTag::Ganked);
+    assert_eq!(review_progress(&entry).as_deref(), Some("1 of 7 reviewed"));
+    entry.meta.events.retain(|e| e.id == 2);
+    assert_eq!(review_progress(&entry).as_deref(), Some("1 of 1 reviewed"));
+    entry.meta.events.clear();
+    assert_eq!(review_progress(&entry), None);
 }

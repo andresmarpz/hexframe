@@ -5,7 +5,7 @@ use rune::{Cursor, El, TextStyle, Tx, col, row, text};
 use rune_kit::Kit;
 
 use super::{ROW_HEIGHT, TABULAR, dot};
-use crate::ui::library_format::{Kda, kda, mode_label, when};
+use crate::ui::library_format::{Kda, kda, mode_label, review_progress, when};
 use crate::ui::{Ui, format_clock};
 use crate::view::champion::champion_icon;
 use crate::view::thumb;
@@ -99,9 +99,16 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
         GameResult::Loss => "Defeat, ",
         GameResult::Unknown => "",
     };
+    let progress = review_progress(rec);
     let label = format!(
-        "{champion}, {mode}, {result_word}{}/{}/{}, {}",
-        kda.kills, kda.deaths, kda.assists, shown.time
+        "{champion}, {mode}, {result_word}{}/{}/{}, {}{}",
+        kda.kills,
+        kda.deaths,
+        kda.assists,
+        shown.time,
+        progress
+            .as_ref()
+            .map_or_else(String::new, |p| format!(", {p}"))
     );
     let id = rec.meta.id.clone();
     let menu_id = id.clone();
@@ -109,7 +116,11 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
         .font(k.ty.body_medium)
         .color(k.c.text_base)
         .truncate();
-    let detail = text(format!("{mode} · {}", shown.time))
+    let detail_line = match &progress {
+        Some(progress) => format!("{mode} · {} · {progress}", shown.time),
+        None => format!("{mode} · {}", shown.time),
+    };
+    let detail = text(detail_line)
         .font(k.ty.small.features(TABULAR))
         .color(k.c.text_muted)
         .truncate();

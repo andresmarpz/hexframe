@@ -104,6 +104,18 @@ pub(crate) fn death_total(rec: &RecordingEntry) -> usize {
     deaths(&meta.events, &meta.game.info.me).len()
 }
 
+pub(crate) fn review_progress(rec: &RecordingEntry) -> Option<String> {
+    let meta = &rec.meta;
+    let list = deaths(&meta.events, &meta.game.info.me);
+    (!list.is_empty()).then(|| {
+        format!(
+            "{} of {} reviewed",
+            meta.review.reviewed_among(&list),
+            list.len()
+        )
+    })
+}
+
 pub(crate) fn death_hint(rec: &RecordingEntry) -> Option<String> {
     let meta = &rec.meta;
     let list = deaths(&meta.events, &meta.game.info.me);
