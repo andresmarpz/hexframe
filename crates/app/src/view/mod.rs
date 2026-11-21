@@ -6,7 +6,7 @@ mod settings;
 mod status;
 
 use greyscreen_engine::NoticeLevel;
-use rune::{Cx, El, TextStyle, col, el, row, text};
+use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
 use rune_kit::{Kit, Toast, ToastRegion};
 
 use crate::ui::{Screen, Ui};
@@ -14,6 +14,7 @@ use crate::ui::{Screen, Ui};
 const PAGE_MAX_WIDTH: f32 = 880.0;
 const PAGE_GUTTER: f32 = 24.0;
 const CARD_RADIUS: f32 = 10.0;
+const SCROLL_FADE: f32 = 28.0;
 
 pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let k = Kit::neutral(cx.system_dark());
@@ -21,7 +22,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let theater = s.review.as_ref().filter(|r| r.theater);
     let body = match theater {
         Some(review) => review::theater(review),
-        None => window(s, &k, &mut layer),
+        None => window(s, &k, &mut layer, cx.titlebar_inset()),
     };
     if let Some(card) = review::hover_card(s, &k) {
         layer.push(card);
@@ -32,40 +33,53 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     rune_kit::root(body, layer)
 }
 
-fn window(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
-    let page = match s.screen {
-        Screen::Status => status::page(s, k),
-        Screen::Recordings => recordings::page(s, k),
-        Screen::Settings => settings::page(s, k, layer),
-        Screen::Review => review::page(s, k),
+fn window(s: &Ui, k: &Kit, layer: &mut Vec<El>, titlebar_inset: f32) -> El {
+    let content = match s.screen {
+        Screen::Status => fixed_content(status::page(s, k)),
+        Screen::Recordings => fixed_content(recordings::page(s, k)),
+        Screen::Review => fixed_content(review::page(s, k)),
+        Screen::Settings => scrolling_content(settings::page(s, k, layer)),
     };
     col()
         .key("window")
         .w_full()
         .h_full()
         .fill(k.c.page)
-        .child(nav::bar(s, k))
-        .child(
-            col()
-                .key("content")
-                .w_full()
-                .grow(1.0)
-                .min_h(0.0)
-                .items_center()
-                .child(
-                    col()
-                        .key("page")
-                        .w_full()
-                        .max_w(PAGE_MAX_WIDTH)
-                        .h_full()
-                        .min_h(0.0)
-                        .px(PAGE_GUTTER)
-                        .pt(20.0)
-                        .pb(PAGE_GUTTER)
-                        .gap(16.0)
-                        .child(page),
-                ),
-        )
+        .child(nav::bar(s, k, titlebar_inset))
+        .child(content)
+}
+
+fn content_column() -> El {
+    col()
+        .key("content")
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
+        .items_center()
+}
+
+fn page_column() -> El {
+    col()
+        .key("page")
+        .w_full()
+        .max_w(PAGE_MAX_WIDTH)
+        .px(PAGE_GUTTER)
+        .pt(20.0)
+        .pb(PAGE_GUTTER)
+        .gap(16.0)
+}
+
+fn fixed_content(page: El) -> El {
+    content_column().child(page_column().h_full().min_h(0.0).child(page))
+}
+
+fn scrolling_content(page: El) -> El {
+    content_column()
+        .scroll(ScrollSpec {
+            stick_bottom: false,
+        })
+        .scroll_edge_fade(SCROLL_FADE)
+        .child(page_column().child(page))
 }
 
 fn page_header(k: &Kit, title: &str, subtitle: &str, action: Option<El>) -> El {

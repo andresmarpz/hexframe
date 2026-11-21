@@ -27,7 +27,7 @@ fn defaults_match_architecture() {
     let s = Settings::default();
     assert!(s.auto_record && s.record_full_game && s.audio);
     assert_eq!(s.quality, Quality::High);
-    assert_eq!(s.resolution, Resolution::P1080);
+    assert_eq!(s.resolution, Resolution::Height(1080));
     assert_eq!(s.fps, 60);
     assert_eq!(s.output_dir, paths::default_output_dir());
     assert!(s.clips.enabled);
@@ -43,7 +43,7 @@ fn save_then_load_round_trips() {
     let path = dir.join("nested").join("settings.json");
     let s = Settings {
         quality: Quality::Max,
-        resolution: Resolution::P720,
+        resolution: Resolution::Height(720),
         fps: 30,
         capture_cursor: false,
         output_dir: dir.join("videos"),
@@ -151,9 +151,9 @@ fn expected_mbps(base: f64, height: u32, fps: u32) -> f64 {
 #[test]
 fn bitrate_table_for_each_preset_and_resolution() {
     let resolutions = [
-        (Resolution::P720, 720),
-        (Resolution::P1080, 1080),
-        (Resolution::P1440, 1440),
+        (Resolution::Height(720), 720),
+        (Resolution::Height(1080), 1080),
+        (Resolution::Height(1440), 1440),
     ];
     for (quality, base, target) in PRESETS {
         for (resolution, height) in resolutions {
@@ -170,22 +170,22 @@ fn bitrate_table_for_each_preset_and_resolution() {
 
 #[test]
 fn bitrate_anchors() {
-    let c = config(Quality::High, Resolution::P1080, 60, 1080);
+    let c = config(Quality::High, Resolution::Height(1080), 60, 1080);
     assert_eq!(c.video_bitrate, 12_000_000);
     assert_eq!(c.video_peak, 24_000_000);
     assert_eq!(c.max_height, Some(1080));
     assert_eq!(c.gop_frames, 60);
     assert_eq!(c.audio_bitrate, 192_000);
-    let c = config(Quality::High, Resolution::P1440, 60, 1440);
+    let c = config(Quality::High, Resolution::Height(1440), 60, 1440);
     assert!((18_400_000..18_600_000).contains(&c.video_bitrate));
-    let c = config(Quality::Balanced, Resolution::P1080, 30, 1080);
+    let c = config(Quality::Balanced, Resolution::Height(1080), 30, 1080);
     assert!((4_550_000..4_650_000).contains(&c.video_bitrate));
     assert_eq!(c.gop_frames, 30);
 }
 
 #[test]
 fn resolution_never_exceeds_native() {
-    let c = config(Quality::High, Resolution::P1440, 60, 1080);
+    let c = config(Quality::High, Resolution::Height(1440), 60, 1080);
     assert_eq!(c.max_height, Some(1080));
     assert_eq!(c.video_bitrate, 12_000_000);
 }
@@ -204,19 +204,23 @@ fn estimate(quality: Quality, resolution: Resolution, fps: u32) -> f64 {
         fps,
         ..Settings::default()
     }
-    .estimated_mb_per_minute()
+    .estimated_mb_per_minute(1440)
 }
 
 #[test]
 fn estimate_is_the_scaled_mean_plus_audio() {
-    let mb = estimate(Quality::High, Resolution::P1080, 60);
+    let mb = estimate(Quality::High, Resolution::Height(1080), 60);
     let expected = (12e6 * 0.6 + 192_000.0) * 60.0 / 8.0 / 1e6;
     assert!((mb - expected).abs() < 1e-9);
 }
 
 #[test]
 fn estimate_grows_with_quality_resolution_and_fps() {
-    for resolution in [Resolution::P720, Resolution::P1080, Resolution::P1440] {
+    for resolution in [
+        Resolution::Height(720),
+        Resolution::Height(1080),
+        Resolution::Height(1440),
+    ] {
         let balanced = estimate(Quality::Balanced, resolution, 60);
         let high = estimate(Quality::High, resolution, 60);
         let max = estimate(Quality::Max, resolution, 60);
@@ -224,19 +228,66 @@ fn estimate_grows_with_quality_resolution_and_fps() {
         assert!(estimate(Quality::High, resolution, 30) < high);
     }
     for quality in [Quality::Balanced, Quality::High, Quality::Max] {
-        assert!(estimate(quality, Resolution::P720, 60) < estimate(quality, Resolution::P1080, 60));
         assert!(
-            estimate(quality, Resolution::P1080, 60) < estimate(quality, Resolution::P1440, 60)
+            estimate(quality, Resolution::Height(720), 60)
+                < estimate(quality, Resolution::Height(1080), 60)
+        );
+        assert!(
+            estimate(quality, Resolution::Height(1080), 60)
+                < estimate(quality, Resolution::Height(1440), 60)
         );
     }
 }
 
 #[test]
-fn native_estimate_assumes_1440p() {
+fn native_estimate_at_1440_matches_a_1440_height() {
     assert_eq!(
         estimate(Quality::High, Resolution::Native, 60),
-        estimate(Quality::High, Resolution::P1440, 60)
+        estimate(Quality::High, Resolution::Height(1440), 60)
     );
+}
+
+#[test]
+fn native_estimate_follows_the_given_display_height() {
+    assert!(estimate_at(Resolution::Native, 2160) > estimate_at(Resolution::Native, 1440));
+    assert_eq!(
+        estimate_at(Resolution::Native, 1080),
+        estimate_at(Resolution::Height(1080), 1080)
+    );
+}
+
+#[test]
+fn a_height_above_the_display_estimates_at_the_display() {
+    assert_eq!(
+        estimate_at(Resolution::Height(1440), 1080),
+        estimate_at(Resolution::Height(1080), 1080)
+    );
+}
+
+fn estimate_at(resolution: Resolution, native: u32) -> f64 {
+    Settings {
+        resolution,
+        ..Settings::default()
+    }
+    .estimated_mb_per_minute(native)
+}
+
+#[test]
+fn validate_keeps_a_saved_height_in_range() {
+    for (input, expected) in [(0, 144), (720, 720), (1200, 1200), (99_999, 4320)] {
+        let mut s = Settings {
+            resolution: Resolution::Height(input),
+            ..Settings::default()
+        };
+        s.validate();
+        assert_eq!(s.resolution, Resolution::Height(expected));
+    }
+    let mut s = Settings {
+        resolution: Resolution::Native,
+        ..Settings::default()
+    };
+    s.validate();
+    assert_eq!(s.resolution, Resolution::Native);
 }
 
 #[test]
@@ -245,7 +296,7 @@ fn audio_off_lowers_the_estimate() {
         audio: false,
         ..Settings::default()
     };
-    assert!(off.estimated_mb_per_minute() < Settings::default().estimated_mb_per_minute());
+    assert!(off.estimated_mb_per_minute(1440) < Settings::default().estimated_mb_per_minute(1440));
 }
 
 #[test]

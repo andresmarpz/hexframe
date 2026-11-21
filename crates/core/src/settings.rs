@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 use crate::media::CaptureConfig;
 use crate::paths;
 
+mod resolution;
+
+pub use resolution::{
+    MAX_HEIGHT, MIN_HEIGHT, RESOLUTION_LADDER, Resolution, ResolutionOption, resolution_options,
+};
+
 const AUDIO_BITRATE: u32 = 192_000;
 const REFERENCE_PIXELS: f64 = 1920.0 * 1080.0;
 const REFERENCE_FPS: f64 = 60.0;
@@ -14,7 +20,6 @@ const PIXEL_EXPONENT: f64 = 0.75;
 const FPS_EXPONENT: f64 = 0.8;
 const PEAK_FACTOR: f64 = 2.0;
 const QUALITY_MODE_SIZE_FACTOR: f64 = 0.6;
-const ESTIMATE_NATIVE_HEIGHT: u32 = 1440;
 const MAX_CLIP_SECS: u32 = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -39,26 +44,6 @@ impl Quality {
             Quality::Balanced => 60,
             Quality::High => 70,
             Quality::Max => 80,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum Resolution {
-    Native,
-    P1440,
-    #[default]
-    P1080,
-    P720,
-}
-
-impl Resolution {
-    fn height(self) -> Option<u32> {
-        match self {
-            Resolution::Native => None,
-            Resolution::P1440 => Some(1440),
-            Resolution::P1080 => Some(1080),
-            Resolution::P720 => Some(720),
         }
     }
 }
@@ -163,6 +148,7 @@ impl Settings {
         } else {
             60
         };
+        self.resolution = self.resolution.clamped();
         self.clips.pre_secs = self.clips.pre_secs.clamp(1, MAX_CLIP_SECS);
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
     }
@@ -194,8 +180,11 @@ impl Settings {
         }
     }
 
-    pub fn estimated_mb_per_minute(&self) -> f64 {
-        let height = self.resolution.height().unwrap_or(ESTIMATE_NATIVE_HEIGHT);
+    pub fn estimated_mb_per_minute(&self, native_height: u32) -> f64 {
+        let height = self
+            .resolution
+            .height()
+            .map_or(native_height, |h| h.min(native_height));
         let (mean, _) = self.mean_bitrate(height);
         let video = mean * QUALITY_MODE_SIZE_FACTOR;
         let audio = if self.audio {

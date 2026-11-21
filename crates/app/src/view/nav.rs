@@ -17,7 +17,15 @@ const ITEMS: [(Screen, &str, &str); 3] = [
     (Screen::Settings, "nav-settings", "Settings"),
 ];
 
-pub(super) fn bar(s: &Ui, k: &Kit) -> El {
+const LEADING_PAD: f32 = 20.0;
+const TRAFFIC_LIGHT_GAP: f32 = 12.0;
+
+pub(super) fn bar(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
+    let leading = if titlebar_inset > 0.0 {
+        titlebar_inset + TRAFFIC_LIGHT_GAP
+    } else {
+        LEADING_PAD
+    };
     let mut tabs = row().key("nav-tabs").gap(4.0).center_y();
     for (screen, key, label) in ITEMS {
         let active =
@@ -43,11 +51,13 @@ pub(super) fn bar(s: &Ui, k: &Kit) -> El {
             row()
                 .w_full()
                 .h(52.0)
-                .px(20.0)
+                .pl(leading)
+                .pr(LEADING_PAD)
                 .center_y()
                 .justify_between()
                 .child(
                     row()
+                        .key("nav-brand")
                         .gap(10.0)
                         .center_y()
                         .child(rune::icon(&LOGO, 20.0).color(k.c.bg_accent).a11y_hidden())

@@ -199,11 +199,11 @@ fn events_in_the_first_seconds_land_at_zero() {
 #[test]
 fn size_estimate_rounds_and_marks_native() {
     assert_eq!(
-        format_size_estimate(63.4, false),
+        format_size_estimate(63.4, None),
         "About 65 MB per minute, about 1.9 GB for a 30-minute game"
     );
     assert_eq!(
-        format_size_estimate(412.0, true),
+        format_size_estimate(412.0, Some(1440)),
         "About 410 MB per minute, about 12 GB for a 30-minute game (at 1440p)"
     );
 }

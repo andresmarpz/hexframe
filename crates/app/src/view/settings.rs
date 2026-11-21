@@ -1,7 +1,7 @@
 use greyscreen_core::paths;
-use greyscreen_core::settings::{Quality, Resolution};
+use greyscreen_core::settings::{Quality, Resolution, resolution_options};
 use greyscreen_engine::reveal;
-use rune::{El, FileDialogOptions, ScrollSpec, col, row, text};
+use rune::{El, FileDialogOptions, col, row, text};
 use rune_kit::{
     Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, Switch, TextInput,
 };
@@ -15,21 +15,15 @@ const QUALITIES: [(Quality, &str); 3] = [
     (Quality::High, "High"),
     (Quality::Max, "Max"),
 ];
-const RESOLUTIONS: [(Resolution, &str); 4] = [
-    (Resolution::Native, "Native"),
-    (Resolution::P1440, "1440p"),
-    (Resolution::P1080, "1080p"),
-    (Resolution::P720, "720p"),
-];
+const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
 const FPS_OPTIONS: [u32; 2] = [30, 60];
 const CONTROL_WIDTH: f32 = 220.0;
+const RESOLUTION_WIDTH: f32 = 200.0;
 
 pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     col()
         .key("settings")
         .w_full()
-        .h_full()
-        .min_h(0.0)
         .gap(16.0)
         .child(page_header(
             k,
@@ -39,22 +33,12 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
         ))
         .child(
             col()
-                .key("settings-scroll")
                 .w_full()
-                .grow(1.0)
-                .min_h(0.0)
-                .scroll(ScrollSpec {
-                    stick_bottom: false,
-                })
-                .child(
-                    col()
-                        .w_full()
-                        .gap(20.0)
-                        .child(recording_section(s, k, layer))
-                        .child(clips_section(s, k))
-                        .child(storage_section(s, k))
-                        .child(about_section(s, k)),
-                ),
+                .gap(20.0)
+                .child(recording_section(s, k, layer))
+                .child(clips_section(s, k))
+                .child(storage_section(s, k))
+                .child(about_section(s, k)),
         )
 }
 
@@ -133,21 +117,25 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
     .build(k)
     .key("quality");
-    let current = RESOLUTIONS
+    let displays = connected_displays();
+    let options = resolution_options(&displays, settings.resolution);
+    let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
+    let current = options
         .iter()
-        .find(|(r, _)| *r == settings.resolution)
-        .map(|(_, label)| *label);
-    let resolution = Select::new("resolution", &RESOLUTIONS.map(|(_, label)| label))
+        .find(|o| o.resolution == settings.resolution)
+        .map(|o| o.label.as_str());
+    let resolution = Select::new("resolution", &labels)
         .current(current)
         .open(s.resolution_open)
-        .width(140.0)
+        .width(RESOLUTION_WIDTH)
         .label("Resolution")
         .on_toggle(|ui: &mut Ui| ui.resolution_open = !ui.resolution_open)
         .on_close(|ui: &mut Ui| ui.resolution_open = false)
-        .on_choose(|ui: &mut Ui, value: &str, _: &mut rune::Tx| {
+        .on_choose(move |ui: &mut Ui, value: &str, _: &mut rune::Tx| {
             ui.resolution_open = false;
-            if let Some((resolution, _)) = RESOLUTIONS.iter().find(|(_, label)| *label == value) {
-                ui.change(|s| s.resolution = *resolution);
+            if let Some(option) = options.iter().find(|o| o.label == value) {
+                let resolution = option.resolution;
+                ui.change(|s| s.resolution = resolution);
             }
         })
         .build(k, layer);
@@ -202,7 +190,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 Some("60 is smoother, 30 uses less disk space."),
                 fps,
             ),
-            size_estimate(s, k),
+            size_estimate(s, k, native_height(&displays)),
             toggle_row(
                 k,
                 "audio",
@@ -223,15 +211,30 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     )
 }
 
-fn size_estimate(s: &Ui, k: &Kit) -> El {
-    let native = s.settings.resolution == Resolution::Native;
-    let line = format_size_estimate(s.settings.estimated_mb_per_minute(), native);
+fn size_estimate(s: &Ui, k: &Kit, display_height: Option<u32>) -> El {
+    let native_height = display_height.unwrap_or(FALLBACK_NATIVE_HEIGHT);
+    let native = (s.settings.resolution == Resolution::Native).then_some(native_height);
+    let line = format_size_estimate(s.settings.estimated_mb_per_minute(native_height), native);
     row()
         .key("size-estimate")
         .w_full()
         .px(16.0)
         .py(10.0)
         .child(text(line).font(k.ty.small).color(k.c.text_muted))
+}
+
+fn native_height(displays: &[(u32, u32)]) -> Option<u32> {
+    displays.iter().map(|&(_, h)| h).filter(|&h| h > 0).max()
+}
+
+#[cfg(windows)]
+fn connected_displays() -> Vec<(u32, u32)> {
+    greyscreen_capture::displays::connected_sizes()
+}
+
+#[cfg(not(windows))]
+fn connected_displays() -> Vec<(u32, u32)> {
+    Vec::new()
 }
 
 fn secs_input(

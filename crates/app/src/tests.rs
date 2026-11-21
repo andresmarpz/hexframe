@@ -1,7 +1,7 @@
 use crossbeam_channel::{Receiver, unbounded};
-use greyscreen_core::settings::{Quality, Settings};
+use greyscreen_core::settings::{Quality, Resolution, Settings};
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{Env, Key, KeyEvent, Mods, Runtime};
+use rune::{Chrome, Env, Key, KeyEvent, Mods, Runtime};
 
 use crate::ui::fake_player::{self, Call};
 use crate::ui::{Screen, Source, Ui, parse_clip_secs};
@@ -572,4 +572,135 @@ fn the_event_card_also_shows_in_theater() {
     hover(&mut rt, "marker-8");
     rt.frame(0.2);
     assert!(rt.find("event-card").is_some());
+}
+
+fn nav_rect_of(rt: &Runtime<Ui>, key: &str) -> [f32; 4] {
+    rt.elements()
+        .into_iter()
+        .find(|e| e.key.as_deref() == Some(key))
+        .unwrap_or_else(|| panic!("no element {key}"))
+        .rect
+}
+
+fn settle(rt: &mut Runtime<Ui>) {
+    for _ in 0..60 {
+        rt.frame(1.0 / 60.0);
+    }
+}
+
+#[test]
+fn the_logo_clears_the_window_buttons() {
+    let mut rt = runtime();
+    let flush_left = nav_rect_of(&rt, "nav-brand")[0];
+    assert!(
+        flush_left < 40.0,
+        "without buttons the logo stays at the edge"
+    );
+    let inset = Chrome::DEFAULT.titlebar_inset();
+    assert!(inset > 0.0);
+    rt.set_titlebar_inset(inset);
+    settle(&mut rt);
+    let brand = nav_rect_of(&rt, "nav-brand");
+    assert!(
+        brand[0] >= inset + 8.0,
+        "logo starts at {}, the buttons end at {inset}",
+        brand[0]
+    );
+    let tabs = nav_rect_of(&rt, "nav-tabs");
+    assert!(
+        brand[0] + brand[2] < tabs[0],
+        "the tabs still fit beside the logo"
+    );
+}
+
+#[test]
+fn the_logo_clears_the_window_buttons_on_every_screen() {
+    let mut rt = runtime();
+    rt.set_titlebar_inset(Chrome::DEFAULT.titlebar_inset());
+    settle(&mut rt);
+    for key in ["nav-recordings", "nav-settings", "nav-status"] {
+        tap(&mut rt, key);
+        settle(&mut rt);
+        assert!(nav_rect_of(&rt, "nav-brand")[0] >= Chrome::DEFAULT.titlebar_inset());
+    }
+}
+
+#[test]
+fn the_whole_settings_page_scrolls_under_a_fixed_nav() {
+    let mut rt = runtime();
+    tap(&mut rt, "nav-settings");
+    let heading = nav_rect_of(&rt, "page-header");
+    let nav = nav_rect_of(&rt, "nav");
+    assert!(
+        rt.find("settings-scroll").is_none(),
+        "no inner scroll region"
+    );
+    rt.wheel(480.0, 320.0, -240.0);
+    for _ in 0..30 {
+        rt.frame(1.0 / 60.0);
+    }
+    let moved = nav_rect_of(&rt, "page-header");
+    assert!(
+        moved[1] < heading[1] - 100.0,
+        "the heading scrolled away: {} -> {}",
+        heading[1],
+        moved[1]
+    );
+    assert_eq!(nav_rect_of(&rt, "nav"), nav);
+}
+
+fn visible_texts(rt: &Runtime<Ui>) -> Vec<String> {
+    rt.accessibility_tree()
+        .nodes
+        .iter()
+        .flat_map(|(_, node)| [node.label(), node.value()])
+        .flatten()
+        .map(str::to_owned)
+        .collect()
+}
+
+fn open_resolution_menu(rt: &mut Runtime<Ui>) {
+    tap(rt, "nav-settings");
+    tap(rt, "resolution-trigger");
+    for _ in 0..30 {
+        rt.frame(1.0 / 60.0);
+    }
+}
+
+#[test]
+fn picking_a_height_from_the_menu_stores_that_height() {
+    let mut rt = runtime();
+    open_resolution_menu(&mut rt);
+    tap(&mut rt, "option3");
+    assert_eq!(rt.state.settings.resolution, Resolution::Height(1200));
+    assert!(!rt.state.resolution_open);
+    open_resolution_menu_again(&mut rt);
+    tap(&mut rt, "option0");
+    assert_eq!(rt.state.settings.resolution, Resolution::Native);
+}
+
+fn open_resolution_menu_again(rt: &mut Runtime<Ui>) {
+    tap(rt, "resolution-trigger");
+    for _ in 0..30 {
+        rt.frame(1.0 / 60.0);
+    }
+}
+
+#[test]
+fn the_menu_lists_native_then_the_ladder_without_a_detected_display() {
+    let mut rt = runtime();
+    open_resolution_menu(&mut rt);
+    let texts = visible_texts(&rt);
+    for label in ["Native", "2160p", "1440p", "1200p", "720p"] {
+        assert!(texts.iter().any(|t| t == label), "missing {label}");
+    }
+}
+
+#[test]
+fn a_saved_height_outside_the_ladder_stays_selectable() {
+    let mut rt = runtime();
+    rt.update(|ui, _| ui.settings.resolution = Resolution::Height(800));
+    rt.frame(1.0 / 60.0);
+    open_resolution_menu(&mut rt);
+    assert!(visible_texts(&rt).iter().any(|t| t == "800p"));
 }

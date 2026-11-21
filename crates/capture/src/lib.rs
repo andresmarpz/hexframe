@@ -7,6 +7,7 @@ pub mod clock;
 pub mod com;
 pub mod crash;
 pub mod d3d;
+pub mod displays;
 pub mod h264;
 pub mod install;
 pub mod instance;
