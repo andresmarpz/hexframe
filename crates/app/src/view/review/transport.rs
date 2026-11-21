@@ -91,10 +91,10 @@ pub(super) fn transport(review: &ReviewState, k: &Kit, theater: bool, width: Opt
     }
     buttons = buttons.child(el().grow(1.0));
     if show.speed {
-        buttons = buttons.child(controls::speed_menu(review, k, &mut Vec::new()));
+        buttons = buttons.child(controls::speed_trigger(review, k));
     }
     let buttons = buttons
-        .child(controls::volume_control(review, k, &mut Vec::new()))
+        .child(controls::volume_trigger(review, k))
         .child(screen_button(theater, k));
     col()
         .key("review-controls")

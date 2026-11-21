@@ -33,10 +33,18 @@ fn speed_name(index: usize) -> String {
     }
 }
 
-pub(super) fn speed_menu(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) -> El {
+fn speed_menu(open: bool) -> Menu {
+    Menu::new("speed-menu")
+        .open(open)
+        .placement(Placement::TopEnd)
+        .min_width(144.0)
+        .on_close(|ui: &mut Ui| ui.review_speed_menu(false))
+}
+
+pub(super) fn speed_trigger(review: &ReviewState, k: &Kit) -> El {
     let open = review.speed_menu;
     let label = speed_label(review.speed_rate());
-    let trigger = Button::new(label.clone())
+    let button = Button::new(label.clone())
         .variant(ButtonVariant::Ghost)
         .control_size(ControlSize::Regular)
         .help("Playback speed")
@@ -46,12 +54,14 @@ pub(super) fn speed_menu(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) -> 
         .build(k)
         .w(SPEED_WIDTH)
         .key("review-speed");
-    let mut menu = Menu::new("speed-menu")
-        .trigger(trigger)
-        .open(open)
-        .placement(Placement::TopEnd)
-        .min_width(144.0)
-        .on_close(|ui: &mut Ui| ui.review_speed_menu(false));
+    speed_menu(open).trigger(button).build(k, &mut Vec::new())
+}
+
+fn speed_overlay(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) {
+    if !review.speed_menu {
+        return;
+    }
+    let mut menu = speed_menu(true);
     for index in 0..SPEEDS.len() {
         menu = menu.item(
             MenuItem::new(speed_name(index))
@@ -59,7 +69,7 @@ pub(super) fn speed_menu(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) -> 
                 .on_select(move |ui: &mut Ui| ui.review_set_speed(index)),
         );
     }
-    menu.build(k, layer)
+    menu.build(k, layer);
 }
 
 fn percent(volume: f32) -> u32 {
@@ -144,7 +154,16 @@ fn popover_body(review: &ReviewState, k: &Kit) -> El {
         )
 }
 
-pub(super) fn volume_control(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) -> El {
+fn volume_popover(open: bool) -> Popover {
+    Popover::new("volume")
+        .label("Volume")
+        .padding(0.0)
+        .placement(Placement::Top)
+        .gutter(4.0)
+        .open(open)
+}
+
+pub(super) fn volume_trigger(review: &ReviewState, k: &Kit) -> El {
     let open = review.volume_open();
     let (icon, name) = if review.shown_volume() <= 0.0 {
         (&icons::MUTED, "Unmute")
@@ -165,17 +184,17 @@ pub(super) fn volume_control(review: &ReviewState, k: &Kit, layer: &mut Vec<El>)
         .key("review-mute")
         .on_hover_change(|ui: &mut Ui, inside, _| ui.review_volume_hover(|h| h.button = inside))
         .hover_delays(HOVER_ENTER, HOVER_LEAVE);
-    let mut popover = Popover::new("volume")
+    volume_popover(open)
         .trigger(trigger)
-        .label("Volume")
-        .padding(0.0)
-        .placement(Placement::Top)
-        .gutter(4.0)
-        .open(open);
-    if open {
-        popover = popover.child(popover_body(review, k));
+        .build(k, &mut Vec::new())
+}
+
+fn volume_overlay(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) {
+    if review.volume_open() {
+        volume_popover(true)
+            .child(popover_body(review, k))
+            .build(k, layer);
     }
-    popover.build(k, layer)
 }
 
 pub(crate) fn layer(ui: &Ui, k: &Kit, layer: &mut Vec<El>) {
@@ -184,6 +203,6 @@ pub(crate) fn layer(ui: &Ui, k: &Kit, layer: &mut Vec<El>) {
     };
     let dark = Kit::neutral(true);
     let k = if review.theater { &dark } else { k };
-    speed_menu(review, k, layer);
-    volume_control(review, k, layer);
+    speed_overlay(review, k, layer);
+    volume_overlay(review, k, layer);
 }
