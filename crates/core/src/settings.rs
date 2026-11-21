@@ -53,6 +53,13 @@ impl Quality {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum NavStyle {
+    #[default]
+    Sidebar,
+    Dock,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClipSettings {
@@ -107,6 +114,8 @@ pub struct Settings {
     pub legacy_save_clip_hotkey: Option<Option<String>>,
     pub storage_limit_gb: Option<u32>,
     pub check_updates: bool,
+    pub nav_style: NavStyle,
+    pub sidebar_collapsed: bool,
 }
 
 impl Default for Settings {
@@ -125,6 +134,8 @@ impl Default for Settings {
             legacy_save_clip_hotkey: None,
             storage_limit_gb: None,
             check_updates: true,
+            nav_style: NavStyle::default(),
+            sidebar_collapsed: false,
         }
     }
 }

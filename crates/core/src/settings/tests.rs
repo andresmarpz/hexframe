@@ -475,3 +475,36 @@ fn storage_limit_bytes_use_decimal_gigabytes() {
     };
     assert_eq!(s.storage_limit_bytes(), Some(100_000_000_000));
 }
+
+#[test]
+fn navigation_defaults_to_an_open_sidebar() {
+    let s = Settings::default();
+    assert_eq!(s.nav_style, NavStyle::Sidebar);
+    assert!(!s.sidebar_collapsed);
+}
+
+#[test]
+fn navigation_settings_survive_a_save() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    let s = Settings {
+        nav_style: NavStyle::Dock,
+        sidebar_collapsed: true,
+        ..Settings::default()
+    };
+    s.save(&path).unwrap();
+    let loaded = Settings::load(&path);
+    assert_eq!(loaded.nav_style, NavStyle::Dock);
+    assert!(loaded.sidebar_collapsed);
+}
+
+#[test]
+fn an_old_settings_file_reads_as_sidebar() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"quality":"Max"}"#).unwrap();
+    let s = Settings::load(&path);
+    assert_eq!(s.nav_style, NavStyle::Sidebar);
+    assert!(!s.sidebar_collapsed);
+    assert_eq!(s.quality, Quality::Max);
+}
