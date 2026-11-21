@@ -16,6 +16,7 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 
 - No comments or doc comments, except one line in plain English when a "why" is not obvious. Names carry the meaning. Never mention tickets or files in code.
 - Files stay under 500 lines, excluding tests. Tests go in a sibling `tests.rs` (`#[cfg(test)] mod tests;`) or in `tests/` for integration tests.
+- Use rune-kit components with their own look. Never restyle or rebuild a kit component (buttons, segmented controls, selects, switches, badges) with custom colours or a local copy. If the kit can't do something, keep the kit's look and say so in the report.
 - `unsafe` only in `capture` and the Windows locator, and each block carries a `// SAFETY:` line (clippy `undocumented_unsafe_blocks`).
 - No `unwrap`/`expect` outside tests, except on a mutex lock.
 - Libraries return `thiserror` errors. Binaries use `anyhow`.

@@ -3,10 +3,10 @@ use greyscreen_core::settings::{Quality, Resolution, resolution_options};
 use greyscreen_engine::reveal;
 use rune::{El, FileDialogOptions, Icon, col, row, text};
 use rune_kit::{
-    Button, ButtonVariant, ControlSize, Kit, Select, SelectAppearance, Switch, TextInput,
+    Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, SelectAppearance, Switch,
+    TextInput,
 };
 
-use super::segmented::segmented;
 use super::{card, hairline, page_header};
 
 use crate::ui::{Ui, format_size_estimate, parse_clip_secs};
@@ -116,14 +116,15 @@ fn toggle_row(
 
 fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let settings = &s.settings;
-    let quality = segmented(
-        k,
-        "quality",
-        "Quality",
+    let quality = SegmentedControl::new(
         &QUALITIES.map(|(_, label)| label),
         QUALITIES.iter().position(|(q, _)| *q == settings.quality),
-        |ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0),
-    );
+    )
+    .label("Quality")
+    .fit()
+    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
+    .build(k)
+    .key("quality");
     let displays = connected_displays();
     let options = resolution_options(&displays, settings.resolution);
     let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
@@ -147,14 +148,15 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
             }
         })
         .build(k, layer);
-    let fps = segmented(
-        k,
-        "fps",
-        "Frame rate",
+    let fps = SegmentedControl::new(
         &FPS_OPTIONS.map(|f| f.to_string()),
         FPS_OPTIONS.iter().position(|f| *f == settings.fps),
-        |ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]),
-    );
+    )
+    .label("Frame rate")
+    .fit()
+    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]))
+    .build(k)
+    .key("fps");
     section(
         k,
         "recording-card",
