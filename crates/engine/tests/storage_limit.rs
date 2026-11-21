@@ -131,12 +131,12 @@ fn with_the_limit_off_nothing_is_deleted() {
         output_dir: temp_dir("limit-off"),
         ..Settings::default()
     };
-    old_game(&settings.output_dir, "huge", 1, 900 * GB);
+    old_game(&settings.output_dir, "big", 1, 4_000_000);
     let output = settings.output_dir.clone();
     let harness = start_idle(settings, Arc::new(FakeMediaSource::new()));
     wait_for(&harness.ui, |msg| {
         matches!(msg, UiMsg::Library(_)).then_some(())
     })
     .expect("startup scan");
-    assert!(output.join("huge/game.mp4").is_file());
+    assert!(output.join("big/game.mp4").is_file());
 }
