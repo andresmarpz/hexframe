@@ -35,6 +35,11 @@ const RING_POLL: Duration = Duration::from_millis(2);
 /// How long before a picture's time the decoder presents it on the clip's layer: the display
 /// shows it at the first refresh after.
 const LAYER_LEAD: Duration = Duration::from_millis(2);
+/// A picture this far past its time on the layer is dropped, not presented: a decoder that fell
+/// behind catches up in one jump instead of replaying what it missed fast.
+const LAYER_LATE: Duration = Duration::from_millis(100);
+/// The layer shows a picture at least this often, however late the pictures are.
+const LAYER_GAP: Duration = Duration::from_millis(250);
 
 /// How long a clip that opens before Rune has a GPU waits for it (`rune_device`).
 const GPU_WAIT: Duration = Duration::from_secs(3);
@@ -365,6 +370,8 @@ impl Decoder {
         let mut retried = false;
         // A fast seek shows the first picture it decodes, the keyframe at or before its time.
         let mut keyframe = false;
+        // When the last picture was handled without dropping it.
+        let mut handled_at = Instant::now();
         loop {
             // Take the UI's asks, then wait for room in the queue and a free texture.
             {
@@ -388,6 +395,7 @@ impl Decoder {
                         skip_before = to;
                         epoch = 0.0;
                         (skipped, delivered, retried, keyframe) = (None, false, false, seek.fast);
+                        handled_at = Instant::now();
                         mf::seek(&self.reader, to)?;
                         self.reopen_streams();
                         if let Some(o) = &self.output {
@@ -465,8 +473,12 @@ impl Decoder {
                 if video {
                     if !keyframe && read.time + self.facts.meta.frame * 0.5 < skip_before {
                         skipped = Some(read.time);
+                    } else if !keyframe && self.late_for_layer(pipe, job, epoch + read.time, handled_at) {
+                        delivered = true;
+                        pipe.lock().touched = Some(Instant::now());
                     } else {
                         (delivered, keyframe) = (true, false);
+                        handled_at = Instant::now();
                         let (picture, texture) = self.picture(&sample)?;
                         let pts = epoch + read.time;
                         let blitted = self.blit_on_layer(pipe, job, texture);
@@ -548,6 +560,14 @@ impl Decoder {
         self.audio_open = self.reads_sound();
     }
 
+
+    /// The layer shows the pictures, the clock runs, and this picture is too late to show: the
+    /// decoder fell behind, and its next pictures catch up with the clock.
+    fn late_for_layer(&self, pipe: &Pipe, job: &Job, pts: f64, handled_at: Instant) -> bool {
+        let Some(clock) = job.clock.get().filter(|_| self.layer.is_some()) else { return false };
+        let now = Instant::now();
+        now.saturating_duration_since(clock.when(pts)) > LAYER_LATE && now.saturating_duration_since(handled_at) < LAYER_GAP && pipe.lock().layer.is_some()
+    }
 
     /// Makes, resizes or lets go of the clip's layer as the window asks (`Inbox::layer`).
     fn follow_layer(&mut self, s: &mut Inbox) {

@@ -196,6 +196,47 @@ fn the_layer_plays_with_sound_and_a_pause_there_holds_its_picture() {
     assert!(held.iter().all(|s| s.picture == shot.picture && s.time == shot.time), "the paused picture moved");
 }
 
+/// The most pictures shown in any `window` of the times they were shown.
+fn busiest(shown: &[Instant], window: Duration) -> usize {
+    (0..shown.len()).map(|i| shown[i..].iter().take_while(|t| t.saturating_duration_since(shown[i]) < window).count()).max().unwrap_or(0)
+}
+
+#[test]
+fn a_decoder_that_fell_behind_on_the_layer_jumps_to_the_clock_instead_of_playing_fast() {
+    let mut rig = open_playing(true);
+    let mut host = Host::open(window::mode()).expect("the layer's window");
+    rig.run(0.5);
+    rig.until(3.0, "the layer showing", |rig, _| {
+        let status = rig.layer(Some(SIZE));
+        if let (Some(host), Some(handle)) = (host.as_mut(), status.handle) {
+            host.show(handle).expect("the layer on the window");
+        }
+        status.showing
+    });
+    let pipe = rig.player.shared.native.lock().unwrap().pipe.clone().expect("the decoder's pipe");
+    let held = pipe.lock();
+    std::thread::sleep(secs(1.2));
+    drop(held);
+    let (mut shown, mut last) = (Vec::new(), None);
+    let end = Instant::now() + secs(0.8);
+    while Instant::now() < end {
+        let now = rig.presented();
+        if now != last {
+            shown.push(Instant::now());
+            last = now;
+        }
+        std::thread::sleep(Duration::from_micros(100));
+    }
+    let most = busiest(&shown, secs(0.1));
+    eprintln!("{} pictures shown in 0.8 s after a 1.2 s stall, at most {most} in 100 ms", shown.len());
+    assert!(most <= 10, "{most} pictures shown within 100 ms after the stall: the decoder replayed what it missed at {:.1}x", most as f64 / 6.0);
+    assert!(rig.layer(Some(SIZE)).showing, "the layer stopped showing");
+    let clock = rig.clock().expect("a running clock");
+    let on_layer = rig.presented().expect("a picture on the layer");
+    let behind = (clock.position(Instant::now()) - on_layer).rem_euclid(6.0);
+    assert!(behind < 0.1 || behind > 5.9, "the layer shows {on_layer:.3} s while the clock stands at {:.3} s", clock.position(Instant::now()));
+}
+
 /// Seeks one a frame for a second, as a drag on a seek bar sends them: `to` names each.
 fn storm(rig: &mut Rig, count: u32, fast: bool, to: impl Fn(u32) -> f64) -> Vec<Shot> {
     let mut shots = Vec::new();
