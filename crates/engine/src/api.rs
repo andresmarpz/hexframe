@@ -8,9 +8,11 @@ use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
+use greyscreen_core::update::UpdateState;
 use greyscreen_league::{GameLocator, LeagueMsg, LiveClient, Poller};
 
 use crate::control;
+use crate::updater::UpdateConfig;
 
 pub use greyscreen_core::session::Status as EngineStatus;
 
@@ -27,6 +29,8 @@ pub enum EngineCmd {
     DeleteRecording { id: String },
     SaveClipNow,
     HotkeyPressed,
+    CheckForUpdates,
+    InstallUpdate,
     Shutdown,
 }
 
@@ -69,6 +73,7 @@ pub enum UiMsg {
     Library(Vec<RecordingEntry>),
     Notice { level: NoticeLevel, text: String },
     HotkeyStatus { error: Option<String> },
+    Update(UpdateState),
 }
 
 pub type UiSink = Box<dyn Fn(UiMsg) + Send + Sync>;
@@ -99,6 +104,7 @@ pub struct EngineConfig {
     pub league: LeagueFactory,
     pub sink: UiSink,
     pub settings_path: Option<PathBuf>,
+    pub updates: Option<UpdateConfig>,
 }
 
 impl std::fmt::Debug for EngineConfig {
@@ -125,6 +131,7 @@ impl Engine {
             league,
             sink,
             settings_path: Some(paths::settings_file()),
+            updates: None,
         })
     }
 
@@ -135,6 +142,7 @@ impl Engine {
             league,
             sink,
             settings_path,
+            updates,
         } = config;
         settings.validate();
         let (cmd, cmd_rx) = unbounded();
@@ -145,6 +153,7 @@ impl Engine {
                 settings,
                 media,
                 settings_path,
+                updates,
                 cmd: cmd.clone(),
             },
             guard,

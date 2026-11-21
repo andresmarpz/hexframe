@@ -20,5 +20,8 @@ jiff.workspace = true
 [target.'cfg(windows)'.dependencies]
 greyscreen-capture.workspace = true
 
+[dev-dependencies]
+tempfile = "3"
+
 [lints]
 workspace = true

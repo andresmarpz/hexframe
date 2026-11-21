@@ -22,6 +22,7 @@ use crate::hotkey::Hotkeys;
 use crate::library;
 use crate::settings_save::SettingsSaver;
 use crate::storage::ActiveFolder;
+use crate::updater::{self, UpdateCmd, UpdateConfig, UpdateHandle};
 use crate::writer::Report;
 use meta::Recording;
 
@@ -40,6 +41,7 @@ pub(crate) struct Spec {
     pub(crate) settings: Settings,
     pub(crate) media: Arc<dyn MediaSource>,
     pub(crate) settings_path: Option<PathBuf>,
+    pub(crate) updates: Option<UpdateConfig>,
     pub(crate) cmd: Sender<EngineCmd>,
 }
 
@@ -67,6 +69,8 @@ struct Control {
     shutting_down: bool,
     test_stop_at: Option<Hns>,
     settings_saver: SettingsSaver,
+    updater: Option<UpdateHandle>,
+    update_busy: bool,
     hotkeys: Hotkeys,
     applied_hotkey: Option<Hotkey>,
     active_folder: ActiveFolder,
@@ -111,10 +115,15 @@ impl Control {
             settings,
             media,
             settings_path,
+            updates,
             cmd,
         } = spec;
         let (internal_tx, internal_rx) = unbounded();
+        let updater =
+            updates.and_then(|config| updater::spawn(config, settings.check_updates, sink.clone()));
         Self {
+            updater,
+            update_busy: false,
             settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
             hotkeys: Hotkeys::start(cmd, sink.clone()),
             applied_hotkey: settings.save_clip_hotkey.clone(),
@@ -173,6 +182,7 @@ impl Control {
                 },
                 recv(ticker) -> _ => self.on_tick(),
             }
+            self.sync_update_busy();
             if self.shutting_down {
                 let deadline = *deadline.get_or_insert_with(|| Instant::now() + SHUTDOWN_GRACE);
                 self.stop_active();
@@ -195,6 +205,8 @@ impl Control {
             }
             EngineCmd::DeleteRecording { id } => self.delete_recording(id),
             EngineCmd::SaveClipNow => self.save_clip_now(),
+            EngineCmd::CheckForUpdates => self.update_cmd(UpdateCmd::Check),
+            EngineCmd::InstallUpdate => self.update_cmd(UpdateCmd::Install),
             EngineCmd::HotkeyPressed => {
                 if matches!(self.session.state(), SessionState::Recording { .. }) {
                     self.save_clip_now();
@@ -220,6 +232,7 @@ impl Control {
     fn apply_settings(&mut self, mut settings: Settings) {
         settings.validate();
         let auto_record = settings.auto_record;
+        self.update_cmd_quiet(UpdateCmd::Auto(settings.check_updates));
         self.settings_saver.save(settings.clone());
         if settings.save_clip_hotkey != self.applied_hotkey {
             self.applied_hotkey = settings.save_clip_hotkey.clone();
@@ -301,6 +314,38 @@ impl Control {
     fn feed(&mut self, input: Input) {
         let effects = self.session.step(input);
         self.run_effects(effects);
+        self.sync_update_busy();
+    }
+
+    fn update_busy_now(&self) -> bool {
+        !matches!(
+            self.session.state(),
+            SessionState::Idle | SessionState::Cooldown
+        ) || self.recording.is_some()
+            || self.stopping
+    }
+
+    fn sync_update_busy(&mut self) {
+        let busy = self.update_busy_now();
+        if busy != self.update_busy {
+            self.update_busy = busy;
+            self.update_cmd_quiet(UpdateCmd::Busy(busy));
+        }
+    }
+
+    fn update_cmd_quiet(&self, cmd: UpdateCmd) {
+        if let Some(updater) = &self.updater {
+            updater.send(cmd);
+        }
+    }
+
+    fn update_cmd(&self, cmd: UpdateCmd) {
+        match &self.updater {
+            Some(updater) => updater.send(cmd),
+            None => self.send(UiMsg::Update(greyscreen_core::update::UpdateState::Failed(
+                "Updates are not available in this build.".into(),
+            ))),
+        }
     }
 
     fn send(&self, msg: UiMsg) {

@@ -82,6 +82,7 @@ fn start(tag: &str, auto_record: bool) -> Match {
             ui_tx.send(msg).ok();
         }),
         settings_path: None,
+        updates: None,
     });
     let mut ui = Ui::live(settings, engine.cmd.clone());
     ui.player_factory = fake_player::factory;

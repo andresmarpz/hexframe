@@ -9,6 +9,7 @@ mod recovery;
 mod ring;
 mod settings_save;
 mod storage;
+pub mod updater;
 mod writer;
 
 pub use api::{

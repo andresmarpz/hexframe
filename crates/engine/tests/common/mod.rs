@@ -93,6 +93,7 @@ pub(crate) fn start_engine(
         league,
         sink,
         settings_path: Some(settings_path.clone()),
+        updates: None,
     });
     Harness {
         engine: Some(engine),
