@@ -5,7 +5,7 @@ use greyscreen_core::review::deaths;
 use greyscreen_engine::RecordingEntry;
 use jiff::Zoned;
 
-use super::format_size;
+use crate::ui::format_size;
 
 const RECENT_DAYS: i64 = 6;
 const WEEK_SECS: i64 = 7 * 24 * 3600;

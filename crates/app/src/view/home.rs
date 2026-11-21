@@ -12,7 +12,7 @@ use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
 
 use super::champion::champion_icon;
 use super::{card, title_style};
-use crate::ui::library_format::mode_label;
+use crate::ui::library::format::mode_label;
 use crate::ui::{Detail, Ui, format_clock};
 
 const LEAGUE_HINT: &str =

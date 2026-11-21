@@ -1,6 +1,6 @@
 use rune::PointerPress;
 
-use super::Ui;
+use crate::ui::Ui;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RowMenu<'a> {

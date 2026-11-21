@@ -1,8 +1,8 @@
 use greyscreen_core::keybinds::Action;
 use greyscreen_engine::RecordingEntry;
 
-use super::Ui;
-use super::key_event::MAC;
+use crate::ui::MAC;
+use crate::ui::Ui;
 
 pub(crate) const RECENT_LIMIT: usize = 5;
 

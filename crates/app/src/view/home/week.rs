@@ -3,7 +3,7 @@ use rune::{El, col, row, text};
 use rune_kit::Kit;
 
 use crate::ui::Ui;
-use crate::ui::library_format::{WeekStats, total_time, week_stats};
+use crate::ui::library::format::{WeekStats, total_time, week_stats};
 use crate::view::{card, hairline, section_header, title_style};
 
 const TABULAR: &str = "'tnum' 1";

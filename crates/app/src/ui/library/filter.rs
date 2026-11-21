@@ -2,8 +2,8 @@ use greyscreen_core::game::GameResult;
 use greyscreen_engine::{EngineCmd, RecordingEntry};
 use rune::TextEdit;
 
-use super::Ui;
-use super::library_format::mode_label;
+use super::format::mode_label;
+use crate::ui::Ui;
 
 #[derive(Debug, Default)]
 pub(crate) struct RecordingsFilter {

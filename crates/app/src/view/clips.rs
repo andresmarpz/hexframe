@@ -4,7 +4,7 @@ use rune_kit::Kit;
 
 use super::thumb::{self, ASPECT};
 use super::{card, hairline};
-use crate::ui::library_format::{RecentClip, clip_title, game_secs_at, recent_clips, when};
+use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips, when};
 use crate::ui::{Ui, format_clock};
 
 const CARD_WIDTH: f32 = 256.0;

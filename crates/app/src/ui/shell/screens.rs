@@ -1,4 +1,4 @@
-use super::Ui;
+use crate::ui::Ui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Screen {

@@ -8,7 +8,7 @@ use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, gl
 
 use super::clearable::clear_when_filled;
 use super::grip::grip;
-use crate::ui::library_format::summary;
+use crate::ui::library::format::summary;
 use crate::ui::{ListItem, PaneEdge, Ui};
 
 pub(super) const ROW_HEIGHT: f32 = 60.0;

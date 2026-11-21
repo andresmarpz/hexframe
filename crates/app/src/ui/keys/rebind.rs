@@ -1,8 +1,8 @@
 use greyscreen_core::keybinds::{Action, BindError, KeyCombo};
 use rune::{Key, KeyEvent, Tx};
 
-use super::Ui;
-use super::key_event::{MAC, combo_of};
+use super::event::{MAC, combo_of};
+use crate::ui::Ui;
 
 const HINT_UNSUPPORTED: &str = "That key can't be used. Try another one.";
 

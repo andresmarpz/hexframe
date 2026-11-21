@@ -4,7 +4,7 @@ use rune_kit::{Button, ButtonVariant, Checkbox, ControlSize, Keybind, Kit, TextI
 
 use super::catalog::Row;
 use super::{setting_row, stacked_row, toggle_row};
-use crate::ui::key_event::MAC;
+use crate::ui::MAC;
 use crate::ui::{SettingsSection, Ui, parse_clip_secs};
 
 const MOMENTS_NOTE: &str =

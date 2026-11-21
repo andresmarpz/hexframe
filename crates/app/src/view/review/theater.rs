@@ -5,7 +5,7 @@ use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::panel::{PANEL_WIDTH, events_body};
 use super::{icons, result_label, transport, video_frame};
-use crate::ui::library_format::mode_label;
+use crate::ui::library::format::mode_label;
 use crate::ui::{ReviewState, Ui};
 
 const BAR_PAD_X: f32 = 24.0;

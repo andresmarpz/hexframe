@@ -1,7 +1,7 @@
 use rune::{Cursor, El, el, row, text};
 use rune_kit::Kit;
 
-use crate::ui::library_format::{RecentClip, clip_title, game_secs_at, recent_clips};
+use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips};
 use crate::ui::{Ui, format_clock};
 use crate::view::thumb::{self, ASPECT};
 use crate::view::{card, hairline, section_header};

@@ -6,7 +6,7 @@ use rune::{Key, Runtime};
 
 use super::{card_text, press, press_char, refresh, runtime_with, tap};
 use crate::ui::fake_player::{self, Call};
-use crate::ui::library_format::{death_hint, review_progress};
+use crate::ui::library::format::{death_hint, review_progress};
 use crate::ui::{Detail, Ui, death_entry};
 
 fn death_runtime() -> Runtime<Ui> {

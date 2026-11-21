@@ -5,7 +5,7 @@ use rune::{Cursor, El, TextStyle, Tx, col, row, text};
 use rune_kit::Kit;
 
 use super::{ROW_HEIGHT, TABULAR, dot};
-use crate::ui::library_format::{Kda, kda, mode_label, review_progress, when};
+use crate::ui::library::format::{Kda, kda, mode_label, review_progress, when};
 use crate::ui::{Ui, format_clock};
 use crate::view::champion::champion_icon;
 use crate::view::thumb;

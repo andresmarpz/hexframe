@@ -4,7 +4,7 @@ use rune::{Color, El, TextStyle, col, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::feed::tinted_pill;
-use crate::ui::library_format::{Kda, death_total, kda, mode_label};
+use crate::ui::library::format::{Kda, death_total, kda, mode_label};
 use crate::ui::{Ui, format_clock};
 use crate::view::thumb;
 use crate::view::{card, hairline, section_header};

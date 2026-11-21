@@ -1,6 +1,6 @@
 use rune::Tx;
 
-use super::{Screen, Ui};
+use crate::ui::{Screen, Ui};
 
 const AWAKE_SECS: f64 = 2.5;
 

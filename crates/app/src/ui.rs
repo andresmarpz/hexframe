@@ -11,27 +11,19 @@ use greyscreen_engine::{
 use rune::{PointerPress, TextEdit, Tx};
 
 mod death_review;
-mod dock;
 pub(crate) mod event_detail;
 mod feedback;
 mod format;
 mod jump;
-pub(crate) mod key_event;
-mod keybinds;
 mod keys;
-pub(crate) mod library_format;
-mod panes;
+pub(crate) mod library;
 mod preview;
 mod preview_thumbs;
-pub(crate) mod recordings_filter;
 mod review;
 mod review_sound;
-mod row_menu;
 mod scenes;
-mod screens;
-mod selection;
 mod settings_sheet;
-mod sidebar;
+mod shell;
 mod tone;
 mod update;
 
@@ -43,19 +35,16 @@ mod paired_sound;
 mod tests;
 
 pub(crate) use death_review::{DeathReviewState, title_line};
-pub(crate) use dock::DockState;
 pub(crate) use feedback::{FeedbackPhase, FeedbackUi, MESSAGE_KEY as FEEDBACK_MESSAGE_KEY};
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
-pub(crate) use panes::{PaneDrag, PaneEdge};
-pub(crate) use recordings_filter::RecordingsFilter;
+pub(crate) use keys::MAC;
+pub(crate) use library::{Detail, ListItem, RecordingsFilter};
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use review_sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
 pub(crate) use scenes::SCENES;
-pub(crate) use screens::Screen;
-pub(crate) use selection::{Detail, ListItem};
 pub(crate) use settings_sheet::SettingsSection;
-pub(crate) use sidebar::{LibraryTotals, RECENT_LIMIT};
+pub(crate) use shell::{DockState, LibraryTotals, PaneDrag, PaneEdge, RECENT_LIMIT, Screen};
 pub(crate) use tone::tone_color;
 pub(crate) use update::UpdateUi;
 

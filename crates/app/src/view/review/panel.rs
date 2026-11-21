@@ -9,7 +9,7 @@ use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant
 use super::card::hoverable;
 use super::tabular;
 use super::timeline::event_color;
-use crate::ui::library_format::{clip_title, humanize};
+use crate::ui::library::format::{clip_title, humanize};
 use crate::ui::{EventFilter, PanelTab, ReviewState, Source, Ui, format_clock, seek_target};
 use crate::view::{card, hairline, thumb};
 

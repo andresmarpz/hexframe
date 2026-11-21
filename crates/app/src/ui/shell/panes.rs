@@ -1,7 +1,7 @@
 use greyscreen_core::settings::{LIST_WIDTH, NAV_WIDTH, PaneWidth};
 use greyscreen_engine::EngineCmd;
 
-use super::Ui;
+use crate::ui::Ui;
 
 pub(crate) const STEP: i32 = 8;
 

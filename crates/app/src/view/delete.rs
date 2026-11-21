@@ -4,7 +4,7 @@ use rune::{El, col, row, text};
 use rune_kit::{Button, ButtonVariant, Dialog, Kit};
 
 use crate::platform::TRASH_NAME;
-use crate::ui::library_format::when;
+use crate::ui::library::format::when;
 use crate::ui::{Ui, format_size};
 
 const WIDTH: f32 = 400.0;

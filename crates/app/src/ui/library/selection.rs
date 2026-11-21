@@ -1,8 +1,8 @@
 use greyscreen_engine::{EngineStatus, RecordingEntry};
 use jiff::Zoned;
 
-use super::library_format::day_heading;
-use super::{Screen, Ui};
+use super::format::day_heading;
+use crate::ui::{Screen, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Detail {

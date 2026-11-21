@@ -1,11 +1,16 @@
+mod event;
+mod rebind;
+
 use greyscreen_core::keybinds::{Action, Scope};
 use greyscreen_core::library::EventEntry;
 use greyscreen_core::settings::NavStyle;
 use rune::{KeyEvent, Tx};
 
 use super::jump::{next_target, previous_target};
-use super::key_event::combo_of;
 use super::{Detail, EventFilter, PanelTab, Screen, Source, Ui, VolumeHover};
+
+pub(crate) use event::MAC;
+use event::combo_of;
 
 const STEP_SECS: f64 = 5.0;
 

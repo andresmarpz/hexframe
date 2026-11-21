@@ -4,7 +4,7 @@ use jiff::Zoned;
 use rune::{Cursor, El, Side, col, el, row};
 use rune_kit::{Kit, SidebarRow, SidebarSection};
 
-use crate::ui::library_format::{ago, kda, recent_games};
+use crate::ui::library::format::{ago, kda, recent_games};
 use crate::ui::{RECENT_LIMIT, Screen, Ui, tone_color};
 use crate::view::champion::champion_icon;
 

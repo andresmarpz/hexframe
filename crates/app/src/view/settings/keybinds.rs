@@ -3,8 +3,8 @@ use rune::{El, Icon, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Keybind, Kit};
 
 use super::setting_row;
+use crate::ui::MAC;
 use crate::ui::Ui;
-use crate::ui::key_event::MAC;
 
 const PRESS_KEYS: &str = "Press keys…";
 const CAPTURE_HELP: &str = "Press the keys to use. Esc cancels, Backspace clears.";

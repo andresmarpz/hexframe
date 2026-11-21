@@ -1,5 +1,5 @@
 use super::{nav_rect_of, runtime, settle, tap, visible_texts};
-use crate::ui::library_format::recent_games;
+use crate::ui::library::format::recent_games;
 use crate::ui::{Detail, Screen};
 
 fn newest_ids(rt: &rune::Runtime<crate::ui::Ui>) -> Vec<String> {

@@ -3,7 +3,7 @@ use rune::{Key, KeyEvent, Runtime};
 
 use super::keybinds::platform;
 use super::{runtime, settle, tap};
-use crate::ui::library_format::recent_clips;
+use crate::ui::library::format::recent_clips;
 use crate::ui::{Detail, Screen, Source, Ui};
 
 fn on_clips() -> Runtime<Ui> {

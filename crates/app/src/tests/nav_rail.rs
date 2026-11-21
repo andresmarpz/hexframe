@@ -3,7 +3,7 @@ use greyscreen_engine::EngineCmd;
 use rune::{Key, KeyEvent, Mods};
 
 use super::{live_runtime, nav_rect_of, runtime, settle, tap};
-use crate::ui::library_format::recent_games;
+use crate::ui::library::format::recent_games;
 use crate::ui::{Screen, Ui};
 
 fn nav_width(rt: &rune::Runtime<Ui>) -> f32 {

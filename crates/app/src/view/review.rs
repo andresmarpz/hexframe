@@ -22,7 +22,7 @@ use rune_kit::{
 
 use super::champion::champion_icon;
 use super::delete::delete_key;
-use crate::ui::library_format::{kda, mode_label, total_time, when};
+use crate::ui::library::format::{kda, mode_label, total_time, when};
 use crate::ui::{ReviewState, Ui, format_clock};
 
 const CHAMPION_ICON: f32 = 28.0;
