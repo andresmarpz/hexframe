@@ -12,6 +12,6 @@ How it is wired:
 - `vendor` is excluded from the workspace, so Greyscreen's lints, `cargo fmt` and clippy skip it.
 - Its `Cargo.toml` is Rune's with the `workspace = true` fields made concrete; the other Rune crates come from git at the same rev.
 
-Test it from the repo root with `cargo test -p rune-media`.
+Test it on its own from the repo root: `cargo test --manifest-path vendor/rune-media/Cargo.toml --target-dir target/vendor --lib`. Its `Cargo.toml` patches `wgpu-hal` for that run only, as Rune's workspace does. On a Mac, six tests fail at this rev because they read fixtures from Rune's other crates; the Windows player's tests are in `src/video/windows` and run on Windows only.
 
 How to drop it: when Rune has the fixes upstream, bump the Rune rev in the root `Cargo.toml`, remove the `[patch."https://github.com/anomalyco/rune"]` section and the `exclude`, delete `vendor/rune-media` and run `cargo update -p rune-media`. When you bump Rune without upstream fixes, copy the new `crates/rune-media` here and replay the patches in `GREYSCREEN_PATCHES.md`.
