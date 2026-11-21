@@ -147,7 +147,7 @@ fn hardware_h264_encoders() -> windows::core::Result<Vec<(String, String)>> {
     Ok(encoders)
 }
 
-fn string_attribute(activate: &IMFActivate, key: &GUID) -> String {
+pub(crate) fn string_attribute(activate: &IMFActivate, key: &GUID) -> String {
     let mut value = PWSTR::null();
     let mut length = 0u32;
     // SAFETY: the out pointers refer to live locals.

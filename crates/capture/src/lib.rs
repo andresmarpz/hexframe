@@ -5,7 +5,7 @@ pub mod audio;
 pub mod clock;
 pub mod com;
 pub mod d3d;
-mod h264;
+pub mod h264;
 mod pacer;
 pub mod probe;
 mod session;
