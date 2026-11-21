@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::categories::CategorySet;
 use crate::keybinds::Keymap;
 use crate::media::CaptureConfig;
 use crate::paths;
@@ -126,6 +127,7 @@ pub struct Settings {
     pub audio: bool,
     pub capture_cursor: bool,
     pub clips: ClipSettings,
+    pub review_events: CategorySet,
     #[serde(deserialize_with = "overrides::lenient_overrides")]
     pub keybinds: BTreeMap<String, String>,
     #[serde(
@@ -155,6 +157,7 @@ impl Default for Settings {
             audio: true,
             capture_cursor: true,
             clips: ClipSettings::default(),
+            review_events: CategorySet::default(),
             keybinds: BTreeMap::new(),
             legacy_save_clip_hotkey: None,
             storage_limit_gb: None,

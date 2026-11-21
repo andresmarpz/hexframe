@@ -554,3 +554,50 @@ fn an_override_for_a_removed_action_changes_nothing() {
     let keymap = Keymap::from_overrides(&overrides);
     assert_eq!(keymap, Keymap::defaults());
 }
+
+#[test]
+fn review_events_default_to_the_recommended_set() {
+    let s = Settings::default();
+    assert_eq!(s.review_events, CategorySet::recommended());
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"fps": 30}"#).unwrap();
+    assert_eq!(Settings::load(&path).review_events, s.review_events);
+}
+
+#[test]
+fn review_events_survive_a_save() {
+    use crate::categories::EventCategory;
+
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    let s = Settings {
+        review_events: CategorySet::all().with(EventCategory::GameFlow, false),
+        ..Settings::default()
+    };
+    s.save(&path).unwrap();
+    assert_eq!(Settings::load(&path).review_events, s.review_events);
+    let raw: serde_json::Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert!(
+        raw["review_events"]
+            .as_array()
+            .is_some_and(|a| a.len() == 13)
+    );
+}
+
+#[test]
+fn an_unknown_review_event_name_does_not_reset_the_settings() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(
+        &path,
+        r#"{"fps": 30, "review_events": ["my_kills", "future"]}"#,
+    )
+    .unwrap();
+    let s = Settings::load(&path);
+    assert_eq!(s.fps, 30);
+    assert_eq!(
+        s.review_events.iter().collect::<Vec<_>>(),
+        [crate::categories::EventCategory::MyKills]
+    );
+}

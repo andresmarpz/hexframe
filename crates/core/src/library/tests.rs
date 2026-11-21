@@ -243,3 +243,54 @@ fn game_thumbnail_uses_the_first_clip_then_falls_back_to_the_game() {
     m.duration_secs = 0.5;
     assert_eq!(thumb::game_thumb_secs(&m), 0.0);
 }
+
+#[test]
+fn a_filter_override_persists_in_the_sidecar_next_to_the_death_notes() {
+    use crate::categories::{CategorySet, EventCategory};
+    use crate::review::DeathTag;
+
+    let dir = tempfile::tempdir().unwrap();
+    write_meta(dir.path(), &meta("a", zoned(20, 19))).unwrap();
+
+    let mut review = ReviewData::default();
+    review.toggle_tag(3, DeathTag::Ganked);
+    let filter = CategorySet::NONE
+        .with(EventCategory::MyDeaths, true)
+        .with(EventCategory::Barons, true);
+    review.filter = Some(filter);
+    write_review(dir.path(), &review).unwrap();
+
+    let read = read_meta(dir.path()).unwrap();
+    assert_eq!(read.review.filter, Some(filter));
+    assert_eq!(read.review.deaths, review.deaths);
+    let raw: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(META_FILE)).unwrap()).unwrap();
+    assert_eq!(
+        raw["review"]["filter"],
+        serde_json::json!(["my_deaths", "barons"])
+    );
+}
+
+#[test]
+fn a_filter_alone_keeps_the_review_section_and_clearing_it_removes_it() {
+    let dir = tempfile::tempdir().unwrap();
+    write_meta(dir.path(), &meta("a", zoned(20, 19))).unwrap();
+    let mut review = ReviewData {
+        filter: Some(crate::categories::CategorySet::all()),
+        ..ReviewData::default()
+    };
+    write_review(dir.path(), &review).unwrap();
+    assert!(read_meta(dir.path()).unwrap().review.filter.is_some());
+    review.filter = None;
+    write_review(dir.path(), &review).unwrap();
+    let raw: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(META_FILE)).unwrap()).unwrap();
+    assert!(raw.get("review").is_none());
+}
+
+#[test]
+fn a_sidecar_without_a_filter_reads_as_no_override() {
+    let json = serde_json::json!({"deaths": [{"event_id": 3, "tags": [], "note": "x"}]});
+    let review: ReviewData = serde_json::from_value(json).unwrap();
+    assert_eq!(review.filter, None);
+}

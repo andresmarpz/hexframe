@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::categories::CategorySet;
 use crate::game::{GameEvent, Player};
 use crate::library::EventEntry;
 
@@ -146,6 +147,8 @@ impl DeathReview {
 #[serde(default)]
 pub struct ReviewData {
     pub deaths: Vec<DeathReview>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<CategorySet>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -158,7 +161,7 @@ pub struct ReviewSummary {
 
 impl ReviewData {
     pub fn is_empty(&self) -> bool {
-        self.deaths.is_empty()
+        self.deaths.is_empty() && self.filter.is_none()
     }
 
     pub fn get(&self, event_id: u32) -> Option<&DeathReview> {
