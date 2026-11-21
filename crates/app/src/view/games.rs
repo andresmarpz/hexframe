@@ -7,6 +7,7 @@ use rune::{El, Key, LoopSpec, Tx, col, el, text};
 use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, glyphs};
 
 use super::grip::grip;
+use super::clearable::clear_when_filled;
 use crate::ui::library_format::summary;
 use crate::ui::{ListItem, PaneEdge, Ui};
 
@@ -80,11 +81,11 @@ pub(super) fn dot(color: rune::Color, pulse: bool) -> El {
 }
 
 fn search(s: &Ui, k: &Kit) -> El {
-    TextInput::new(&s.filter.champion)
+    let input = TextInput::new(&s.filter.champion)
         .label("Search games")
         .placeholder("Search games")
-        .leading_icon(&glyphs::SEARCH)
-        .clear_button()
+        .leading_icon(&glyphs::SEARCH);
+    clear_when_filled(input, &s.filter.champion.text)
         .width(None)
         .on_edit(|ui: &mut Ui| &mut ui.filter.champion)
         .on_key(search_key)

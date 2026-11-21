@@ -10,6 +10,7 @@ mod recording;
 mod storage;
 mod updates;
 
+use super::clearable::clear_when_filled;
 use super::{card, hairline};
 use crate::ui::{SettingsSection, Ui};
 use catalog::Row;
@@ -69,8 +70,8 @@ fn search_bar(s: &Ui, k: &Kit) -> El {
     let input = TextInput::new(&s.settings_search)
         .label("Search settings")
         .placeholder("Search settings…")
-        .leading_icon(&glyphs::SEARCH)
-        .clear_button()
+        .leading_icon(&glyphs::SEARCH);
+    let input = clear_when_filled(input, &s.settings_search.text)
         .width(Some(SHEET_WIDTH - 32.0))
         .on_edit(|ui: &mut Ui| &mut ui.settings_search)
         .on_key(|ui: &mut Ui, ev: &KeyEvent, _: &mut Tx| ui.clear_settings_search_on_escape(ev))
@@ -90,7 +91,10 @@ fn nav(s: &Ui, k: &Kit, active: bool) -> El {
         list = list.child(
             SidebarRow::new(section.label())
                 .selected(active && s.settings_section == section)
-                .on_select(move |ui: &mut Ui, _| ui.pick_settings_section(section))
+                .on_select(move |ui: &mut Ui, tx: &mut Tx| {
+                    tx.instant();
+                    ui.pick_settings_section(section);
+                })
                 .build(k)
                 .key(format!("settings-nav-{}", section.id())),
         );

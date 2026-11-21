@@ -1,4 +1,5 @@
 pub(crate) mod champion;
+mod clearable;
 mod clips;
 mod delete;
 mod games;
@@ -13,7 +14,7 @@ mod update_banner;
 
 use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::NoticeLevel;
-use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
+use rune::{Cx, El, ScrollSpec, TextStyle, Transition, col, el, row, text};
 use rune_kit::{Divider, Kit, Page, Toast, ToastRegion, Toolbar};
 
 use crate::ui::{Detail, Screen, Ui};
@@ -84,12 +85,17 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     }
 }
 
+fn settled(el: El) -> El {
+    el.transition(Transition::none()).instant_changes()
+}
+
 fn screen(s: &Ui, k: &Kit, inset: f32) -> El {
-    match s.screen {
-        Screen::Home => home_screen(s, k, inset),
-        Screen::Games => games_screen(s, k, inset),
-        Screen::Clips => clips_screen(s, k, inset),
-    }
+    let (key, built) = match s.screen {
+        Screen::Home => ("screen-home", home_screen(s, k, inset)),
+        Screen::Games => ("screen-games", games_screen(s, k, inset)),
+        Screen::Clips => ("screen-clips", clips_screen(s, k, inset)),
+    };
+    settled(col().key(key).w_full().h_full().child(built))
 }
 
 fn home_screen(s: &Ui, k: &Kit, inset: f32) -> El {

@@ -9,8 +9,10 @@ use crate::view;
 
 mod clips_screen;
 mod coach;
+mod delete_dialog;
 mod death_review;
 mod dock;
+mod instant_pages;
 mod keybinds;
 mod match_flow;
 mod nav;
@@ -19,6 +21,7 @@ mod nav_recent;
 mod nav_status;
 mod panes;
 mod review_flow;
+mod search_clear;
 mod selection;
 mod settings_sheet;
 mod storage_limit;
