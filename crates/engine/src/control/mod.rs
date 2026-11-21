@@ -22,6 +22,7 @@ use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
 use crate::delete;
 use crate::disk::FreeSpace;
+use crate::export::{ExportHandle, default_reencoder};
 use crate::feedback::{self, FeedbackConfig};
 use crate::hotkey::{self, HotkeyBackend};
 use crate::library;
@@ -87,6 +88,7 @@ struct Control {
     free_space: Arc<dyn FreeSpace>,
     disk_checked: Option<Instant>,
     disk_refused: bool,
+    export: ExportHandle,
 }
 
 pub(crate) fn spawn(
@@ -148,6 +150,7 @@ impl Control {
             free_space,
             disk_checked: None,
             disk_refused: false,
+            export: ExportHandle::new(default_reencoder()),
             test_stop_at: None,
             session: Session::new(settings.auto_record),
             settings,
@@ -233,6 +236,8 @@ impl Control {
             EngineCmd::SendFeedback(draft) => {
                 feedback::spawn_send(self.feedback.clone(), draft, self.sink.clone());
             }
+            EngineCmd::Export(job) => self.export.start(job, self.sink.clone()),
+            EngineCmd::CancelExport => self.export.cancel(),
             EngineCmd::GlobalAction(action) => self.global_action(action),
         }
     }

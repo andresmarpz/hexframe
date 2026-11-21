@@ -159,7 +159,7 @@ impl FragmentedWriter {
     fn push_audio(&mut self, packet: &Packet, origin: i64) -> Result<()> {
         let rate = self.audio_format.as_ref().map_or(1, |f| f.sample_rate);
         if !self.audio_started {
-            if ends_before(packet, rate, origin) {
+            if ends_before(packet.dts, packet.duration, rate, origin) {
                 return Ok(());
             }
             self.audio_started = true;

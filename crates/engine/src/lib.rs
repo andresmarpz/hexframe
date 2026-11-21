@@ -1,10 +1,12 @@
 mod api;
+mod clipboard;
 mod clipjob;
 mod control;
 mod delete;
 mod diagnostics;
 mod disk;
 mod encoder_check;
+mod export;
 pub(crate) mod fake;
 pub(crate) mod feedback;
 mod hotkey;
@@ -22,8 +24,10 @@ pub use api::{
     LeagueFactory, LeagueGuard, MANUAL_CLIP_LABEL, NoticeAction, NoticeLevel, RecordingEntry,
     UiMsg, UiSink, league_factory_default, reveal,
 };
+pub use clipboard::copy_file;
 pub use disk::{FreeSpace, LOW_DISK_URL};
 pub use encoder_check::{EncoderCheckSpec, run_encoder_check, spawn_encoder_check};
+pub use export::REENCODE_AVAILABLE;
 pub use fake::FakeMediaSource;
 pub use feedback::{FeedbackConfig, FeedbackTransport};
 pub use hotkey::HotkeyBackend;

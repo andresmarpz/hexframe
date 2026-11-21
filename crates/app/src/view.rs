@@ -41,6 +41,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     }
     if theater.is_none() {
         overlays::feedback_dialog(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));
+        overlays::export_dialog(s, &k, &mut layer);
     }
     overlays::row_menu(s, &k, &mut layer);
     if let Some(rec) = s.pending_delete_entry() {

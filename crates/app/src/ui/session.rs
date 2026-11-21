@@ -83,6 +83,7 @@ impl Ui {
             } => self.show_notice_with(level, text, Some(action), tx),
             UiMsg::Update(state) => self.apply_update(state),
             UiMsg::Feedback(result) => self.apply_feedback(result),
+            UiMsg::Export(event) => self.apply_export(event),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
             UiMsg::Encoder(check) => self.encoder = Some(check),
         }

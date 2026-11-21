@@ -1,7 +1,8 @@
 use jiff::Zoned;
 use rune::{Cursor, El, col, el, row, text};
-use rune_kit::Kit;
+use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit};
 
+use super::widgets::EXPORT;
 use super::widgets::thumb::{self, ASPECT};
 use super::{TABULAR, card, hairline};
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips, when};
@@ -38,6 +39,15 @@ fn item(clip: &RecentClip, now: &Zoned, k: &Kit) -> El {
     let length = format_clock((clip.clip.end_secs - clip.clip.start_secs).max(0.0) as u32);
     let shown = when(&entry.meta.started_at, now);
     let font = k.ty.small.features(TABULAR);
+    let export_id = id.clone();
+    let export = IconButton::new(&EXPORT)
+        .label("Export clip")
+        .help("Export…")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Small)
+        .on_press(move |ui: &mut Ui| ui.open_export_clip(&export_id, index))
+        .build(k)
+        .key(format!("export-clip-{id}-{index}"));
     let picture = thumb::clip_thumb(k, entry, clip.clip, el().w_full().aspect_ratio(ASPECT));
     card(k)
         .key(format!("clip-{id}-{index}"))
@@ -76,6 +86,7 @@ fn item(clip: &RecentClip, now: &Zoned, k: &Kit) -> El {
                 .center_y()
                 .child(text(length).font(font).color(k.c.text_base))
                 .child(el().grow(1.0).a11y_hidden())
-                .child(text(shown.label()).font(font).color(k.c.text_muted)),
+                .child(text(shown.label()).font(font).color(k.c.text_muted))
+                .child(export),
         )
 }

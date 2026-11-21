@@ -1,6 +1,7 @@
 mod death;
 mod dock;
 mod errors;
+mod export;
 mod feedback;
 mod games;
 mod home;
@@ -28,6 +29,7 @@ pub(crate) fn all() -> &'static [Scene] {
             games::SCENES,
             dock::SCENES,
             errors::SCENES,
+            export::SCENES,
             review::SCENES,
             settings::SCENES,
             update::SCENES,

@@ -115,6 +115,10 @@ impl ReviewState {
         }
     }
 
+    pub(crate) fn can_export_moment(&self) -> bool {
+        self.source == Source::Game && self.player.is_some()
+    }
+
     pub(crate) fn speed_rate(&self) -> f32 {
         SPEEDS[self.speed]
     }

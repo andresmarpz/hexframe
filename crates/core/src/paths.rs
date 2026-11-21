@@ -10,6 +10,10 @@ pub fn home_dir() -> Option<PathBuf> {
     dirs::home_dir()
 }
 
+pub fn downloads_dir() -> Option<PathBuf> {
+    dirs::download_dir()
+}
+
 pub fn logs_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_default()

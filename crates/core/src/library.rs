@@ -79,7 +79,7 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-fn sanitize(text: &str, fallback: &str) -> String {
+pub(crate) fn sanitize(text: &str, fallback: &str) -> String {
     let clean: String = text
         .chars()
         .filter_map(|c| match c {

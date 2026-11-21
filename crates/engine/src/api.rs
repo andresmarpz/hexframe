@@ -4,6 +4,7 @@ use std::thread::JoinHandle;
 
 use crossbeam_channel::{Sender, unbounded};
 use greyscreen_core::encoder::EncoderCheck;
+use greyscreen_core::export::{ExportEvent, ExportJob};
 use greyscreen_core::feedback::{FeedbackDraft, FeedbackResult};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::keybinds::Action;
@@ -38,6 +39,8 @@ pub enum EngineCmd {
     CheckForUpdates,
     InstallUpdate,
     SendFeedback(FeedbackDraft),
+    Export(ExportJob),
+    CancelExport,
     Shutdown,
 }
 
@@ -100,6 +103,7 @@ pub enum UiMsg {
     },
     Update(UpdateState),
     Feedback(FeedbackResult),
+    Export(ExportEvent),
     Thumbnail(PathBuf),
     Encoder(EncoderCheck),
 }

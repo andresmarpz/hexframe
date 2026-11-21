@@ -7,7 +7,7 @@ use super::{faded_scroll, mark_active, muted_note};
 use crate::ui::library::format::clip_title;
 use crate::ui::{ReviewState, Ui, format_clock};
 use crate::view::review::tabular;
-use crate::view::widgets::thumb;
+use crate::view::widgets::{EXPORT, thumb};
 
 const CLIP_ROW_HEIGHT: f32 = 52.0;
 const CLIP_THUMB_WIDTH: f32 = 64.0;
@@ -23,6 +23,16 @@ fn clip_row(index: usize, clip: &ClipEntry, active: bool, review: &ReviewState, 
         .on_press(move |_: &mut Ui| reveal(&file))
         .build(k)
         .key(format!("clip-folder-{index}"))
+        .group_opacity(0.0, 1.0);
+    let id = review.entry.meta.id.clone();
+    let export = IconButton::new(&EXPORT)
+        .label("Export clip")
+        .help("Export…")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Small)
+        .on_press(move |ui: &mut Ui| ui.open_export_clip(&id, index))
+        .build(k)
+        .key(format!("export-clip-{index}"))
         .group_opacity(0.0, 1.0);
     let line = row()
         .key(format!("clip-{index}"))
@@ -63,6 +73,7 @@ fn clip_row(index: usize, clip: &ClipEntry, active: bool, review: &ReviewState, 
                     .color(k.c.text_muted),
                 ),
         )
+        .child(export)
         .child(show);
     k.interactive(mark_active(
         line,

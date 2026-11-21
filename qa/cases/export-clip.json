@@ -1,0 +1,15 @@
+{
+  "about": "A clip's Export... opens the dialog on the clip's range. Dragging a handle trims it, Export starts and Cancel asks the engine to stop (headless runs have no engine, so it stays on Cancelling).",
+  "scene": "review-clips",
+  "steps": [
+    {"hover": "clip-1"},
+    {"tap": "export-clip-1"},
+    {"check": "open", "has": ["export-dialog", "export-range", "export-preset", "export-destination", "export-start"], "text": ["Export clip", "Original quality", "Save to"]},
+    {"drag": "export-end-handle", "dx": 90},
+    {"check": "trimmed", "has": ["export-dialog"], "snap": true},
+    {"tap": "export-start"},
+    {"check": "working", "has": ["export-progress", "export-cancel"], "lacks": ["export-start"], "text": ["Exporting…"]},
+    {"tap": "export-cancel"},
+    {"check": "cancelling", "text": ["Cancelling…"], "snap": false}
+  ]
+}

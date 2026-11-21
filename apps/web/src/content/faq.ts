@@ -74,6 +74,15 @@ export const faqGroups: FaqGroup[] = [
           "Press F9 while a game is recording to save the last 30 seconds as a clip. F9 works in game. Change it in Settings > Keybinds.",
         ],
       },
+      {
+        id: "share-clip",
+        q: "How do I share a clip on Discord?",
+        a: [
+          "Open Games, pick a match and open the Clips tab. Click the Export icon on a clip. To cut any other moment, click the Export icon in the review toolbar while the full game plays: it starts with 15 seconds before and after the current time. Drag the two handles to trim.",
+          "Pick \"For Discord (under 10 MB)\" to re-encode the clip to 720p or less so it fits Discord's upload limit. Greyscreen works the bitrate out from the length and tries a smaller size once if the file is still over 10 MB. Clips longer than about four minutes cannot fit, so trim them first. Pick \"Original quality\" to copy the video exactly as recorded, with no re-encoding. That is quick and loses nothing, but the file can be bigger than Discord allows, and it cuts at keyframes, so it can start up to a second early.",
+          "When it says Exported, click Copy file and paste into a Discord message, or click Show in folder. Files go to an exports folder inside the game's folder, or to Downloads if you choose that.",
+        ],
+      },
     ],
   },
   {

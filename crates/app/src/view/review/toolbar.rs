@@ -10,6 +10,7 @@ use super::{health, icons, tabular, tone_pill};
 use crate::ui::library::format::{kda, mode_label, total_time, when};
 use crate::ui::{ReviewState, Ui, format_clock};
 use crate::view::overlays::delete_key;
+use crate::view::widgets::EXPORT;
 use crate::view::widgets::champion::champion_icon;
 
 const CHAMPION_ICON: f32 = 28.0;
@@ -108,9 +109,24 @@ pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     Toolbar::new()
         .leading(line)
         .trailing(deaths_button(review, k))
+        .trailing(export_moment(review, k))
         .trailing(health::trigger(review, k))
         .trailing(folder)
         .trailing(delete)
+}
+
+fn export_moment(review: &ReviewState, k: &Kit) -> El {
+    if !review.can_export_moment() {
+        return el();
+    }
+    IconButton::new(&EXPORT)
+        .label("Export this moment")
+        .help("Export this moment…")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Regular)
+        .on_press(|ui: &mut Ui| ui.open_export_moment())
+        .build(k)
+        .key("review-export")
 }
 
 fn deaths_button(review: &ReviewState, k: &Kit) -> El {

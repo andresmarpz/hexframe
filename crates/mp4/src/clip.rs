@@ -12,12 +12,22 @@ use crate::{Mp4Error, Result};
 const MDAT_SMALL_HEADER: u64 = 8;
 const MDAT_LARGE_HEADER: u64 = 16;
 
-struct Layout {
-    kept: Vec<Arc<Packet>>,
-    tables: SampleTables,
-    chunking: Chunking,
-    payload_len: u64,
+pub(crate) struct Slot {
+    pub track: Track,
+    pub dts: i64,
+    pub duration: u32,
+    pub key: bool,
+    pub len: usize,
 }
+
+pub(crate) struct Layout {
+    pub kept: Vec<usize>,
+    pub tables: SampleTables,
+    pub chunking: Chunking,
+    pub payload_len: u64,
+}
+
+pub(crate) type Fill<'a> = dyn FnMut(usize, &mut dyn Write) -> Result<()> + 'a;
 
 pub fn write_clip(
     path: &Path,
@@ -25,7 +35,29 @@ pub fn write_clip(
     audio: Option<&AudioFormat>,
     packets: &[Arc<Packet>],
 ) -> Result<()> {
-    let mut layout = plan(audio, packets)?;
+    let slots: Vec<Slot> = packets
+        .iter()
+        .map(|p| Slot {
+            track: p.track,
+            dts: p.dts,
+            duration: p.duration,
+            key: p.key,
+            len: p.data.len(),
+        })
+        .collect();
+    let layout = plan(audio, &slots)?;
+    write_laid_out(path, video, audio, layout, &mut |index, out| {
+        out.write_all(&packets[index].data).map_err(Mp4Error::from)
+    })
+}
+
+pub(crate) fn write_laid_out(
+    path: &Path,
+    video: &VideoFormat,
+    audio: Option<&AudioFormat>,
+    mut layout: Layout,
+    fill: &mut Fill<'_>,
+) -> Result<()> {
     let ftyp = write_ftyp(b"isom", &BRANDS);
     let mdat_header_len = if layout.payload_len + MDAT_SMALL_HEADER > u64::from(u32::MAX) {
         MDAT_LARGE_HEADER
@@ -41,7 +73,7 @@ pub fn write_clip(
     }
 
     let tmp = tmp_path(path);
-    let result = write_file(&tmp, &ftyp, &moov, mdat_header_len, &layout)
+    let result = write_file(&tmp, &ftyp, &moov, mdat_header_len, &layout, fill)
         .and_then(|()| std::fs::rename(&tmp, path).map_err(Mp4Error::from));
     if result.is_err() {
         std::fs::remove_file(&tmp).ok();
@@ -61,6 +93,7 @@ fn write_file(
     moov: &[u8],
     mdat_header_len: u64,
     layout: &Layout,
+    fill: &mut Fill<'_>,
 ) -> Result<()> {
     let mut out = BufWriter::new(File::create(tmp)?);
     out.write_all(ftyp)?;
@@ -74,8 +107,8 @@ fn write_file(
         out.write_all(&(mdat_size as u32).to_be_bytes())?;
         out.write_all(b"mdat")?;
     }
-    for packet in &layout.kept {
-        out.write_all(&packet.data)?;
+    for &index in &layout.kept {
+        fill(index, &mut out)?;
     }
     out.flush()?;
     out.get_ref().sync_data()?;
@@ -101,32 +134,32 @@ fn shift_offsets(layout: &mut Layout, delta: u64) {
     }
 }
 
-fn plan(audio: Option<&AudioFormat>, packets: &[Arc<Packet>]) -> Result<Layout> {
-    let idr = packets
+pub(crate) fn plan(audio: Option<&AudioFormat>, slots: &[Slot]) -> Result<Layout> {
+    let idr = slots
         .iter()
-        .find(|p| p.track == Track::Video)
-        .filter(|p| p.key)
+        .find(|s| s.track == Track::Video)
+        .filter(|s| s.key)
         .ok_or_else(|| Mp4Error::Invalid("clip does not start with a video key frame".into()))?;
 
-    let mut kept: Vec<Arc<Packet>> = Vec::with_capacity(packets.len());
-    for packet in packets {
-        match (packet.track, audio) {
-            (Track::Video, _) => kept.push(packet.clone()),
+    let mut kept: Vec<usize> = Vec::with_capacity(slots.len());
+    for (index, slot) in slots.iter().enumerate() {
+        match (slot.track, audio) {
+            (Track::Video, _) => kept.push(index),
             (Track::Audio, None) => {
                 return Err(Mp4Error::Invalid(
                     "audio packet without audio format".into(),
                 ));
             }
             (Track::Audio, Some(format)) => {
-                if !ends_before(packet, format.sample_rate, idr.dts) {
-                    kept.push(packet.clone());
+                if !ends_before(slot.dts, slot.duration, format.sample_rate, idr.dts) {
+                    kept.push(index);
                 }
             }
         }
     }
 
-    let video_durations = durations(&kept, Track::Video)?;
-    let audio_durations = durations(&kept, Track::Audio)?;
+    let video_durations = durations(slots, &kept, Track::Video)?;
+    let audio_durations = durations(slots, &kept, Track::Audio)?;
     let mut video_durations = video_durations.into_iter();
     let mut audio_durations = audio_durations.into_iter();
 
@@ -134,8 +167,9 @@ fn plan(audio: Option<&AudioFormat>, packets: &[Arc<Packet>]) -> Result<Layout> 
     let mut chunking = Chunking::default();
     let mut position = 0u64;
     let mut last_track = None;
-    for packet in &kept {
-        let (rows, chunks, duration) = match packet.track {
+    for &index in &kept {
+        let slot = &slots[index];
+        let (rows, chunks, duration) = match slot.track {
             Track::Video => (
                 &mut tables.video,
                 &mut chunking.video,
@@ -147,25 +181,25 @@ fn plan(audio: Option<&AudioFormat>, packets: &[Arc<Packet>]) -> Result<Layout> 
                 audio_durations.next(),
             ),
         };
-        if last_track != Some(packet.track) {
+        if last_track != Some(slot.track) {
             chunks.push(Chunk {
                 first_sample: rows.len() as u32,
                 count: 0,
                 offset: position,
             });
-            last_track = Some(packet.track);
+            last_track = Some(slot.track);
         }
         if let Some(chunk) = chunks.last_mut() {
             chunk.count += 1;
         }
         rows.push(SampleRow {
             offset: position,
-            size: u32::try_from(packet.data.len())
+            size: u32::try_from(slot.len)
                 .map_err(|_| Mp4Error::Invalid("sample larger than 4 GiB".into()))?,
             duration: duration.unwrap_or(0),
-            sync: packet.key,
+            sync: slot.key,
         });
-        position += packet.data.len() as u64;
+        position += slot.len as u64;
     }
 
     Ok(Layout {
@@ -176,17 +210,17 @@ fn plan(audio: Option<&AudioFormat>, packets: &[Arc<Packet>]) -> Result<Layout> 
     })
 }
 
-pub(crate) fn ends_before(packet: &Packet, sample_rate: u32, idr_dts: i64) -> bool {
-    let end = packet.dts + i64::from(packet.duration);
+pub(crate) fn ends_before(dts: i64, duration: u32, sample_rate: u32, idr_dts: i64) -> bool {
+    let end = dts + i64::from(duration);
     i128::from(end) * i128::from(VideoFormat::TIMESCALE)
         <= i128::from(idr_dts) * i128::from(sample_rate)
 }
 
-fn durations(packets: &[Arc<Packet>], track: Track) -> Result<Vec<u32>> {
-    let of_track: Vec<&Packet> = packets
+fn durations(slots: &[Slot], kept: &[usize], track: Track) -> Result<Vec<u32>> {
+    let of_track: Vec<&Slot> = kept
         .iter()
-        .filter(|p| p.track == track)
-        .map(|p| &**p)
+        .map(|&i| &slots[i])
+        .filter(|s| s.track == track)
         .collect();
     let mut out = Vec::with_capacity(of_track.len());
     for pair in of_track.windows(2) {
