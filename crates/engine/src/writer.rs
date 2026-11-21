@@ -3,16 +3,26 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 use greyscreen_mp4::fragmented::{FinishedInfo, FragmentedWriter};
 
 pub(crate) const PART_FILE: &str = "game.mp4.part";
 pub(crate) const VIDEO_FILE: &str = "game.mp4";
 const QUEUE: usize = 4096;
+const RENAME_ATTEMPTS: u32 = 5;
+const RENAME_PAUSE: Duration = Duration::from_millis(200);
 
 pub(crate) type Report = Result<FinishedInfo, String>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Sent {
+    Queued,
+    Full,
+    Stopped,
+}
 
 #[derive(Debug)]
 pub(crate) struct GameWriter {
@@ -27,10 +37,20 @@ impl GameWriter {
         audio: Option<&AudioFormat>,
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
+        Self::spawn_with_queue(folder, video, audio, QUEUE, on_done)
+    }
+
+    pub(crate) fn spawn_with_queue(
+        folder: &Path,
+        video: &VideoFormat,
+        audio: Option<&AudioFormat>,
+        queue: usize,
+        on_done: impl FnOnce(Report) + Send + 'static,
+    ) -> Result<Self, String> {
         let part = folder.join(PART_FILE);
         let writer = FragmentedWriter::create(&part, video, audio).map_err(|e| e.to_string())?;
         let target = folder.join(VIDEO_FILE);
-        let (tx, rx) = bounded(QUEUE);
+        let (tx, rx) = bounded(queue);
         let thread = thread::Builder::new()
             .name("game-writer".into())
             .spawn(move || {
@@ -48,11 +68,22 @@ impl GameWriter {
         })
     }
 
-    pub(crate) fn send(&self, packet: Arc<Packet>) {
-        if let Some(tx) = &self.tx
-            && tx.send(packet).is_err()
-        {
-            tracing::warn!("game writer is gone, dropping packet");
+    pub(crate) fn send(&mut self, packet: Arc<Packet>) -> Sent {
+        let Some(tx) = &self.tx else {
+            return Sent::Stopped;
+        };
+        match tx.try_send(packet) {
+            Ok(()) => Sent::Queued,
+            Err(TrySendError::Full(_)) => {
+                tracing::error!("game writer queue is full, stopping the full game recording");
+                self.tx.take();
+                Sent::Full
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                tracing::warn!("game writer is gone, dropping packet");
+                self.tx.take();
+                Sent::Stopped
+            }
         }
     }
 
@@ -97,6 +128,26 @@ fn drain(
         return Err(err);
     }
     let info = writer.finish().map_err(|e| e.to_string())?;
-    fs::rename(part, target).map_err(|e| e.to_string())?;
+    rename_with_retry(part, target)?;
     Ok(info)
 }
+
+fn rename_with_retry(part: &Path, target: &Path) -> Result<(), String> {
+    let mut last = String::new();
+    for attempt in 1..=RENAME_ATTEMPTS {
+        match fs::rename(part, target) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                tracing::warn!(attempt, %err, "cannot rename the finished game video");
+                last = err.to_string();
+            }
+        }
+        if attempt < RENAME_ATTEMPTS {
+            thread::sleep(RENAME_PAUSE);
+        }
+    }
+    Err(last)
+}
+
+#[cfg(test)]
+mod tests;

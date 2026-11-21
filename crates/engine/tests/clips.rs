@@ -9,6 +9,7 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use greyscreen_core::game::{GameEvent, GameResult, TimedEvent};
 use greyscreen_core::library::{self, RecordingMeta};
+use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource};
 use greyscreen_core::settings::{ClipSettings, Settings};
 use greyscreen_core::time::{Hns, secs_to_hns};
 use greyscreen_engine::{
@@ -17,8 +18,8 @@ use greyscreen_engine::{
 use greyscreen_league::LeagueMsg;
 
 use common::{
-    Harness, WAIT, assert_playable_from_key_frame, info, kill, recording_since, start_engine,
-    start_idle, temp_dir, wait_for,
+    Harness, WAIT, assert_playable_from_key_frame, ffprobe, info, kill, recording_since,
+    start_engine, start_idle, temp_dir, wait_for,
 };
 
 fn clip_settings(tag: &str, enabled: bool) -> Settings {
@@ -44,6 +45,22 @@ fn dragon() -> GameEvent {
 }
 
 fn game(settings: Settings, offsets: Vec<(f64, GameEvent)>, finish: LeagueMsg) -> Harness {
+    game_with(
+        settings,
+        Arc::new(FakeMediaSource::new()),
+        offsets,
+        finish,
+        Duration::ZERO,
+    )
+}
+
+fn game_with(
+    settings: Settings,
+    media: Arc<dyn MediaSource>,
+    offsets: Vec<(f64, GameEvent)>,
+    finish: LeagueMsg,
+    finish_after: Duration,
+) -> Harness {
     let (go_tx, go_rx) = unbounded::<Hns>();
     let league: LeagueFactory = Box::new(move |out: Sender<LeagueMsg>| {
         let (go, offsets, finish) = (go_rx.clone(), offsets.clone(), finish.clone());
@@ -62,6 +79,7 @@ fn game(settings: Settings, offsets: Vec<(f64, GameEvent)>, finish: LeagueMsg) -
                 }))
                 .ok();
             }
+            thread::sleep(finish_after);
             out.send(finish).ok();
         }))
     });
@@ -70,12 +88,7 @@ fn game(settings: Settings, offsets: Vec<(f64, GameEvent)>, finish: LeagueMsg) -
             go_tx.send(*since).ok();
         }
     });
-    start_engine(
-        settings,
-        Arc::new(FakeMediaSource::new()),
-        league,
-        Some(tap),
-    )
+    start_engine(settings, media, league, Some(tap))
 }
 
 fn collect_until_saved(ui: &Receiver<UiMsg>) -> Vec<UiMsg> {
@@ -134,6 +147,8 @@ fn highlights_become_merged_clips_before_recording_saved() {
     assert_eq!(meta.clips.len(), 2);
     assert_eq!(meta.clips[0].label, "MyKill");
     assert_eq!(meta.clips[1].label, "MyDeath+Dragon");
+    assert_eq!(meta.clips[0].file, "clips/00-01_MyKill.mp4");
+    assert_eq!(meta.clips[1].file, "clips/00-03_MyDeath-Dragon.mp4");
     assert!(meta.clips[0].start_secs.abs() < 1e-9);
     assert!((meta.clips[1].start_secs - 2.0).abs() < 0.05);
     assert!((meta.clips[1].end_secs - 4.5).abs() < 0.05);
@@ -174,7 +189,7 @@ fn clips_disabled_writes_nothing() {
 fn test_recording_makes_a_manual_folder() {
     let harness = start_idle(
         clip_settings("test-rec", true),
-        Arc::new(FakeMediaSource::fast()),
+        Arc::new(FakeMediaSource::new().with_speed(20)),
     );
     let cmd = harness.engine.as_ref().expect("engine").cmd.clone();
     cmd.send(EngineCmd::StartTestRecording { secs: 1 }).ok();
@@ -223,4 +238,135 @@ fn save_clip_now_cuts_a_manual_clip() {
     assert!(clip.clip.end_secs > 1.0 && clip.clip.end_secs < 3.0);
     assert_playable_from_key_frame(&clip.folder.join(&clip.clip.file));
     assert_eq!(saved_meta(&msgs).clips.len(), 1);
+}
+
+#[test]
+fn long_merged_plan_keeps_its_first_seconds() {
+    let events = (0..4)
+        .map(|i| (20.0 + 15.0 * f64::from(i), kill("Hero", "Villain")))
+        .collect();
+    let mut settings = clip_settings("long-plan", true);
+    settings.clips.pre_secs = 15;
+    settings.clips.post_secs = 5;
+    let harness = game_with(
+        settings,
+        Arc::new(FakeMediaSource::new().with_speed(10)),
+        events,
+        LeagueMsg::Gone,
+        Duration::from_secs(8),
+    );
+    let msgs = collect_until_saved(&harness.ui);
+    let meta = saved_meta(&msgs);
+    assert_eq!(meta.clips.len(), 1);
+    let clip = &meta.clips[0];
+    assert!((clip.start_secs - 5.0).abs() < 0.05, "{}", clip.start_secs);
+    let Some(UiMsg::RecordingSaved(entry)) = msgs.last() else {
+        panic!("last message is not RecordingSaved");
+    };
+    let path = entry.folder.join(&clip.file);
+    if let Some(duration) = ffprobe(
+        &path,
+        &["-show_entries", "format=duration", "-of", "csv=p=0"],
+    ) {
+        let secs: f64 = duration.trim().parse().expect("duration");
+        assert!(secs > 60.0, "clip lost its start: {secs} s");
+    }
+}
+
+#[test]
+fn sidecar_and_clip_times_subtract_the_media_offset() {
+    let harness = game_with(
+        clip_settings("offset", true),
+        Arc::new(FakeMediaSource::new().with_start_offset_secs(2)),
+        vec![(3.0, kill("Hero", "Villain"))],
+        LeagueMsg::Gone,
+        Duration::from_millis(3500),
+    );
+    let msgs = collect_until_saved(&harness.ui);
+    let meta = saved_meta(&msgs);
+    assert_eq!(meta.events.len(), 1);
+    assert!(
+        (meta.events[0].rec_secs - 1.0).abs() < 0.05,
+        "{}",
+        meta.events[0].rec_secs
+    );
+    assert_eq!(meta.clips.len(), 1);
+    let clip = &meta.clips[0];
+    assert!(clip.start_secs.abs() < 0.05, "{}", clip.start_secs);
+    assert_eq!(clip.file, "clips/00-01_MyKill.mp4");
+}
+
+struct FailsAfter {
+    inner: FakeMediaSource,
+    delay: Duration,
+}
+
+impl MediaSource for FailsAfter {
+    fn start(
+        &self,
+        target: CaptureTarget,
+        cfg: CaptureConfig,
+        out: Sender<MediaEvent>,
+    ) -> Result<Box<dyn MediaSession>, String> {
+        let failed = out.clone();
+        let delay = self.delay;
+        thread::spawn(move || {
+            thread::sleep(delay);
+            failed
+                .send(MediaEvent::Failed("window closed".to_owned()))
+                .ok();
+        });
+        self.inner.start(target, cfg, out)
+    }
+}
+
+fn error_notices(msgs: &[UiMsg]) -> Vec<&str> {
+    msgs.iter()
+        .filter_map(|m| match m {
+            UiMsg::Notice {
+                level: NoticeLevel::Error,
+                text,
+            } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn capture_failure_in_the_tail_is_not_an_error_notice() {
+    let harness = game_with(
+        clip_settings("fail-tail", true),
+        Arc::new(FailsAfter {
+            inner: FakeMediaSource::new(),
+            delay: Duration::from_secs(1),
+        }),
+        Vec::new(),
+        LeagueMsg::Ended(GameResult::Win),
+        Duration::ZERO,
+    );
+    let msgs = collect_until_saved(&harness.ui);
+    assert!(msgs.iter().any(|m| matches!(m, UiMsg::RecordingSaved(_))));
+    assert_eq!(error_notices(&msgs), Vec::<&str>::new());
+}
+
+#[test]
+fn capture_failure_while_recording_is_an_error_notice() {
+    let harness = game_with(
+        clip_settings("fail-live", true),
+        Arc::new(FailsAfter {
+            inner: FakeMediaSource::new(),
+            delay: Duration::from_secs(1),
+        }),
+        Vec::new(),
+        LeagueMsg::Skipped("never".to_owned()),
+        Duration::ZERO,
+    );
+    let msgs = collect_until_saved(&harness.ui);
+    assert!(
+        error_notices(&msgs)
+            .iter()
+            .any(|text| text.starts_with("Capture failed")),
+        "{:?}",
+        error_notices(&msgs)
+    );
 }

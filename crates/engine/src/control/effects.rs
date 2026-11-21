@@ -2,13 +2,12 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::thread;
 
 use crossbeam_channel::{bounded, never};
-use greyscreen_core::clips::ClipPlanner;
+use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
 use greyscreen_core::highlight::classify;
 use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
 use greyscreen_core::media::{CaptureTarget, MediaEvent};
-use greyscreen_core::session::{Effect, Input, Status};
-use greyscreen_core::settings::Settings;
+use greyscreen_core::session::{Effect, Input, SessionState, Status};
 use greyscreen_core::time::{Hns, hns_to_secs, mono_now, secs_to_hns};
 use jiff::Zoned;
 
@@ -22,11 +21,12 @@ use crate::writer::{GameWriter, VIDEO_FILE};
 const NATIVE_HEIGHT_CEILING: u32 = 2160;
 const MEDIA_QUEUE: usize = 1024;
 const RING_MARGIN_SECS: u32 = 5;
+const DISK_TOO_SLOW: &str = "Disk too slow: the full game recording stopped";
 
-pub(super) fn ring_keep(settings: &Settings) -> Hns {
-    let clip_secs = settings.clips.pre_secs + settings.clips.post_secs;
-    let secs = clip_secs.max(super::clips::MANUAL_CLIP_SECS) + RING_MARGIN_SECS;
-    secs_to_hns(f64::from(secs))
+pub(super) fn ring_keep() -> Hns {
+    let plan = MAX_PLAN + DUE_DELAY;
+    let manual = secs_to_hns(f64::from(super::clips::MANUAL_CLIP_SECS));
+    plan.max(manual) + secs_to_hns(f64::from(RING_MARGIN_SECS))
 }
 
 impl Control {
@@ -120,7 +120,7 @@ impl Control {
         let Some(recording) = self.recording.as_mut() else {
             return;
         };
-        let rec_secs = hns_to_secs(event.at - recording.t0);
+        let rec_secs = recording.file_secs(event.at);
         let highlights = classify(&event.kind, &recording.meta.game.info);
         if rec_secs >= 0.0 {
             recording.meta.events.push(EventEntry {
@@ -154,8 +154,12 @@ impl Control {
                 self.started = None;
             }
             MediaEvent::Packet(packet) => {
-                if let Some(recording) = self.recording.as_mut() {
-                    recording.push(packet);
+                let overflowed = self
+                    .recording
+                    .as_mut()
+                    .is_some_and(|recording| recording.push(packet));
+                if overflowed {
+                    self.notice(NoticeLevel::Error, DISK_TOO_SLOW);
                 }
             }
             MediaEvent::Warning(text) => {
@@ -163,8 +167,15 @@ impl Control {
                 self.notice(NoticeLevel::Warn, text);
             }
             MediaEvent::Failed(text) => {
-                tracing::error!(%text, "capture failed");
-                self.notice(NoticeLevel::Error, format!("Capture failed: {text}"));
+                if matches!(
+                    self.session.state(),
+                    SessionState::Starting { .. } | SessionState::Recording { .. }
+                ) {
+                    tracing::error!(%text, "capture failed");
+                    self.notice(NoticeLevel::Error, format!("Capture failed: {text}"));
+                } else {
+                    tracing::info!(%text, "capture ended after the game window closed");
+                }
                 self.feed(Input::MediaFailed(text));
                 if self.media_session.is_some() {
                     self.stop_media();
@@ -194,13 +205,17 @@ impl Control {
         let rx = std::mem::replace(&mut self.media_rx, never());
         match self.recording.as_mut() {
             Some(recording) => {
+                let mut overflowed = false;
                 for event in rx.try_iter() {
                     if let MediaEvent::Packet(packet) = event {
-                        recording.push(packet);
+                        overflowed |= recording.push(packet);
                     }
                 }
                 recording.media_stopped = true;
                 recording.close_writer();
+                if overflowed {
+                    self.notice(NoticeLevel::Error, DISK_TOO_SLOW);
+                }
             }
             None if self.orphan_finalize => {
                 self.orphan_finalize = false;
@@ -244,7 +259,8 @@ impl Control {
             meta,
             folder,
             t0: since,
-            ring: ClipRing::new(since, ring_keep(&self.settings), rate),
+            media_offset_secs: None,
+            ring: ClipRing::new(since, ring_keep(), rate),
             video: started.video,
             audio: started.audio,
             writer,

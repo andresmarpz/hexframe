@@ -123,7 +123,12 @@ fn start(settings: Settings, finish_with: Vec<LeagueMsg>) -> Harness {
     });
     let dir = settings.output_dir.clone();
     let league = scripted_league(go_rx, finish_with);
-    let engine = Engine::start(settings, Arc::new(FakeMediaSource::fast()), league, sink);
+    let engine = Engine::start(
+        settings,
+        Arc::new(FakeMediaSource::new().with_speed(20)),
+        league,
+        sink,
+    );
     Harness {
         engine: Some(engine),
         ui: ui_rx,
@@ -295,7 +300,7 @@ fn rec_secs_match_event_instants_within_ten_ms() {
             output_dir: dir.clone(),
             ..Settings::default()
         },
-        Arc::new(FakeMediaSource::fast()),
+        Arc::new(FakeMediaSource::new().with_speed(20)),
         league,
         sink,
     );
@@ -382,7 +387,7 @@ fn shutdown_during_recording_finalizes_the_video() {
             output_dir: dir.clone(),
             ..Settings::default()
         },
-        Arc::new(FakeMediaSource::fast()),
+        Arc::new(FakeMediaSource::new().with_speed(20)),
         league,
         sink,
     );

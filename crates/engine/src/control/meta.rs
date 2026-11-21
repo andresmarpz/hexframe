@@ -8,12 +8,12 @@ use greyscreen_core::game::{GameInfo, GameResult, Player, Team, TimedEvent};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
-use greyscreen_core::time::{HNS_PER_SEC, Hns};
+use greyscreen_core::time::{HNS_PER_SEC, Hns, hns_to_secs};
 use jiff::Zoned;
 
 use crate::api::FeedItem;
 use crate::ring::ClipRing;
-use crate::writer::{GameWriter, Report};
+use crate::writer::{GameWriter, Report, Sent};
 
 const SIDECAR_DEBOUNCE: Hns = 5 * HNS_PER_SEC;
 const MANUAL_NAME: &str = "Test";
@@ -24,6 +24,7 @@ pub(super) struct Recording {
     pub(super) meta: RecordingMeta,
     pub(super) folder: PathBuf,
     pub(super) t0: Hns,
+    pub(super) media_offset_secs: Option<f64>,
     pub(super) video: VideoFormat,
     pub(super) audio: Option<AudioFormat>,
     pub(super) ring: ClipRing,
@@ -41,16 +42,34 @@ pub(super) struct Recording {
 }
 
 impl Recording {
-    pub(super) fn push(&mut self, packet: Packet) {
+    pub(super) fn push(&mut self, packet: Packet) -> bool {
+        if packet.track == Track::Video && self.media_offset_secs.is_none() {
+            self.set_media_offset(video_dts_secs(&packet));
+        }
         let key_video = packet.track == Track::Video && packet.key;
         let packet = Arc::new(packet);
-        if let Some(writer) = &self.writer {
-            writer.send(packet.clone());
-        }
+        let overflowed = self
+            .writer
+            .as_mut()
+            .is_some_and(|writer| writer.send(packet.clone()) == Sent::Full);
         self.ring.push(packet);
         if key_video {
             self.ring.prune();
         }
+        overflowed
+    }
+
+    fn set_media_offset(&mut self, offset: f64) {
+        self.media_offset_secs = Some(offset);
+        for event in &mut self.meta.events {
+            event.rec_secs -= offset;
+        }
+        self.meta.events.retain(|event| event.rec_secs >= 0.0);
+        self.dirty = true;
+    }
+
+    pub(super) fn file_secs(&self, at: Hns) -> f64 {
+        file_secs(at, self.t0, self.media_offset_secs.unwrap_or(0.0))
     }
 
     pub(super) fn close_writer(&mut self) {
@@ -76,6 +95,14 @@ impl Recording {
     pub(super) fn sidecar_due(&self, now: Hns) -> bool {
         self.dirty && now - self.last_write >= SIDECAR_DEBOUNCE
     }
+}
+
+fn video_dts_secs(packet: &Packet) -> f64 {
+    packet.dts as f64 / f64::from(VideoFormat::TIMESCALE)
+}
+
+pub(super) fn file_secs(at: Hns, t0: Hns, offset_secs: f64) -> f64 {
+    hns_to_secs(at - t0) - offset_secs
 }
 
 pub(super) fn manual_game() -> GameInfo {
@@ -139,3 +166,6 @@ pub(super) fn feed_item(event: &TimedEvent, rec_secs: f64, highlights: Vec<Highl
         highlights,
     }
 }
+
+#[cfg(test)]
+mod tests;

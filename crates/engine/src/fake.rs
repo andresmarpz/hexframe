@@ -108,15 +108,38 @@ fn parse_fixtures() -> Result<Fixtures, String> {
 #[derive(Debug, Clone, Copy)]
 pub struct FakeMediaSource {
     realtime: bool,
+    speed: u32,
+    start_offset_secs: u32,
 }
 
 impl FakeMediaSource {
     pub fn new() -> Self {
-        Self { realtime: true }
+        Self {
+            realtime: true,
+            speed: 1,
+            start_offset_secs: 0,
+        }
     }
 
     pub fn fast() -> Self {
-        Self { realtime: false }
+        Self {
+            realtime: false,
+            ..Self::new()
+        }
+    }
+
+    pub fn with_speed(self, speed: u32) -> Self {
+        Self {
+            speed: speed.max(1),
+            ..self
+        }
+    }
+
+    pub fn with_start_offset_secs(self, secs: u32) -> Self {
+        Self {
+            start_offset_secs: secs,
+            ..self
+        }
     }
 }
 
@@ -152,11 +175,15 @@ impl MediaSource for FakeMediaSource {
     ) -> Result<Box<dyn MediaSession>, String> {
         let fixtures = fixtures()?;
         let (stop_tx, stop_rx) = bounded::<()>(0);
-        let realtime = self.realtime;
+        let pace = Pace {
+            realtime: self.realtime,
+            speed: i64::from(self.speed),
+            start_offset_secs: i64::from(self.start_offset_secs),
+        };
         let t0 = mono_now();
         let thread = thread::Builder::new()
             .name("fake-media".into())
-            .spawn(move || run(fixtures, realtime, t0, &out, &stop_rx))
+            .spawn(move || run(fixtures, pace, t0, &out, &stop_rx))
             .map_err(|e| e.to_string())?;
         Ok(Box::new(FakeSession {
             stop: Some(stop_tx),
@@ -176,13 +203,14 @@ fn ticks_to_hns(ticks: i64, timescale: i64) -> Hns {
     ticks * HNS_PER_SEC / timescale
 }
 
-fn run(
-    fixtures: &Fixtures,
+#[derive(Clone, Copy)]
+struct Pace {
     realtime: bool,
-    t0: Hns,
-    out: &Sender<MediaEvent>,
-    stop: &Receiver<()>,
-) {
+    speed: i64,
+    start_offset_secs: i64,
+}
+
+fn run(fixtures: &Fixtures, pace: Pace, t0: Hns, out: &Sender<MediaEvent>, stop: &Receiver<()>) {
     let started = MediaEvent::Started {
         t0,
         video: fixtures.video.clone(),
@@ -194,10 +222,12 @@ fn run(
     }
     let video_step = i64::from(fixtures.video.frame_ticks());
     let audio_step = i64::from(AAC_FRAME_TICKS);
+    let video_start = pace.start_offset_secs * i64::from(VideoFormat::TIMESCALE);
+    let audio_start = pace.start_offset_secs * i64::from(SAMPLE_RATE);
     let (mut video_index, mut audio_index) = (0usize, 0usize);
     loop {
-        let video_dts = video_index as i64 * video_step;
-        let audio_dts = audio_index as i64 * audio_step;
+        let video_dts = video_start + video_index as i64 * video_step;
+        let audio_dts = audio_start + audio_index as i64 * audio_step;
         let video_at = ticks_to_hns(video_dts, i64::from(VideoFormat::TIMESCALE));
         let audio_at = ticks_to_hns(audio_dts, i64::from(SAMPLE_RATE));
         let (due, packet) = if video_at <= audio_at {
@@ -229,7 +259,7 @@ fn run(
                 },
             )
         };
-        if realtime && !wait_until(t0 + due, stop) {
+        if pace.realtime && !wait_until(t0 + due / pace.speed, stop) {
             return;
         }
         if !send(out, stop, MediaEvent::Packet(packet)) {

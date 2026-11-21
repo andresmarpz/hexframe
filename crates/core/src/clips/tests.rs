@@ -16,6 +16,7 @@ fn single_highlight_gets_pre_and_post_padding() {
         vec![ClipPlan {
             start: 85 * S,
             end: 105 * S,
+            moment: 100 * S,
             label: "Kill".into(),
             events: vec![1],
         }]
@@ -33,6 +34,14 @@ fn nearby_highlights_merge_and_join_labels() {
     assert_eq!(plans[0].end, 115 * S);
     assert_eq!(plans[0].label, "Kill+Double");
     assert_eq!(plans[0].events, vec![1, 2]);
+}
+
+#[test]
+fn merged_plan_keeps_the_first_moment() {
+    let mut p = planner();
+    p.on_highlight(100 * S, "Kill", 1);
+    p.on_highlight(110 * S, "Double", 2);
+    assert_eq!(p.flush()[0].moment, 100 * S);
 }
 
 #[test]

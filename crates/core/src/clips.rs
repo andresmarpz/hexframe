@@ -1,13 +1,14 @@
 use crate::time::{HNS_PER_SEC, Hns};
 
-const MAX_PLAN: Hns = 90 * HNS_PER_SEC;
-const DUE_DELAY: Hns = HNS_PER_SEC;
+pub const MAX_PLAN: Hns = 90 * HNS_PER_SEC;
+pub const DUE_DELAY: Hns = HNS_PER_SEC;
 const MAX_LABELS: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClipPlan {
     pub start: Hns,
     pub end: Hns,
+    pub moment: Hns,
     pub label: String,
     pub events: Vec<u32>,
 }
@@ -16,6 +17,7 @@ pub struct ClipPlan {
 struct Open {
     start: Hns,
     end: Hns,
+    moment: Hns,
     labels: Vec<String>,
     events: Vec<u32>,
 }
@@ -35,6 +37,7 @@ impl Open {
         ClipPlan {
             start: self.start,
             end: self.end,
+            moment: self.moment,
             label,
             events: self.events,
         }
@@ -77,6 +80,7 @@ impl ClipPlanner {
         self.open = Some(Open {
             start,
             end: end.min(start + MAX_PLAN),
+            moment: at,
             labels: vec![label.to_owned()],
             events: vec![event_id],
         });

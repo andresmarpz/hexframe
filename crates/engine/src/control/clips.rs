@@ -1,7 +1,7 @@
 use greyscreen_core::clips::ClipPlan;
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::library::{self, ClipEntry};
-use greyscreen_core::time::{Hns, hns_to_secs, mono_now, secs_to_hns};
+use greyscreen_core::time::{Hns, mono_now, secs_to_hns};
 
 use super::Control;
 use crate::api::{self, NoticeLevel, UiMsg};
@@ -39,6 +39,7 @@ impl Control {
         recording.queued.push(ClipPlan {
             start: now - secs_to_hns(f64::from(MANUAL_CLIP_SECS)),
             end: now,
+            moment: now,
             label: MANUAL_LABEL.to_owned(),
             events: Vec::new(),
         });
@@ -117,8 +118,9 @@ impl Control {
             );
             return;
         }
-        let start_secs = hns_to_secs(plan.start - recording.t0);
-        let base = library::clip_file_name(start_secs, &plan.label);
+        let start_secs = recording.file_secs(plan.start).max(0.0);
+        let moment_secs = recording.file_secs(plan.moment);
+        let base = library::clip_file_name(moment_secs, &plan.label);
         let name = unique_name(&base, |candidate| {
             recording.clip_names.contains(candidate)
                 || recording.folder.join(CLIPS_DIR).join(candidate).exists()
@@ -129,7 +131,7 @@ impl Control {
             entry: ClipEntry {
                 file: format!("{CLIPS_DIR}/{name}"),
                 start_secs,
-                end_secs: hns_to_secs(plan.end - recording.t0),
+                end_secs: recording.file_secs(plan.end),
                 label: plan.label,
             },
             video: recording.video.clone(),

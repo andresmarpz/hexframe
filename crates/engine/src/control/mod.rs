@@ -182,12 +182,8 @@ impl Control {
     fn apply_settings(&mut self, mut settings: Settings) {
         settings.validate();
         let auto_record = settings.auto_record;
-        let keep = effects::ring_keep(&settings);
         self.settings_saver.save(settings.clone());
         self.settings = settings;
-        if let Some(recording) = self.recording.as_mut() {
-            recording.ring.set_keep(keep);
-        }
         self.feed(Input::SettingsChanged { auto_record });
     }
 

@@ -24,10 +24,6 @@ impl ClipRing {
         }
     }
 
-    pub(crate) fn set_keep(&mut self, keep: Hns) {
-        self.keep = keep;
-    }
-
     pub(crate) fn push(&mut self, packet: Arc<Packet>) {
         self.newest = self.newest.max(self.start_of(&packet));
         self.packets.push_back(packet);

@@ -77,15 +77,19 @@ fn update_sidecar(folder: &Path, video: &Path) {
     let Ok(mut meta) = library::read_meta(folder) else {
         return;
     };
-    if meta.duration_secs > 0.0 {
-        return;
-    }
-    let Some(duration) = movie_duration_secs(video) else {
-        return;
-    };
-    meta.duration_secs = duration;
+    let mut changed = false;
     if meta.video.is_empty() {
         meta.video = VIDEO_FILE.to_owned();
+        changed = true;
+    }
+    if meta.duration_secs <= 0.0
+        && let Some(duration) = movie_duration_secs(video)
+    {
+        meta.duration_secs = duration;
+        changed = true;
+    }
+    if !changed {
+        return;
     }
     if let Err(err) = library::write_meta(folder, &meta) {
         tracing::warn!(folder = %folder.display(), %err, "cannot update recovered sidecar");
