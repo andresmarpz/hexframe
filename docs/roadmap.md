@@ -517,3 +517,39 @@ Acceptance:
 
 - One fresh Opus reviewer gets the `crates/capture`, `crates/engine` and `crates/mp4` code plus the goal. It looks for bugs, false claims, race conditions, COM lifetime errors, resource leaks and unsafe misuse. At most 2 rounds.
 - The orchestrator files fix tickets (R3-x) for real bugs, and Sonnet workers run them.
+
+---
+
+## Review fixes (from `docs/reviews/2026-11-21-adversarial.md`)
+
+### F1: Session and poller robustness (`core::session`, `league`)
+Items 1, 4, 9, 13 (engine side).
+- Tail and Finalizing remember whether `Gone` arrived. `Finalized` goes to Idle when it did, otherwise to Cooldown.
+- Cooldown also accepts `WindowFound` with a different pid and goes to Armed.
+- Armed keeps the `GameInfo` after a failed start. It retries `StartMedia` on Tick every 5 s, at most 5 times, then reports an Error and goes to Cooldown.
+- Starting with no `MediaStarted` within 15 s acts as `MediaFailed("capture did not start")`, with `StopMedia`.
+- League client: a connect or read timeout is `NotReady`, not `Refused`. Only real refusals count toward the 3 refused polls.
+
+### F2: Engine fixes (`engine`)
+Items 2 (engine side), 3, 5, 7, 12, plus clip naming.
+- Ring keep: `max(MAX_PLAN + DUE_DELAY, 30 s) + 5 s`. Expose `MAX_PLAN` and `DUE_DELAY` from `core::clips`.
+- Media offset: keep `first_video_dts` (seconds) from the first video packet. Sidecar `rec_secs`, clip `start_secs` and `end_secs` subtract it, so they match times in `game.mp4`.
+- A writer error must not hide the recording. Retry the final rename 5 times, 200 ms apart. Recovery's `update_sidecar` sets `video` whenever it is empty, and the duration when it is 0.
+- A `Failed` that arrives in Tail or Finalizing, or after the game window is gone, is logged at info. It is not an Error notice.
+- The writer queue uses `try_send`. When it is full, mark the writer failed (`Notice` Error "Disk too slow: the full game recording stopped") and keep running, so clips still work.
+- Clip file names use the first highlight's moment (`rec_secs` of its event), not the clip start. `ClipPlan` gains `moment: Hns`.
+
+### F3: Capture fixes (`capture`, `core::media` timeline)
+Items 2 (source side), 6, 8, 10, 11, 13, 14.
+- Take `t0` after audio start, just before the pacer loop. The pacer starts at tick 0 with no resync jump on the first tick.
+- Match outputs to ticks by `pts_hns`: pop `in_flight` entries while their pts is below the output's, and use the matching tick. If the output pts is missing (0 after the first), fall back to FIFO.
+- Watchdog: no video output for 5 s while submitting sends `Failed("encoder stopped producing frames")`. Free NV12 slots FIFO on each output (one input, one output).
+- `stop()` waits up to 15 s.
+- `AudioTimeline` in distrust mode re-anchors on `now` with the same 30 ms resync threshold.
+- If 120 outputs pass with no SPS/PPS, send `Failed("encoder sent no parameter sets")`.
+- If in-band SPS/PPS differ from the ones in `Started`, send `Failed("encoder parameters changed")`.
+
+### F4: MP4 fixes (`mp4`)
+Items 2 (writer side), 15.
+- `FragmentedWriter` rebases both tracks to the first video key packet's time. It drops audio frames that end before it, and keeps the one covering it, as `clip.rs` does. Recovery stays consistent: its `tfdt` starts at 0.
+- Move the `already_finalized` check into `mp4::recover::recover` (rename only). Remove the engine's copy and call `recover`.
