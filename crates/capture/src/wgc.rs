@@ -183,6 +183,9 @@ impl WgcCapture {
     }
 
     fn teardown(&mut self) {
+        if self.pool.is_none() && self.session.is_none() {
+            return;
+        }
         if let (Some(pool), Some(token)) = (&self.pool, self.frame_token.take())
             && let Err(error) = pool.RemoveFrameArrived(token)
         {

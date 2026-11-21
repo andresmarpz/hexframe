@@ -69,6 +69,7 @@ impl Video {
         if let Err(error) = unsafe { self.gpu.device.GetDeviceRemovedReason() } {
             return Err(Exit::Lost(format!("graphics device removed: {error}")));
         }
+        self.drain_video()?;
         let submitting = self.process_frame()?;
         self.drain_video()?;
         if let Some(reason) = self.sink.take_fault() {
@@ -97,7 +98,7 @@ impl Video {
             return Ok(false);
         };
         self.seq = seq;
-        match self.encoder.need_input() {
+        match self.wait_for_input() {
             Ok(true) => {}
             Ok(false) => {
                 self.stats.dropped += 1;
@@ -126,6 +127,21 @@ impl Video {
         self.sink.submitted(self.pacer.tick(), pts);
         self.soft_errors = 0;
         Ok(true)
+    }
+
+    fn wait_for_input(&mut self) -> Result<bool, H264Error> {
+        let deadline = mono_now() + self.pacer.frame_hns() / 2;
+        loop {
+            if self.encoder.need_input()? {
+                return Ok(true);
+            }
+            if mono_now() >= deadline {
+                return Ok(false);
+            }
+            self.encoder.drain_output(&mut self.scratch)?;
+            self.sink.video(&mut self.scratch);
+            std::thread::sleep(std::time::Duration::from_micros(250));
+        }
     }
 
     fn soft_frame(
