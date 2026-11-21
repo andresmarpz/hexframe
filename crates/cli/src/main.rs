@@ -9,7 +9,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "greyscreen-cli", version, about = "Greyscreen console tool")]
+#[command(name = "greyscreen-cli", version = env!("GREYSCREEN_BUILD"), about = "Greyscreen console tool")]
 struct Cli {
     #[command(subcommand)]
     command: Command,

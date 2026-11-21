@@ -4,7 +4,15 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
   workflow_dispatch:
 
 permissions:
@@ -52,6 +60,22 @@ jobs:
         with:
           cache-on-failure: true
       - run: cargo build --profile $env:BUILD_PROFILE --locked -p greyscreen -p greyscreen-cli
+      - name: Check exe imports and subsystem
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe | Where-Object { $_.FullName -like '*Hostx64\x64*' } | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dumpbin) { throw 'dumpbin not found' }
+          $dir = "target/$env:BUILD_PROFILE"
+          foreach ($exe in 'greyscreen.exe', 'greyscreen-cli.exe') {
+            $deps = (& $dumpbin /dependents "$dir/$exe") -join "`n"
+            Write-Host $deps
+            if ($deps -match 'VCRUNTIME|MSVCP|api-ms-win-crt') { throw "$exe imports the C runtime dynamically" }
+          }
+          $gui = (& $dumpbin /headers "$dir/greyscreen.exe") -join "`n"
+          if ($gui -notmatch 'subsystem \(Windows GUI\)') { throw 'greyscreen.exe is not a GUI subsystem exe' }
+          $cui = (& $dumpbin /headers "$dir/greyscreen-cli.exe") -join "`n"
+          if ($cui -notmatch 'subsystem \(Windows CUI\)') { throw 'greyscreen-cli.exe is not a console subsystem exe' }
       - uses: actions/upload-artifact@v7
         with:
           name: greyscreen-windows-x64

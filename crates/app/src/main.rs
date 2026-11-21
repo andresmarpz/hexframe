@@ -44,6 +44,7 @@ fn main() {
         }
     };
     let _log_guard = (!headless).then(logging::init).flatten();
+    tracing::info!("greyscreen {} starting", env!("GREYSCREEN_BUILD"));
     #[cfg(windows)]
     greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
     #[cfg(windows)]
