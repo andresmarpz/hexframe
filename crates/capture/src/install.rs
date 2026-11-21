@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use greyscreen_core::install::{
-    APP_ID, EXE_NAME, RUN_KEY, RUN_VALUE, RegValue, UNINSTALL_KEY, cleanup_command, is_inside,
-    run_command, uninstall_values,
+    APP_ID, EXE_NAME, InstallPlan, QUIT_POLL, QUIT_WAIT, RUN_KEY, RUN_VALUE, RegValue,
+    UNINSTALL_KEY, cleanup_command, install_plan, is_inside, run_command, uninstall_values,
+    wait_until,
 };
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
 use windows::Win32::Storage::EnhancedStorage::PKEY_AppUserModel_ID;
@@ -25,6 +26,7 @@ use windows::Win32::System::Registry::{
 use windows::Win32::System::Variant::VT_LPWSTR;
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::Shell::{IShellLinkW, SetCurrentProcessExplicitAppUserModelID, ShellLink};
+use windows::Win32::UI::WindowsAndMessaging::{MB_ICONINFORMATION, MB_OK, MessageBoxW};
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -81,20 +83,79 @@ pub fn install_and_relaunch() -> Result<bool, InstallError> {
     }
     let target = dir.join(EXE_NAME);
     fs::create_dir_all(&dir)?;
+    let identical = files_match(&source, &target);
+    match install_plan(target.exists(), identical) {
+        InstallPlan::RelaunchInstalled => {
+            tracing::info!("the installed copy is identical, relaunching it");
+            relaunch(&target, &dir)?;
+            return Ok(true);
+        }
+        InstallPlan::QuitAndReplace => {
+            tracing::info!("an installed copy exists, asking a running one to quit");
+            if crate::instance::request_quit(APP_ID) {
+                tracing::info!("quit signalled, waiting for the installed exe to unlock");
+            }
+            if !wait_until(QUIT_WAIT, QUIT_POLL, || is_writable(&target)) {
+                tracing::warn!("the installed exe is still locked, giving up");
+                show_still_running();
+                return Ok(true);
+            }
+            tracing::info!("the installed exe is unlocked");
+        }
+        InstallPlan::CopyFresh => {}
+    }
     let size = fs::copy(&source, &target).map_err(|source| InstallError::Copy {
         path: target.clone(),
         source,
     })?;
     create_shortcut(&target, &dir)?;
     write_uninstall_entry(&target, &dir, size)?;
-    Command::new(&target)
-        .args(std::env::args_os().skip(1))
-        .current_dir(&dir)
-        .spawn()?;
+    tracing::info!("installed, relaunching");
+    relaunch(&target, &dir)?;
     Ok(true)
 }
 
+fn relaunch(target: &Path, dir: &Path) -> io::Result<()> {
+    Command::new(target)
+        .args(std::env::args_os().skip(1))
+        .current_dir(dir)
+        .spawn()
+        .map(drop)
+}
+
+fn files_match(a: &Path, b: &Path) -> bool {
+    let (Ok(meta_a), Ok(meta_b)) = (fs::metadata(a), fs::metadata(b)) else {
+        return false;
+    };
+    meta_a.len() == meta_b.len() && matches!((fs::read(a), fs::read(b)), (Ok(x), Ok(y)) if x == y)
+}
+
+fn is_writable(path: &Path) -> bool {
+    !path.exists() || fs::OpenOptions::new().write(true).open(path).is_ok()
+}
+
+fn show_still_running() {
+    // SAFETY: both strings outlive the call and no owner window is used.
+    unsafe {
+        MessageBoxW(
+            None,
+            &HSTRING::from(
+                "Greyscreen is still running. Quit it from the tray, then run this file again.",
+            ),
+            &HSTRING::from("Greyscreen"),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
+}
+
 pub fn uninstall() {
+    if crate::instance::request_quit(APP_ID) {
+        tracing::info!("asked the running copy to quit");
+        let stopped = wait_until(QUIT_WAIT, QUIT_POLL, || {
+            !crate::instance::is_running(APP_ID)
+        });
+        tracing::info!(stopped, "waited for the running copy");
+    }
     if let Ok(shortcut) = shortcut_path() {
         fs::remove_file(shortcut).ok();
     }

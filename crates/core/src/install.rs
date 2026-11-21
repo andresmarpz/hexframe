@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 pub const APP_ID: &str = "dev.greyscreen.app";
 pub const EXE_NAME: &str = "greyscreen.exe";
@@ -51,6 +52,37 @@ pub fn uninstall_values(
             RegValue::Number(u32::try_from(size_bytes.div_ceil(1024)).unwrap_or(u32::MAX)),
         ),
     ]
+}
+
+pub const QUIT_WAIT: Duration = Duration::from_secs(10);
+pub const QUIT_POLL: Duration = Duration::from_millis(200);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallPlan {
+    CopyFresh,
+    QuitAndReplace,
+    RelaunchInstalled,
+}
+
+pub fn install_plan(installed_exists: bool, installed_matches_running: bool) -> InstallPlan {
+    match (installed_exists, installed_matches_running) {
+        (false, _) => InstallPlan::CopyFresh,
+        (true, true) => InstallPlan::RelaunchInstalled,
+        (true, false) => InstallPlan::QuitAndReplace,
+    }
+}
+
+pub fn wait_until(timeout: Duration, poll: Duration, mut ready: impl FnMut() -> bool) -> bool {
+    let start = Instant::now();
+    loop {
+        if ready() {
+            return true;
+        }
+        if start.elapsed() >= timeout {
+            return false;
+        }
+        std::thread::sleep(poll);
+    }
 }
 
 pub fn cleanup_command(dir: &Path) -> String {

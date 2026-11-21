@@ -104,10 +104,17 @@ fn main() {
         #[cfg(windows)]
         if let Some(signal) = instance {
             let shown = handle.clone();
-            signal.on_signal(move || {
-                shown.show();
-                shown.focus();
-            });
+            let quitting = handle.clone();
+            signal.on_signal(
+                move || {
+                    shown.show();
+                    shown.focus();
+                },
+                move || {
+                    tracing::info!("quit requested by another copy");
+                    quitting.quit();
+                },
+            );
         }
         let sink_handle = handle.clone();
         let engine = Engine::start(

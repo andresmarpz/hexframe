@@ -74,3 +74,38 @@ fn cleanup_waits_then_removes_the_folder() {
         "ping 127.0.0.1 -n 3 >nul & rmdir /s /q \"/p\""
     );
 }
+
+#[test]
+fn missing_installed_copy_is_copied_fresh() {
+    assert_eq!(install_plan(false, false), InstallPlan::CopyFresh);
+    assert_eq!(install_plan(false, true), InstallPlan::CopyFresh);
+}
+
+#[test]
+fn identical_installed_copy_is_only_relaunched() {
+    assert_eq!(install_plan(true, true), InstallPlan::RelaunchInstalled);
+}
+
+#[test]
+fn different_installed_copy_is_replaced_after_a_quit() {
+    assert_eq!(install_plan(true, false), InstallPlan::QuitAndReplace);
+}
+
+#[test]
+fn wait_until_returns_once_ready() {
+    let mut calls = 0;
+    let ready = wait_until(Duration::from_secs(1), Duration::from_millis(1), || {
+        calls += 1;
+        calls == 3
+    });
+    assert!(ready);
+    assert_eq!(calls, 3);
+}
+
+#[test]
+fn wait_until_gives_up_after_the_timeout() {
+    let ready = wait_until(Duration::from_millis(20), Duration::from_millis(5), || {
+        false
+    });
+    assert!(!ready);
+}
