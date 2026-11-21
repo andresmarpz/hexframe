@@ -105,31 +105,75 @@ fn the_clip_holding_the_playhead_is_highlighted() {
     fake_player::set_time(0.0);
 }
 
-#[test]
-fn the_speed_pill_cycles_and_tells_the_player() {
-    let mut rt = review_runtime();
-    let rate = |rt: &Runtime<Ui>| rt.state.review.as_ref().map(|r| r.speed_rate());
-    assert_eq!(rate(&rt), Some(1.0));
-    let mut seen = Vec::new();
-    for _ in 0..5 {
-        tap(&mut rt, "review-speed");
-        seen.push(rate(&rt).expect("rate"));
-    }
-    assert_eq!(seen, vec![1.5, 2.0, 0.25, 0.5, 1.0]);
-    let rates: Vec<f32> = fake_player::calls()
+fn rates() -> Vec<f32> {
+    fake_player::calls()
         .into_iter()
         .filter_map(|call| match call {
             Call::Rate(r) => Some(r),
             _ => None,
         })
-        .collect();
-    assert_eq!(rates, seen);
+        .collect()
+}
+
+fn speed_open(rt: &Runtime<Ui>) -> bool {
+    rt.state.review.as_ref().is_some_and(|r| r.speed_menu)
+}
+
+#[test]
+fn picking_a_speed_from_the_menu_sets_the_rate_and_closes_the_menu() {
+    let mut rt = review_runtime();
+    let rate = |rt: &Runtime<Ui>| rt.state.review.as_ref().map(|r| r.speed_rate());
+    assert_eq!(rate(&rt), Some(1.0));
+    tap(&mut rt, "review-speed");
+    assert!(speed_open(&rt));
+    for index in 0..7 {
+        assert!(rt.find(&format!("speed-menu-item{index}")).is_some());
+    }
+    tap(&mut rt, "speed-menu-item5");
+    assert_eq!(rate(&rt), Some(1.5));
+    assert!(!speed_open(&rt));
+    assert!(rt.find("speed-menu-item5").is_none());
+    assert_eq!(rates(), vec![1.5]);
+}
+
+#[test]
+fn normal_speed_is_one_pick_from_any_speed() {
+    for index in [0, 1, 2, 4, 5, 6] {
+        let mut rt = review_runtime();
+        rt.update(move |ui, _| ui.review_set_speed(index));
+        rt.frame(1.0 / 60.0);
+        tap(&mut rt, "review-speed");
+        tap(&mut rt, "speed-menu-item3");
+        assert_eq!(
+            rt.state.review.as_ref().map(|r| r.speed_rate()),
+            Some(1.0),
+            "from index {index}"
+        );
+    }
+}
+
+#[test]
+fn the_speed_trigger_shows_the_current_speed() {
+    let mut rt = review_runtime();
+    rt.update(|ui, _| ui.review_set_speed(0));
+    rt.frame(1.0 / 60.0);
+    assert!(super::card_text(&rt).contains("0.25×"));
+}
+
+#[test]
+fn escape_closes_the_speed_menu_without_changing_it() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "review-speed");
+    press(&mut rt, Key::Escape);
+    assert!(!speed_open(&rt));
+    assert_eq!(rt.state.review.as_ref().map(|r| r.speed_rate()), Some(1.0));
 }
 
 #[test]
 fn the_speed_survives_a_clip_swap() {
     let mut rt = review_runtime();
     tap(&mut rt, "review-speed");
+    tap(&mut rt, "speed-menu-item5");
     tap(&mut rt, "tab-clips");
     fake_player::clear_calls();
     tap(&mut rt, "clip-1");

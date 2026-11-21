@@ -1,4 +1,5 @@
 mod card;
+mod controls;
 mod death_summary;
 mod deaths;
 mod icons;
@@ -30,6 +31,7 @@ const PAGE_PADDING: f32 = 16.0;
 const NO_VIDEO: &str = "No video for this game";
 
 pub(super) use card::hover_card;
+pub(super) use controls::layer as controls_layer;
 pub(super) use theater::screen as theater;
 
 pub(super) fn tabular(style: TextStyle) -> TextStyle {

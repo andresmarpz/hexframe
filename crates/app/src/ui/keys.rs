@@ -5,7 +5,7 @@ use rune::{KeyEvent, Tx};
 
 use super::jump::{next_target, previous_target};
 use super::key_event::combo_of;
-use super::{Detail, EventFilter, PanelTab, Screen, Source, Ui};
+use super::{Detail, EventFilter, PanelTab, Screen, Source, Ui, VolumeHover};
 
 const STEP_SECS: f64 = 5.0;
 
@@ -137,6 +137,33 @@ impl Ui {
     pub(crate) fn review_mute(&mut self) {
         if let Some(review) = &mut self.review {
             review.toggle_mute();
+            self.sound = review.sound();
+        }
+    }
+
+    pub(crate) fn review_set_volume(&mut self, volume: f32) {
+        if let Some(review) = &mut self.review {
+            review.set_volume(volume);
+            self.sound = review.sound();
+        }
+    }
+
+    pub(crate) fn review_step_volume(&mut self, delta: i32) {
+        if let Some(review) = &self.review {
+            let steps = (review.shown_volume() * 20.0).round() + delta as f32;
+            self.review_set_volume(steps / 20.0);
+        }
+    }
+
+    pub(crate) fn review_volume_hover(&mut self, update: impl FnOnce(&mut VolumeHover)) {
+        if let Some(review) = &mut self.review {
+            update(&mut review.volume_hover);
+        }
+    }
+
+    pub(crate) fn review_speed_menu(&mut self, open: bool) {
+        if let Some(review) = &mut self.review {
+            review.speed_menu = open;
         }
     }
 
@@ -146,9 +173,9 @@ impl Ui {
         }
     }
 
-    pub(crate) fn review_cycle_speed(&mut self) {
+    pub(crate) fn review_set_speed(&mut self, index: usize) {
         if let Some(review) = &mut self.review {
-            review.cycle_speed();
+            review.set_speed(index);
         }
     }
 

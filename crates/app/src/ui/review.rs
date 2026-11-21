@@ -6,6 +6,7 @@ use greyscreen_engine::RecordingEntry;
 use rune::{El, Player, PlayerState, SurfaceFit};
 
 use super::death_review::DeathReviewState;
+use super::review_sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
 
 pub(crate) trait ReviewPlayer: Debug {
     fn play(&self);
@@ -16,6 +17,7 @@ pub(crate) trait ReviewPlayer: Debug {
     fn state(&self) -> PlayerState;
     fn set_rate(&self, rate: f32);
     fn set_muted(&self, muted: bool);
+    fn set_volume(&self, volume: f32);
     fn show(&self, frame: El) -> El;
 }
 
@@ -52,6 +54,10 @@ impl ReviewPlayer for Player {
         Player::set_muted(self, muted);
     }
 
+    fn set_volume(&self, volume: f32) {
+        Player::set_volume(self, volume);
+    }
+
     fn show(&self, frame: El) -> El {
         frame.video(self, SurfaceFit::Fit)
     }
@@ -71,8 +77,6 @@ pub(crate) enum Source {
     Clip(usize),
 }
 
-pub(crate) const SPEEDS: [f32; 5] = [0.25, 0.5, 1.0, 1.5, 2.0];
-const NORMAL_SPEED: usize = 2;
 const FRAME_SECS: f64 = 1.0 / 60.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -155,6 +159,9 @@ pub(crate) struct ReviewState {
     pub filter: EventFilter,
     pub speed: usize,
     pub muted: bool,
+    pub volume: f32,
+    pub speed_menu: bool,
+    pub volume_hover: VolumeHover,
     pub drawer: bool,
     pub death: Option<DeathReviewState>,
 }
@@ -162,7 +169,7 @@ pub(crate) struct ReviewState {
 const CONTROLS_HIDE_SECS: f64 = 2.5;
 
 impl ReviewState {
-    pub(crate) fn open(entry: RecordingEntry, make: PlayerFactory) -> Self {
+    pub(crate) fn open(entry: RecordingEntry, make: PlayerFactory, sound: Sound) -> Self {
         let path = entry.folder.join(&entry.meta.video);
         let player = path.is_file().then(|| make(&path));
         if let Some(player) = &player {
@@ -183,7 +190,10 @@ impl ReviewState {
             tab: PanelTab::Events,
             filter: EventFilter::All,
             speed: NORMAL_SPEED,
-            muted: false,
+            muted: sound.muted,
+            volume: sound.volume,
+            speed_menu: false,
+            volume_hover: VolumeHover::default(),
             drawer: false,
             death: None,
         };
@@ -200,31 +210,6 @@ impl ReviewState {
 
     pub(crate) fn speed_rate(&self) -> f32 {
         SPEEDS[self.speed]
-    }
-
-    pub(crate) fn cycle_speed(&mut self) {
-        self.speed = (self.speed + 1) % SPEEDS.len();
-        if let Some(player) = &self.player {
-            player.set_rate(self.speed_rate());
-        }
-    }
-
-    pub(crate) fn step_speed(&mut self, delta: i32) {
-        let last = SPEEDS.len() - 1;
-        let next = self.speed.saturating_add_signed(delta as isize).min(last);
-        if next != self.speed {
-            self.speed = next;
-            if let Some(player) = &self.player {
-                player.set_rate(self.speed_rate());
-            }
-        }
-    }
-
-    pub(crate) fn toggle_mute(&mut self) {
-        self.muted = !self.muted;
-        if let Some(player) = &self.player {
-            player.set_muted(self.muted);
-        }
     }
 
     pub(crate) fn step_frame(&mut self, direction: f64) {
@@ -272,6 +257,9 @@ impl ReviewState {
         if self.speed != NORMAL_SPEED {
             player.set_rate(self.speed_rate());
         }
+        if self.volume < 1.0 {
+            player.set_volume(self.volume);
+        }
         if self.muted {
             player.set_muted(true);
         }
@@ -284,7 +272,12 @@ impl ReviewState {
 
     pub(crate) fn hide_idle_controls(&mut self, clock: f64) -> bool {
         let idle = clock - self.last_move >= CONTROLS_HIDE_SECS;
-        if self.theater && self.controls_visible && self.is_playing() && idle {
+        if self.theater
+            && self.controls_visible
+            && self.is_playing()
+            && idle
+            && !self.controls_menu_open()
+        {
             self.controls_visible = false;
             self.hovered = None;
             return true;

@@ -13,6 +13,7 @@ pub(crate) enum Call {
     Seek(f64),
     Rate(f32),
     Muted(bool),
+    Volume(f32),
 }
 
 thread_local! {
@@ -89,6 +90,10 @@ impl ReviewPlayer for FakePlayer {
 
     fn set_muted(&self, muted: bool) {
         record(Call::Muted(muted));
+    }
+
+    fn set_volume(&self, volume: f32) {
+        record(Call::Volume(volume));
     }
 
     fn show(&self, frame: El) -> El {

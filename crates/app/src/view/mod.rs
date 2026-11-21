@@ -37,6 +37,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     if let Some(card) = review::hover_card(s, &k) {
         layer.push(card);
     }
+    review::controls_layer(s, &k, &mut layer);
     if theater.is_none() {
         settings::sheet(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));
     }

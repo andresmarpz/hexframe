@@ -25,6 +25,7 @@ mod preview;
 mod preview_thumbs;
 pub(crate) mod recordings_filter;
 mod review;
+mod review_sound;
 mod row_menu;
 mod scenes;
 mod screens;
@@ -47,6 +48,7 @@ pub(crate) use jump::seek_target;
 pub(crate) use panes::{PaneDrag, PaneEdge};
 pub(crate) use recordings_filter::RecordingsFilter;
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
+pub(crate) use review_sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
 pub(crate) use scenes::SCENES;
 pub(crate) use screens::Screen;
 pub(crate) use selection::{Detail, ListItem};
@@ -100,6 +102,7 @@ pub(crate) struct Ui {
     pub review: Option<ReviewState>,
     pub row_menu: Option<(String, PointerPress)>,
     pub player_factory: PlayerFactory,
+    pub sound: Sound,
     pub resolution_open: bool,
     pub storage_open: bool,
     pub settings_open: bool,
@@ -148,6 +151,7 @@ impl Ui {
             review: None,
             row_menu: None,
             player_factory: review::rune_player,
+            sound: Sound::default(),
             resolution_open: false,
             storage_open: false,
             settings_open: false,
@@ -232,7 +236,7 @@ impl Ui {
 
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
         self.close_settings();
-        self.review = Some(ReviewState::open(entry, self.player_factory));
+        self.review = Some(ReviewState::open(entry, self.player_factory, self.sound));
         self.live_selected = false;
         self.screen = Screen::Games;
     }

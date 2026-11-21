@@ -415,11 +415,11 @@ fn the_speed_keys_step_through_the_speeds_and_stop_at_the_ends() {
     let mut rt = key_review_runtime();
     let rate = |rt: &Runtime<Ui>| rt.state.review.as_ref().map(|r| r.speed_rate());
     press_char(&mut rt, "]");
-    assert_eq!(rate(&rt), Some(1.5));
+    assert_eq!(rate(&rt), Some(1.25));
     press_char(&mut rt, "]");
     press_char(&mut rt, "]");
     assert_eq!(rate(&rt), Some(2.0));
-    for _ in 0..6 {
+    for _ in 0..7 {
         press_char(&mut rt, "[");
     }
     assert_eq!(rate(&rt), Some(0.25));
@@ -430,7 +430,7 @@ fn the_speed_keys_step_through_the_speeds_and_stop_at_the_ends() {
             _ => None,
         })
         .collect();
-    assert_eq!(rates, vec![1.5, 2.0, 1.5, 1.0, 0.5, 0.25]);
+    assert_eq!(rates, vec![1.25, 1.5, 2.0, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25]);
 }
 
 #[test]

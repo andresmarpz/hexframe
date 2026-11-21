@@ -22,6 +22,7 @@ mod nav_recent;
 mod nav_status;
 mod panes;
 mod review_flow;
+mod review_volume;
 mod search_clear;
 mod selection;
 mod settings_sheet;
