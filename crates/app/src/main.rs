@@ -44,6 +44,11 @@ fn main() {
     if let Err(err) = rune::set_app_icon(include_bytes!("../assets/icon.png").as_slice()) {
         tracing::warn!(%err, "cannot set app icon");
     }
+    let mut settings = Settings::load(&paths::settings_file());
+    settings.validate();
+    let opening_size = settings
+        .window_size
+        .map_or((1180.0, 680.0), |(w, h)| (w as f32, h as f32));
     let spec = AppSpec {
         min_size: Some((1000.0, 600.0)),
         scenes: ui::scene_list(),
@@ -53,7 +58,7 @@ fn main() {
             view::champion::set_waker(waker);
         }),
         on_key: Some(Ui::on_key),
-        ..AppSpec::new("Greyscreen", (1180.0, 680.0), Ui::preview, view::root)
+        ..AppSpec::new("Greyscreen", opening_size, Ui::preview, view::root)
     };
     let mut app = App::new(spec)
         .chrome(Chrome {
@@ -65,8 +70,6 @@ fn main() {
     if std::env::args().any(|arg| arg == HIDDEN_FLAG) {
         app = app.windowless();
     }
-    let mut settings = Settings::load(&paths::settings_file());
-    settings.validate();
     let (_tray, _engine) = if headless {
         (None, None)
     } else {

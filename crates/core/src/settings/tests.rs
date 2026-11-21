@@ -691,3 +691,19 @@ fn finishing_the_first_run_survives_a_save_and_load() {
     settings.save(&path).unwrap();
     assert!(Settings::load(&path).first_run_done);
 }
+
+#[test]
+fn a_saved_window_size_stays_inside_the_allowed_range() {
+    let mut settings = Settings {
+        window_size: Some((200, 99_999)),
+        ..Settings::default()
+    };
+    settings.validate();
+    assert_eq!(
+        settings.window_size,
+        Some((MIN_WINDOW_SIZE.0, MAX_WINDOW_SIZE.1))
+    );
+    settings.window_size = Some((1400, 800));
+    settings.validate();
+    assert_eq!(settings.window_size, Some((1400, 800)));
+}

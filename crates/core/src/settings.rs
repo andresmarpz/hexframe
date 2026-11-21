@@ -27,6 +27,8 @@ const BYTES_PER_GB: u64 = 1_000_000_000;
 pub const MAX_SOUND_VOLUME: u32 = 100;
 pub const NATIVE_HEIGHT_CEILING: u32 = 2160;
 pub const DEFAULT_SOUND_VOLUME: u32 = 60;
+pub const MIN_WINDOW_SIZE: (u32, u32) = (1000, 600);
+pub const MAX_WINDOW_SIZE: (u32, u32) = (8192, 8192);
 pub const STORAGE_LIMITS_GB: [u32; 4] = [50, 100, 250, 500];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +150,7 @@ pub struct Settings {
     pub sidebar_collapsed: bool,
     pub nav_width: u32,
     pub list_width: u32,
+    pub window_size: Option<(u32, u32)>,
     pub client_id: Option<String>,
     #[serde(default = "yes")]
     pub first_run_done: bool,
@@ -181,6 +184,7 @@ impl Default for Settings {
             sidebar_collapsed: false,
             nav_width: NAV_WIDTH.default,
             list_width: LIST_WIDTH.default,
+            window_size: None,
             client_id: None,
             first_run_done: false,
         }
@@ -238,6 +242,12 @@ impl Settings {
         self.sound_volume = self.sound_volume.min(MAX_SOUND_VOLUME);
         self.nav_width = NAV_WIDTH.clamp(self.nav_width);
         self.list_width = LIST_WIDTH.clamp(self.list_width);
+        self.window_size = self.window_size.map(|(w, h)| {
+            (
+                w.clamp(MIN_WINDOW_SIZE.0, MAX_WINDOW_SIZE.0),
+                h.clamp(MIN_WINDOW_SIZE.1, MAX_WINDOW_SIZE.1),
+            )
+        });
     }
 
     pub fn keymap(&self) -> Keymap {

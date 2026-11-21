@@ -45,7 +45,9 @@ pub(crate) use review::{
 };
 pub(crate) use scenes::all as scene_list;
 pub(crate) use settings_sheet::SettingsSection;
-pub(crate) use shell::{DockState, LibraryTotals, PaneDrag, PaneEdge, RECENT_LIMIT, Screen};
+pub(crate) use shell::{
+    DockState, LibraryTotals, PaneDrag, PaneEdge, RECENT_LIMIT, Screen, WindowSizeWatch,
+};
 pub(crate) use update::UpdateUi;
 
 #[cfg(test)]
@@ -75,6 +77,7 @@ pub(crate) struct Notice {
 pub(crate) struct Ui {
     pub screen: Screen,
     pub pane_drag: Option<PaneDrag>,
+    pub window_watch: WindowSizeWatch,
     pub live_selected: bool,
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
@@ -131,6 +134,7 @@ impl Ui {
         Ui {
             screen: Screen::Home,
             pane_drag: None,
+            window_watch: WindowSizeWatch::new(),
             live_selected: false,
             status: EngineStatus::Idle,
             feed: VecDeque::new(),

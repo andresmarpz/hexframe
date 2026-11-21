@@ -151,6 +151,7 @@ impl Ui {
     pub(crate) fn poll(&mut self, clock: f64, tx: &mut Tx) -> bool {
         let mut changed = false;
         self.sync_full_screen(tx);
+        self.save_settled_window_size(clock, tx);
         if let Some((_, until)) = &self.notice
             && clock >= *until
         {

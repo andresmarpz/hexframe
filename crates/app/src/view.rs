@@ -56,7 +56,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     if let Some((notice, _)) = &s.notice {
         layer.push(overlays::toast(notice, &k));
     }
-    rune_kit::root(body, layer)
+    rune_kit::root(body, layer).on_layout(|s: &mut Ui, r| s.note_window_size(r[2], r[3]))
 }
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
