@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used)]
-
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use greyscreen_core::game::{GameInfo, GameResult, Player, Team};

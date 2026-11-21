@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::expect_used)]
 
 #[cfg(not(windows))]
 use std::path::{Path, PathBuf};
