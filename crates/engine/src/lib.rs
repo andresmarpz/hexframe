@@ -22,3 +22,4 @@ pub use api::{
 pub use fake::FakeMediaSource;
 pub use feedback::{FeedbackConfig, FeedbackTransport};
 pub use hotkey::HotkeyBackend;
+pub use library::entries as library_entries;

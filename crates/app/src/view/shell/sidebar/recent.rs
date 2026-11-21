@@ -1,6 +1,5 @@
 use greyscreen_core::game::GameResult;
 use greyscreen_core::highlight::Tone;
-use jiff::Zoned;
 use rune::{Cursor, El, Side, col, el, row};
 use rune_kit::{Kit, SidebarRow, SidebarSection};
 
@@ -50,7 +49,7 @@ impl Game {
 }
 
 fn games(s: &Ui) -> Vec<Game> {
-    let now = Zoned::now();
+    let now = crate::qa::now();
     let open = s.selected_id().filter(|_| s.screen == Screen::Games);
     recent_games(&s.recordings, RECENT_LIMIT)
         .into_iter()

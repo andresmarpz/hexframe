@@ -1,0 +1,14 @@
+{
+  "about": "Searching settings shows only matching rows across sections; Escape clears the search, then closes the sheet.",
+  "scene": "games-pick",
+  "steps": [
+    {"tap": "nav-settings"},
+    {"tap": "settings-search"},
+    {"type": "dock"},
+    {"check": "dock", "has": ["nav-style-row"], "lacks": ["quality-row"]},
+    {"press": "Escape"},
+    {"check": "cleared", "has": ["settings-sheet", "quality-row"], "snap": false},
+    {"press": "Escape"},
+    {"check": "closed", "lacks": ["settings-sheet"], "snap": false}
+  ]
+}

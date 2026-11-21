@@ -6,7 +6,6 @@ mod week;
 mod welcome;
 
 use greyscreen_engine::EngineStatus;
-use jiff::Zoned;
 use rune::{Color, El, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
 
@@ -26,7 +25,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     if s.recordings.is_empty() {
         return page.child(welcome::card_for(s, k));
     }
-    let now = Zoned::now();
+    let now = crate::qa::now();
     let mut page = page;
     if let Some(entry) = &s.last_game {
         page = page.child(last_game::panel(entry, k));

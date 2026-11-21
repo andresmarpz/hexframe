@@ -1,5 +1,4 @@
 use greyscreen_engine::{EngineStatus, RecordingEntry};
-use jiff::Zoned;
 
 use super::format::day_heading;
 use crate::ui::{Screen, Ui};
@@ -79,7 +78,7 @@ impl Ui {
     }
 
     pub(crate) fn list_items(&self) -> Vec<ListItem> {
-        let now = Zoned::now();
+        let now = crate::qa::now();
         let mut items = Vec::new();
         if self.live_row_visible() {
             items.push(ListItem::Live);

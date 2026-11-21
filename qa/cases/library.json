@@ -1,0 +1,10 @@
+{
+  "about": "A real library folder (the seeded demo library, copied) lists its games and opens one.",
+  "scene": "games-pick",
+  "library": true,
+  "steps": [
+    {"check": "list", "has": ["games-list >> label:Ahri", "games-list >> label:Thresh"]},
+    {"tap": "games-list >> label:Thresh"},
+    {"check": "opened", "has": ["review-header", "review-player"], "text": ["Thresh"]}
+  ]
+}

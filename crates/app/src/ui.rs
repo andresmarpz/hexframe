@@ -4,7 +4,7 @@ use crossbeam_channel::Sender;
 use greyscreen_core::keybinds::Action;
 use greyscreen_core::settings::Settings;
 use greyscreen_core::update::UpdateInfo;
-use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, reveal};
+use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry};
 use rune::{PointerPress, TextEdit};
 
 use crate::sfx::Sfx;
@@ -159,7 +159,9 @@ impl Ui {
 
     pub(crate) fn toggle_start_with_windows(&mut self) {
         self.start_with_windows = !self.start_with_windows;
-        crate::platform::set_start_with_windows(self.start_with_windows);
+        if !rune::is_headless() {
+            crate::platform::set_start_with_windows(self.start_with_windows);
+        }
     }
 
     pub(crate) fn send(&self, cmd: EngineCmd) {
@@ -231,7 +233,7 @@ impl Ui {
     }
 
     pub(crate) fn reveal_output_dir(&self) {
-        reveal(&self.settings.output_dir);
+        crate::qa::reveal(&self.settings.output_dir);
     }
 
     pub(crate) fn change(&mut self, edit: impl FnOnce(&mut Settings)) {

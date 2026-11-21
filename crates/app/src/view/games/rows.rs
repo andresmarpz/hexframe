@@ -1,6 +1,5 @@
 use greyscreen_core::game::GameResult;
 use greyscreen_engine::{EngineStatus, RecordingEntry};
-use jiff::Zoned;
 use rune::{Cursor, El, TextStyle, Tx, col, row, text};
 use rune_kit::Kit;
 
@@ -93,7 +92,7 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
     let info = &rec.meta.game.info;
     let champion = info.me.champion.as_str();
     let kda = kda(&rec.meta.events, info);
-    let shown = when(&rec.meta.started_at, &Zoned::now());
+    let shown = when(&rec.meta.started_at, &crate::qa::now());
     let mode = mode_label(&info.mode);
     let result = rec.meta.game.result;
     let result_word = match result {

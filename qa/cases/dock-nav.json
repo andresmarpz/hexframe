@@ -1,0 +1,13 @@
+{
+  "about": "In Dock mode the dock buttons switch screens.",
+  "scene": "dock",
+  "steps": [
+    {"check": "home", "has": ["dock", "home"]},
+    {"tap": "dock-games"},
+    {"check": "games", "has": ["games-list"], "snap": false},
+    {"tap": "dock-clips"},
+    {"check": "clips", "has": ["clips-grid"], "snap": false},
+    {"tap": "dock-settings"},
+    {"check": "settings", "has": ["settings-sheet"]}
+  ]
+}

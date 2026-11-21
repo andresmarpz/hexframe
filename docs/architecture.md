@@ -41,9 +41,10 @@ crates/
   thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
   app/      greyscreen          The Rune UI binary. It also holds the setup window.
   cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `demo` (seeds or clears a fake library).
+  qa/       greyscreen-qa       Headless UI QA (`docs/qa.md`). A library (case format, locators, tree checks, script compiler, image diff) and a runner binary that drives the app binary through Rune's `--script`, `--tree` and `--snap`. No Greyscreen dependencies; never shipped.
 ```
 
-Dependency direction: `core` ← (`mp4`, `league`, `capture`, `engine`); `mp4` ← (`capture`, `engine`); `league` ← (`engine`, `app`, `cli`); `thumbs` ← (`engine`, `app`, `cli`); `capture` (Windows only) ← (`engine`, `app`, `cli`); `engine` ← (`app`, `cli`). `app` also uses `core` and `league` directly.
+Dependency direction: `core` ← (`mp4`, `league`, `capture`, `engine`); `mp4` ← (`capture`, `engine`); `league` ← (`engine`, `app`, `cli`); `thumbs` ← (`engine`, `app`, `cli`); `capture` (Windows only) ← (`engine`, `app`, `cli`); `engine` ← (`app`, `cli`). `app` also uses `core` and `league` directly. `qa` depends on no Greyscreen crate; `app` uses it only in tests, and its runner starts the `greyscreen` and `greyscreen-cli` binaries.
 
 ## Clocks and time units
 

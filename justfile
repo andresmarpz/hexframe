@@ -34,6 +34,11 @@ dist: build-win
     cp target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt dist/
     cp dist/greyscreen.exe dist/GreyscreenSetup.exe
 
+# Headless UI QA (docs/qa.md): no window, no OS input, no sound. Args go to greyscreen-qa: --update, --only NAME, --library DIR.
+qa *args:
+    cargo build -q --locked -p greyscreen -p greyscreen-cli -p greyscreen-qa
+    target/debug/greyscreen-qa {{args}}
+
 # Everyday gate: fmt check, host clippy and the tests. Run before every push.
 check: lint test
 

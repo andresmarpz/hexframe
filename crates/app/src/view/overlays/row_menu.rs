@@ -1,4 +1,4 @@
-use greyscreen_engine::reveal;
+use crate::qa::reveal;
 use rune::El;
 use rune_kit::{Kit, Menu, MenuItem};
 

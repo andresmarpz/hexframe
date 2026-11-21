@@ -35,6 +35,8 @@ pub(crate) enum Action {
         games: usize,
         #[arg(long)]
         force: bool,
+        #[arg(long)]
+        now: Option<Zoned>,
     },
     Clear {
         #[arg(long)]
@@ -44,7 +46,12 @@ pub(crate) enum Action {
 
 pub(crate) fn run(action: Action) -> Result<()> {
     match action {
-        Action::Seed { dir, games, force } => seed(&resolve(dir), games, force),
+        Action::Seed {
+            dir,
+            games,
+            force,
+            now,
+        } => seed(&resolve(dir), games, force, now.unwrap_or_else(Zoned::now)),
         Action::Clear { dir } => clear(&resolve(dir)),
     }
 }
@@ -53,11 +60,10 @@ fn resolve(dir: Option<PathBuf>) -> PathBuf {
     dir.unwrap_or_else(|| Settings::load(&paths::settings_file()).output_dir)
 }
 
-fn seed(dir: &Path, games: usize, force: bool) -> Result<()> {
+fn seed(dir: &Path, games: usize, force: bool, now: Zoned) -> Result<()> {
     if games == 0 {
         bail!("--games must be at least 1");
     }
-    let now = Zoned::now();
     let planned: Vec<(Spec, Zoned, PathBuf)> = script::specs(games)
         .into_iter()
         .map(|spec| {

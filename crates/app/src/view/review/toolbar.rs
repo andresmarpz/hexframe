@@ -1,6 +1,5 @@
+use crate::qa::reveal;
 use greyscreen_core::game::GameResult;
-use greyscreen_engine::reveal;
-use jiff::Zoned;
 use rune::{El, el, row, text};
 use rune_kit::{
     Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
@@ -90,7 +89,7 @@ pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
         };
         line = line.child(tone_pill(k, label, colors).key("review-result"));
     }
-    let when = when(&meta.started_at, &Zoned::now());
+    let when = when(&meta.started_at, &crate::qa::now());
     let line = line
         .child(
             text(when.label())

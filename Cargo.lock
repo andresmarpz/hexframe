@@ -1363,6 +1363,7 @@ dependencies = [
  "greyscreen-core",
  "greyscreen-engine",
  "greyscreen-league",
+ "greyscreen-qa",
  "greyscreen-thumbs",
  "jiff",
  "png 0.18.1",
@@ -1465,6 +1466,18 @@ name = "greyscreen-mp4"
 version = "0.1.11-preview.13"
 dependencies = [
  "greyscreen-core",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "greyscreen-qa"
+version = "0.1.11-preview.13"
+dependencies = [
+ "anyhow",
+ "clap",
+ "png 0.18.1",
+ "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
 ]
 

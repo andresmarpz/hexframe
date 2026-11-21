@@ -1,0 +1,42 @@
+{
+  "about": "Typing a champion in the games search narrows the list; the field's clear button brings every game back.",
+  "scene": "games-pick",
+  "steps": [
+    {
+      "tap": "filter-champion"
+    },
+    {
+      "type": "ahri"
+    },
+    {
+      "check": "ahri-only",
+      "has": [
+        "games-list >> label:Ahri"
+      ],
+      "lacks": [
+        "games-list >> label:Lux",
+        "games-list >> label:Jinx"
+      ]
+    },
+    {
+      "type": "zzz"
+    },
+    {
+      "check": "no-match",
+      "lacks": [
+        "games-list >> label:Ahri"
+      ]
+    },
+    {
+      "tap": "filter-champion >> action"
+    },
+    {
+      "check": "cleared",
+      "has": [
+        "games-list >> label:Lux",
+        "games-list >> label:Ahri"
+      ],
+      "snap": false
+    }
+  ]
+}

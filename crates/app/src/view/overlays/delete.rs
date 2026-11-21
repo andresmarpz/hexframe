@@ -1,5 +1,4 @@
 use greyscreen_engine::RecordingEntry;
-use jiff::Zoned;
 use rune::{El, col, row, text};
 use rune_kit::{Button, ButtonVariant, Dialog, Kit};
 
@@ -15,7 +14,7 @@ pub(crate) fn delete_key(id: &str) -> String {
 }
 
 pub(crate) fn confirm_delete(rec: &RecordingEntry, k: &Kit, layer: &mut Vec<El>) {
-    let shown = when(&rec.meta.started_at, &Zoned::now());
+    let shown = when(&rec.meta.started_at, &crate::qa::now());
     let summary = format!(
         "{} · {} · {}",
         rec.meta.game.info.me.champion,

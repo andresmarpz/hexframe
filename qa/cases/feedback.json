@@ -1,0 +1,14 @@
+{
+  "about": "Send feedback opens the dialog, takes a message and a kind, and Cancel closes it. Nothing is sent: headless runs have no engine.",
+  "scene": "games-pick",
+  "steps": [
+    {"tap": "nav-feedback"},
+    {"check": "open", "has": ["feedback-dialog", "feedback-message", "feedback-send"]},
+    {"tap": "feedback-kind >> segment1"},
+    {"tap": "feedback-message"},
+    {"type": "The timeline skips when I drag fast."},
+    {"check": "filled", "text": ["The timeline skips when I drag fast."]},
+    {"tap": "feedback-cancel"},
+    {"check": "closed", "lacks": ["feedback-dialog"], "snap": false}
+  ]
+}

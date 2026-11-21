@@ -1,5 +1,5 @@
+use crate::qa::reveal;
 use greyscreen_core::paths;
-use greyscreen_engine::reveal;
 use rune::{El, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 

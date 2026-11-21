@@ -1,5 +1,5 @@
+use crate::qa::reveal;
 use greyscreen_core::library::ClipEntry;
-use greyscreen_engine::reveal;
 use rune::{El, col, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, glyphs};
 

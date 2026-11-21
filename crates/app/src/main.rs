@@ -4,6 +4,7 @@ mod champion_icons;
 mod logging;
 mod logo;
 mod platform;
+mod qa;
 mod setup;
 mod sfx;
 mod tray;

@@ -1,0 +1,10 @@
+{
+  "about": "Clicking a row opens its review in place; Escape closes it and the list stays.",
+  "scene": "games-pick",
+  "steps": [
+    {"tap": "games-list >> label:Lux"},
+    {"check": "opened", "has": ["review-player", "review-header", "games-list"], "lacks": ["games-pick"], "text": ["Lux"]},
+    {"press": "Escape"},
+    {"check": "closed", "has": ["games-pick"], "lacks": ["review-player"], "snap": false}
+  ]
+}

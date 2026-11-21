@@ -43,6 +43,14 @@ pub(crate) fn reload() {
     });
 }
 
+fn icons_dir() -> std::path::PathBuf {
+    if crate::qa::active() {
+        std::env::temp_dir().join("greyscreen-no-icons")
+    } else {
+        paths::champion_icons_dir()
+    }
+}
+
 fn image_for(name: &str) -> Option<Image> {
     ICONS.with(|icons| {
         let mut icons = icons.borrow_mut();
@@ -52,7 +60,7 @@ fn image_for(name: &str) -> Option<Image> {
         }
         let index = icons
             .index
-            .get_or_insert_with(|| ChampionIcons::open(&paths::champion_icons_dir()));
+            .get_or_insert_with(|| ChampionIcons::open(&icons_dir()));
         let image = index.icon_path(name).map(|path| {
             let cache = icons.cache.get_or_insert_with(|| {
                 let waker = WAKER.get().cloned().unwrap_or_else(|| Arc::new(|| {}));

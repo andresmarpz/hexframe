@@ -20,7 +20,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
                 .color(k.c.text_muted),
         );
     }
-    let now = Zoned::now();
+    let now = crate::qa::now();
     let mut grid = row().key("clips-grid").w_full().flex_wrap().gap(GAP);
     for clip in &clips {
         grid = grid.child(item(clip, &now, k));

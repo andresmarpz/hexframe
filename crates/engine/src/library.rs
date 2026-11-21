@@ -25,7 +25,7 @@ pub(crate) fn size_bytes(folder: &Path) -> u64 {
     file + clips
 }
 
-pub(crate) fn entries(output_dir: &Path) -> Vec<RecordingEntry> {
+pub fn entries(output_dir: &Path) -> Vec<RecordingEntry> {
     library::scan(output_dir)
         .into_iter()
         .filter_map(|meta| {

@@ -2,7 +2,7 @@
 
 League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done and what is next, `docs/research/` has the API details.
 
-Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback clients), `capture` (Windows only), `engine` (threads and I/O), `thumbs` (OS thumbnails), `app` (the Rune UI and the setup window) and `cli`. `docs/architecture.md` has the dependency direction.
+Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback clients), `capture` (Windows only), `engine` (threads and I/O), `thumbs` (OS thumbnails), `app` (the Rune UI and the setup window), `cli` and `qa` (the headless QA runner, `docs/qa.md`). `docs/architecture.md` has the dependency direction.
 
 ## Worker protocol
 
@@ -32,6 +32,8 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 
 ## Commands
 
+- `just qa`: headless UI QA (`docs/qa.md`): runs `qa/cases` through the real app with no window, checks the element tree and diffs snapshots against `qa/goldens/<os>`; the report is `target/qa/report.html`. `just qa --update` rewrites the goldens.
+- QA never uses OS-level input, never activates or shows a window, never plays sound out loud and never changes system settings. Never QA by driving the real app with UI Automation, SendInput or a visible window.
 - `just check`: the everyday gate: fmt check, host clippy, tests (through cargo-nextest when installed: `cargo install cargo-nextest --locked`).
 - `just ci`: the full gate, `just check` plus typos and Windows clippy through cargo-xwin. `just release` runs it.
 - CI: pushes run only the spell check (`ci.yml`). `Tests` (fmt, clippy and nextest on macOS), `Windows` (clippy, tests and exe build) and `macOS` (app bundle, `just mac-bundle`) run once per published release and on manual runs, not per push. The README badges show the latest release run.
