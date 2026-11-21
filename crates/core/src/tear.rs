@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 pub const RING_SLOTS: usize = 4;
-pub const THUMB_MAX_WIDTH: u32 = 64;
+pub const THUMB_MAX_WIDTH: u32 = 128;
 pub const COPY_WAIT_BUDGET: Duration = Duration::from_millis(12);
 pub const COPY_WAIT_SLOW: Duration = Duration::from_millis(4);
 
@@ -9,6 +9,8 @@ const CELL_DELTA: u8 = 40;
 const MIN_CELL_SHARE: usize = 64;
 const MIN_CELLS: usize = 4;
 const NEIGHBOUR_RATIO: usize = 4;
+const TILE: usize = 8;
+const TILE_SHARE: usize = 4;
 const SPIN_FOR: Duration = Duration::from_micros(500);
 const SLEEP_STEP: Duration = Duration::from_micros(100);
 
@@ -22,6 +24,7 @@ pub enum Arrival {
 #[derive(Debug, Clone, Default)]
 pub struct HoldBack {
     thumbs: [Vec<u8>; RING_SLOTS],
+    widths: [usize; RING_SLOTS],
     published: Option<usize>,
     pending: Option<usize>,
     reading: Option<usize>,
@@ -47,8 +50,9 @@ impl HoldBack {
         self.reading
     }
 
-    pub fn thumb_mut(&mut self, slot: usize) -> &mut Vec<u8> {
-        &mut self.thumbs[slot % RING_SLOTS]
+    pub fn store_thumb(&mut self, slot: usize, thumb: &mut Vec<u8>, width: usize) {
+        std::mem::swap(&mut self.thumbs[slot % RING_SLOTS], thumb);
+        self.widths[slot % RING_SLOTS] = width;
     }
 
     pub fn published(&self) -> Option<usize> {
@@ -64,16 +68,16 @@ impl HoldBack {
             return Arrival::Held;
         };
         let torn = self.published.is_some_and(|prev| {
-            let thumbs = &self.thumbs;
-            let diff = |a: usize, b: usize| changed_cells(&thumbs[a], &thumbs[b]);
-            match (
-                diff(prev, candidate),
-                diff(candidate, slot),
-                diff(prev, slot),
-            ) {
-                (Some(a), Some(b), Some(c)) => is_torn(a, b, c, thumbs[slot].len()),
-                _ => false,
-            }
+            let width = self.widths[slot];
+            let same_width = self.widths[prev] == width && self.widths[candidate] == width;
+            is_torn_frame(
+                [
+                    &self.thumbs[prev],
+                    &self.thumbs[candidate],
+                    &self.thumbs[slot],
+                ],
+                if same_width { width } else { 0 },
+            )
         });
         if torn {
             Arrival::Dropped(candidate)
@@ -115,6 +119,54 @@ pub fn changed_cells(a: &[u8], b: &[u8]) -> Option<usize> {
 
 pub fn is_torn(prev_cur: usize, cur_next: usize, prev_next: usize, cells: usize) -> bool {
     let floor = (cells / MIN_CELL_SHARE).max(MIN_CELLS);
+    let jump = prev_cur.min(cur_next);
+    jump >= floor && jump >= prev_next.saturating_mul(NEIGHBOUR_RATIO)
+}
+
+pub fn is_torn_frame([prev, cur, next]: [&[u8]; 3], width: usize) -> bool {
+    let whole = match (
+        changed_cells(prev, cur),
+        changed_cells(cur, next),
+        changed_cells(prev, next),
+    ) {
+        (Some(a), Some(b), Some(c)) => is_torn(a, b, c, next.len()),
+        _ => return false,
+    };
+    whole || has_torn_tile([prev, cur, next], width)
+}
+
+pub fn has_torn_tile([prev, cur, next]: [&[u8]; 3], width: usize) -> bool {
+    let len = cur.len();
+    if width == 0
+        || len == 0
+        || !len.is_multiple_of(width)
+        || prev.len() != len
+        || next.len() != len
+    {
+        return false;
+    }
+    let height = len / width;
+    let changed = |x: u8, y: u8| usize::from(x.abs_diff(y) >= CELL_DELTA);
+    (0..height).step_by(TILE).any(|top| {
+        let rows = top..(top + TILE).min(height);
+        (0..width).step_by(TILE).any(|left| {
+            let cols = left..(left + TILE).min(width);
+            let (mut a, mut b, mut c) = (0, 0, 0);
+            for y in rows.clone() {
+                let row = y * width;
+                for i in cols.clone().map(|x| row + x) {
+                    a += changed(prev[i], cur[i]);
+                    b += changed(cur[i], next[i]);
+                    c += changed(prev[i], next[i]);
+                }
+            }
+            is_torn_tile(a, b, c, rows.len() * cols.len())
+        })
+    })
+}
+
+fn is_torn_tile(prev_cur: usize, cur_next: usize, prev_next: usize, cells: usize) -> bool {
+    let floor = (cells / TILE_SHARE).max(MIN_CELLS);
     let jump = prev_cur.min(cur_next);
     jump >= floor && jump >= prev_next.saturating_mul(NEIGHBOUR_RATIO)
 }

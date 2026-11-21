@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use super::*;
 
-const CELLS: usize = 48 * 27;
+const WIDTH: usize = 48;
+const CELLS: usize = WIDTH * 27;
 
 fn scene(level: u8) -> Vec<u8> {
     (0..CELLS)
@@ -19,9 +20,18 @@ fn torn_from(base: &[u8], cells: usize) -> Vec<u8> {
     out
 }
 
+fn store(guard: &mut HoldBack, slot: usize, mut thumb: Vec<u8>) {
+    let width = if thumb.len().is_multiple_of(WIDTH) {
+        WIDTH
+    } else {
+        1
+    };
+    guard.store_thumb(slot, &mut thumb, width);
+}
+
 fn arrive(guard: &mut HoldBack, thumb: Vec<u8>) -> (usize, Arrival) {
     let slot = guard.write_slot();
-    *guard.thumb_mut(slot) = thumb;
+    store(guard, slot, thumb);
     (slot, guard.arrive(slot))
 }
 
@@ -99,7 +109,7 @@ fn the_write_slot_is_never_the_published_or_pending_one() {
         let slot = guard.write_slot();
         assert_ne!(Some(slot), guard.published());
         assert_ne!(Some(slot), guard.pending());
-        *guard.thumb_mut(slot) = scene(step);
+        store(&mut guard, slot, scene(step));
         guard.arrive(slot);
     }
 }
@@ -145,11 +155,11 @@ fn the_write_slot_avoids_published_pending_and_read_slots_in_any_sequence() {
             2 => guard.done_reading(),
             3 => guard.publish_now(slot),
             4 => {
-                *guard.thumb_mut(slot) = torn_from(&scene(30), 300);
+                store(&mut guard, slot, torn_from(&scene(30), 300));
                 guard.arrive(slot);
             }
             _ => {
-                *guard.thumb_mut(slot) = scene(30);
+                store(&mut guard, slot, scene(30));
                 drops += usize::from(matches!(guard.arrive(slot), Arrival::Dropped(_)));
             }
         }
@@ -180,13 +190,34 @@ fn publish_now_skips_the_check() {
 }
 
 #[test]
-fn thumbnail_level_keeps_the_width_at_most_64() {
-    assert_eq!(thumb_level((3072, 1728)), 6);
-    assert_eq!(thumb_size((3072, 1728), 6), (48, 27));
-    assert_eq!(thumb_level((1920, 1080)), 5);
-    assert_eq!(thumb_size((1920, 1080), 5), (60, 33));
+fn thumbnail_level_keeps_the_width_at_most_128() {
+    assert_eq!(thumb_level((3072, 1728)), 5);
+    assert_eq!(thumb_size((3072, 1728), 5), (96, 54));
+    assert_eq!(thumb_level((2560, 1440)), 5);
+    assert_eq!(thumb_size((2560, 1440), 5), (80, 45));
+    assert_eq!(thumb_level((1920, 1080)), 4);
+    assert_eq!(thumb_size((1920, 1080), 4), (120, 67));
+    assert_eq!(thumb_level((128, 72)), 0);
+    assert_eq!(thumb_level((200, 2)), 1);
+    assert_eq!(thumb_size((200, 2), 1), (100, 1));
     assert_eq!(thumb_level((64, 36)), 0);
     assert_eq!(thumb_level((4096, 1)), 0);
+}
+
+#[test]
+fn thumbnails_of_different_widths_skip_the_tile_rule() {
+    let mut guard = HoldBack::default();
+    let clean = scene(30);
+    arrive(&mut guard, clean.clone());
+    arrive(&mut guard, clean.clone());
+    let mut blink = clean.clone();
+    blink[..8].fill(200);
+    blink[WIDTH..WIDTH + 8].fill(200);
+    let slot = guard.write_slot();
+    guard.store_thumb(slot, &mut blink, WIDTH / 2);
+    guard.arrive(slot);
+    let (_, arrival) = arrive(&mut guard, clean);
+    assert_eq!(arrival, Arrival::Published(slot));
 }
 
 #[test]
@@ -262,4 +293,157 @@ fn copy_waits_count_slow_and_timed_out_copies() {
     assert_eq!(waits.slow, 1);
     assert_eq!(waits.timeouts, 1);
     assert_eq!(waits.max_us, 12_000);
+}
+
+const GAME_WIDTH: usize = 96;
+const GAME_HEIGHT: usize = 54;
+const HUD_COLS: std::ops::Range<usize> = 70..90;
+const HUD_ROWS: std::ops::Range<usize> = 36..52;
+
+fn noise(seed: usize) -> u8 {
+    let mut x = (seed as u32).wrapping_mul(0x9e37_79b9) ^ 0x85eb_ca6b;
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2c1b_3c6d);
+    x ^= x >> 12;
+    x as u8
+}
+
+fn world(shift: usize) -> Vec<u8> {
+    (0..GAME_WIDTH * GAME_HEIGHT)
+        .map(|i| noise(i % GAME_WIDTH + shift + (i / GAME_WIDTH) * 1000))
+        .collect()
+}
+
+fn with_hud(mut frame: Vec<u8>, hud: impl Fn(usize, usize) -> u8) -> Vec<u8> {
+    for y in HUD_ROWS {
+        for x in HUD_COLS {
+            frame[y * GAME_WIDTH + x] = hud(x, y);
+        }
+    }
+    frame
+}
+
+fn minimap(_: usize, _: usize) -> u8 {
+    20
+}
+
+fn checkerboard(x: usize, y: usize) -> u8 {
+    if (x + y).is_multiple_of(2) { 0 } else { 255 }
+}
+
+fn feed(frames: impl IntoIterator<Item = Vec<u8>>) -> Vec<usize> {
+    let mut guard = HoldBack::default();
+    let mut dropped = Vec::new();
+    for (index, mut thumb) in frames.into_iter().enumerate() {
+        let slot = guard.write_slot();
+        guard.store_thumb(slot, &mut thumb, GAME_WIDTH);
+        if let Arrival::Dropped(_) = guard.arrive(slot) {
+            dropped.push(index - 1);
+        }
+    }
+    dropped
+}
+
+fn game(frames: usize, hud_at: impl Fn(usize) -> Option<fn(usize, usize) -> u8>) -> Vec<Vec<u8>> {
+    (0..frames)
+        .map(|step| {
+            let frame = world(step * 3);
+            match hud_at(step) {
+                Some(hud) => with_hud(frame, hud),
+                None => frame,
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn a_hud_missing_for_one_frame_while_the_world_moves_is_dropped() {
+    let frames = game(12, |step| {
+        (step != 6).then_some(minimap as fn(usize, usize) -> u8)
+    });
+    assert_eq!(feed(frames), vec![6]);
+}
+
+#[test]
+fn a_hud_turned_to_a_checkerboard_for_one_frame_is_dropped() {
+    let frames = game(12, |step| {
+        Some(if step == 6 { checkerboard } else { minimap })
+    });
+    assert_eq!(feed(frames), vec![6]);
+}
+
+#[test]
+fn a_camera_pan_with_no_hud_is_never_dropped() {
+    assert_eq!(feed(game(60, |_| None)), Vec::<usize>::new());
+}
+
+#[test]
+fn a_camera_pan_under_a_steady_hud_is_never_dropped() {
+    assert_eq!(feed(game(60, |_| Some(minimap))), Vec::<usize>::new());
+}
+
+#[test]
+fn a_hud_element_that_opens_and_stays_is_kept() {
+    let frames = (0..12).map(|step| {
+        let frame = world(step * 3);
+        if step >= 6 {
+            with_hud(frame, minimap)
+        } else {
+            frame
+        }
+    });
+    assert_eq!(feed(frames), Vec::<usize>::new());
+}
+
+#[test]
+fn a_hud_element_that_closes_and_stays_closed_is_kept() {
+    let frames = (0..12).map(|step| {
+        let frame = world(step * 3);
+        if step < 6 {
+            with_hud(frame, minimap)
+        } else {
+            frame
+        }
+    });
+    assert_eq!(feed(frames), Vec::<usize>::new());
+}
+
+#[test]
+fn a_one_frame_full_screen_flash_is_dropped() {
+    let frames = (0..12).map(|step| {
+        if step == 6 {
+            vec![255; GAME_WIDTH * GAME_HEIGHT]
+        } else {
+            with_hud(scene_of(40), minimap)
+        }
+    });
+    assert_eq!(feed(frames), vec![6]);
+}
+
+fn scene_of(level: u8) -> Vec<u8> {
+    (0..GAME_WIDTH * GAME_HEIGHT)
+        .map(|i| level.wrapping_add((i % 7) as u8))
+        .collect()
+}
+
+#[test]
+fn noise_below_the_cell_threshold_never_drops() {
+    let base = with_hud(world(0), minimap);
+    let frames = (0..200).map(|step| {
+        base.iter()
+            .enumerate()
+            .map(|(i, &value)| {
+                let jitter = i32::from(noise(step * 7919 + i) % 31) - 15;
+                (i32::from(value) + jitter).clamp(0, 255) as u8
+            })
+            .collect()
+    });
+    assert_eq!(feed(frames), Vec::<usize>::new());
+}
+
+#[test]
+fn a_still_world_with_a_hud_blink_is_dropped() {
+    let still = with_hud(world(0), minimap);
+    let frames = (0..12).map(|step| if step == 6 { world(0) } else { still.clone() });
+    assert_eq!(feed(frames), vec![6]);
 }

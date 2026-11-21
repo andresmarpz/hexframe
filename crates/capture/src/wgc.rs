@@ -341,18 +341,21 @@ impl Shared {
         let Some(texture) = copier.as_ref().and_then(|c| c.texture(copy.slot)) else {
             return;
         };
-        let checked = copy.copied.thumbed
-            && copier.as_ref().is_some_and(|copier| {
+        let width = copier
+            .as_ref()
+            .filter(|_| copy.copied.thumbed)
+            .and_then(|copier| {
                 copier
                     .read_thumb(thumb)
                     .inspect_err(|error| tracing::debug!(%error, "thumbnail read failed"))
-                    .is_ok()
+                    .ok()
             });
+        let checked = width.is_some();
         let mut guard = lock(&self.published);
         let published = &mut *guard;
         let holdback = &mut published.holdback;
-        if checked {
-            std::mem::swap(holdback.thumb_mut(copy.slot), thumb);
+        if let Some(width) = width {
+            holdback.store_thumb(copy.slot, thumb, width);
         }
         published.seq += 1;
         let entry = Latest {

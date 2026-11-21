@@ -91,7 +91,7 @@ impl FrameCopier {
         Ok(Copied { wait, thumbed })
     }
 
-    pub(crate) fn read_thumb(&self, out: &mut Vec<u8>) -> windows::core::Result<()> {
+    pub(crate) fn read_thumb(&self, out: &mut Vec<u8>) -> windows::core::Result<usize> {
         let thumb = self
             .thumb
             .as_ref()
@@ -115,7 +115,7 @@ impl FrameCopier {
         }
         // SAFETY: the texture was mapped above and `row` no longer borrows the mapping.
         unsafe { context.Unmap(&thumb.staging, 0) };
-        Ok(())
+        Ok(width)
     }
 
     pub(crate) fn release(&mut self) {
