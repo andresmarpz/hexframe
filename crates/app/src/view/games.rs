@@ -3,17 +3,16 @@ mod rows;
 use std::borrow::Cow;
 use std::rc::Rc;
 
-use rune::{El, Key, LoopSpec, Tx, col, el, text};
+use rune::{El, Key, Tx, col, el, text};
 use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, glyphs};
 
+use super::TABULAR;
 use super::widgets::clear_when_filled;
 use super::widgets::grip;
 use crate::ui::library::format::summary;
 use crate::ui::{ListItem, PaneEdge, Ui};
 
 pub(super) const ROW_HEIGHT: f32 = 60.0;
-const PULSE_SECS: f64 = 1.4;
-const TABULAR: &str = "'tnum' 1";
 
 pub(super) fn list(s: &Ui, k: &Kit) -> El {
     col()
@@ -68,15 +67,6 @@ fn key_of<'a>(s: &'a Ui, item: &ListItem) -> Cow<'a, str> {
             .map_or(Cow::Borrowed("missing"), |rec| {
                 Cow::Borrowed(rec.meta.id.as_str())
             }),
-    }
-}
-
-pub(super) fn dot(color: rune::Color, pulse: bool) -> El {
-    let dot = el().size(8.0, 8.0).radius(4.0).fill(color).a11y_hidden();
-    if pulse {
-        dot.looping(LoopSpec::opacity(PULSE_SECS, 0.0, 0.25, 1.0))
-    } else {
-        dot
     }
 }
 

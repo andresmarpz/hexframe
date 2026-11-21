@@ -4,11 +4,10 @@ use rune_kit::Kit;
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips};
 use crate::ui::{Ui, format_clock};
 use crate::view::thumb::{self, ASPECT};
-use crate::view::{card, hairline, section_header};
+use crate::view::{TABULAR, titled_card};
 
 const LIMIT: usize = 4;
 const GAP: f32 = 12.0;
-const TABULAR: &str = "'tnum' 1";
 
 pub(super) fn section(s: &Ui, k: &Kit) -> Option<El> {
     let clips = recent_clips(&s.recordings, LIMIT);
@@ -22,13 +21,7 @@ pub(super) fn section(s: &Ui, k: &Kit) -> Option<El> {
     for _ in clips.len()..LIMIT {
         strip = strip.child(el().w(0.0).grow(1.0).a11y_hidden());
     }
-    Some(
-        card(k)
-            .key("recent-clips")
-            .child(section_header(k, "Recent clips"))
-            .child(hairline(k))
-            .child(strip),
-    )
+    Some(titled_card(k, "recent-clips", "Recent clips").child(strip))
 }
 
 fn item(clip: &RecentClip, k: &Kit) -> El {

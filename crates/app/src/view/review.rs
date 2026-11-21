@@ -20,6 +20,7 @@ use rune_kit::{
     Toolbar, glyphs,
 };
 
+use super::TABULAR;
 use super::overlays::delete_key;
 use super::widgets::champion::champion_icon;
 use crate::ui::library::format::{kda, mode_label, total_time, when};
@@ -39,7 +40,7 @@ pub(super) use theater::screen as theater;
 
 pub(super) fn tabular(style: TextStyle) -> TextStyle {
     if style.features.is_empty() {
-        style.features("'tnum' 1")
+        style.features(TABULAR)
     } else {
         style
     }
@@ -217,7 +218,7 @@ pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     let when = when(&meta.started_at, &Zoned::now());
     let line = line
         .child(
-            text(format!("{} {}", when.day, when.time))
+            text(when.label())
                 .key("review-when")
                 .font(k.ty.body)
                 .color(k.c.text_muted)

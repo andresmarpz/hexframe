@@ -98,6 +98,10 @@ impl ReviewState {
             .is_some_and(|d| d.finished && !d.summary)
     }
 
+    pub(crate) fn current_death_event(&self) -> Option<u32> {
+        self.death.as_ref()?.current().map(|d| d.event_id)
+    }
+
     pub(crate) fn death_window(&self) -> Option<(f64, f64)> {
         let death = self.death.as_ref()?.current()?;
         Some(death.window(self.duration()))

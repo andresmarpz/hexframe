@@ -87,12 +87,7 @@ impl Ui {
         let Some(review) = &mut self.review else {
             return;
         };
-        let Some(id) = review
-            .death
-            .as_ref()
-            .and_then(|d| d.current())
-            .map(|d| d.event_id)
-        else {
+        let Some(id) = review.current_death_event() else {
             return;
         };
         review.entry.meta.review.toggle_tag(id, tag);
@@ -103,12 +98,7 @@ impl Ui {
         let Some(review) = &mut self.review else {
             return;
         };
-        let Some(id) = review
-            .death
-            .as_ref()
-            .and_then(|d| d.current())
-            .map(|d| d.event_id)
-        else {
+        let Some(id) = review.current_death_event() else {
             return;
         };
         review.entry.meta.review.set_note(id, &self.death_note.text);

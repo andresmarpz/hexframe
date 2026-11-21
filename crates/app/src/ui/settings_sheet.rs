@@ -1,6 +1,6 @@
 use rune::{Key, KeyEvent, TextEdit};
 
-use super::Ui;
+use super::{LibraryTotals, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum SettingsSection {
@@ -84,6 +84,6 @@ impl Ui {
     }
 
     pub(crate) fn storage_used_bytes(&self) -> u64 {
-        self.recordings.iter().map(|r| r.size_bytes).sum()
+        LibraryTotals::of(&self.recordings).bytes
     }
 }

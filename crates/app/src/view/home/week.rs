@@ -4,32 +4,26 @@ use rune_kit::Kit;
 
 use crate::ui::Ui;
 use crate::ui::library::format::{WeekStats, total_time, week_stats};
-use crate::view::{card, hairline, section_header, title_style};
-
-const TABULAR: &str = "'tnum' 1";
+use crate::view::{TABULAR, title_style, titled_card};
 
 pub(super) fn section(s: &Ui, k: &Kit, now: &Zoned) -> El {
     let stats = week_stats(&s.recordings, now);
-    card(k)
-        .key("this-week")
-        .child(section_header(k, "This week"))
-        .child(hairline(k))
-        .child(
-            row()
-                .w_full()
-                .px(16.0)
-                .py(14.0)
-                .gap(16.0)
-                .child(stat(k, "week-games", games(&stats), "Games"))
-                .child(stat(k, "week-record", record(&stats), "Wins–Losses"))
-                .child(stat(k, "week-win-rate", win_rate(&stats), "Win rate"))
-                .child(stat(
-                    k,
-                    "week-time",
-                    total_time(stats.secs),
-                    "Time recorded",
-                )),
-        )
+    titled_card(k, "this-week", "This week").child(
+        row()
+            .w_full()
+            .px(16.0)
+            .py(14.0)
+            .gap(16.0)
+            .child(stat(k, "week-games", games(&stats), "Games"))
+            .child(stat(k, "week-record", record(&stats), "Wins–Losses"))
+            .child(stat(k, "week-win-rate", win_rate(&stats), "Win rate"))
+            .child(stat(
+                k,
+                "week-time",
+                total_time(stats.secs),
+                "Time recorded",
+            )),
+    )
 }
 
 fn games(stats: &WeekStats) -> String {

@@ -5,6 +5,7 @@ use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant
 use super::sidebar::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME};
 use crate::ui::{Detail, Screen, Ui, format_clock};
 use crate::view::champion::champion_icon;
+use crate::view::widgets::dot;
 
 const HEIGHT: f32 = 44.0;
 const BOTTOM_GAP: f32 = 16.0;
@@ -149,10 +150,6 @@ fn record_segment(s: &Ui, k: &Kit) -> El {
         }
         _ => segment.w(IDLE_WIDTH).child(armed(s, k)),
     }
-}
-
-fn dot(color: rune::Color) -> El {
-    el().size(8.0, 8.0).radius(4.0).fill(color).a11y_hidden()
 }
 
 fn armed(s: &Ui, k: &Kit) -> El {

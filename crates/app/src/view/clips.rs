@@ -3,13 +3,12 @@ use rune::{Cursor, El, col, el, row, text};
 use rune_kit::Kit;
 
 use super::widgets::thumb::{self, ASPECT};
-use super::{card, hairline};
+use super::{TABULAR, card, hairline};
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips, when};
 use crate::ui::{Ui, format_clock};
 
 const CARD_WIDTH: f32 = 256.0;
 const GAP: f32 = 12.0;
-const TABULAR: &str = "'tnum' 1";
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
     let clips = recent_clips(&s.recordings, usize::MAX);
@@ -77,10 +76,6 @@ fn item(clip: &RecentClip, now: &Zoned, k: &Kit) -> El {
                 .center_y()
                 .child(text(length).font(font).color(k.c.text_base))
                 .child(el().grow(1.0).a11y_hidden())
-                .child(
-                    text(format!("{} {}", shown.day, shown.time))
-                        .font(font)
-                        .color(k.c.text_muted),
-                ),
+                .child(text(shown.label()).font(font).color(k.c.text_muted)),
         )
 }

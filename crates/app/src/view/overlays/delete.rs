@@ -17,10 +17,9 @@ pub(crate) fn delete_key(id: &str) -> String {
 pub(crate) fn confirm_delete(rec: &RecordingEntry, k: &Kit, layer: &mut Vec<El>) {
     let shown = when(&rec.meta.started_at, &Zoned::now());
     let summary = format!(
-        "{} · {} {} · {}",
+        "{} · {} · {}",
         rec.meta.game.info.me.champion,
-        shown.day,
-        shown.time,
+        shown.label(),
         format_size(rec.size_bytes)
     );
     let details = col()

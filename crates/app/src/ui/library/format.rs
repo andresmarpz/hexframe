@@ -23,6 +23,12 @@ pub(crate) struct When {
     pub time: String,
 }
 
+impl When {
+    pub(crate) fn label(&self) -> String {
+        format!("{} {}", self.day, self.time)
+    }
+}
+
 pub(crate) fn mode_label(mode: &str) -> String {
     match mode.to_ascii_uppercase().as_str() {
         "CLASSIC" => "Summoner's Rift".into(),

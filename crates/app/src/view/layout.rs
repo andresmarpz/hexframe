@@ -5,6 +5,7 @@ use rune_kit::Kit;
 use super::shell;
 use crate::ui::Ui;
 
+pub(crate) const TABULAR: &str = "'tnum' 1";
 const PAGE_MAX_WIDTH: f32 = 880.0;
 const PAGE_GUTTER: f32 = 24.0;
 const CARD_RADIUS: f32 = 10.0;
@@ -66,6 +67,13 @@ pub(super) fn section_header(k: &Kit, title: &str) -> El {
         .px(16.0)
         .center_y()
         .child(text(title).font(k.ty.body_medium).color(k.c.text_base))
+}
+
+pub(super) fn titled_card(k: &Kit, key: &'static str, title: &str) -> El {
+    card(k)
+        .key(key)
+        .child(section_header(k, title))
+        .child(hairline(k))
 }
 
 pub(super) fn hairline(k: &Kit) -> El {

@@ -7,10 +7,9 @@ use super::feed::tinted_pill;
 use crate::ui::library::format::{Kda, death_total, kda, mode_label};
 use crate::ui::{Ui, format_clock};
 use crate::view::thumb;
-use crate::view::{card, hairline, section_header};
+use crate::view::{TABULAR, titled_card};
 
 const THUMB_WIDTH: f32 = 96.0;
-const TABULAR: &str = "'tnum' 1";
 
 pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
     let game = &entry.meta.game;
@@ -53,11 +52,7 @@ pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
         .child(result_pill(game.result, k))
         .children(deaths_button(entry, k))
         .child(open);
-    card(k)
-        .key("last-game-card")
-        .child(section_header(k, "Last game"))
-        .child(hairline(k))
-        .child(summary)
+    titled_card(k, "last-game-card", "Last game").child(summary)
 }
 
 fn deaths_button(entry: &RecordingEntry, k: &Kit) -> Option<El> {
