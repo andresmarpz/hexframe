@@ -1,5 +1,15 @@
 # Roadmap
 
+## Status (2026-11-21)
+
+| Ticket | State |
+|---|---|
+| P0, C1 to C4, M1 to M3, L1, L2, W1 to W7, E0 to E2, X1, A0, A1, A4, R0, R1, F1 to F4, T1 | Done |
+| A2, A3 | Done inside A0 and A1 |
+| R2 | README done. Releases `v0.0.1-preview.1` and `v0.1.0-preview.2` published |
+| R3 | Review done (`docs/reviews/2026-11-21-adversarial.md`). Fixes landed as F1 to F4 |
+| Next | The first run on Windows hardware: `doctor`, `record`, and a real game. Then fix what it shows |
+
 Every ticket below is one worker session, one commit (or a few) straight to `main`, under about 400 changed lines excluding tests and fixtures. Read `docs/architecture.md` first: it fixes the shared types, units and rules. Each ticket names the research section with the exact API calls.
 
 ## Worker protocol (applies to every ticket)
