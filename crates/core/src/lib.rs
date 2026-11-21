@@ -6,6 +6,7 @@ pub mod install;
 pub mod library;
 pub mod media;
 pub mod paths;
+pub mod retention;
 pub mod session;
 pub mod settings;
 pub mod time;

@@ -1,5 +1,5 @@
 use greyscreen_core::paths;
-use greyscreen_core::settings::{Quality, Resolution, resolution_options};
+use greyscreen_core::settings::{Hotkey, Quality, Resolution, STORAGE_LIMITS_GB, resolution_options};
 use greyscreen_engine::reveal;
 use rune::{El, FileDialogOptions, Icon, col, row, text};
 use rune_kit::{
@@ -20,6 +20,10 @@ const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
 const FPS_OPTIONS: [u32; 2] = [30, 60];
 const CONTROL_WIDTH: f32 = 220.0;
 const RESOLUTION_WIDTH: f32 = 200.0;
+const STORAGE_WIDTH: f32 = 140.0;
+const STORAGE_OFF: &str = "Off";
+const STORAGE_LIMIT_NOTE: &str = "Oldest full-game videos are deleted permanently when recordings pass this size. Clips are kept as long as possible.";
+const PRESS_A_KEY: &str = "Press a key…";
 const RIOT_NOTICE: &str = "Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
 
 static INFO: Icon = Icon {
@@ -45,7 +49,7 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 .gap(20.0)
                 .child(recording_section(s, k, layer))
                 .child(clips_section(s, k))
-                .child(storage_section(s, k))
+                .child(storage_section(s, k, layer))
                 .child(about_section(s, k)),
         )
 }
@@ -72,7 +76,7 @@ fn section(k: &Kit, key: &str, title: &str, rows: Vec<El>) -> El {
 }
 
 fn setting_row(k: &Kit, key: &str, label: &str, description: Option<&str>, control: El) -> El {
-    let mut copy = col().gap(2.0).child(
+    let mut copy = col().gap(2.0).grow(1.0).child(
         text(label.to_owned())
             .font(k.ty.body_medium)
             .color(k.c.text_base),
@@ -80,6 +84,8 @@ fn setting_row(k: &Kit, key: &str, label: &str, description: Option<&str>, contr
     if let Some(description) = description {
         copy = copy.child(
             text(description.to_owned())
+                .wrap()
+                .w_full()
                 .font(k.ty.small)
                 .color(k.c.text_muted),
         );
@@ -224,20 +230,7 @@ fn size_estimate(s: &Ui, k: &Kit, display_height: Option<u32>) -> El {
     let native_height = display_height.unwrap_or(FALLBACK_NATIVE_HEIGHT);
     let native = (s.settings.resolution == Resolution::Native).then_some(native_height);
     let line = format_size_estimate(s.settings.estimated_mb_per_minute(native_height), native);
-    row()
-        .key("size-estimate")
-        .w_full()
-        .px(16.0)
-        .py(8.0)
-        .gap(6.0)
-        .center_y()
-        .fill(k.c.layer_01)
-        .child(rune::icon(&INFO, 14.0).color(k.c.icon_muted).a11y_hidden())
-        .child(
-            text(format!("{line}."))
-                .font(k.ty.small)
-                .color(k.c.text_muted),
-        )
+    note_row(k, "size-estimate", &format!("{line}."))
 }
 
 fn native_height(displays: &[(u32, u32)]) -> Option<u32> {
@@ -280,74 +273,163 @@ fn clips_section(s: &Ui, k: &Kit) -> El {
     let post = secs_input(k, "post-secs", "Seconds after", &s.post_secs, |ui| {
         &mut ui.post_secs
     });
-    section(
+    let mut rows = vec![
+        toggle_row(
+            k,
+            "clips-enabled",
+            "Save highlight clips",
+            Some("Cut short clips around the moments you pick below."),
+            clips.enabled,
+            |ui| ui.change(|s| s.clips.enabled = !s.clips.enabled),
+        ),
+        setting_row(
+            k,
+            "pre-row",
+            "Before the moment",
+            Some("1 to 120 seconds."),
+            pre,
+        ),
+        setting_row(
+            k,
+            "post-row",
+            "After the moment",
+            Some("1 to 120 seconds."),
+            post,
+        ),
+        toggle_row(k, "clip-kills", "Kills", None, clips.kills, |ui| {
+            ui.change(|s| s.clips.kills = !s.clips.kills)
+        }),
+        toggle_row(k, "clip-deaths", "Deaths", None, clips.deaths, |ui| {
+            ui.change(|s| s.clips.deaths = !s.clips.deaths)
+        }),
+        toggle_row(k, "clip-assists", "Assists", None, clips.assists, |ui| {
+            ui.change(|s| s.clips.assists = !s.clips.assists)
+        }),
+        toggle_row(
+            k,
+            "clip-multikills",
+            "Multikills",
+            None,
+            clips.multikills,
+            |ui| ui.change(|s| s.clips.multikills = !s.clips.multikills),
+        ),
+        toggle_row(
+            k,
+            "clip-objectives",
+            "Objectives",
+            Some("Dragon, Herald, Baron and Voidgrubs."),
+            clips.objectives,
+            |ui| ui.change(|s| s.clips.objectives = !s.clips.objectives),
+        ),
+        toggle_row(
+            k,
+            "clip-structures",
+            "Structures",
+            Some("Turrets and inhibitors."),
+            clips.structures,
+            |ui| ui.change(|s| s.clips.structures = !s.clips.structures),
+        ),
+        toggle_row(k, "clip-aces", "Aces", None, clips.aces, |ui| {
+            ui.change(|s| s.clips.aces = !s.clips.aces)
+        }),
+        hotkey_row(s, k),
+    ];
+    if let Some(line) = hotkey_note(s) {
+        rows.push(note_row(k, "hotkey-note", line));
+    }
+    section(k, "clips-card", "Clips", rows)
+}
+
+fn hotkey_note(s: &Ui) -> Option<&str> {
+    if s.hotkey_capture {
+        return s.hotkey_hint;
+    }
+    s.hotkey_error.as_deref()
+}
+
+fn hotkey_row(s: &Ui, k: &Kit) -> El {
+    let label = if s.hotkey_capture {
+        PRESS_A_KEY.to_owned()
+    } else {
+        s.settings
+            .save_clip_hotkey
+            .as_ref()
+            .map_or_else(|| "Not set".to_owned(), Hotkey::to_string)
+    };
+    let pick = Button::new(label)
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Large)
+        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.toggle_hotkey_capture(tx))
+        .build(k)
+        .key("hotkey-button");
+    let mut control = row().gap(8.0).center_y().child(pick);
+    if s.settings.save_clip_hotkey.is_some() && !s.hotkey_capture {
+        control = control.child(
+            Button::new("Turn off")
+                .variant(ButtonVariant::Ghost)
+                .control_size(ControlSize::Large)
+                .on_press(|ui: &mut Ui| ui.clear_hotkey())
+                .build(k)
+                .key("hotkey-off"),
+        );
+    }
+    let description = if s.hotkey_capture {
+        "Press the key or combination to use. Esc cancels."
+    } else {
+        "Saves the last 30 seconds while you play. Works while League is in front."
+    };
+    setting_row(
         k,
-        "clips-card",
-        "Clips",
-        vec![
-            toggle_row(
-                k,
-                "clips-enabled",
-                "Save highlight clips",
-                Some("Cut short clips around the moments you pick below."),
-                clips.enabled,
-                |ui| ui.change(|s| s.clips.enabled = !s.clips.enabled),
-            ),
-            setting_row(
-                k,
-                "pre-row",
-                "Before the moment",
-                Some("1 to 120 seconds."),
-                pre,
-            ),
-            setting_row(
-                k,
-                "post-row",
-                "After the moment",
-                Some("1 to 120 seconds."),
-                post,
-            ),
-            toggle_row(k, "clip-kills", "Kills", None, clips.kills, |ui| {
-                ui.change(|s| s.clips.kills = !s.clips.kills)
-            }),
-            toggle_row(k, "clip-deaths", "Deaths", None, clips.deaths, |ui| {
-                ui.change(|s| s.clips.deaths = !s.clips.deaths)
-            }),
-            toggle_row(k, "clip-assists", "Assists", None, clips.assists, |ui| {
-                ui.change(|s| s.clips.assists = !s.clips.assists)
-            }),
-            toggle_row(
-                k,
-                "clip-multikills",
-                "Multikills",
-                None,
-                clips.multikills,
-                |ui| ui.change(|s| s.clips.multikills = !s.clips.multikills),
-            ),
-            toggle_row(
-                k,
-                "clip-objectives",
-                "Objectives",
-                Some("Dragon, Herald, Baron and Voidgrubs."),
-                clips.objectives,
-                |ui| ui.change(|s| s.clips.objectives = !s.clips.objectives),
-            ),
-            toggle_row(
-                k,
-                "clip-structures",
-                "Structures",
-                Some("Turrets and inhibitors."),
-                clips.structures,
-                |ui| ui.change(|s| s.clips.structures = !s.clips.structures),
-            ),
-            toggle_row(k, "clip-aces", "Aces", None, clips.aces, |ui| {
-                ui.change(|s| s.clips.aces = !s.clips.aces)
-            }),
-        ],
+        "hotkey-row",
+        "Save clip hotkey",
+        Some(description),
+        control,
     )
 }
 
-fn storage_section(s: &Ui, k: &Kit) -> El {
+fn note_row(k: &Kit, key: &str, line: &str) -> El {
+    row()
+        .key(key.to_owned())
+        .w_full()
+        .px(16.0)
+        .py(8.0)
+        .gap(6.0)
+        .center_y()
+        .fill(k.c.layer_01)
+        .child(rune::icon(&INFO, 14.0).color(k.c.icon_muted).a11y_hidden())
+        .child(text(line.to_owned()).font(k.ty.small).color(k.c.text_muted))
+}
+
+fn storage_limit_label(gb: Option<u32>) -> String {
+    gb.map_or_else(|| STORAGE_OFF.to_owned(), |gb| format!("{gb} GB"))
+}
+
+fn storage_limit_select(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
+    let labels: Vec<String> = std::iter::once(None)
+        .chain(STORAGE_LIMITS_GB.map(Some))
+        .map(storage_limit_label)
+        .collect();
+    let names: Vec<&str> = labels.iter().map(String::as_str).collect();
+    let current = storage_limit_label(s.settings.storage_limit_gb);
+    Select::new("storage-limit", &names)
+        .current(Some(current.as_str()))
+        .open(s.storage_open)
+        .appearance(SelectAppearance::Field)
+        .width(STORAGE_WIDTH)
+        .label("Storage limit")
+        .on_toggle(|ui: &mut Ui| ui.storage_open = !ui.storage_open)
+        .on_close(|ui: &mut Ui| ui.storage_open = false)
+        .on_choose(|ui: &mut Ui, value: &str, _: &mut rune::Tx| {
+            ui.storage_open = false;
+            let limit = STORAGE_LIMITS_GB
+                .into_iter()
+                .find(|gb| storage_limit_label(Some(*gb)) == value);
+            ui.change(|s| s.storage_limit_gb = limit);
+        })
+        .build(k, layer)
+}
+
+fn storage_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let change = Button::new("Change")
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Large)
@@ -388,13 +470,22 @@ fn storage_section(s: &Ui, k: &Kit) -> El {
         k,
         "storage-card",
         "Storage",
-        vec![setting_row(
-            k,
-            "folder-row",
-            "Recordings folder",
-            Some("Games and clips are saved here."),
-            control,
-        )],
+        vec![
+            setting_row(
+                k,
+                "folder-row",
+                "Recordings folder",
+                Some("Games and clips are saved here."),
+                control,
+            ),
+            setting_row(
+                k,
+                "storage-limit-row",
+                "Storage limit",
+                Some(STORAGE_LIMIT_NOTE),
+                storage_limit_select(s, k, layer),
+            ),
+        ],
     )
 }
 

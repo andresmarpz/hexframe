@@ -7,6 +7,7 @@ use crate::ui::fake_player::{self, Call};
 use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
+mod hotkey_storage;
 mod match_flow;
 mod nav_settings;
 mod recordings;

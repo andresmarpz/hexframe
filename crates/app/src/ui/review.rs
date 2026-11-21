@@ -165,7 +165,7 @@ impl ReviewState {
         if let Some(player) = &player {
             player.play();
         }
-        let review = ReviewState {
+        let mut review = ReviewState {
             entry,
             player,
             source: Source::Game,
@@ -184,7 +184,14 @@ impl ReviewState {
             drawer: false,
         };
         review.apply_audio();
+        review.fall_back_to_first_clip(make);
         review
+    }
+
+    fn fall_back_to_first_clip(&mut self, make: PlayerFactory) {
+        if self.player.is_none() && !self.entry.meta.clips.is_empty() {
+            self.play_clip(0, make);
+        }
     }
 
     pub(crate) fn speed_rate(&self) -> f32 {

@@ -8,6 +8,9 @@ const STEP_SECS: f64 = 5.0;
 
 impl Ui {
     pub(crate) fn on_key(&mut self, ev: &KeyEvent, tx: &mut Tx) -> bool {
+        if self.hotkey_capture {
+            return self.capture_hotkey(ev);
+        }
         let m = ev.mods;
         if self.screen != Screen::Review
             || self.review.is_none()

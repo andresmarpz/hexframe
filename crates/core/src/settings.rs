@@ -7,8 +7,10 @@ use serde::{Deserialize, Serialize};
 use crate::media::CaptureConfig;
 use crate::paths;
 
+mod hotkey;
 mod resolution;
 
+pub use hotkey::{Hotkey, ParseHotkeyError};
 pub use resolution::{
     MAX_HEIGHT, MIN_HEIGHT, RESOLUTION_LADDER, Resolution, ResolutionOption, resolution_options,
 };
@@ -21,6 +23,8 @@ const FPS_EXPONENT: f64 = 0.8;
 const PEAK_FACTOR: f64 = 2.0;
 const QUALITY_MODE_SIZE_FACTOR: f64 = 0.6;
 const MAX_CLIP_SECS: u32 = 120;
+const BYTES_PER_GB: u64 = 1_000_000_000;
+pub const STORAGE_LIMITS_GB: [u32; 4] = [50, 100, 250, 500];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Quality {
@@ -92,6 +96,9 @@ pub struct Settings {
     pub audio: bool,
     pub capture_cursor: bool,
     pub clips: ClipSettings,
+    #[serde(deserialize_with = "hotkey::deserialize_lenient")]
+    pub save_clip_hotkey: Option<Hotkey>,
+    pub storage_limit_gb: Option<u32>,
 }
 
 impl Default for Settings {
@@ -106,6 +113,8 @@ impl Default for Settings {
             audio: true,
             capture_cursor: true,
             clips: ClipSettings::default(),
+            save_clip_hotkey: Some(Hotkey::default()),
+            storage_limit_gb: None,
         }
     }
 }
@@ -151,6 +160,11 @@ impl Settings {
         self.resolution = self.resolution.clamped();
         self.clips.pre_secs = self.clips.pre_secs.clamp(1, MAX_CLIP_SECS);
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
+        self.storage_limit_gb = self.storage_limit_gb.map(nearest_storage_limit);
+    }
+
+    pub fn storage_limit_bytes(&self) -> Option<u64> {
+        self.storage_limit_gb.map(|gb| u64::from(gb) * BYTES_PER_GB)
     }
 
     fn mean_bitrate(&self, height: u32) -> (f64, f64) {
@@ -194,6 +208,13 @@ impl Settings {
         };
         (video + audio) * 60.0 / 8.0 / 1_000_000.0
     }
+}
+
+fn nearest_storage_limit(gb: u32) -> u32 {
+    STORAGE_LIMITS_GB
+        .into_iter()
+        .min_by_key(|option| option.abs_diff(gb))
+        .unwrap_or(STORAGE_LIMITS_GB[0])
 }
 
 #[cfg(test)]

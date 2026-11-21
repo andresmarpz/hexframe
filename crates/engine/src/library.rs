@@ -7,6 +7,7 @@ use greyscreen_core::library;
 use crate::api::{RecordingEntry, UiMsg};
 use crate::control::Sink;
 use crate::recovery;
+use crate::storage::{self, ActiveFolder};
 use crate::writer::VIDEO_FILE;
 
 pub(crate) const CLIPS_DIR: &str = "clips";
@@ -44,12 +45,18 @@ pub(crate) fn spawn_scan(output_dir: PathBuf, sink: Sink) {
     });
 }
 
-pub(crate) fn spawn_startup(output_dir: PathBuf, sink: Sink) {
+pub(crate) fn spawn_startup(
+    output_dir: PathBuf,
+    limit_bytes: Option<u64>,
+    active: ActiveFolder,
+    sink: Sink,
+) {
     let parts = recovery::find_parts(&output_dir);
     spawn_worker("library-startup", move || {
         for part in &parts {
             recovery::recover_part(part);
         }
+        storage::run(&output_dir, limit_bytes, &active, &sink);
         sink(UiMsg::Library(entries(&output_dir)));
     });
 }

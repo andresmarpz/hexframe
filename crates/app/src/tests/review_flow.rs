@@ -231,3 +231,43 @@ fn the_fullscreen_toggle_sits_at_the_far_right_of_the_transport() {
     let toggle = super::rect(&rt, "theater-shrink");
     assert!(super::rect(&rt, "review-mute")[0] < toggle[0]);
 }
+
+fn clips_only_entry() -> greyscreen_engine::RecordingEntry {
+    let mut entry = crate::ui::review_entry();
+    entry.meta.video = String::new();
+    entry.meta.clips.truncate(1);
+    entry.meta.clips[0].file = "review.mp4".into();
+    entry
+}
+
+#[test]
+fn a_game_without_its_video_opens_its_first_clip() {
+    fake_player::clear_calls();
+    let mut ui = Ui::preview();
+    ui.player_factory = fake_player::factory;
+    ui.open_review_entry(clips_only_entry());
+    let review = ui.review.as_ref().expect("review");
+    assert_eq!(review.source, crate::ui::Source::Clip(0));
+    assert!(review.player.is_some());
+    assert!(
+        matches!(fake_player::calls().first(), Some(Call::Open(p)) if p.ends_with("review.mp4"))
+    );
+}
+
+#[test]
+fn a_game_with_no_video_and_no_clips_says_so() {
+    let mut entry = clips_only_entry();
+    entry.meta.clips.clear();
+    let mut ui = Ui::preview();
+    ui.player_factory = fake_player::factory;
+    ui.open_review_entry(entry);
+    let mut rt = super::runtime_with(ui);
+    rt.frame(1.0 / 60.0);
+    let review = rt.state.review.as_ref().expect("review");
+    assert!(review.player.is_none());
+    assert!(
+        super::visible_texts(&rt)
+            .iter()
+            .any(|t| t == "No video for this game")
+    );
+}

@@ -9,6 +9,7 @@ pub mod crash;
 pub mod d3d;
 pub mod displays;
 pub mod h264;
+pub mod hotkey;
 pub mod install;
 pub mod instance;
 mod pacer;

@@ -16,6 +16,7 @@ use super::{Control, Internal, StartedMedia};
 use crate::api::{FeedItem, NoticeLevel, RecordingEntry, UiMsg};
 use crate::library;
 use crate::ring::ClipRing;
+use crate::storage;
 use crate::writer::{GameWriter, VIDEO_FILE};
 
 const NATIVE_HEIGHT_CEILING: u32 = 2160;
@@ -283,6 +284,7 @@ impl Control {
         if let Err(err) = recording.write_sidecar(mono_now()) {
             tracing::warn!(%err, "cannot write recording sidecar");
         }
+        self.set_active_folder(Some(folder_id(&recording.folder)));
         self.recording = Some(recording);
         Ok(())
     }
@@ -335,6 +337,7 @@ impl Control {
             }
             None => recording.meta.duration_secs = elapsed,
         }
+        self.set_active_folder(None);
         recording.meta.game.result = recording.result.unwrap_or(GameResult::Unknown);
         if let Err(err) = recording.write_sidecar(mono_now()) {
             tracing::error!(%err, "cannot write final sidecar");
@@ -350,6 +353,18 @@ impl Control {
             meta: recording.meta,
             folder: recording.folder,
         }));
+        storage::spawn(
+            self.settings.output_dir.clone(),
+            self.settings.storage_limit_bytes(),
+            self.active_folder.clone(),
+            self.sink.clone(),
+        );
+    }
+
+    fn set_active_folder(&self, id: Option<String>) {
+        if let Ok(mut active) = self.active_folder.lock() {
+            *active = id;
+        }
     }
 }
 

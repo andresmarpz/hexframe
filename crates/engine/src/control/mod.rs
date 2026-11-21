@@ -11,15 +11,17 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, never, select, tick, unbounded};
 use greyscreen_core::media::{MediaEvent, MediaSession, MediaSource};
 use greyscreen_core::session::{Input, Session, SessionState, Status};
-use greyscreen_core::settings::Settings;
+use greyscreen_core::settings::{Hotkey, Settings};
 use greyscreen_core::time::{Hns, mono_now, secs_to_hns};
 use greyscreen_league::LeagueMsg;
 
 use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
 use crate::delete;
+use crate::hotkey::Hotkeys;
 use crate::library;
 use crate::settings_save::SettingsSaver;
+use crate::storage::ActiveFolder;
 use crate::writer::Report;
 use meta::Recording;
 
@@ -38,6 +40,7 @@ pub(crate) struct Spec {
     pub(crate) settings: Settings,
     pub(crate) media: Arc<dyn MediaSource>,
     pub(crate) settings_path: Option<PathBuf>,
+    pub(crate) cmd: Sender<EngineCmd>,
 }
 
 #[derive(Debug)]
@@ -64,6 +67,9 @@ struct Control {
     shutting_down: bool,
     test_stop_at: Option<Hns>,
     settings_saver: SettingsSaver,
+    hotkeys: Hotkeys,
+    applied_hotkey: Option<Hotkey>,
+    active_folder: ActiveFolder,
 }
 
 pub(crate) fn spawn(
@@ -105,10 +111,14 @@ impl Control {
             settings,
             media,
             settings_path,
+            cmd,
         } = spec;
         let (internal_tx, internal_rx) = unbounded();
         Self {
             settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
+            hotkeys: Hotkeys::start(cmd, sink.clone()),
+            applied_hotkey: settings.save_clip_hotkey.clone(),
+            active_folder: ActiveFolder::default(),
             test_stop_at: None,
             session: Session::new(settings.auto_record),
             settings,
@@ -129,7 +139,13 @@ impl Control {
 
     fn run(mut self, mut cmd_rx: Receiver<EngineCmd>, mut league_rx: Receiver<LeagueMsg>) {
         let ticker = tick(TICK);
-        library::spawn_startup(self.settings.output_dir.clone(), self.sink.clone());
+        self.hotkeys.set(self.applied_hotkey.as_ref());
+        library::spawn_startup(
+            self.settings.output_dir.clone(),
+            self.settings.storage_limit_bytes(),
+            self.active_folder.clone(),
+            self.sink.clone(),
+        );
         let mut deadline: Option<Instant> = None;
         loop {
             let media_rx = self.media_rx.clone();
@@ -179,6 +195,11 @@ impl Control {
             }
             EngineCmd::DeleteRecording { id } => self.delete_recording(id),
             EngineCmd::SaveClipNow => self.save_clip_now(),
+            EngineCmd::HotkeyPressed => {
+                if matches!(self.session.state(), SessionState::Recording { .. }) {
+                    self.save_clip_now();
+                }
+            }
         }
     }
 
@@ -200,6 +221,10 @@ impl Control {
         settings.validate();
         let auto_record = settings.auto_record;
         self.settings_saver.save(settings.clone());
+        if settings.save_clip_hotkey != self.applied_hotkey {
+            self.applied_hotkey = settings.save_clip_hotkey.clone();
+            self.hotkeys.set(self.applied_hotkey.as_ref());
+        }
         self.settings = settings;
         self.feed(Input::SettingsChanged { auto_record });
     }

@@ -3,10 +3,12 @@ mod clipjob;
 mod control;
 mod delete;
 pub mod fake;
+mod hotkey;
 mod library;
 mod recovery;
 mod ring;
 mod settings_save;
+mod storage;
 mod writer;
 
 pub use api::{

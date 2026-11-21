@@ -10,6 +10,7 @@ use rune::{TextEdit, Tx};
 
 pub(crate) mod event_detail;
 mod format;
+mod hotkey_capture;
 mod jump;
 mod keys;
 pub(crate) mod library_format;
@@ -85,6 +86,14 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.filter.pending_delete = ui.recordings.get(1).map(|rec| rec.meta.id.clone());
     }),
     ("settings", |ui| ui.screen = Screen::Settings),
+    ("settings-hotkey", |ui| {
+        ui.screen = Screen::Settings;
+        ui.hotkey_capture = true;
+    }),
+    ("settings-hotkey-taken", |ui| {
+        ui.screen = Screen::Settings;
+        ui.hotkey_error = Some("F9 is already used by another app. Choose a different key.".into());
+    }),
     ("review", |ui| {
         ui.open_review_entry(preview::review_entry());
     }),
@@ -138,6 +147,10 @@ pub(crate) struct Ui {
     pub review: Option<ReviewState>,
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
+    pub storage_open: bool,
+    pub hotkey_capture: bool,
+    pub hotkey_hint: Option<&'static str>,
+    pub hotkey_error: Option<String>,
     pub window_full_screen: bool,
     pub start_with_windows: bool,
     pub pre_secs: TextEdit,
@@ -171,6 +184,10 @@ impl Ui {
             review: None,
             player_factory: review::rune_player,
             resolution_open: false,
+            storage_open: false,
+            hotkey_capture: false,
+            hotkey_hint: None,
+            hotkey_error: None,
             window_full_screen: false,
             start_with_windows: false,
             pre_secs: TextEdit::new(settings.clips.pre_secs.to_string()),
@@ -225,6 +242,8 @@ impl Ui {
 
     pub(crate) fn go(&mut self, screen: Screen) {
         self.screen = screen;
+        self.hotkey_capture = false;
+        self.hotkey_hint = None;
         if screen != Screen::Review {
             self.review = None;
         }
@@ -302,6 +321,7 @@ impl Ui {
             }
             UiMsg::Library(recordings) => self.recordings = recordings,
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
+            UiMsg::HotkeyStatus { error } => self.hotkey_error = error,
         }
     }
 

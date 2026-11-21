@@ -26,6 +26,7 @@ pub enum EngineCmd {
     RescanLibrary,
     DeleteRecording { id: String },
     SaveClipNow,
+    HotkeyPressed,
     Shutdown,
 }
 
@@ -67,6 +68,7 @@ pub enum UiMsg {
     RecordingSaved(RecordingEntry),
     Library(Vec<RecordingEntry>),
     Notice { level: NoticeLevel, text: String },
+    HotkeyStatus { error: Option<String> },
 }
 
 pub type UiSink = Box<dyn Fn(UiMsg) + Send + Sync>;
@@ -143,6 +145,7 @@ impl Engine {
                 settings,
                 media,
                 settings_path,
+                cmd: cmd.clone(),
             },
             guard,
             league_rx,
