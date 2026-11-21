@@ -14,7 +14,9 @@ const ITEMS: [(Screen, &str, &str); 3] = [
 pub(super) fn bar(s: &Ui, k: &Kit) -> El {
     let mut tabs = row().key("nav-tabs").gap(4.0).center_y();
     for (screen, key, label) in ITEMS {
-        let variant = if s.screen == screen {
+        let active =
+            s.screen == screen || (screen == Screen::Recordings && s.screen == Screen::Review);
+        let variant = if active {
             ButtonVariant::Neutral
         } else {
             ButtonVariant::Ghost
@@ -23,7 +25,7 @@ pub(super) fn bar(s: &Ui, k: &Kit) -> El {
             Button::new(label)
                 .variant(variant)
                 .control_size(ControlSize::Large)
-                .on_press(move |ui: &mut Ui| ui.screen = screen)
+                .on_press(move |ui: &mut Ui| ui.go(screen))
                 .build(k)
                 .key(key),
         );

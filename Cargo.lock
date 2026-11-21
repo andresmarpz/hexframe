@@ -1324,8 +1324,11 @@ name = "greyscreen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "crossbeam-channel",
+ "greyscreen-capture",
  "greyscreen-core",
  "greyscreen-engine",
+ "jiff",
  "rune",
  "rune-kit",
  "tracing",

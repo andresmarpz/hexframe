@@ -1,4 +1,6 @@
+use greyscreen_core::paths;
 use greyscreen_core::settings::{Quality, Resolution};
+use greyscreen_engine::reveal;
 use rune::{El, FileDialogOptions, ScrollSpec, col, row, text};
 use rune_kit::{
     Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, Switch, TextInput,
@@ -49,7 +51,8 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                         .gap(20.0)
                         .child(recording_section(s, k, layer))
                         .child(clips_section(s, k))
-                        .child(storage_section(s, k)),
+                        .child(storage_section(s, k))
+                        .child(about_section(k)),
                 ),
         )
 }
@@ -168,6 +171,14 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 Some("Start when a League game starts, stop when it ends."),
                 settings.auto_record,
                 |ui| ui.change(|s| s.auto_record = !s.auto_record),
+            ),
+            toggle_row(
+                k,
+                "full-game",
+                "Record the full game",
+                Some("Off keeps only highlight clips."),
+                settings.record_full_game,
+                |ui| ui.change(|s| s.record_full_game = !s.record_full_game),
             ),
             setting_row(
                 k,
@@ -320,7 +331,18 @@ fn storage_section(s: &Ui, k: &Kit) -> El {
             .color(k.c.text_muted)
             .truncate(),
     );
-    let control = row().gap(12.0).center_y().child(path).child(change);
+    let open = Button::new("Open")
+        .variant(ButtonVariant::Ghost)
+        .control_size(ControlSize::Large)
+        .on_press(|ui: &mut Ui| ui.reveal_output_dir())
+        .build(k)
+        .key("open-output");
+    let control = row()
+        .gap(12.0)
+        .center_y()
+        .child(path)
+        .child(change)
+        .child(open);
     section(
         k,
         "storage-card",
@@ -332,5 +354,33 @@ fn storage_section(s: &Ui, k: &Kit) -> El {
             Some("Games and clips are saved here."),
             control,
         )],
+    )
+}
+
+fn about_section(k: &Kit) -> El {
+    let version = text(format!("Version {}", env!("CARGO_PKG_VERSION")))
+        .key("version")
+        .font(k.ty.body)
+        .color(k.c.text_muted);
+    let logs = Button::new("Open logs folder")
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Large)
+        .on_press(|_: &mut Ui| reveal(&paths::logs_dir()))
+        .build(k)
+        .key("open-logs");
+    section(
+        k,
+        "about-card",
+        "About",
+        vec![
+            setting_row(k, "version-row", "Greyscreen", None, version),
+            setting_row(
+                k,
+                "logs-row",
+                "Logs",
+                Some("Attach these when you report a problem."),
+                logs,
+            ),
+        ],
     )
 }
