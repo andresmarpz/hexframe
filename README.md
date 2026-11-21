@@ -1,17 +1,44 @@
-<p align="center"><img src="assets/icon.svg" width="72" alt=""></p>
-<h1 align="center">greyscreen</h1>
-<p align="center">Automatic League of Legends recorder for Windows.</p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo-horizontal-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="brand/logo-horizontal-light.svg">
+    <img src="brand/logo-horizontal-light.svg" alt="Greyscreen" height="56">
+  </picture>
+</p>
 
-Free, open-source, and written in Rust.
+<p align="center">Automatic League of Legends recorder and death review for Windows.</p>
+
+<p align="center">
+  <a href="https://greyscreen-lake.vercel.app">Website</a> ·
+  <a href="https://github.com/andresmarpz/greyscreen/releases/latest">Latest release</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+Greyscreen records every League game on your GPU, logs kills, deaths and objectives as an event timeline, and helps you learn from your deaths. It is free, open source and written in Rust.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screens/home.png" alt="The Home screen: recording state, last game, recent clips and weekly stats."><br><sub><b>Home.</b> Recording state, last game, recent clips and weekly stats.</sub></td>
+    <td width="50%"><img src="docs/screens/death-review.png" alt="Death review: one death at a time, with tags and a note."><br><sub><b>Death review.</b> Step through each death, tag it and write a note.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screens/clips.png" alt="The Clips screen: a grid of highlight clips with thumbnails."><br><sub><b>Clips.</b> Every highlight clip, with thumbnails.</sub></td>
+    <td width="50%"><img src="docs/screens/dock-games.png" alt="The Games screen with the dock navigation: games list, player and event list."><br><sub><b>Games, with the Dock.</b> Games list, player and event list.</sub></td>
+  </tr>
+</table>
 
 ## Features
 
 - **GPU hardware encoding:** Keeps frames on the GPU with near-zero FPS cost.
 - **Vanguard-safe game capture:** Records only League video and audio without touching the game process.
-- **Automatic event timeline:** Starts and stops with each match, plotting kills and objectives.
-- **Highlight clips:** Cuts clips around chosen moments without re-encoding.
+- **Automatic event timeline:** Starts and stops with each match, plotting kills, deaths and objectives. Click a marker to jump to that moment.
+- **Death review:** Steps through each death with a replay and slow motion on the final seconds. Tag the cause (out of position, no vision, bad trade and more) and add a note.
+- **Games and Clips:** A searchable games list with thumbnails and results, and a grid of every highlight clip.
+- **Clips without re-encoding:** Cuts clips around chosen moments, or press `F9` to save the last seconds.
 - **Crash-safe MP4 files:** Saves fragmented recordings and repairs unfinished files after a crash.
-- **One small exe:** Native tray app with no extra runtime. It installs itself for your user, with no admin rights.
+- **Sidebar or Dock:** Pick the navigation style in Settings.
+- **One small exe:** Native tray app with no extra runtime. It installs itself for your user, with no admin rights, and tells you when an update is ready.
 
 ## Install
 
@@ -26,7 +53,7 @@ Set League of Legends to **Borderless** or **Windowed** mode, because exclusive 
 
 ## Usage
 
-Start greyscreen and play. Recording begins when the game finishes loading and stops a few seconds after the Nexus falls. TFT, replays, and spectator games are not recorded.
+Start Greyscreen and play. Recording begins when the game finishes loading and stops a few seconds after the Nexus falls. TFT, replays, and spectator games are not recorded.
 
 Each match is saved to `Videos\Greyscreen\<date>_<champion>_<mode>\`:
 
@@ -59,13 +86,13 @@ greyscreen-cli.exe record --seconds 10 --window "<title>"
 greyscreen-cli.exe recover <file.mp4.part>
 ```
 
-Black video usually means the game is in exclusive fullscreen, or you are on a laptop with two GPUs. Switch League to Borderless or Windowed mode, and set greyscreen to **High performance** in Windows Graphics settings.
+Black video usually means the game is in exclusive fullscreen, or you are on a laptop with two GPUs. Switch League to Borderless or Windowed mode, and set Greyscreen to **High performance** in Windows Graphics settings.
 
 When reporting a problem, attach the contents of `%LOCALAPPDATA%\Greyscreen\logs`.
 
 ## How it works
 
-Video frames stay on the GPU from capture to encode, audio is isolated to the League process, and match state comes from Riot's local HTTP API. The fragmented MP4 writer is pure Rust and written specifically for greyscreen.
+Video frames stay on the GPU from capture to encode, audio is isolated to the League process, and match state comes from Riot's local HTTP API. The fragmented MP4 writer is pure Rust and written specifically for Greyscreen.
 
 ```text
 Game window -> Windows.Graphics.Capture (D3D11)
@@ -80,7 +107,7 @@ Live Client Data API (127.0.0.1:2999)
 
 ## Building from source
 
-greyscreen is developed on macOS and cross-compiled to Windows with `cargo-xwin`. It also builds natively on Windows with the MSVC toolchain.
+Greyscreen is developed on macOS and cross-compiled to Windows with `cargo-xwin`. It also builds natively on Windows with the MSVC toolchain.
 
 **Requirements:**
 
@@ -133,7 +160,7 @@ Design notes live in [docs/architecture.md](docs/architecture.md), [docs/roadmap
 
 ## Status
 
-greyscreen is an early preview. It is built and tested on macOS and in CI, and real-hardware testing on Windows is under way. Bug reports are welcome.
+Greyscreen is an early preview. It is built and tested on macOS and in CI, and real-hardware testing on Windows is under way. Bug reports are welcome.
 
 ## License
 
