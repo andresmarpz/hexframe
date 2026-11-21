@@ -1,7 +1,7 @@
 name: CI
 
 # Pushes run only the spell check. Windows tests and the release build run on stable
-# version tags (v1.2.3, not previews) and on manual runs; `just ci` is the per-push gate.
+# version tags (v1.2.3, not previews) and on manual runs; `just check` is the per-push gate.
 
 on:
   push:

@@ -97,7 +97,10 @@ cargo install --locked cargo-xwin
 **Commands:**
 
 ```bash
-# Format check, clippy on macOS and Windows, and tests
+# Everyday gate: format check, clippy and tests
+just check
+
+# Full gate: check, typos and Windows clippy
 just ci
 
 # Build Windows release executables

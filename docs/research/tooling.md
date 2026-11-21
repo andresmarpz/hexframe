@@ -66,7 +66,7 @@ Versions checked against crates.io and GitHub on 2026-11-20.
 
 ### Git hooks
 
-- None. A pre-commit hook that runs clippy twice (host and Windows) is slow and gets bypassed. CI is the gate, `just lint` is the habit. If one is wanted later: a plain `.git/hooks`-free `lefthook` with `cargo fmt --check` only.
+- None. A pre-commit hook that runs clippy twice (host and Windows) is slow and gets bypassed. CI is the gate, `just check` is the habit. If one is wanted later: a plain `.git/hooks`-free `lefthook` with `cargo fmt --check` only.
 
 ### CI
 

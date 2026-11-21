@@ -55,4 +55,4 @@ Vercel project `greyscreen` (team `andresmarpzs-projects`) is connected to `andr
 
 ## Not in CI
 
-`just ci` does not touch the website.
+`just check` and `just ci` do not touch the website.
