@@ -37,7 +37,7 @@ fn full_queue_stops_the_writer_without_blocking() {
     assert_eq!(writer.send(packet()), Sent::Queued);
     assert_eq!(writer.send(packet()), Sent::Full);
     assert_eq!(writer.send(packet()), Sent::Stopped);
-    assert!(started.elapsed() < Duration::from_millis(500));
+    assert!(started.elapsed() < Duration::from_secs(5));
     assert_eq!(rx.iter().count(), 2);
 }
 

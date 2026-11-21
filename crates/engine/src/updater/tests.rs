@@ -137,6 +137,23 @@ fn quiet_for(rig: &Rig, wait: Duration) {
     assert!(rig.msgs.recv_timeout(wait).is_err());
 }
 
+fn wait_for_checks(rig: &Rig, at_least: usize) {
+    let deadline = Instant::now() + WAIT;
+    while rig.source.checks() < at_least {
+        assert!(
+            Instant::now() < deadline,
+            "only {} checks",
+            rig.source.checks()
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+fn settle(rig: &Rig) {
+    rig.handle.send(UpdateCmd::Check);
+    states(rig, |s| matches!(s, UpdateState::UpToDate));
+}
+
 #[test]
 fn a_scheduled_check_downloads_a_newer_release() {
     let rig = start(
@@ -168,15 +185,14 @@ fn scheduled_checks_are_silent_when_up_to_date() {
         true,
         vec![release("v0.1.7-preview.9", true)],
     );
-    quiet_for(&rig, Duration::from_millis(300));
-    assert!(rig.source.checks() >= 2);
+    wait_for_checks(&rig, 2);
+    quiet_for(&rig, Duration::from_millis(150));
 }
 
 #[test]
 fn scheduled_checks_repeat_on_the_interval() {
     let rig = start("0.1.7-preview.9", true, true, vec![]);
-    std::thread::sleep(Duration::from_millis(400));
-    assert!(rig.source.checks() >= 3, "{}", rig.source.checks());
+    wait_for_checks(&rig, 3);
 }
 
 #[test]
@@ -186,8 +202,7 @@ fn nothing_is_checked_while_busy_and_the_check_runs_after() {
     std::thread::sleep(Duration::from_millis(400));
     assert_eq!(rig.source.checks(), 0);
     rig.handle.send(UpdateCmd::Busy(false));
-    std::thread::sleep(Duration::from_millis(300));
-    assert!(rig.source.checks() >= 1);
+    wait_for_checks(&rig, 1);
 }
 
 #[test]
@@ -205,10 +220,9 @@ fn turning_the_setting_on_and_off_starts_and_stops_checks() {
     std::thread::sleep(Duration::from_millis(150));
     assert_eq!(rig.source.checks(), 0);
     rig.handle.send(UpdateCmd::Auto(true));
-    std::thread::sleep(Duration::from_millis(250));
-    assert!(rig.source.checks() >= 1);
+    wait_for_checks(&rig, 1);
     rig.handle.send(UpdateCmd::Auto(false));
-    std::thread::sleep(Duration::from_millis(100));
+    settle(&rig);
     let after_off = rig.source.checks();
     std::thread::sleep(Duration::from_millis(250));
     assert_eq!(rig.source.checks(), after_off);
