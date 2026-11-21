@@ -7,7 +7,8 @@ use rune_kit::{
 };
 
 use super::{card, hairline, page_header};
-use crate::ui::{Ui, parse_clip_secs};
+
+use crate::ui::{Ui, format_size_estimate, parse_clip_secs};
 
 const QUALITIES: [(Quality, &str); 3] = [
     (Quality::Balanced, "Balanced"),
@@ -201,6 +202,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 Some("60 is smoother, 30 uses less disk space."),
                 fps,
             ),
+            size_estimate(s, k),
             toggle_row(
                 k,
                 "audio",
@@ -219,6 +221,17 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
             ),
         ],
     )
+}
+
+fn size_estimate(s: &Ui, k: &Kit) -> El {
+    let native = s.settings.resolution == Resolution::Native;
+    let line = format_size_estimate(s.settings.estimated_mb_per_minute(), native);
+    row()
+        .key("size-estimate")
+        .w_full()
+        .px(16.0)
+        .py(10.0)
+        .child(text(line).font(k.ty.small).color(k.c.text_muted))
 }
 
 fn secs_input(

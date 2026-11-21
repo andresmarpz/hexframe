@@ -19,7 +19,7 @@ pub(crate) mod fake_player;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use format::{format_clock, format_date, format_size};
+pub(crate) use format::{format_clock, format_date, format_size, format_size_estimate};
 pub(crate) use jump::seek_target;
 pub(crate) use review::{PlayerFactory, ReviewState, Source};
 

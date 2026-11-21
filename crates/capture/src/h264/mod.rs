@@ -1,4 +1,5 @@
 mod pump;
+mod rate;
 mod setup;
 #[cfg(test)]
 mod tests;
@@ -101,6 +102,7 @@ impl H264Encoder {
             fps,
             mean_bitrate: cfg.video_bitrate,
             peak_bitrate: cfg.video_peak.max(cfg.video_bitrate),
+            quality: cfg.quality,
             gop_frames: cfg.gop_frames,
         };
         let opened = setup::open(gpu, &spec)?;
@@ -135,6 +137,7 @@ impl H264Encoder {
             max_height: None,
             video_bitrate: 20_000_000,
             video_peak: 30_000_000,
+            quality: None,
             gop_frames: 120,
             audio: false,
             audio_bitrate: 0,

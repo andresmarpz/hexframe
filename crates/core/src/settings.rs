@@ -10,7 +10,11 @@ use crate::paths;
 const AUDIO_BITRATE: u32 = 192_000;
 const REFERENCE_PIXELS: f64 = 1920.0 * 1080.0;
 const REFERENCE_FPS: f64 = 60.0;
-const PEAK_FACTOR: f64 = 1.5;
+const PIXEL_EXPONENT: f64 = 0.75;
+const FPS_EXPONENT: f64 = 0.8;
+const PEAK_FACTOR: f64 = 2.0;
+const QUALITY_MODE_SIZE_FACTOR: f64 = 0.6;
+const ESTIMATE_NATIVE_HEIGHT: u32 = 1440;
 const MAX_CLIP_SECS: u32 = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -24,9 +28,17 @@ pub enum Quality {
 impl Quality {
     fn mean_bitrate_at_1080p60(self) -> f64 {
         match self {
-            Quality::Balanced => 12_000_000.0,
-            Quality::High => 20_000_000.0,
-            Quality::Max => 35_000_000.0,
+            Quality::Balanced => 8_000_000.0,
+            Quality::High => 12_000_000.0,
+            Quality::Max => 20_000_000.0,
+        }
+    }
+
+    fn target_quality(self) -> u32 {
+        match self {
+            Quality::Balanced => 60,
+            Quality::High => 70,
+            Quality::Max => 80,
         }
     }
 }
@@ -155,25 +167,43 @@ impl Settings {
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
     }
 
-    pub fn capture_config(&self, native_height: u32) -> CaptureConfig {
-        let max_height = self.resolution.height().map(|h| h.min(native_height));
-        let height = max_height.unwrap_or(native_height);
+    fn mean_bitrate(&self, height: u32) -> (f64, f64) {
         let width = f64::from(height) * 16.0 / 9.0;
         let pixels = width * f64::from(height);
         let mean = self.quality.mean_bitrate_at_1080p60()
-            * (pixels / REFERENCE_PIXELS)
-            * (f64::from(self.fps) / REFERENCE_FPS);
+            * (pixels / REFERENCE_PIXELS).powf(PIXEL_EXPONENT)
+            * (f64::from(self.fps) / REFERENCE_FPS).powf(FPS_EXPONENT);
+        (mean, pixels)
+    }
+
+    pub fn capture_config(&self, native_height: u32) -> CaptureConfig {
+        let max_height = self.resolution.height().map(|h| h.min(native_height));
+        let height = max_height.unwrap_or(native_height);
+        let (mean, pixels) = self.mean_bitrate(height);
         CaptureConfig {
             fps: self.fps,
             max_height,
             video_bitrate: mean.round() as u32,
             video_peak: (mean * PEAK_FACTOR).round() as u32,
+            quality: Some(self.quality.target_quality()),
             gop_frames: self.fps,
             audio: self.audio,
             audio_bitrate: AUDIO_BITRATE,
             cursor: self.capture_cursor,
             bitrate_pixels: pixels.round() as u64,
         }
+    }
+
+    pub fn estimated_mb_per_minute(&self) -> f64 {
+        let height = self.resolution.height().unwrap_or(ESTIMATE_NATIVE_HEIGHT);
+        let (mean, _) = self.mean_bitrate(height);
+        let video = mean * QUALITY_MODE_SIZE_FACTOR;
+        let audio = if self.audio {
+            f64::from(AUDIO_BITRATE)
+        } else {
+            0.0
+        };
+        (video + audio) * 60.0 / 8.0 / 1_000_000.0
     }
 }
 

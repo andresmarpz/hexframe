@@ -57,6 +57,7 @@ pub struct CaptureConfig {
     pub max_height: Option<u32>,
     pub video_bitrate: u32,
     pub video_peak: u32,
+    pub quality: Option<u32>,
     pub gop_frames: u32,
     pub audio: bool,
     pub audio_bitrate: u32,
@@ -70,7 +71,8 @@ impl CaptureConfig {
         if self.bitrate_pixels == 0 || pixels >= self.bitrate_pixels {
             return self.clone();
         }
-        let scale = |bits: u32| (u64::from(bits) * pixels / self.bitrate_pixels) as u32;
+        let ratio = (pixels as f64 / self.bitrate_pixels as f64).powf(0.75);
+        let scale = |bits: u32| (f64::from(bits) * ratio).round() as u32;
         Self {
             video_bitrate: scale(self.video_bitrate),
             video_peak: scale(self.video_peak),

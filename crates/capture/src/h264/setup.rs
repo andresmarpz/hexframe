@@ -1,8 +1,7 @@
+use super::rate::{self, RateMode};
 use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, LUID, S_OK};
 use windows::Win32::Media::MediaFoundation::{
-    CODECAPI_AVEncCommonBufferSize, CODECAPI_AVEncCommonMaxBitRate,
-    CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonQualityVsSpeed,
-    CODECAPI_AVEncCommonRateControlMode, CODECAPI_AVEncH264CABACEnable,
+    CODECAPI_AVEncCommonQualityVsSpeed, CODECAPI_AVEncH264CABACEnable,
     CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncMPVGOPSize, CODECAPI_AVLowLatencyMode,
     ICodecAPI, IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaEventGenerator,
     IMFMediaType, IMFTransform, MF_LOW_LATENCY, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE,
@@ -17,7 +16,7 @@ use windows::Win32::Media::MediaFoundation::{
     MFT_MESSAGE_NOTIFY_START_OF_STREAM, MFT_MESSAGE_SET_D3D_MANAGER, MFT_REGISTER_TYPE_INFO,
     MFTEnum2, MFTEnumEx, MFVideoFormat_H264, MFVideoFormat_NV12, MFVideoInterlace_Progressive,
     MFVideoPrimaries_BT709, MFVideoTransFunc_709, MFVideoTransferMatrix_BT709,
-    eAVEncCommonRateControlMode_PeakConstrainedVBR, eAVEncH264VProfile_High,
+    eAVEncH264VProfile_High,
 };
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Variant::VARIANT;
@@ -37,6 +36,7 @@ pub(super) struct Spec {
     pub(super) fps: u32,
     pub(super) mean_bitrate: u32,
     pub(super) peak_bitrate: u32,
+    pub(super) quality: Option<u32>,
     pub(super) gop_frames: u32,
 }
 
@@ -60,13 +60,14 @@ struct Configured {
     input_id: u32,
     output_id: u32,
     sequence_header: Vec<u8>,
+    mode: RateMode,
 }
 
-struct Property {
-    name: &'static str,
-    id: GUID,
-    value: VARIANT,
-    required: bool,
+pub(super) struct Property {
+    pub(super) name: &'static str,
+    pub(super) id: GUID,
+    pub(super) value: VARIANT,
+    pub(super) required: bool,
 }
 
 pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
@@ -91,7 +92,7 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
                     manager,
                     input_id: configured.input_id,
                     output_id: configured.output_id,
-                    name,
+                    name: format!("{name} ({})", configured.mode.label()),
                     sequence_header: configured.sequence_header,
                 });
             }
@@ -243,7 +244,7 @@ fn configure(
     }
     let (input_id, output_id) = stream_ids(&transform)?;
     let codec: ICodecAPI = transform.cast()?;
-    apply_codec_properties(&codec, spec)?;
+    let mode = apply_codec_properties(&codec, spec)?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
     // SAFETY: the type is live and not modified after this point.
     unsafe {
@@ -275,6 +276,7 @@ fn configure(
         input_id,
         output_id,
         sequence_header,
+        mode,
     })
 }
 
@@ -364,33 +366,8 @@ fn start_streaming(transform: &IMFTransform) -> Result<()> {
     Ok(())
 }
 
-fn properties(spec: &Spec) -> Vec<Property> {
-    let rate_mode = eAVEncCommonRateControlMode_PeakConstrainedVBR.0 as u32;
+fn base_properties(spec: &Spec) -> Vec<Property> {
     vec![
-        Property {
-            name: "AVEncCommonRateControlMode",
-            id: CODECAPI_AVEncCommonRateControlMode,
-            value: VARIANT::from(rate_mode),
-            required: true,
-        },
-        Property {
-            name: "AVEncCommonMeanBitRate",
-            id: CODECAPI_AVEncCommonMeanBitRate,
-            value: VARIANT::from(spec.mean_bitrate),
-            required: true,
-        },
-        Property {
-            name: "AVEncCommonMaxBitRate",
-            id: CODECAPI_AVEncCommonMaxBitRate,
-            value: VARIANT::from(spec.peak_bitrate),
-            required: false,
-        },
-        Property {
-            name: "AVEncCommonBufferSize",
-            id: CODECAPI_AVEncCommonBufferSize,
-            value: VARIANT::from(spec.peak_bitrate / 8),
-            required: false,
-        },
         Property {
             name: "AVEncMPVGOPSize",
             id: CODECAPI_AVEncMPVGOPSize,
@@ -424,14 +401,20 @@ fn properties(spec: &Spec) -> Vec<Property> {
     ]
 }
 
-fn apply_codec_properties(codec: &ICodecAPI, spec: &Spec) -> Result<()> {
-    for property in properties(spec) {
+fn apply_codec_properties(codec: &ICodecAPI, spec: &Spec) -> Result<RateMode> {
+    let mode = rate::apply(codec, spec)?;
+    for property in base_properties(spec) {
         apply_property(codec, &property)?;
     }
-    Ok(())
+    Ok(mode)
 }
 
-fn apply_property(codec: &ICodecAPI, property: &Property) -> Result<()> {
+pub(super) struct Applied {
+    pub(super) set: bool,
+    pub(super) read_back: Option<u32>,
+}
+
+pub(super) fn apply_property(codec: &ICodecAPI, property: &Property) -> Result<Applied> {
     // SAFETY: the vtable call receives the live interface pointer and a GUID that outlives it.
     let supported =
         unsafe { (Interface::vtable(codec).IsSupported)(Interface::as_raw(codec), &property.id) };
@@ -447,12 +430,16 @@ fn apply_property(codec: &ICodecAPI, property: &Property) -> Result<()> {
         read_back = %read_back.as_ref().map_or_else(|e| format!("error {:#010x}", e.code().0), describe_variant),
         "codec property"
     );
+    let applied = Applied {
+        set: set.is_ok(),
+        read_back: read_back.ok().and_then(|value| u32::try_from(&value).ok()),
+    };
     match set {
         Err(source) if property.required => Err(H264Error::Property {
             property: property.name,
             source,
         }),
-        _ => Ok(()),
+        _ => Ok(applied),
     }
 }
 

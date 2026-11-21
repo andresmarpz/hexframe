@@ -8,6 +8,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
+use record::{Preset, RateControl};
+
 #[derive(Parser, Debug)]
 #[command(name = "greyscreen-cli", version = env!("GREYSCREEN_BUILD"), about = "Greyscreen console tool")]
 struct Cli {
@@ -33,6 +35,16 @@ enum Command {
         no_audio: bool,
         #[arg(long)]
         cursor: bool,
+        #[arg(long, value_enum, default_value = "high")]
+        preset: Preset,
+        #[arg(long, value_enum)]
+        rc: Option<RateControl>,
+        #[arg(long, value_parser = clap::value_parser!(u32).range(0..=100))]
+        quality: Option<u32>,
+        #[arg(long, value_name = "MBPS")]
+        bitrate: Option<f64>,
+        #[arg(long, value_name = "MBPS")]
+        peak: Option<f64>,
     },
     FakeLeague {
         #[arg(long, default_value_t = 2999)]
@@ -64,6 +76,11 @@ fn main() -> ExitCode {
             height,
             no_audio,
             cursor,
+            preset,
+            rc,
+            quality,
+            bitrate,
+            peak,
         } => record::run(&record::Args {
             seconds,
             out,
@@ -72,6 +89,11 @@ fn main() -> ExitCode {
             height,
             audio: !no_audio,
             cursor,
+            preset,
+            rc,
+            quality,
+            bitrate_mbps: bitrate,
+            peak_mbps: peak,
         }),
         Command::Recover { path } => finish(recover::run(&path)),
     }

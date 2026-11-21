@@ -205,7 +205,11 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `clips.kills`, `deaths`, `multikills`, `objectives`, `aces` | `bool` | `true` |
 | `clips.assists`, `structures` | `bool` | `false` |
 
-Bitrate: the mean bitrate at 1080p60 is 12, 20 or 35 Mbps for Balanced, High or Max. It scales linearly with pixel count and fps. Peak is 1.5 times the mean. `Settings::capture_config(native_height)` computes the `CaptureConfig`.
+Bitrate: the mean bitrate at 1080p60 is 8, 12 or 20 Mbps for Balanced, High or Max. It scales with pixel count to the power 0.75 and with fps/60 to the power 0.8. Peak is 2.0 times the mean. `CaptureConfig::for_encode_size` rescales with the same 0.75 exponent when the real encode size is smaller than `bitrate_pixels`.
+
+Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Balanced, High or Max. With `Some(q)` the encoder uses Quality rate control with `AVEncCommonQuality = q`, and mean and peak only cap through `MaxBitRate` and the buffer size. If the encoder rejects or misreads either value, it falls back to peak-constrained VBR at the mean and peak, and logs one warning. `MediaEvent::Started.encoder` ends with the mode, for example `(quality 70)` or `(vbr 18.5 Mbps)`. `Settings::estimated_mb_per_minute` returns 0.6 times the mean bitrate plus audio, for the size line in Settings (Native counts as 1440p). The 0.6 factor is a placeholder until real recordings give numbers.
+
+`greyscreen-cli record` takes `--preset`, `--rc quality|vbr`, `--quality N`, `--bitrate MBPS`, `--peak MBPS` and `--height H` to override the config for A/B tests.
 
 ## Rules for code
 

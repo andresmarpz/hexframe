@@ -22,3 +22,15 @@ pub(crate) fn format_size(bytes: u64) -> String {
 pub(crate) fn format_date(at: &Zoned) -> String {
     at.strftime("%Y-%m-%d %H:%M").to_string()
 }
+
+pub(crate) fn format_size_estimate(mb_per_minute: f64, native: bool) -> String {
+    let per_minute = (mb_per_minute / 5.0).round().max(1.0) * 5.0;
+    let per_game = per_minute * 30.0 / 1000.0;
+    let game = if per_game < 10.0 {
+        format!("{per_game:.1}")
+    } else {
+        format!("{per_game:.0}")
+    };
+    let suffix = if native { " (at 1440p)" } else { "" };
+    format!("About {per_minute:.0} MB per minute, about {game} GB for a 30-minute game{suffix}")
+}

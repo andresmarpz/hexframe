@@ -9,7 +9,7 @@ use greyscreen_core::media::{
     AudioFormat, CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource, Packet,
     Track, VideoFormat,
 };
-use greyscreen_core::settings::Settings;
+use greyscreen_core::settings::{Quality, Resolution, Settings};
 use greyscreen_mp4::fragmented::FragmentedWriter;
 
 const CHANNEL_CAPACITY: usize = 1024;
@@ -25,6 +25,66 @@ pub(crate) struct Args {
     pub(crate) height: u32,
     pub(crate) audio: bool,
     pub(crate) cursor: bool,
+    pub(crate) preset: Preset,
+    pub(crate) rc: Option<RateControl>,
+    pub(crate) quality: Option<u32>,
+    pub(crate) bitrate_mbps: Option<f64>,
+    pub(crate) peak_mbps: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub(crate) enum Preset {
+    Balanced,
+    High,
+    Max,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub(crate) enum RateControl {
+    Quality,
+    Vbr,
+}
+
+fn mbps_to_bits(name: &str, mbps: f64) -> Result<u32> {
+    if !mbps.is_finite() || mbps <= 0.0 || mbps > 1000.0 {
+        bail!("--{name} must be between 0 and 1000 Mbps");
+    }
+    Ok((mbps * 1e6).round() as u32)
+}
+
+pub(crate) fn build_config(args: &Args) -> Result<CaptureConfig> {
+    let quality = match args.preset {
+        Preset::Balanced => Quality::Balanced,
+        Preset::High => Quality::High,
+        Preset::Max => Quality::Max,
+    };
+    let settings = Settings {
+        quality,
+        resolution: Resolution::Native,
+        fps: args.fps,
+        audio: args.audio,
+        capture_cursor: args.cursor,
+        ..Settings::default()
+    };
+    let mut cfg = settings.capture_config(args.height);
+    cfg.max_height = Some(args.height);
+    match (args.rc, args.quality) {
+        (Some(RateControl::Vbr), Some(_)) => bail!("--quality only applies to --rc quality"),
+        (Some(RateControl::Vbr), None) => cfg.quality = None,
+        (_, Some(value)) => cfg.quality = Some(value),
+        (Some(RateControl::Quality), None) | (None, None) => {}
+    }
+    if args.bitrate_mbps.is_some() || args.peak_mbps.is_some() {
+        if let Some(mbps) = args.bitrate_mbps {
+            cfg.video_bitrate = mbps_to_bits("bitrate", mbps)?;
+            cfg.video_peak = cfg.video_bitrate.saturating_mul(2);
+        }
+        if let Some(mbps) = args.peak_mbps {
+            cfg.video_peak = mbps_to_bits("peak", mbps)?;
+        }
+        cfg.bitrate_pixels = 0;
+    }
+    Ok(cfg)
 }
 
 #[derive(Debug, Default)]
@@ -62,11 +122,7 @@ fn record(args: &Args) -> Result<ExitCode> {
     #[cfg(windows)]
     crate::init_windows();
     let (source, target) = source_and_target(args)?;
-    let mut cfg = Settings::default().capture_config(2160);
-    cfg.fps = args.fps;
-    cfg.max_height = Some(args.height);
-    cfg.audio = args.audio;
-    cfg.cursor = args.cursor;
+    let cfg = build_config(args)?;
     run_with(source.as_ref(), target, cfg, args)
 }
 
@@ -303,3 +359,6 @@ unsafe extern "system" fn enum_proc(
     search.found = Some((hwnd.0 as isize, pid));
     BOOL(0)
 }
+
+#[cfg(test)]
+mod tests;

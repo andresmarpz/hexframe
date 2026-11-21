@@ -1,5 +1,5 @@
 use crossbeam_channel::{Receiver, unbounded};
-use greyscreen_core::settings::Settings;
+use greyscreen_core::settings::{Quality, Settings};
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Env, Key, KeyEvent, Mods, Runtime};
 
@@ -377,4 +377,29 @@ fn keys_do_nothing_outside_the_review_screen() {
     press_char(&mut rt, "f");
     assert_eq!(rt.state.screen, Screen::Status);
     assert!(!in_theater(&rt));
+}
+
+fn size_estimate_text(rt: &Runtime<Ui>) -> String {
+    rt.accessibility_tree()
+        .nodes
+        .iter()
+        .flat_map(|(_, node)| [node.label(), node.value()])
+        .flatten()
+        .find(|text| text.contains("MB per minute"))
+        .map(str::to_owned)
+        .expect("size estimate text")
+}
+
+#[test]
+fn changing_quality_updates_the_size_estimate() {
+    let mut rt = runtime();
+    tap(&mut rt, "nav-settings");
+    assert!(rt.find("size-estimate").is_some());
+    let before = size_estimate_text(&rt);
+    let (x, y) = rt.find("quality").unwrap();
+    rt.pointer_down(x + 60.0, y);
+    rt.pointer_up(x + 60.0, y);
+    rt.frame(1.0 / 60.0);
+    assert_eq!(rt.state.settings.quality, Quality::Max);
+    assert_ne!(size_estimate_text(&rt), before);
 }
