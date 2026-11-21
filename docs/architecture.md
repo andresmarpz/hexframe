@@ -296,13 +296,13 @@ The website's FAQ page (`https://greyscreen-lake.vercel.app/faq`) needs one sect
 | Anchor | Shown when | What the FAQ should say |
 |---|---|---|
 | `fullscreen` | Capture got no frames from the League window | Switch League to Borderless in its video settings. If League runs as administrator, run Greyscreen as administrator too |
-| `league-not-found` | The League window closed or was not found while capture started | Make sure League is running, then retry |
-| `recordings-folder` | The recordings folder is missing, read-only or cannot be created | Choose another folder in Settings > Storage |
+| `window-not-found` | The League window closed or was not found while capture started | Make sure League is running, then retry |
+| `folder-not-writable` | The recordings folder is missing, read-only or cannot be created | Choose another folder in Settings > Storage |
 | `low-disk` | The drive has no space left | Free some space or choose another folder |
 | `no-encoder` | No hardware H.264 encoder or GPU was usable | Update the graphics driver and restart Greyscreen |
 | `windows-version` | Windows Graphics Capture is not supported | Update to Windows 10 version 1903 or newer |
-| `capture-blocked` | Windows refused access to the window (access denied) | Run Greyscreen as administrator if League does; check Settings > Privacy & security > Screen capture |
-| `capture-failed` | Any other capture failure | Retry; open the logs folder; send feedback |
+| `run-as-admin` | Windows refused access to the window (access denied) | Run Greyscreen as administrator if League does; check Settings > Privacy & security > Screen capture |
+| `help` | Any other capture failure | The Get help section: send feedback, GitHub Issues, logs |
 
 On Windows 10 builds that cannot hide the capture border, a start warning says Windows draws a yellow border around the captured window and that it is not in the video. It has no anchor.
 

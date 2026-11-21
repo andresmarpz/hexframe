@@ -98,13 +98,13 @@ impl Problem {
     pub fn anchor(self) -> &'static str {
         match self {
             Problem::ExclusiveFullscreen => "fullscreen",
-            Problem::LeagueNotFound => "league-not-found",
-            Problem::FolderUnusable => "recordings-folder",
+            Problem::LeagueNotFound => "window-not-found",
+            Problem::FolderUnusable => "folder-not-writable",
             Problem::LowDisk => "low-disk",
             Problem::NoEncoder => "no-encoder",
             Problem::WindowsTooOld => "windows-version",
-            Problem::CaptureBlocked => "capture-blocked",
-            Problem::Other => "capture-failed",
+            Problem::CaptureBlocked => "run-as-admin",
+            Problem::Other => "help",
         }
     }
 

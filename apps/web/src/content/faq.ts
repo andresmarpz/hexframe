@@ -115,6 +115,13 @@ export const faqGroups: FaqGroup[] = [
         ],
       },
       {
+        id: "windows-version",
+        q: "Windows is too old to record",
+        a: [
+          "Greyscreen uses Windows Graphics Capture, which needs Windows 10 version 1903 or newer. Run Windows Update, then start Greyscreen again.",
+        ],
+      },
+      {
         id: "no-encoder",
         q: "No video encoder found",
         a: [
