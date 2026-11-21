@@ -1,11 +1,12 @@
 mod clips;
 mod events;
+pub(super) mod filter;
 
 use rune::{Color, El, ScrollSpec, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::library::format::clip_title;
-use crate::ui::{EventFilter, PanelTab, ReviewState, Source, Ui};
+use crate::ui::{PanelTab, ReviewState, Source, Ui};
 use crate::view::{card, hairline};
 
 #[cfg(test)]
@@ -25,10 +26,10 @@ fn tab_label(review: &ReviewState, tab: PanelTab) -> String {
     match tab {
         PanelTab::Events => {
             let total = review.entry.meta.events.len();
-            if review.filter == EventFilter::All {
+            if review.hidden_events() == 0 {
                 format!("Events {total}")
             } else {
-                format!("Events {} of {total}", review.shown_events().count())
+                format!("Events {} of {total}", total - review.hidden_events())
             }
         }
         PanelTab::Clips => format!("Clips {}", review.entry.meta.clips.len()),

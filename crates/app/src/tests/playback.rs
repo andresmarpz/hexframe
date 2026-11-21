@@ -20,6 +20,7 @@ fn session(media: Media) -> Session {
 fn session_with(media: Media, entry: greyscreen_engine::RecordingEntry) -> Session {
     sim::simulate(media);
     let mut ui = Ui::preview();
+    ui.settings.review_events = greyscreen_core::categories::CategorySet::all();
     ui.player_factory = sim::factory;
     let mut rt = runtime_sized(ui, (1400.0, 680.0));
     rt.on_key = Some(Ui::on_key);

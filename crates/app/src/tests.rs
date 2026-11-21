@@ -1,4 +1,5 @@
 use crossbeam_channel::{Receiver, unbounded};
+use greyscreen_core::categories::CategorySet;
 use greyscreen_core::settings::{Quality, Resolution, Settings};
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Env, Key, KeyEvent, Mods, Runtime};
@@ -22,6 +23,7 @@ mod nav_recent;
 mod nav_status;
 mod panes;
 mod playback;
+mod review_filter;
 mod review_flow;
 mod review_markers;
 mod review_narrow;
@@ -174,7 +176,12 @@ fn clip_seconds_outside_the_range_are_ignored() {
 }
 
 fn review_runtime() -> Runtime<Ui> {
+    review_runtime_showing(CategorySet::all())
+}
+
+fn review_runtime_showing(shown: CategorySet) -> Runtime<Ui> {
     let mut ui = Ui::preview();
+    ui.settings.review_events = shown;
     ui.player_factory = fake_player::factory;
     let mut rt = runtime_sized(ui, (1400.0, 680.0));
     rt.update(|ui, _| ui.open_review_entry(crate::ui::review_entry()));

@@ -7,6 +7,7 @@ mod catalog;
 mod clips;
 mod keybinds;
 mod recording;
+mod review;
 mod storage;
 mod updates;
 
@@ -249,6 +250,7 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         Row::ClipsEnabled | Row::Moments | Row::ClipWindow | Row::ClipHotkey => {
             clips::render(s, k, row)
         }
+        Row::ReviewEvents | Row::ReviewReset => review::render(s, k, row),
         Row::Folder | Row::StorageLimit => storage::render(s, k, layer, row),
         Row::Bind(action) => keybinds::bind_row(s, k, action),
         Row::Version

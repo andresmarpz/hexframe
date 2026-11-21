@@ -15,6 +15,17 @@ pub(super) const SCENES: &[Scene] = &[
         ui.settings.clips.enabled = false;
         sheet(ui, SettingsSection::Clips);
     }),
+    ("settings-review", |ui| {
+        ui.settings.review_events = ui
+            .settings
+            .review_events
+            .with(greyscreen_core::categories::EventCategory::EnemyKills, true);
+        sheet(ui, SettingsSection::Review);
+    }),
+    ("settings-review-search", |ui| {
+        sheet(ui, SettingsSection::Recording);
+        ui.settings_search = TextEdit::new("baron");
+    }),
     ("settings-storage", |ui| {
         ui.settings.storage_limit_gb = Some(50);
         sheet(ui, SettingsSection::Storage);

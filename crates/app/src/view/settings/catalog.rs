@@ -1,3 +1,4 @@
+use greyscreen_core::categories::EventCategory;
 use greyscreen_core::keybinds::Action;
 
 use crate::platform;
@@ -17,6 +18,8 @@ pub(super) enum Row {
     Moments,
     ClipWindow,
     ClipHotkey,
+    ReviewEvents,
+    ReviewReset,
     Folder,
     StorageLimit,
     Bind(Action),
@@ -46,6 +49,8 @@ impl Row {
             }
             Self::ClipWindow => "clip window before after seconds length duration pre post",
             Self::ClipHotkey => "save clip hotkey shortcut manual keybind",
+            Self::ReviewEvents => return events_terms(),
+            Self::ReviewReset => "reset default review events filter restore recommended",
             Self::Folder => "recordings folder location path change open directory",
             Self::StorageLimit => "storage limit disk space gb usage used delete",
             Self::Bind(action) => return format!("{} keybind shortcut hotkey key", action.label()),
@@ -68,6 +73,17 @@ impl Row {
     }
 }
 
+fn events_terms() -> String {
+    let names: Vec<&str> = EventCategory::ALL
+        .iter()
+        .map(|category| category.search_terms())
+        .collect();
+    format!(
+        "review events shown show hide filter timeline {}",
+        names.join(" ")
+    )
+}
+
 pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
     match section {
         SettingsSection::Recording => vec![
@@ -86,6 +102,7 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
             Row::ClipWindow,
             Row::ClipHotkey,
         ],
+        SettingsSection::Review => vec![Row::ReviewEvents, Row::ReviewReset],
         SettingsSection::Storage => vec![Row::Folder, Row::StorageLimit],
         SettingsSection::Keybinds => Action::ALL.iter().map(|a| Row::Bind(*a)).collect(),
         SettingsSection::About => {

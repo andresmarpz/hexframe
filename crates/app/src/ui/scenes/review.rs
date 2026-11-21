@@ -9,6 +9,22 @@ pub(super) const SCENES: &[Scene] = &[
             review.tab = PanelTab::Clips;
         }
     }),
+    ("review-filter-menu", |ui| {
+        game(ui);
+        ui.review_filter_menu(true);
+    }),
+    ("review-filter-custom", |ui| {
+        game(ui);
+        if let Some(review) = &mut ui.review {
+            review.set_filter(
+                review
+                    .default_filter
+                    .toggled(greyscreen_core::categories::EventCategory::TeammateKills)
+                    .toggled(greyscreen_core::categories::EventCategory::Structures),
+            );
+            review.filter_menu = true;
+        }
+    }),
     ("review-speed-menu", |ui| {
         game(ui);
         ui.review_speed_menu(true);

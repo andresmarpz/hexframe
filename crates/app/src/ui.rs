@@ -30,8 +30,8 @@ pub(crate) use keys::MAC;
 pub(crate) use library::{Detail, ListItem, RecordingsFilter};
 pub(crate) use review::jump::seek_target;
 pub(crate) use review::{
-    DeathReviewState, EventFilter, NORMAL_SPEED, PanelTab, PlayerFactory, ReviewState, SPEEDS,
-    Sound, Source, VolumeHover, title_line,
+    DeathReviewState, NORMAL_SPEED, PanelTab, PlayerFactory, ReviewState, SPEEDS, Sound, Source,
+    VolumeHover, title_line,
 };
 pub(crate) use scenes::all as scene_list;
 pub(crate) use settings_sheet::SettingsSection;
@@ -184,7 +184,12 @@ impl Ui {
 
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
         self.close_settings();
-        self.review = Some(ReviewState::open(entry, self.player_factory, self.sound));
+        self.review = Some(ReviewState::open(
+            entry,
+            self.player_factory,
+            self.sound,
+            self.settings.review_events,
+        ));
         self.live_selected = false;
         self.screen = Screen::Games;
     }
@@ -216,6 +221,7 @@ impl Ui {
     pub(crate) fn change(&mut self, edit: impl FnOnce(&mut Settings)) {
         edit(&mut self.settings);
         self.settings.validate();
+        self.sync_review_default();
         self.send(EngineCmd::ApplySettings(self.settings.clone()));
     }
 

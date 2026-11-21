@@ -142,7 +142,7 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
         for clip in &review.entry.meta.clips {
             line = line.child(band(clip, review, k));
         }
-        for event in &review.entry.meta.events {
+        for event in review.shown_events() {
             line = line.child(marker(event, review, k));
         }
     }

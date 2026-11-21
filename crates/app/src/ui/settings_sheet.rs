@@ -7,15 +7,17 @@ pub(crate) enum SettingsSection {
     #[default]
     Recording,
     Clips,
+    Review,
     Storage,
     Keybinds,
     About,
 }
 
 impl SettingsSection {
-    pub(crate) const ALL: [SettingsSection; 5] = [
+    pub(crate) const ALL: [SettingsSection; 6] = [
         Self::Recording,
         Self::Clips,
+        Self::Review,
         Self::Storage,
         Self::Keybinds,
         Self::About,
@@ -25,6 +27,7 @@ impl SettingsSection {
         match self {
             Self::Recording => "Recording",
             Self::Clips => "Clips",
+            Self::Review => "Review",
             Self::Storage => "Storage",
             Self::Keybinds => "Keybinds",
             Self::About => "Updates & About",
@@ -35,6 +38,7 @@ impl SettingsSection {
         match self {
             Self::Recording => "recording",
             Self::Clips => "clips",
+            Self::Review => "review",
             Self::Storage => "storage",
             Self::Keybinds => "keybinds",
             Self::About => "about",

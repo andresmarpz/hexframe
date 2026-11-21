@@ -9,11 +9,12 @@ mod sound;
 
 use std::path::Path;
 
+use greyscreen_core::categories::{CategorySet, EventCategory, categorize};
 use greyscreen_engine::RecordingEntry;
 use rune::PlayerState;
 
 pub(crate) use deaths::{DeathReviewState, title_line};
-pub(crate) use events::{EventFilter, EventHover};
+pub(crate) use events::EventHover;
 pub(crate) use player::{PlayerFactory, ReviewPlayer, rune_player};
 pub(crate) use sound::{NORMAL_SPEED, SPEEDS, Sound, VolumeHover};
 
@@ -46,7 +47,10 @@ pub(crate) struct ReviewState {
     pub last_move: f64,
     pub hovered: Option<EventHover>,
     pub tab: PanelTab,
-    pub filter: EventFilter,
+    pub categories: Vec<EventCategory>,
+    pub filter: CategorySet,
+    pub default_filter: CategorySet,
+    pub filter_menu: bool,
     pub speed: usize,
     pub muted: bool,
     pub volume: f32,
@@ -60,12 +64,19 @@ const CONTROLS_HIDE_SECS: f64 = 2.5;
 const END_GUARD_SECS: f64 = 1.0;
 
 impl ReviewState {
-    pub(crate) fn open(entry: RecordingEntry, make: PlayerFactory, sound: Sound) -> Self {
+    pub(crate) fn open(
+        entry: RecordingEntry,
+        make: PlayerFactory,
+        sound: Sound,
+        default_filter: CategorySet,
+    ) -> Self {
         let path = entry.folder.join(&entry.meta.video);
         let player = path.is_file().then(|| make(&path));
         if let Some(player) = &player {
             player.play();
         }
+        let categories = categorize(&entry.meta.events, &entry.meta.game.info);
+        let filter = entry.meta.review.filter.unwrap_or(default_filter);
         let mut review = ReviewState {
             entry,
             player,
@@ -79,7 +90,10 @@ impl ReviewState {
             last_move: 0.0,
             hovered: None,
             tab: PanelTab::Events,
-            filter: EventFilter::All,
+            categories,
+            filter,
+            default_filter,
+            filter_menu: false,
             speed: NORMAL_SPEED,
             muted: sound.muted,
             volume: sound.volume,
@@ -240,6 +254,7 @@ impl ReviewState {
         self.shown_time = 0.0;
         self.settling = false;
         self.hovered = None;
+        self.filter_menu = false;
     }
 
     pub(crate) fn follow_player(&self, clock: f64) {

@@ -6,6 +6,7 @@ use rune_kit::{
     Placement, Popover,
 };
 
+use super::panel::filter;
 use super::{icons, tabular};
 use crate::ui::{NORMAL_SPEED, ReviewState, SPEEDS, Ui};
 
@@ -205,4 +206,5 @@ pub(crate) fn layer(ui: &Ui, k: &Kit, layer: &mut Vec<El>) {
     let k = if review.theater { &dark } else { k };
     speed_overlay(review, k, layer);
     volume_overlay(review, k, layer);
+    filter::overlay(review, k, layer);
 }

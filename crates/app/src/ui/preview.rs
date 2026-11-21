@@ -292,6 +292,18 @@ pub(super) fn review_entry() -> RecordingEntry {
     entry.meta.video = "review.mp4".into();
     entry.meta.duration_secs = 10.0;
     let who = || String::from("Summoner");
+    let mate = |name: &str, champion: &str, team: Team| Player {
+        name: name.into(),
+        champion: champion.into(),
+        team,
+        is_bot: false,
+    };
+    entry.meta.game.info.players.extend([
+        mate("Jinx", "Jinx", Team::Order),
+        mate("Lux", "Lux", Team::Chaos),
+        mate("Lee Sin", "Lee Sin", Team::Chaos),
+        mate("Zed", "Zed", Team::Chaos),
+    ]);
     let kill = |killer: &str, victim: &str| GameEvent::ChampionKill {
         killer: killer.into(),
         victim: victim.into(),
@@ -320,7 +332,7 @@ pub(super) fn review_entry() -> RecordingEntry {
             GameEvent::DragonKill {
                 dragon_type: "Fire".into(),
                 stolen: false,
-                killer: "Jinx".into(),
+                killer: "Lee Sin".into(),
                 assisters: Vec::new(),
             },
             &["EnemyDragon"],

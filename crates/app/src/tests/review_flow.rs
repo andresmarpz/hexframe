@@ -2,40 +2,7 @@ use rune::{Key, Runtime};
 
 use super::{assert_seeks_to, key_review_runtime, press, press_char, refresh, review_runtime, tap};
 use crate::ui::fake_player::{self, Call};
-use crate::ui::{EventFilter, PanelTab, Ui};
-
-fn shown_ids(rt: &Runtime<Ui>) -> Vec<u32> {
-    let review = rt.state.review.as_ref().expect("review");
-    review.shown_events().map(|e| e.id).collect()
-}
-
-#[test]
-fn filter_chips_narrow_the_event_list() {
-    let mut rt = review_runtime();
-    assert_eq!(shown_ids(&rt).len(), 10);
-    tap(&mut rt, "filter-deaths");
-    assert_eq!(shown_ids(&rt), vec![5]);
-    assert!(rt.find("event-5").is_some());
-    assert!(rt.find("event-3").is_none());
-    tap(&mut rt, "filter-kills");
-    assert_eq!(shown_ids(&rt), vec![2, 3, 8]);
-    tap(&mut rt, "filter-objectives");
-    assert_eq!(shown_ids(&rt), vec![4, 6, 9, 10]);
-    tap(&mut rt, "filter-all");
-    assert_eq!(shown_ids(&rt).len(), 10);
-}
-
-#[test]
-fn the_events_tab_counts_the_filtered_events() {
-    let mut rt = review_runtime();
-    assert!(super::card_text(&rt).contains("Events 10"));
-    tap(&mut rt, "filter-objectives");
-    assert!(super::card_text(&rt).contains("Events 4 of 10"));
-    assert_eq!(
-        rt.state.review.as_ref().map(|r| r.filter),
-        Some(EventFilter::Objectives)
-    );
-}
+use crate::ui::{PanelTab, Ui};
 
 #[test]
 fn the_row_at_the_playhead_is_highlighted() {
@@ -56,25 +23,6 @@ fn the_row_at_the_playhead_is_highlighted() {
 }
 
 #[test]
-fn the_active_row_follows_the_filter() {
-    let mut rt = review_runtime();
-    tap(&mut rt, "filter-deaths");
-    fake_player::set_time(3.0);
-    refresh(&mut rt);
-    assert_eq!(
-        rt.state.review.as_ref().and_then(|r| r.active_event()),
-        None
-    );
-    fake_player::set_time(5.0);
-    refresh(&mut rt);
-    assert_eq!(
-        rt.state.review.as_ref().and_then(|r| r.active_event()),
-        Some(5)
-    );
-    fake_player::set_time(0.0);
-}
-
-#[test]
 fn the_tabs_swap_the_panel_body() {
     let mut rt = review_runtime();
     assert!(rt.find("event-1").is_some());
@@ -86,7 +34,7 @@ fn the_tabs_swap_the_panel_body() {
     );
     assert!(rt.find("clip-0").is_some());
     assert!(rt.find("event-1").is_none());
-    assert!(rt.find("filter-all").is_none());
+    assert!(rt.find("event-filter").is_none());
     tap(&mut rt, "tab-events");
     assert!(rt.find("event-1").is_some());
     assert!(rt.find("clip-0").is_none());

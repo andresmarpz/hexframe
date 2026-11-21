@@ -30,6 +30,7 @@ pub(crate) fn death_entry() -> RecordingEntry {
     meta.duration_secs = DEATH_VIDEO_SECS;
     meta.clips.clear();
     meta.review = Default::default();
+    meta.game.info.players = vec![meta.game.info.me.clone()];
     meta.game
         .info
         .players

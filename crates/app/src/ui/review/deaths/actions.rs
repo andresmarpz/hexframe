@@ -115,7 +115,7 @@ impl Ui {
         self.death_note = TextEdit::new(note);
     }
 
-    fn save_review(&mut self, tx: &mut Tx) {
+    pub(crate) fn save_review(&mut self, tx: &mut Tx) {
         let Some(review) = &self.review else { return };
         let data = review.entry.meta.review.clone();
         let id = review.entry.meta.id.clone();

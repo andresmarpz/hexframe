@@ -1,55 +1,9 @@
+use greyscreen_core::categories::{CategorySet, EventCategory};
 use greyscreen_core::library::EventEntry;
+use rune::Tx;
 
 use super::{ReviewState, Source};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum EventFilter {
-    #[default]
-    All,
-    Deaths,
-    Kills,
-    Objectives,
-}
-
-impl EventFilter {
-    pub(crate) const EVERY: [EventFilter; 4] = [
-        EventFilter::All,
-        EventFilter::Deaths,
-        EventFilter::Kills,
-        EventFilter::Objectives,
-    ];
-
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            EventFilter::All => "All",
-            EventFilter::Deaths => "Deaths",
-            EventFilter::Kills => "Kills",
-            EventFilter::Objectives => "Objectives",
-        }
-    }
-
-    pub(crate) fn matches(self, event: &EventEntry) -> bool {
-        let any = |wanted: fn(&str) -> bool| event.highlights.iter().any(|h| wanted(h));
-        match self {
-            EventFilter::All => true,
-            EventFilter::Deaths => any(|h| h == "MyDeath"),
-            EventFilter::Kills => any(is_kill_label),
-            EventFilter::Objectives => any(is_objective_label),
-        }
-    }
-}
-
-fn is_kill_label(label: &str) -> bool {
-    matches!(label, "MyKill" | "MyAssist" | "FirstBlood" | "Ace") || label.starts_with("Multikill")
-}
-
-fn is_objective_label(label: &str) -> bool {
-    let label = label.strip_prefix("Enemy").unwrap_or(label);
-    matches!(
-        label,
-        "Baron" | "Dragon" | "Herald" | "VoidGrub" | "Turret" | "Inhibitor"
-    )
-}
+use crate::ui::Ui;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EventHover {
@@ -65,7 +19,30 @@ impl ReviewState {
             .meta
             .events
             .iter()
-            .filter(move |e| filter.matches(e))
+            .zip(&self.categories)
+            .filter(move |(_, category)| filter.contains(**category))
+            .map(|(event, _)| event)
+    }
+
+    pub(crate) fn hidden_events(&self) -> usize {
+        self.entry.meta.events.len() - self.shown_events().count()
+    }
+
+    pub(crate) fn filter_differs_from_default(&self) -> bool {
+        self.filter != self.default_filter
+    }
+
+    pub(crate) fn set_filter(&mut self, filter: CategorySet) {
+        self.filter = filter;
+        self.entry.meta.review.filter = (filter != self.default_filter).then_some(filter);
+    }
+
+    pub(crate) fn set_default_filter(&mut self, default: CategorySet) {
+        self.default_filter = default;
+        if self.entry.meta.review.filter == Some(default) {
+            self.entry.meta.review.filter = None;
+        }
+        self.filter = self.entry.meta.review.filter.unwrap_or(default);
     }
 
     pub(crate) fn active_event(&self) -> Option<u32> {
@@ -107,5 +84,45 @@ impl ReviewState {
             .iter()
             .find(|e| e.id == hover.event_id)?;
         Some((event, hover.anchor.as_str()))
+    }
+}
+
+impl Ui {
+    pub(crate) fn review_filter_menu(&mut self, open: bool) {
+        if let Some(review) = &mut self.review {
+            review.filter_menu = open;
+        }
+    }
+
+    pub(crate) fn review_toggle_category(&mut self, category: EventCategory, tx: &mut Tx) {
+        if let Some(review) = &mut self.review {
+            review.set_filter(review.filter.toggled(category));
+        }
+        self.save_review(tx);
+    }
+
+    pub(crate) fn review_use_default_filter(&mut self, tx: &mut Tx) {
+        if let Some(review) = &mut self.review {
+            review.set_filter(review.default_filter);
+            review.filter_menu = false;
+        }
+        self.save_review(tx);
+    }
+
+    pub(crate) fn review_save_filter_as_default(&mut self, tx: &mut Tx) {
+        let Some(review) = &mut self.review else {
+            return;
+        };
+        let filter = review.filter;
+        review.filter_menu = false;
+        self.change(|s| s.review_events = filter);
+        self.save_review(tx);
+    }
+
+    pub(crate) fn sync_review_default(&mut self) {
+        let default = self.settings.review_events;
+        if let Some(review) = &mut self.review {
+            review.set_default_filter(default);
+        }
     }
 }

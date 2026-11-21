@@ -2,17 +2,16 @@ use std::borrow::Cow;
 
 use greyscreen_core::highlight::{describe_label, dominant_label};
 use greyscreen_core::library::EventEntry;
-use rune::{Color, El, GrowthSpec, col, el, row, text};
+use rune::{El, GrowthSpec, col, el, row, text};
 use rune_kit::Kit;
 
+use super::filter;
 use super::{LIST_PAD, ROW_HEIGHT, faded_scroll, mark_active, muted_note};
 use crate::ui::library::format::humanize;
-use crate::ui::{EventFilter, ReviewState, Source, Ui, format_clock, seek_target};
+use crate::ui::{ReviewState, Source, Ui, format_clock, seek_target};
 use crate::view::review::card::hoverable;
 use crate::view::review::tabular;
 use crate::view::review::timeline::event_color;
-
-const CHIP_HEIGHT: f32 = 24.0;
 
 pub(crate) fn event_title(event: &EventEntry) -> String {
     match dominant_label(event.highlights.iter().map(String::as_str)) {
@@ -24,51 +23,6 @@ pub(crate) fn event_title(event: &EventEntry) -> String {
 fn kind_name(event: &EventEntry) -> String {
     let debug = format!("{:?}", event.kind);
     debug.chars().take_while(|c| c.is_alphanumeric()).collect()
-}
-
-fn chip(filter: EventFilter, active: bool, k: &Kit) -> El {
-    let chip = row()
-        .key(format!("filter-{}", filter.name().to_lowercase()))
-        .role("button")
-        .label(filter.name())
-        .h(CHIP_HEIGHT)
-        .px(10.0)
-        .center()
-        .radius(CHIP_HEIGHT / 2.0)
-        .fill(if active {
-            k.c.layer_03
-        } else {
-            Color::BLACK.alpha(0.0)
-        })
-        .on_press(move |ui: &mut Ui| ui.review_filter(filter))
-        .child(
-            text(filter.name())
-                .font(if active {
-                    k.ty.small_medium
-                } else {
-                    k.ty.small
-                })
-                .color(if active {
-                    k.c.text_base
-                } else {
-                    k.c.text_muted
-                }),
-        );
-    k.interactive(chip)
-}
-
-fn chips(review: &ReviewState, k: &Kit) -> El {
-    row()
-        .key("event-filters")
-        .w_full()
-        .px(8.0)
-        .py(8.0)
-        .gap(4.0)
-        .children(
-            EventFilter::EVERY
-                .into_iter()
-                .map(|filter| chip(filter, review.filter == filter, k)),
-        )
 }
 
 fn event_row(event: &EventEntry, active: bool, k: &Kit) -> El {
@@ -118,7 +72,7 @@ fn events_list(review: &ReviewState, k: &Kit) -> El {
             .w_full()
             .grow(1.0)
             .min_h(0.0)
-            .child(muted_note("No events match", k));
+            .child(muted_note("No events match the filter", k));
     }
     let kit = k.clone();
     let rows = col()
@@ -158,7 +112,7 @@ pub(crate) fn events_body(review: &ReviewState, k: &Kit) -> El {
             .w_full()
             .grow(1.0)
             .min_h(0.0)
-            .child(chips(review, k))
+            .child(filter::bar(review, k))
             .child(events_list(review, k)),
         Source::Clip(_) => col()
             .w_full()

@@ -7,7 +7,7 @@ use greyscreen_core::settings::NavStyle;
 use rune::{KeyEvent, Tx};
 
 use super::review::jump::{next_target, previous_target};
-use super::{Detail, EventFilter, PanelTab, Screen, Source, Ui, VolumeHover};
+use super::{Detail, PanelTab, Screen, Source, Ui, VolumeHover};
 
 pub(crate) use event::MAC;
 use event::combo_of;
@@ -191,12 +191,7 @@ impl Ui {
     pub(crate) fn review_tab(&mut self, tab: PanelTab) {
         if let Some(review) = &mut self.review {
             review.tab = tab;
-        }
-    }
-
-    pub(crate) fn review_filter(&mut self, filter: EventFilter) {
-        if let Some(review) = &mut self.review {
-            review.filter = filter;
+            review.filter_menu = false;
         }
     }
 
@@ -213,10 +208,14 @@ impl Ui {
     }
 
     fn review_jump(&mut self, pick: fn(&[EventEntry], f64) -> Option<f64>) {
-        if let Some(review) = &mut self.review
-            && review.source == Source::Game
-            && let Some(target) = pick(&review.entry.meta.events, review.time())
-        {
+        let Some(review) = &mut self.review else {
+            return;
+        };
+        if review.source != Source::Game {
+            return;
+        }
+        let shown: Vec<EventEntry> = review.shown_events().cloned().collect();
+        if let Some(target) = pick(&shown, review.time()) {
             review.seek(target);
         }
     }
