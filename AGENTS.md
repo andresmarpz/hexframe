@@ -32,7 +32,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 
 ## Commands
 
-- `just check`: the everyday gate: fmt check, host clippy, tests.
+- `just check`: the everyday gate: fmt check, host clippy, tests (through cargo-nextest when installed: `cargo install cargo-nextest --locked`).
 - `just ci`: the full gate, `just check` plus typos and Windows clippy through cargo-xwin. `just release` runs it.
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows.
 - `just release <tag>`: runs `just ci`, builds and publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe` and `README.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. GitHub Actions has no minutes to spare, so releases never go through CI. A tag with a dash is a prerelease.

@@ -20,8 +20,9 @@ spell:
 check-win:
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"; cargo xwin clippy --workspace --all-targets --target {{win}} --locked -- -D warnings
 
+# Uses cargo-nextest when installed (cargo install cargo-nextest --locked): each test runs in its own process, in parallel across all binaries.
 test:
-    cargo test --workspace --locked
+    if cargo nextest --version >/dev/null 2>&1; then cargo nextest run --workspace --locked; else cargo test --workspace --locked; fi
 
 build-win:
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"; cargo xwin build --release --locked --target {{win}} -p greyscreen -p greyscreen-cli
