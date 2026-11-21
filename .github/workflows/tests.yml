@@ -1,35 +1,19 @@
 name: Tests
 
-# Per-push CI is three workflows, one badge each: Tests (macOS), Windows and macOS (app bundle).
-# Doc-only, website and backend changes skip them. A new push cancels the older run of the same PR only,
-# so every push to main finishes and the badges never show a cancelled run. Releases are built locally, never here.
+# Tests, Windows and macOS run when a release is published (`just release`, previews included) and on
+# manual runs, never per push. The README badges show the latest release run.
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - 'apps/web/**'
-      - 'apps/api/**'
-      - 'brand/**'
-      - '.github/ISSUE_TEMPLATE/**'
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - 'apps/web/**'
-      - 'apps/api/**'
-      - 'brand/**'
-      - '.github/ISSUE_TEMPLATE/**'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tests-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always

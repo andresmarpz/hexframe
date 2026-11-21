@@ -34,7 +34,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 
 - `just check`: the everyday gate: fmt check, host clippy, tests (through cargo-nextest when installed: `cargo install cargo-nextest --locked`).
 - `just ci`: the full gate, `just check` plus typos and Windows clippy through cargo-xwin. `just release` runs it.
-- Per-push CI (`.github/workflows`): `Tests` runs fmt, clippy and nextest on macOS, `Windows` runs clippy and tests and builds the exes on Windows, `macOS` builds the app bundle (`just mac-bundle`), `Typos` runs the spell check. Doc, website and backend changes skip the first three. The README badges point at them.
+- CI: pushes run only the spell check (`ci.yml`). `Tests` (fmt, clippy and nextest on macOS), `Windows` (clippy, tests and exe build) and `macOS` (app bundle, `just mac-bundle`) run once per published release and on manual runs, not per push. The README badges show the latest release run.
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows.
 - `just release <tag>`: runs `just ci`, builds and publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe` and `README.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. Releases are built and published from the Mac, never through CI. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.

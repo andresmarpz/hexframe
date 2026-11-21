@@ -1,31 +1,16 @@
 name: macOS
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - 'apps/web/**'
-      - 'apps/api/**'
-      - 'brand/**'
-      - '.github/ISSUE_TEMPLATE/**'
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - 'apps/web/**'
-      - 'apps/api/**'
-      - 'brand/**'
-      - '.github/ISSUE_TEMPLATE/**'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: macos-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: macos-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always

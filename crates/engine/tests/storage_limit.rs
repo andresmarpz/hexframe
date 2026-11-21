@@ -60,9 +60,20 @@ fn old_game(output: &Path, id: &str, day: u32, video_bytes: u64) {
     };
     library::write_meta(&folder, &meta).expect("meta");
     fs::write(folder.join("clips/01-00_Kill.mp4"), b"clip").expect("clip");
-    File::create(folder.join("game.mp4"))
-        .and_then(|file| file.set_len(video_bytes))
-        .expect("sparse video");
+    sparse_file(&folder.join("game.mp4"), video_bytes).expect("sparse video");
+}
+
+fn sparse_file(path: &Path, bytes: u64) -> std::io::Result<()> {
+    File::create(path)?;
+    #[cfg(windows)]
+    std::process::Command::new("fsutil")
+        .args(["sparse", "setflag"])
+        .arg(path)
+        .output()?;
+    fs::OpenOptions::new()
+        .write(true)
+        .open(path)?
+        .set_len(bytes)
 }
 
 fn limited(tag: &str, gb: u32) -> Settings {
