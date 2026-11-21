@@ -26,8 +26,13 @@ const AHEAD: f64 = 1.0;
 /// How far written sound may be from the clock before it jumps back in line: a start, a seek, a
 /// stall, a clock the UI set again.
 const SLOP: f64 = 0.04;
-/// How far the sound may run from the clock, on average, before the clock moves to the sound.
-const NUDGE: f64 = 0.008;
+/// How far the sound may run from the clock, on average, before the clock moves to the sound:
+/// a quarter of a picture at 60 fps, so one move never crosses a picture's boundary.
+const NUDGE: f64 = 0.004;
+/// Moves this soon after a start correct the start's estimate of the device's latency too.
+const SETTLE: Duration = Duration::from_secs(1);
+/// A stopped stream's unplayed sound is read again from this far before the clock stopped.
+const REREAD: f64 = 0.1;
 /// Each write's weight in that average.
 const SMOOTH: f64 = 0.1;
 /// The device's position is trusted only this far past the estimate from its buffer.
@@ -80,7 +85,7 @@ pub(super) struct Feed {
     pub stop: bool,
     /// Media time of the next sample the device gets, once it's writing in line with the clock.
     cursor: Option<f64>,
-    /// For the reader: an unwrapped time to read from next.
+    /// For the reader: an unwrapped time to read from next. Without a reader, nobody reads it.
     pub seek: Option<f64>,
     pub looping: bool,
 }
@@ -272,10 +277,10 @@ impl Stream {
     }
 
     /// When the next sample written will be heard. Running, from the device's position: what
-    /// was written and not yet played is still to come. Else from the buffer and the stream's
-    /// latency.
-    fn heard(&self, now: Instant, written: u64, padding: u32, rate: f64, running: bool) -> Instant {
-        let buffered = self.latency.as_secs_f64() + f64::from(padding) / rate;
+    /// was written and not yet played is still to come. Else from the buffer, the stream's
+    /// latency and `bias`, the error earlier starts found in that estimate.
+    fn heard(&self, now: Instant, written: u64, padding: u32, rate: f64, running: bool, bias: f64) -> Instant {
+        let buffered = (self.latency.as_secs_f64() + f64::from(padding) / rate + bias).max(0.0);
         let from_buffer = now + Duration::from_secs_f64(buffered);
         let Some((clock, frequency)) = self.position.as_ref().filter(|_| running) else { return from_buffer };
         let (mut position, mut counter) = (0u64, 0u64);
@@ -296,6 +301,10 @@ impl Stream {
         // Frames written since the stream started, and how far the sound runs from the clock.
         let mut written = 0u64;
         let mut drift = 0.0;
+        // When the stream last started, the clock it last played to, and the start estimate's error.
+        let mut since: Option<Instant> = None;
+        let mut last: Option<Anchor> = None;
+        let mut bias = 0.0;
         loop {
             if !started {
                 // Stopped: sleep until the clock runs, not on the device's period.
@@ -316,11 +325,19 @@ impl Stream {
                     }
                     started = false;
                     written = 0;
-                    queue.lock().cursor = None;
+                    let mut feed = queue.lock();
+                    // The device's unplayed sound is gone: a reader reads it again, unless a
+                    // seek already cleared the queue.
+                    if let (Some(_), Some(last)) = (feed.cursor.take(), last) {
+                        feed.seek = Some(last.position(Instant::now()) - REREAD);
+                        drop(feed);
+                        queue.room.notify_all();
+                    }
                 }
                 drift = 0.0;
                 continue;
             };
+            last = Some(anchor);
             if started && !woke {
                 continue;
             }
@@ -333,12 +350,13 @@ impl Stream {
                 }
                 let Ok(data) = self.render.GetBuffer(free) else { continue };
                 let out = std::slice::from_raw_parts_mut(data.cast::<f32>(), free as usize * channels);
-                let heard = self.heard(Instant::now(), written, padding, rate, started);
+                let heard = self.heard(Instant::now(), written, padding, rate, started, bias);
                 let off = fill(&mut queue.lock(), out, channels, rate, anchor.position(heard));
                 let _ = self.render.ReleaseBuffer(free, 0);
                 written += u64::from(free);
                 if !started {
                     started = self.client.Start().is_ok();
+                    since = Some(Instant::now());
                 }
                 off
             };
@@ -348,6 +366,9 @@ impl Stream {
                     drift += (off - drift) * SMOOTH;
                     if drift.abs() > NUDGE {
                         clock.nudge(anchor, drift);
+                        if since.is_some_and(|t| t.elapsed() < SETTLE) {
+                            bias -= drift;
+                        }
                         drift = 0.0;
                     }
                 }

@@ -59,13 +59,15 @@ struct Reader {
     skip_before: f64,
     /// Not at the stream's end.
     open: bool,
+    /// A sample came since the last seek: a loop has sound to go back to.
+    got: bool,
 }
 
 impl Reader {
     fn seek(&mut self, at: f64, duration: f64) -> Result<(), String> {
         let (epoch, to) = place(at, duration);
         mf::seek(&self.reader, to)?;
-        (self.epoch, self.skip_before, self.open) = (epoch, at, true);
+        (self.epoch, self.skip_before, self.open, self.got) = (epoch, at, true, false);
         Ok(())
     }
 }
@@ -78,7 +80,7 @@ fn run(read: &Read, queue: &Queue, sound: Sound) -> Result<(), String> {
     if opened.sound != Some(sound) {
         return Err("the sound's format differs from the clip's".into());
     }
-    let mut r = Reader { reader: opened.reader, index, epoch: 0.0, skip_before: 0.0, open: true };
+    let mut r = Reader { reader: opened.reader, index, epoch: 0.0, skip_before: 0.0, open: true, got: false };
     r.seek(read.at, read.duration)?;
     loop {
         let mut feed = queue.lock();
@@ -94,7 +96,7 @@ fn run(read: &Read, queue: &Queue, sound: Sound) -> Result<(), String> {
                 continue;
             }
             // Looping turned on after the sound's end: on into the next loop.
-            if !r.open && feed.looping && read.duration > 0.0 {
+            if !r.open && r.got && feed.looping && read.duration > 0.0 {
                 let next = r.epoch + read.duration;
                 drop(feed);
                 r.seek(next, read.duration)?;
@@ -113,13 +115,13 @@ fn run(read: &Read, queue: &Queue, sound: Sound) -> Result<(), String> {
             return Err("the decoder stopped with an error".into());
         }
         if let Some(sample) = got.sample.take() {
+            r.got = true;
             push_sample(queue, sound, &sample, r.epoch + got.time, r.skip_before);
         }
         if got.flags & MF_SOURCE_READERF_ENDOFSTREAM.0 != 0 {
-            if looping && read.duration > 0.0 {
-                mf::seek(&r.reader, 0.0)?;
-                r.epoch += read.duration;
-                r.skip_before = 0.0;
+            if looping && r.got && read.duration > 0.0 {
+                let next = r.epoch + read.duration;
+                r.seek(next, read.duration)?;
             } else {
                 r.open = false;
             }
