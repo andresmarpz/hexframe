@@ -252,10 +252,10 @@ fn long_merged_plan_keeps_its_first_seconds() {
     settings.clips.post_secs = 5;
     let harness = game_with(
         settings,
-        Arc::new(FakeMediaSource::new().with_speed(10)),
+        Arc::new(FakeMediaSource::new().with_speed(40)),
         events,
         LeagueMsg::Gone,
-        Duration::from_secs(8),
+        Duration::from_millis(2500),
     );
     let msgs = collect_until_saved(&harness.ui);
     let meta = saved_meta(&msgs);
@@ -279,10 +279,14 @@ fn long_merged_plan_keeps_its_first_seconds() {
 fn sidecar_and_clip_times_subtract_the_media_offset() {
     let harness = game_with(
         clip_settings("offset", true),
-        Arc::new(FakeMediaSource::new().with_start_offset_secs(2)),
+        Arc::new(
+            FakeMediaSource::new()
+                .with_speed(20)
+                .with_start_offset_secs(2),
+        ),
         vec![(3.0, kill("Hero", "Villain"))],
         LeagueMsg::Gone,
-        Duration::from_millis(3500),
+        Duration::from_millis(800),
     );
     let msgs = collect_until_saved(&harness.ui);
     let meta = saved_meta(&msgs);

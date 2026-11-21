@@ -70,6 +70,36 @@ debug = "line-tables-only"
 opt-level = 2
 debug = false
 
+[profile.dev.package.serde_derive]
+opt-level = 0
+
+[profile.dev.package.zerofrom-derive]
+opt-level = 0
+
+[profile.dev.package.tracing-attributes]
+opt-level = 0
+
+[profile.dev.package.yoke-derive]
+opt-level = 0
+
+[profile.dev.package.zerovec-derive]
+opt-level = 0
+
+[profile.dev.package.zerocopy-derive]
+opt-level = 0
+
+[profile.dev.package.thiserror-impl]
+opt-level = 0
+
+[profile.dev.package.displaydoc]
+opt-level = 0
+
+[profile.dev.package.bytemuck_derive]
+opt-level = 0
+
+[profile.dev.package.clap_derive]
+opt-level = 0
+
 [profile.release]
 opt-level = 3
 lto = "fat"

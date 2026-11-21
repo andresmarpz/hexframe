@@ -57,7 +57,7 @@ fn gamestats_is_404_while_loading_then_200() {
 
 #[test]
 fn poller_sees_ready_events_and_win() {
-    let league = FakeLeague::start(0, 15.0, Script::builtin().unwrap()).unwrap();
+    let league = FakeLeague::start(0, 60.0, Script::builtin().unwrap()).unwrap();
     let client = LiveClient::new(&format!("http://127.0.0.1:{}", league.port()));
     let (tx, rx) = unbounded();
     let _handle = Poller::spawn_with_interval(

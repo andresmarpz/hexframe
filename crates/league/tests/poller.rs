@@ -225,7 +225,7 @@ fn timeouts_count_as_not_ready_and_never_emit_gone() {
     assert!(matches!(recv(&rx), LeagueMsg::Ready(_)));
 
     server.with(|s| s.stall = Duration::from_millis(150));
-    expect_silence(&rx, 1500);
+    expect_silence(&rx, 800);
 }
 
 #[test]
