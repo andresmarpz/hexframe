@@ -1,4 +1,8 @@
+mod states;
+mod toolbar;
+
 use std::borrow::Cow;
+use std::rc::Rc;
 
 use greyscreen_core::game::GameResult;
 use greyscreen_engine::{RecordingEntry, reveal};
@@ -6,6 +10,8 @@ use jiff::Zoned;
 use rune::{Color, Cursor, El, GrowthSpec, Icon, ScrollSpec, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, glyphs};
 
+use self::states::{confirm_delete, delete_key, empty, no_match};
+use self::toolbar::toolbar;
 use super::champion::champion_icon;
 use super::{card, hairline, page_header};
 use crate::ui::library_format::{Kda, kda, mode_label, summary, when};
@@ -20,9 +26,18 @@ const COL_WHEN: f32 = 112.0;
 const COL_DURATION: f32 = 58.0;
 const COL_CLIPS: f32 = 44.0;
 const COL_SIZE: f32 = 62.0;
-const COL_ACTION: f32 = 32.0;
+const COL_ACTION: f32 = 68.0;
 const COLUMN_GAP: f32 = 12.0;
 const TABULAR: &str = "'tnum' 1";
+
+static TRASH: Icon = Icon {
+    name: "greyscreen-trash",
+    view: 16.0,
+    body: concat!(
+        r#"<path d="M2.5 4.5h11M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#,
+        r#"<path d="M4 4.5l.6 8a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4l.6-8M6.8 7v4.5M9.2 7v4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#
+    ),
+};
 
 static CLIP: Icon = Icon {
     name: "greyscreen-clip",
@@ -33,7 +48,7 @@ static CLIP: Icon = Icon {
     ),
 };
 
-pub(super) fn page(s: &Ui, k: &Kit) -> El {
+pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let open = Button::new("Open folder")
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Large)
@@ -41,6 +56,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
         .build(k)
         .key("open-folder");
     let folder = s.settings.output_dir.display().to_string();
+    let shown = s.filter.apply(&s.recordings);
     let mut page = col()
         .key("recordings")
         .w_full()
@@ -49,21 +65,44 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
         .gap(12.0)
         .child(page_header(k, "Recordings", &folder, Some(open)));
     if !s.recordings.is_empty() {
-        page = page.child(
-            text(summary(&s.recordings))
-                .key("recordings-summary")
-                .font(k.ty.ui.features(TABULAR))
-                .color(k.c.text_muted),
-        );
+        page = page
+            .child(
+                text(summary(&shown, s.recordings.len()))
+                    .key("recordings-summary")
+                    .font(k.ty.ui.features(TABULAR))
+                    .color(k.c.text_muted),
+            )
+            .child(toolbar(s, k, layer));
     }
-    page.child(table(s, k))
+    if let Some(rec) = s.pending_delete_entry() {
+        confirm_delete(rec, k, layer);
+    }
+    let rows: Rc<[usize]> = s
+        .recordings
+        .iter()
+        .enumerate()
+        .filter(|(_, rec)| s.filter.accepts(rec))
+        .map(|(i, _)| i)
+        .collect();
+    page.child(table(s, k, rows))
 }
 
-fn table(s: &Ui, k: &Kit) -> El {
-    let body = if s.recordings.is_empty() {
-        empty(k)
-    } else {
-        let kit = k.clone();
+fn table(s: &Ui, k: &Kit, rows: Rc<[usize]>) -> El {
+    let card = card(k)
+        .key("recordings-card")
+        .grow(1.0)
+        .min_h(0.0)
+        .clip_rounded(super::CARD_RADIUS);
+    if s.recordings.is_empty() {
+        return card.child(empty(k));
+    }
+    if rows.is_empty() && s.filter.is_active() {
+        return card.child(no_match(k));
+    }
+    let kit = k.clone();
+    let count = rows.len();
+    let key_rows = rows.clone();
+    card.child(header_row(k)).child(hairline(k)).child(
         col()
             .key("recordings-scroll")
             .w_full()
@@ -73,54 +112,16 @@ fn table(s: &Ui, k: &Kit) -> El {
                 stick_bottom: false,
             })
             .child(col().w_full().growth(GrowthSpec::default()).virtual_rows(
-                s.recordings.len(),
+                count,
                 ROW_HEIGHT,
-                |s: &Ui, i| Cow::Borrowed(s.recordings[i].meta.id.as_str()),
-                move |s: &Ui, i| rec_row(&s.recordings[i], &kit),
-            ))
-    };
-    let mut card = card(k)
-        .key("recordings-card")
-        .grow(1.0)
-        .min_h(0.0)
-        .clip_rounded(super::CARD_RADIUS);
-    if !s.recordings.is_empty() {
-        card = card.child(header_row(k)).child(hairline(k));
-    }
-    card.child(body)
-}
-
-fn empty(k: &Kit) -> El {
-    col()
-        .key("recordings-empty")
-        .w_full()
-        .grow(1.0)
-        .center()
-        .gap(14.0)
-        .px(24.0)
-        .child(
-            el().size(48.0, 48.0)
-                .radius(12.0)
-                .fill(k.c.layer_02)
-                .center()
-                .a11y_hidden()
-                .child(rune::icon(&CLIP, 22.0).color(k.c.icon_muted)),
-        )
-        .child(
-            col()
-                .items_center()
-                .gap(4.0)
-                .child(
-                    text("No recordings yet")
-                        .font(k.ty.body_medium)
-                        .color(k.c.text_base),
-                )
-                .child(
-                    text("Play a game, or run a test recording from Status.")
-                        .font(k.ty.body)
-                        .color(k.c.text_muted),
-                ),
-        )
+                move |s: &Ui, i| Cow::Borrowed(s.recordings[key_rows[i]].meta.id.as_str()),
+                move |s: &Ui, i| {
+                    let rec = &s.recordings[rows[i]];
+                    let asking = s.filter.pending_delete.as_deref() == Some(rec.meta.id.as_str());
+                    rec_row(rec, asking, &kit)
+                },
+            )),
+    )
 }
 
 fn left(width: f32, child: El) -> El {
@@ -227,7 +228,31 @@ fn show_button(rec: &RecordingEntry, k: &Kit) -> El {
         .group_opacity(0.0, 1.0)
 }
 
-fn rec_row(rec: &RecordingEntry, k: &Kit) -> El {
+fn delete_button(rec: &RecordingEntry, asking: bool, k: &Kit) -> El {
+    let id = rec.meta.id.clone();
+    let button = IconButton::new(&TRASH)
+        .label("Delete recording")
+        .help("Delete recording")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Small)
+        .on_press(move |ui: &mut Ui| ui.ask_delete(id.clone()))
+        .build(k)
+        .key(delete_key(&rec.meta.id));
+    if asking {
+        button
+    } else {
+        button.group_opacity(0.0, 1.0)
+    }
+}
+
+fn actions(rec: &RecordingEntry, asking: bool, k: &Kit) -> El {
+    row()
+        .gap(4.0)
+        .child(show_button(rec, k))
+        .child(delete_button(rec, asking, k))
+}
+
+fn rec_row(rec: &RecordingEntry, asking: bool, k: &Kit) -> El {
     let game = &rec.meta.game;
     let champion = game.info.me.champion.as_str();
     let id = rec.meta.id.clone();
@@ -283,5 +308,5 @@ fn rec_row(rec: &RecordingEntry, k: &Kit) -> El {
                 .font(font)
                 .color(k.c.text_muted),
         ))
-        .child(right(COL_ACTION, show_button(rec, k)))
+        .child(right(COL_ACTION, actions(rec, asking, k)))
 }

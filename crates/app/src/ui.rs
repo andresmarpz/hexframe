@@ -14,6 +14,7 @@ mod jump;
 mod keys;
 pub(crate) mod library_format;
 mod preview;
+pub(crate) mod recordings_filter;
 mod review;
 mod tone;
 
@@ -24,6 +25,7 @@ mod tests;
 
 pub(crate) use format::{format_clock, format_date, format_size, format_size_estimate};
 pub(crate) use jump::seek_target;
+pub(crate) use recordings_filter::{RecordingsFilter, ResultFilter, modes_present};
 pub(crate) use review::{PlayerFactory, ReviewState, Source};
 pub(crate) use tone::tone_color;
 
@@ -69,6 +71,19 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.screen = Screen::Recordings;
         ui.recordings.clear();
     }),
+    ("recordings-filtered", |ui| {
+        ui.screen = Screen::Recordings;
+        ui.filter.champion = TextEdit::new("ahri");
+        ui.filter.result = ResultFilter::Victory;
+    }),
+    ("recordings-no-match", |ui| {
+        ui.screen = Screen::Recordings;
+        ui.filter.champion = TextEdit::new("zzz");
+    }),
+    ("recordings-delete", |ui| {
+        ui.screen = Screen::Recordings;
+        ui.filter.pending_delete = ui.recordings.get(1).map(|rec| rec.meta.id.clone());
+    }),
     ("settings", |ui| ui.screen = Screen::Settings),
     ("review", |ui| {
         ui.open_review_entry(preview::review_entry());
@@ -112,6 +127,7 @@ pub(crate) struct Ui {
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
     pub recordings: Vec<RecordingEntry>,
+    pub filter: RecordingsFilter,
     pub last_game: Option<RecordingEntry>,
     pub settings: Settings,
     pub notice: Option<(Notice, f64)>,
@@ -145,6 +161,7 @@ impl Ui {
             status: EngineStatus::Idle,
             feed: VecDeque::new(),
             recordings: Vec::new(),
+            filter: RecordingsFilter::default(),
             last_game: None,
             notice: None,
             cmd: None,

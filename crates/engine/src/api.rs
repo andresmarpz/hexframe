@@ -24,6 +24,7 @@ pub enum EngineCmd {
     StopRecording,
     Retry,
     RescanLibrary,
+    DeleteRecording { id: String },
     SaveClipNow,
     Shutdown,
 }

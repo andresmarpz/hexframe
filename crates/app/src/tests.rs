@@ -8,6 +8,7 @@ use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
 mod match_flow;
+mod recordings;
 mod status;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {

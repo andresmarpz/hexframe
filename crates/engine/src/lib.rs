@@ -1,6 +1,7 @@
 mod api;
 mod clipjob;
 mod control;
+mod delete;
 pub mod fake;
 mod library;
 mod recovery;

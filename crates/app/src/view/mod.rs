@@ -36,7 +36,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 fn window(s: &Ui, k: &Kit, layer: &mut Vec<El>, titlebar_inset: f32) -> El {
     let content = match s.screen {
         Screen::Status => fixed_content(status::page(s, k)),
-        Screen::Recordings => fixed_content(recordings::page(s, k)),
+        Screen::Recordings => fixed_content(recordings::page(s, k, layer)),
         Screen::Review => fixed_content(review::page(s, k)),
         Screen::Settings => scrolling_content(settings::page(s, k, layer)),
     };

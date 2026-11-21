@@ -17,6 +17,7 @@ use greyscreen_league::LeagueMsg;
 
 use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
+use crate::delete;
 use crate::library;
 use crate::settings_save::SettingsSaver;
 use crate::writer::Report;
@@ -176,8 +177,23 @@ impl Control {
             EngineCmd::RescanLibrary => {
                 library::spawn_scan(self.settings.output_dir.clone(), self.sink.clone());
             }
+            EngineCmd::DeleteRecording { id } => self.delete_recording(id),
             EngineCmd::SaveClipNow => self.save_clip_now(),
         }
+    }
+
+    fn delete_recording(&self, id: String) {
+        let active = self
+            .recording
+            .as_ref()
+            .and_then(|recording| recording.folder.file_name())
+            .map(|name| name.to_string_lossy().into_owned());
+        delete::spawn(
+            self.settings.output_dir.clone(),
+            id,
+            active,
+            self.sink.clone(),
+        );
     }
 
     fn apply_settings(&mut self, mut settings: Settings) {

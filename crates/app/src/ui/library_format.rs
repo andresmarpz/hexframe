@@ -100,7 +100,7 @@ pub(crate) fn total_time(secs: f64) -> String {
     }
 }
 
-pub(crate) fn summary(recordings: &[RecordingEntry]) -> String {
+pub(crate) fn summary(recordings: &[&RecordingEntry], total: usize) -> String {
     let count = |wanted| {
         recordings
             .iter()
@@ -110,9 +110,14 @@ pub(crate) fn summary(recordings: &[RecordingEntry]) -> String {
     let games = recordings.len();
     let secs: f64 = recordings.iter().map(|r| r.meta.duration_secs).sum();
     let bytes: u64 = recordings.iter().map(|r| r.size_bytes).sum();
+    let games_label = if games == total {
+        games.to_string()
+    } else {
+        format!("{games} of {total}")
+    };
     format!(
-        "{games} {} · {}W {}L · {} recorded · {}",
-        if games == 1 { "game" } else { "games" },
+        "{games_label} {} · {}W {}L · {} recorded · {}",
+        if total == 1 { "game" } else { "games" },
         count(GameResult::Win),
         count(GameResult::Loss),
         total_time(secs),

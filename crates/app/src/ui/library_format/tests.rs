@@ -1,5 +1,6 @@
 use greyscreen_core::game::{GameEvent, GameResult, Player, Team};
 use greyscreen_core::library::EventEntry;
+use greyscreen_engine::RecordingEntry;
 use jiff::Zoned;
 
 use super::*;
@@ -135,13 +136,21 @@ fn summary_counts_games_results_time_and_size() {
         r.meta.duration_secs = 1800.0;
         r.size_bytes = 1_000_000_000;
     }
+    let all: Vec<&RecordingEntry> = recordings.iter().collect();
     assert_eq!(
-        summary(&recordings),
+        summary(&all, 3),
         "3 games · 1W 1L · 1h 30m recorded · 3.0 GB"
     );
-    recordings.truncate(1);
     assert_eq!(
-        summary(&recordings),
+        summary(&all[..1], 1),
         "1 game · 1W 0L · 30m recorded · 1.0 GB"
     );
+}
+
+#[test]
+fn summary_of_a_filtered_set_says_how_many_of_all() {
+    let recordings = Ui::preview().recordings;
+    let shown: Vec<&RecordingEntry> = recordings.iter().take(3).collect();
+    let line = summary(&shown, recordings.len());
+    assert!(line.starts_with("3 of 8 games · "), "{line}");
 }

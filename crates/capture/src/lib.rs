@@ -13,6 +13,7 @@ pub mod install;
 pub mod instance;
 mod pacer;
 pub mod probe;
+pub mod recycle;
 mod session;
 pub mod vproc;
 mod watchdog;
