@@ -1,0 +1,109 @@
+use serde::{Deserialize, Serialize};
+
+use crate::time::Hns;
+
+mod stats;
+mod tracker;
+pub mod verdict;
+
+pub use stats::{CaptureSetup, CaptureStats, LatencyHistogram};
+pub use tracker::{DiagSample, HealthTracker, Queues};
+pub use verdict::{Area, Finding, Level, audio_level};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct RecordingHealth {
+    pub target_fps: u32,
+    pub width: u32,
+    pub height: u32,
+    pub duration_secs: f64,
+    pub frames_expected: u64,
+    pub frames_captured: u64,
+    pub frames_encoded: u64,
+    pub frames_dropped: u64,
+    pub frames_repeated: u64,
+    pub dropped_pct: f64,
+    pub repeated_pct: f64,
+    pub source_fps: f64,
+    pub longest_video_gap_ms: f64,
+    pub encoder: String,
+    pub encode_ms: Option<EncodeTiming>,
+    pub audio: Option<AudioHealth>,
+    pub file_bytes: u64,
+    pub avg_bitrate_kbps: u32,
+    pub capture_errors: u32,
+    pub capture_soft_errors: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct EncodeTiming {
+    pub avg: f64,
+    pub p95: f64,
+    pub max: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct AudioHealth {
+    pub packets: u64,
+    pub gaps: u32,
+    pub longest_gap_ms: f64,
+    pub discontinuities: u64,
+    pub idle_silence_ms: u64,
+    pub start_offset_ms: f64,
+    pub drift_ms: f64,
+}
+
+impl RecordingHealth {
+    pub fn effective_fps(&self) -> f64 {
+        if self.duration_secs > 0.0 {
+            self.frames_encoded as f64 / self.duration_secs
+        } else {
+            0.0
+        }
+    }
+
+    pub fn findings(&self) -> Vec<Finding> {
+        verdict::findings(self)
+    }
+
+    pub fn worst(&self) -> Level {
+        self.findings()
+            .iter()
+            .map(|f| f.level)
+            .max()
+            .unwrap_or(Level::Ok)
+    }
+
+    pub fn summary_line(&self) -> String {
+        let mut parts = vec![
+            format!("{:.1} fps", self.effective_fps()),
+            format!("{:.1}% dropped", self.dropped_pct),
+        ];
+        if let Some(audio) = &self.audio {
+            let level = verdict::audio_level(audio);
+            parts.push(match level {
+                Level::Ok => "audio OK".to_owned(),
+                Level::Warn => "audio warning".to_owned(),
+                Level::Bad => "audio bad".to_owned(),
+            });
+        }
+        parts.push(format!(
+            "{:.0} Mbps",
+            f64::from(self.avg_bitrate_kbps) / 1000.0
+        ));
+        parts.join(" · ")
+    }
+}
+
+pub fn ticks_to_ms(ticks: i64, timescale: u32) -> f64 {
+    ticks as f64 * 1000.0 / f64::from(timescale.max(1))
+}
+
+pub fn hns_ms(hns: Hns) -> f64 {
+    hns as f64 / 10_000.0
+}
+
+#[cfg(test)]
+mod tests;

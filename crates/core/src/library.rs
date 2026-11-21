@@ -6,6 +6,7 @@ use jiff::Zoned;
 use serde::{Deserialize, Serialize};
 
 use crate::game::{GameEvent, GameInfo, GameResult};
+use crate::health::RecordingHealth;
 use crate::review::ReviewData;
 
 pub mod thumb;
@@ -68,6 +69,8 @@ pub struct RecordingMeta {
     pub video_format: VideoInfo,
     #[serde(default, skip_serializing_if = "ReviewData::is_empty")]
     pub review: ReviewData,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<RecordingHealth>,
 }
 
 fn sanitize(text: &str, fallback: &str) -> String {

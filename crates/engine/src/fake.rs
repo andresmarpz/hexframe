@@ -3,6 +3,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender, bounded, select};
+use greyscreen_core::health::{CaptureSetup, CaptureStats};
 use greyscreen_core::media::{
     AudioFormat, CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource, Packet,
     Track, VideoFormat,
@@ -170,7 +171,7 @@ impl MediaSource for FakeMediaSource {
     fn start(
         &self,
         _target: CaptureTarget,
-        _cfg: CaptureConfig,
+        cfg: CaptureConfig,
         out: Sender<MediaEvent>,
     ) -> Result<Box<dyn MediaSession>, String> {
         let fixtures = fixtures()?;
@@ -183,7 +184,7 @@ impl MediaSource for FakeMediaSource {
         let t0 = mono_now();
         let thread = thread::Builder::new()
             .name("fake-media".into())
-            .spawn(move || run(fixtures, pace, t0, &out, &stop_rx))
+            .spawn(move || run(fixtures, pace, t0, cfg.diagnostics, &out, &stop_rx))
             .map_err(|e| e.to_string())?;
         Ok(Box::new(FakeSession {
             stop: Some(stop_tx),
@@ -210,7 +211,14 @@ struct Pace {
     start_offset_secs: i64,
 }
 
-fn run(fixtures: &Fixtures, pace: Pace, t0: Hns, out: &Sender<MediaEvent>, stop: &Receiver<()>) {
+fn run(
+    fixtures: &Fixtures,
+    pace: Pace,
+    t0: Hns,
+    diagnostics: bool,
+    out: &Sender<MediaEvent>,
+    stop: &Receiver<()>,
+) {
     let started = MediaEvent::Started {
         t0,
         video: fixtures.video.clone(),
@@ -220,6 +228,22 @@ fn run(fixtures: &Fixtures, pace: Pace, t0: Hns, out: &Sender<MediaEvent>, stop:
     if !send(out, stop, started) {
         return;
     }
+    if diagnostics {
+        let setup = CaptureSetup {
+            adapter: "Fake GPU".into(),
+            fps: fixtures.video.fps,
+            encode_width: fixtures.video.width,
+            encode_height: fixtures.video.height,
+            encoder: "fake".into(),
+            audio: true,
+            ..CaptureSetup::default()
+        };
+        if !send(out, stop, MediaEvent::Setup(Box::new(setup))) {
+            return;
+        }
+    }
+    let mut stats = CaptureStats::default();
+    let mut next_stats = HNS_PER_SEC;
     let video_step = i64::from(fixtures.video.frame_ticks());
     let audio_step = i64::from(AAC_FRAME_TICKS);
     let video_start = pace.start_offset_secs * i64::from(VideoFormat::TIMESCALE);
@@ -262,8 +286,21 @@ fn run(fixtures: &Fixtures, pace: Pace, t0: Hns, out: &Sender<MediaEvent>, stop:
         if pace.realtime && !wait_until(t0 + due / pace.speed, stop) {
             return;
         }
+        let is_video = packet.track == Track::Video;
         if !send(out, stop, MediaEvent::Packet(packet)) {
             return;
+        }
+        if is_video {
+            stats.captured += 1;
+            stats.ticks += 1;
+            stats.encode.record(2_000);
+        }
+        if due >= next_stats {
+            next_stats += HNS_PER_SEC;
+            stats.at = t0 + due;
+            if !send(out, stop, MediaEvent::Stats(Box::new(stats.clone()))) {
+                return;
+            }
         }
     }
 }

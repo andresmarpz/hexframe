@@ -55,6 +55,7 @@ fn entry(folder: &Path, clips: &[&str]) -> RecordingEntry {
                 fps: 60,
             },
             review: Default::default(),
+            health: None,
         },
     }
 }

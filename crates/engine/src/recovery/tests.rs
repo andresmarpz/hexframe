@@ -88,6 +88,7 @@ fn meta(duration_secs: f64, video: &str) -> RecordingMeta {
             fps: 60,
         },
         review: Default::default(),
+        health: None,
     }
 }
 

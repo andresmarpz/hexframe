@@ -4,6 +4,7 @@ use std::thread;
 use crossbeam_channel::{bounded, never};
 use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
+use greyscreen_core::health::HealthTracker;
 use greyscreen_core::highlight::classify;
 use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
 use greyscreen_core::media::{CaptureTarget, MediaEvent};
@@ -14,6 +15,7 @@ use jiff::Zoned;
 use super::meta::{self, Recording};
 use super::{Control, Internal, StartedMedia};
 use crate::api::{FeedItem, NoticeLevel, RecordingEntry, UiMsg};
+use crate::diagnostics::DiagWriter;
 use crate::library;
 use crate::ring::ClipRing;
 use crate::storage;
@@ -163,6 +165,17 @@ impl Control {
                     self.notice(NoticeLevel::Error, DISK_TOO_SLOW);
                 }
             }
+            MediaEvent::Stats(stats) => {
+                let queued = self.media_rx.len();
+                if let Some(recording) = self.recording.as_mut() {
+                    recording.on_stats(&stats, queued);
+                }
+            }
+            MediaEvent::Setup(setup) => {
+                if let Some(recording) = self.recording.as_ref() {
+                    recording.on_setup(&setup);
+                }
+            }
             MediaEvent::Warning(text) => {
                 tracing::warn!(%text, "capture warning");
                 self.notice(NoticeLevel::Warn, text);
@@ -173,6 +186,9 @@ impl Control {
                     SessionState::Starting { .. } | SessionState::Recording { .. }
                 ) {
                     tracing::error!(%text, "capture failed");
+                    if let Some(recording) = self.recording.as_mut() {
+                        recording.health.on_failure();
+                    }
                     self.notice(NoticeLevel::Error, format!("Capture failed: {text}"));
                 } else {
                     tracing::info!(%text, "capture ended after the game window closed");
@@ -236,6 +252,13 @@ impl Control {
         let info = game.unwrap_or_else(meta::manual_game);
         let folder = meta::create_folder(&self.settings.output_dir, started_at.clone(), &info)?;
         let writer = self.spawn_writer(&folder, &started);
+        let health = HealthTracker::new(
+            since,
+            &started.video,
+            &started.encoder,
+            started.audio.as_ref().map(|a| a.sample_rate),
+        );
+        let diag = self.start_diagnostics(&folder);
         let meta = RecordingMeta {
             version: META_VERSION,
             id: folder_id(&folder),
@@ -255,6 +278,7 @@ impl Control {
                 fps: started.video.fps,
             },
             review: Default::default(),
+            health: None,
         };
         let rate = started.audio.as_ref().map_or(48_000, |a| a.sample_rate);
         let mut recording = Recording {
@@ -281,6 +305,8 @@ impl Control {
             pending_clips: 0,
             clips_flushed: false,
             clip_names: Default::default(),
+            health,
+            diag,
         };
         if let Err(err) = recording.write_sidecar(mono_now()) {
             tracing::warn!(%err, "cannot write recording sidecar");
@@ -288,6 +314,19 @@ impl Control {
         self.set_active_folder(Some(folder_id(&recording.folder)));
         self.recording = Some(recording);
         Ok(())
+    }
+
+    fn start_diagnostics(&self, folder: &std::path::Path) -> Option<DiagWriter> {
+        if !self.settings.recording_diagnostics {
+            return None;
+        }
+        match DiagWriter::start(folder) {
+            Ok(writer) => Some(writer),
+            Err(err) => {
+                tracing::warn!(%err, "cannot start the diagnostics file");
+                None
+            }
+        }
     }
 
     fn spawn_writer(&self, folder: &std::path::Path, started: &StartedMedia) -> Option<GameWriter> {
@@ -322,10 +361,12 @@ impl Control {
             return;
         };
         let elapsed = hns_to_secs(mono_now() - recording.t0);
+        let mut file_bytes = None;
         match recording.report.take() {
             Some(Ok(info)) => {
                 recording.meta.video = VIDEO_FILE.to_owned();
                 recording.meta.duration_secs = info.duration_secs;
+                file_bytes = Some(info.bytes);
             }
             Some(Err(err)) => {
                 tracing::error!(%err, "game video not finalized");
@@ -338,6 +379,11 @@ impl Control {
             }
             None => recording.meta.duration_secs = elapsed,
         }
+        recording.meta.health = recording
+            .health
+            .has_video()
+            .then(|| recording.health.finish(file_bytes));
+        recording.diag.take();
         self.set_active_folder(None);
         recording.meta.game.result = recording.result.unwrap_or(GameResult::Unknown);
         if let Err(err) = recording.write_sidecar(mono_now()) {

@@ -215,6 +215,7 @@ fn entry(row: Row) -> RecordingEntry {
                 fps: 60,
             },
             review: Default::default(),
+            health: None,
         },
     }
 }

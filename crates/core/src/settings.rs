@@ -128,6 +128,7 @@ pub struct Settings {
     pub fps: u32,
     pub audio: bool,
     pub capture_cursor: bool,
+    pub recording_diagnostics: bool,
     pub sound_effects: bool,
     pub sound_volume: u32,
     pub clips: ClipSettings,
@@ -160,6 +161,7 @@ impl Default for Settings {
             fps: 60,
             audio: true,
             capture_cursor: true,
+            recording_diagnostics: false,
             sound_effects: true,
             sound_volume: DEFAULT_SOUND_VOLUME,
             clips: ClipSettings::default(),
@@ -262,6 +264,7 @@ impl Settings {
             audio_bitrate: AUDIO_BITRATE,
             cursor: self.capture_cursor,
             bitrate_pixels: pixels.round() as u64,
+            diagnostics: self.recording_diagnostics,
         }
     }
 

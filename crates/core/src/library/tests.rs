@@ -58,6 +58,7 @@ fn meta(id: &str, started_at: Zoned) -> RecordingMeta {
             fps: 60,
         },
         review: Default::default(),
+        health: None,
     }
 }
 

@@ -87,6 +87,12 @@ impl GameWriter {
         }
     }
 
+    pub(crate) fn queued(&self) -> u32 {
+        self.tx
+            .as_ref()
+            .map_or(0, |tx| u32::try_from(tx.len()).unwrap_or(u32::MAX))
+    }
+
     pub(crate) fn close(&mut self) {
         self.tx.take();
     }

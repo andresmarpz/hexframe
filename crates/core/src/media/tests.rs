@@ -291,6 +291,7 @@ fn bitrate_scales_down_to_a_smaller_encode_size() {
         audio_bitrate: 192_000,
         cursor: false,
         bitrate_pixels: 3840 * 2160,
+        diagnostics: false,
     };
     let scaled = cfg.for_encode_size(1920, 1080);
     assert_eq!(scaled.video_bitrate, 28_284_271);

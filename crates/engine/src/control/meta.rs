@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use greyscreen_core::clips::{ClipPlan, ClipPlanner};
 use greyscreen_core::game::{GameInfo, GameResult, Player, Team, TimedEvent};
+use greyscreen_core::health::{CaptureSetup, CaptureStats, HealthTracker, Queues};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
@@ -12,6 +13,7 @@ use greyscreen_core::time::{HNS_PER_SEC, Hns, hns_to_secs};
 use jiff::Zoned;
 
 use crate::api::FeedItem;
+use crate::diagnostics::DiagWriter;
 use crate::ring::ClipRing;
 use crate::writer::{GameWriter, Report, Sent};
 
@@ -39,6 +41,8 @@ pub(super) struct Recording {
     pub(super) pending_clips: usize,
     pub(super) clips_flushed: bool,
     pub(super) clip_names: HashSet<String>,
+    pub(super) health: HealthTracker,
+    pub(super) diag: Option<DiagWriter>,
 }
 
 impl Recording {
@@ -46,6 +50,7 @@ impl Recording {
         if packet.track == Track::Video && self.media_offset_secs.is_none() {
             self.set_media_offset(video_dts_secs(&packet));
         }
+        self.health.on_packet(&packet);
         let key_video = packet.track == Track::Video && packet.key;
         let packet = Arc::new(packet);
         let overflowed = self
@@ -57,6 +62,23 @@ impl Recording {
             self.ring.prune();
         }
         overflowed
+    }
+
+    pub(super) fn on_stats(&mut self, stats: &CaptureStats, media_queue: usize) {
+        let queues = Queues {
+            writer: self.writer.as_ref().map_or(0, GameWriter::queued),
+            media: u32::try_from(media_queue).unwrap_or(u32::MAX),
+        };
+        let sample = self.health.on_stats(stats, queues);
+        if let Some(diag) = &self.diag {
+            diag.line("second", &sample);
+        }
+    }
+
+    pub(super) fn on_setup(&self, setup: &CaptureSetup) {
+        if let Some(diag) = &self.diag {
+            diag.line("setup", setup);
+        }
     }
 
     fn set_media_offset(&mut self, offset: f64) {

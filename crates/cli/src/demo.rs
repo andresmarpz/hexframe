@@ -177,6 +177,7 @@ fn write_game(media: &Media, spec: &Spec, started_at: Zoned, folder: &Path) -> R
             fps: media.video.fps,
         },
         review: Default::default(),
+        health: None,
     };
     library::write_meta(folder, &meta)?;
     Ok(())

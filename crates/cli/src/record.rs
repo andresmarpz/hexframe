@@ -198,6 +198,7 @@ fn wait_started(rx: &Receiver<MediaEvent>, tally: &mut Tally) -> Result<Started,
                 ..
             }) => return Ok((video, audio, encoder)),
             Ok(MediaEvent::Warning(w)) => tally.warnings.push(w),
+            Ok(MediaEvent::Stats(_) | MediaEvent::Setup(_)) => {}
             Ok(MediaEvent::Failed(m)) => return Err(m),
             Ok(MediaEvent::Packet(_)) => return Err("packet before Started".into()),
             Err(_) => return Err("timed out waiting for Started".into()),
@@ -223,7 +224,7 @@ fn handle(
             Ok(None)
         }
         MediaEvent::Failed(m) => Err(m),
-        MediaEvent::Started { .. } => Ok(None),
+        MediaEvent::Started { .. } | MediaEvent::Stats(_) | MediaEvent::Setup(_) => Ok(None),
     }
 }
 

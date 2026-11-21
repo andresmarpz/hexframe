@@ -2,6 +2,7 @@ mod api;
 mod clipjob;
 mod control;
 mod delete;
+mod diagnostics;
 pub(crate) mod fake;
 pub(crate) mod feedback;
 mod hotkey;

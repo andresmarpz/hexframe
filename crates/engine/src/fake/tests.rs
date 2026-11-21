@@ -16,6 +16,7 @@ fn config() -> CaptureConfig {
         audio_bitrate: 192_000,
         cursor: false,
         bitrate_pixels: 0,
+        diagnostics: false,
     }
 }
 

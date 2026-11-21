@@ -63,6 +63,7 @@ pub struct CaptureConfig {
     pub audio_bitrate: u32,
     pub cursor: bool,
     pub bitrate_pixels: u64,
+    pub diagnostics: bool,
 }
 
 impl CaptureConfig {
@@ -91,6 +92,8 @@ pub enum MediaEvent {
         encoder: String,
     },
     Packet(Packet),
+    Stats(Box<crate::health::CaptureStats>),
+    Setup(Box<crate::health::CaptureSetup>),
     Warning(String),
     Failed(String),
 }

@@ -37,7 +37,7 @@ impl Media {
                         break Ok(());
                     }
                 }
-                Ok(MediaEvent::Warning(_)) => {}
+                Ok(MediaEvent::Warning(_) | MediaEvent::Stats(_) | MediaEvent::Setup(_)) => {}
                 Ok(MediaEvent::Failed(message)) => break Err(anyhow!(message)),
                 Err(_) => break Err(anyhow!("fixture source went quiet")),
             }

@@ -66,6 +66,7 @@ fn meta(id: &str, day: u32, clips: &[&str]) -> RecordingMeta {
             fps: 60,
         },
         review: Default::default(),
+        health: None,
     }
 }
 

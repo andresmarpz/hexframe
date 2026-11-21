@@ -4,6 +4,7 @@ pub mod clips;
 pub mod crop;
 pub mod feedback;
 pub mod game;
+pub mod health;
 pub mod highlight;
 pub mod install;
 pub mod keybinds;

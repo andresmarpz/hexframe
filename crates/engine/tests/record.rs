@@ -264,6 +264,53 @@ fn records_game_with_events_and_finalizes() {
 }
 
 #[test]
+fn game_json_gets_a_health_summary_and_no_diagnostics_file_by_default() {
+    let harness = start(
+        settings("health"),
+        vec![LeagueMsg::Ended(GameResult::Win), LeagueMsg::Gone],
+    );
+    let msgs = collect_until_idle(&harness.ui);
+    no_errors(&msgs);
+    let folder = recording_folder(&msgs);
+    let health = read(&folder).health.expect("health in game.json");
+    assert_eq!(health.target_fps, 60);
+    assert!(health.frames_encoded > 60, "{health:?}");
+    assert_eq!(health.frames_dropped, 0);
+    assert_eq!(health.dropped_pct, 0.0);
+    assert!(health.file_bytes > 0 && health.avg_bitrate_kbps > 0);
+    assert!(health.encode_ms.is_some());
+    assert_eq!(health.audio.expect("audio health").gaps, 0);
+    assert!(!folder.join("diagnostics.jsonl").exists());
+}
+
+#[test]
+fn diagnostics_setting_writes_one_line_per_second_after_the_setup_line() {
+    let harness = start(
+        Settings {
+            recording_diagnostics: true,
+            ..settings("diag")
+        },
+        vec![LeagueMsg::Ended(GameResult::Win), LeagueMsg::Gone],
+    );
+    let msgs = collect_until_idle(&harness.ui);
+    let folder = recording_folder(&msgs);
+    let text = std::fs::read_to_string(folder.join("diagnostics.jsonl")).expect("diagnostics");
+    let lines: Vec<serde_json::Value> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).expect("json line"))
+        .collect();
+    assert_eq!(lines[0]["type"], "setup");
+    assert_eq!(lines[0]["adapter"], "Fake GPU");
+    let seconds: Vec<_> = lines.iter().filter(|l| l["type"] == "second").collect();
+    assert!(seconds.len() >= 3, "{text}");
+    assert_eq!(
+        seconds[1]["t"].as_f64().expect("t") - seconds[0]["t"].as_f64().expect("t"),
+        1.0
+    );
+    assert!(seconds[1]["encoded"].as_u64().expect("encoded") >= 55);
+}
+
+#[test]
 fn rec_secs_match_event_instants_within_ten_ms() {
     let (at_tx, at_rx) = unbounded::<Hns>();
     let (go_tx, go_rx) = unbounded();
