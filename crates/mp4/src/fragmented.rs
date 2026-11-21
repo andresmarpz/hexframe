@@ -103,7 +103,7 @@ pub struct FragmentedWriter {
     sequence: u32,
     synced_video_ticks: u64,
     origin: Option<i64>,
-    audio_shift: Option<i64>,
+    audio_started: bool,
     audio_backlog: Vec<Packet>,
 }
 
@@ -131,7 +131,7 @@ impl FragmentedWriter {
             sequence: 0,
             synced_video_ticks: 0,
             origin: None,
-            audio_shift: None,
+            audio_started: false,
             audio_backlog: Vec::new(),
         })
     }
@@ -158,45 +158,34 @@ impl FragmentedWriter {
 
     fn push_audio(&mut self, packet: &Packet, origin: i64) -> Result<()> {
         let rate = self.audio_format.as_ref().map_or(1, |f| f.sample_rate);
-        if self.audio_shift.is_none() {
+        if !self.audio_started {
             if ends_before(packet, rate, origin) {
                 return Ok(());
             }
-            self.audio_shift = Some(packet.dts);
+            self.audio_started = true;
         }
-        let shift = self.audio_shift.unwrap_or(0);
-        let mut shifted = packet.clone();
-        shifted.dts -= shift;
-        shifted.pts -= shift;
-        self.audio.accept(&shifted)?;
-        self.audio.pending = Some(shifted);
+        self.audio.accept(packet)?;
+        self.audio.pending = Some(packet.clone());
         Ok(())
     }
 
     fn push_video(&mut self, packet: &Packet) -> Result<()> {
-        let origin = match self.origin {
-            Some(origin) => origin,
-            None if packet.key => {
-                self.origin = Some(packet.dts);
-                for audio in std::mem::take(&mut self.audio_backlog) {
-                    self.push_audio(&audio, packet.dts)?;
-                }
-                packet.dts
-            }
-            None => {
+        if self.origin.is_none() {
+            if !packet.key {
                 return Err(Mp4Error::Invalid(
                     "first video packet is not a key frame".into(),
                 ));
             }
-        };
-        let mut shifted = packet.clone();
-        shifted.dts -= origin;
-        shifted.pts -= origin;
-        self.video.accept(&shifted)?;
-        if shifted.key && !self.video.queued.is_empty() {
+            self.origin = Some(packet.dts);
+            for audio in std::mem::take(&mut self.audio_backlog) {
+                self.push_audio(&audio, packet.dts)?;
+            }
+        }
+        self.video.accept(packet)?;
+        if packet.key && !self.video.queued.is_empty() {
             self.flush()?;
         }
-        self.video.pending = Some(shifted);
+        self.video.pending = Some(packet.clone());
         Ok(())
     }
 

@@ -406,3 +406,82 @@ fn file_is_rebased_to_the_first_video_key_frame() {
     assert!(audio.abs() <= 0.021);
     assert_decodes_cleanly(file.path());
 }
+
+fn muxed(media: &Media, packets: &[Packet], name: &str) -> Vec<u8> {
+    let file = TempPath::new(name);
+    write_file(file.path(), media, packets, true, true);
+    std::fs::read(file.path()).unwrap_or_else(|e| panic!("read: {e}"))
+}
+
+fn shifted(packets: &[Packet], video_ticks: i64, audio_ticks: i64) -> Vec<Packet> {
+    packets
+        .iter()
+        .map(|p| {
+            let by = if p.track == Track::Video {
+                video_ticks
+            } else {
+                audio_ticks
+            };
+            Packet {
+                dts: p.dts + by,
+                pts: p.pts + by,
+                ..p.clone()
+            }
+        })
+        .collect()
+}
+
+fn audio_sample_count(file: &[u8]) -> u32 {
+    let moov = boxes(file)
+        .find(|b| &b.fourcc == b"moov")
+        .unwrap_or_else(|| panic!("no moov"));
+    let audio_track = moov
+        .children(file)
+        .filter(|b| &b.fourcc == b"trak")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no audio track"));
+    let stsz = [b"mdia", b"minf", b"stbl", b"stsz"]
+        .iter()
+        .try_fold(audio_track, |parent, name| parent.find(file, name))
+        .unwrap_or_else(|| panic!("no stsz"));
+    let payload = stsz.payload_bytes(file);
+    u32::from_be_bytes(payload[8..12].try_into().unwrap_or_default())
+}
+
+#[test]
+fn streams_that_start_late_mux_exactly_like_streams_that_start_at_zero() {
+    let media = media();
+    let packets = packets(&media, 2, true);
+    let from_zero = muxed(&media, &packets, "from-zero");
+
+    for (name, video, audio) in [
+        ("late-short", 90_000 * 7, 48_000 * 7),
+        ("late-long", 90_000 * 3_600, 48_000 * 3_600),
+    ] {
+        let late = muxed(&media, &shifted(&packets, video, audio), name);
+
+        assert!(late == from_zero, "{name} differs from the zero start");
+    }
+}
+
+#[test]
+fn audio_that_ends_before_the_first_key_frame_is_dropped_by_absolute_time() {
+    let media = media();
+    let packets = packets(&media, 2, true);
+    let all_audio = audio_sample_count(&muxed(&media, &packets, "audio-all"));
+    let mut ordered = shifted(&packets, 90_000, 0);
+    ordered.sort_by(|a, b| {
+        let rate = |p: &Packet| {
+            if p.track == Track::Video {
+                90_000.0
+            } else {
+                48_000.0
+            }
+        };
+        (a.dts as f64 / rate(a)).total_cmp(&(b.dts as f64 / rate(b)))
+    });
+
+    let kept = audio_sample_count(&muxed(&media, &ordered, "audio-late-video"));
+
+    assert_eq!(all_audio - kept, 46);
+}
