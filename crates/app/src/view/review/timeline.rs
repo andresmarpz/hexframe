@@ -61,6 +61,11 @@ fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
         .size(MARKER_WIDTH, MARKER_HEIGHT)
         .center()
         .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)))
+        .on_drag(|ui: &mut Ui, drag: &mut Drag, _| {
+            if drag.phase == Phase::Move {
+                ui.review_scrub(drag.window_point()[0]);
+            }
+        })
         .child(
             el().size(DOT, DOT)
                 .radius(DOT / 2.0)
@@ -132,6 +137,11 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
         .w_full()
         .h(HEIGHT)
         .hover_group()
+        .on_layout(|ui: &mut Ui, rect: [f32; 4]| {
+            if let Some(review) = &mut ui.review {
+                review.timeline_rect = rect;
+            }
+        })
         .on_drag(move |ui: &mut Ui, drag: &mut Drag, _| {
             if matches!(drag.phase, Phase::Down | Phase::Move) {
                 ui.review_seek(drag_target(drag.x, drag.w, duration));

@@ -219,6 +219,17 @@ impl Ui {
         }
     }
 
+    pub(crate) fn review_scrub(&mut self, window_x: f32) {
+        if let Some(review) = &mut self.review {
+            let [left, _, width, _] = review.timeline_rect;
+            if width > 0.0 {
+                let secs =
+                    f64::from(((window_x - left) / width).clamp(0.0, 1.0)) * review.duration();
+                review.seek(secs);
+            }
+        }
+    }
+
     pub(crate) fn reveal_output_dir(&self) {
         reveal(&self.settings.output_dir);
     }

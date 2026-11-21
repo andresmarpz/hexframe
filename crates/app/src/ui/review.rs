@@ -37,6 +37,7 @@ pub(crate) struct ReviewState {
     pub player: Option<Box<dyn ReviewPlayer>>,
     pub source: Source,
     pub track_width: f32,
+    pub timeline_rect: [f32; 4],
     pub shown_state: Option<PlayerState>,
     pub shown_time: f64,
     pub settling: bool,
@@ -59,6 +60,7 @@ pub(crate) struct ReviewState {
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
+const HALF_FRAME_SECS: f64 = 1.0 / 120.0;
 
 impl ReviewState {
     pub(crate) fn open(
@@ -79,6 +81,7 @@ impl ReviewState {
             player,
             source: Source::Game,
             track_width: 0.0,
+            timeline_rect: [0.0; 4],
             shown_state: None,
             shown_time: 0.0,
             settling: false,
@@ -213,9 +216,19 @@ impl ReviewState {
             self.replay_death();
         } else if self.is_playing() {
             self.pause();
-        } else if let Some(player) = &self.player {
-            player.play();
+        } else if self.player.is_some() {
+            if self.held_at_end() {
+                self.seek(0.0);
+            }
+            if let Some(player) = &self.player {
+                player.play();
+            }
         }
+    }
+
+    fn held_at_end(&self) -> bool {
+        let duration = self.duration();
+        duration > 0.0 && self.time() >= duration - HALF_FRAME_SECS
     }
 
     pub(crate) fn play_clip(&mut self, index: usize, make: PlayerFactory) {

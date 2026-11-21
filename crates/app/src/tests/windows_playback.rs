@@ -170,3 +170,22 @@ fn pausing_after_the_last_picture_does_not_wedge_the_player() {
     s.run(1.0);
     assert!(s.playing() && s.time() < 2.0, "restarted at {}", s.time());
 }
+
+#[test]
+fn play_on_the_last_picture_restarts_the_clip_at_once() {
+    let mut s = windows(layered(60.0));
+    s.run(0.5);
+    s.space();
+    s.rt.update(|ui, _| ui.review_seek(60.0));
+    s.run(0.5);
+    assert!(sim::landed(), "the seek to the end never landed");
+    assert!(!s.playing());
+    assert_eq!(
+        s.review().player.as_ref().map(|p| p.state()),
+        Some(PlayerState::Ready)
+    );
+    s.space();
+    s.run(1.0);
+    assert!(s.playing(), "one press did not keep the clip playing");
+    assert!(s.time() < 3.0, "restarted at {:.2}", s.time());
+}
