@@ -1,6 +1,11 @@
+use std::sync::Once;
+
 use greyscreen_core::health::driver_version_text;
 use greyscreen_core::media::CaptureTarget;
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
+use windows::Wdk::Graphics::Direct3D::{
+    D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH, D3DKMTSetProcessSchedulingPriorityClass,
+};
 use windows::Win32::Foundation::{HMODULE, HWND, LUID};
 use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
@@ -16,6 +21,7 @@ use windows::Win32::Graphics::Dxgi::{
 use windows::Win32::Graphics::Gdi::{
     HMONITOR, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MonitorFromWindow,
 };
+use windows::Win32::System::Threading::GetCurrentProcess;
 use windows::Win32::System::WinRT::Direct3D11::CreateDirect3D11DeviceFromDXGIDevice;
 use windows::core::Interface;
 
@@ -103,6 +109,7 @@ impl GpuDevice {
         let multithread: ID3D11Multithread = context.cast()?;
         // SAFETY: the interface was just obtained from the live immediate context.
         let _previous = unsafe { multithread.SetMultithreadProtected(true) };
+        raise_gpu_priority(&device);
         Ok(Self {
             device,
             context,
@@ -112,6 +119,36 @@ impl GpuDevice {
             driver_version,
         })
     }
+}
+
+const GPU_THREAD_PRIORITY: i32 = 7;
+
+fn raise_gpu_priority(device: &ID3D11Device) {
+    match device.cast::<IDXGIDevice>() {
+        Ok(dxgi) => {
+            // SAFETY: `dxgi` is a live DXGI device and the call only takes an integer.
+            match unsafe { dxgi.SetGPUThreadPriority(GPU_THREAD_PRIORITY) } {
+                Ok(()) => tracing::info!(priority = GPU_THREAD_PRIORITY, "gpu thread priority set"),
+                Err(error) => tracing::warn!(%error, "set gpu thread priority failed"),
+            }
+        }
+        Err(error) => tracing::warn!(%error, "gpu thread priority needs a dxgi device"),
+    }
+    static PROCESS_CLASS: Once = Once::new();
+    PROCESS_CLASS.call_once(|| {
+        // SAFETY: the pseudo handle from GetCurrentProcess is always valid and the call takes a plain enum value.
+        let status = unsafe {
+            D3DKMTSetProcessSchedulingPriorityClass(
+                GetCurrentProcess(),
+                D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH,
+            )
+        };
+        if status.is_ok() {
+            tracing::info!("gpu process scheduling class set to high");
+        } else {
+            tracing::warn!(status = status.0, "set gpu process scheduling class failed");
+        }
+    });
 }
 
 pub(crate) fn target_monitor(target: &CaptureTarget) -> HMONITOR {
