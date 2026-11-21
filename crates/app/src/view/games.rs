@@ -3,14 +3,11 @@ mod rows;
 use std::borrow::Cow;
 use std::rc::Rc;
 
-use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{El, Key, LoopSpec, TextStyle, Tx, col, el, row, text};
-use rune_kit::{
-    Button, ButtonVariant, ControlSize, Kit, Sidebar, SidebarHeader, TextInput, glyphs,
-};
+use rune::{El, Key, LoopSpec, Tx, col, el, text};
+use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, glyphs};
 
 use crate::ui::library_format::summary;
-use crate::ui::{ListItem, Ui, format_clock};
+use crate::ui::{ListItem, Ui};
 
 pub(super) const ROW_HEIGHT: f32 = 60.0;
 const PULSE_SECS: f64 = 1.4;
@@ -22,7 +19,6 @@ pub(super) fn content(s: &Ui, k: &Kit) -> El {
         .label("Games")
         .row_height(ROW_HEIGHT)
         .header_padding(4.0, 8.0)
-        .header(status_bar(s, k))
         .header(search(s, k));
     if items.is_empty() {
         sidebar = sidebar.child(empty(s, k));
@@ -63,37 +59,6 @@ fn key_of<'a>(s: &'a Ui, item: &ListItem) -> Cow<'a, str> {
     }
 }
 
-struct Status {
-    label: String,
-    dot: rune::Color,
-    pulse: bool,
-}
-
-fn status(s: &Ui, k: &Kit) -> Status {
-    let quiet = |label: &str, dot| Status {
-        label: label.to_owned(),
-        dot,
-        pulse: false,
-    };
-    match &s.status {
-        EngineStatus::Idle if s.settings.auto_record => quiet("Ready", k.c.success.icon),
-        EngineStatus::Idle => quiet("Recording off", k.c.text_faint),
-        EngineStatus::GameRunning => quiet("Not recording", k.c.text_faint),
-        EngineStatus::Waiting => quiet("Waiting for game", k.c.warning.icon),
-        EngineStatus::Finalizing => Status {
-            label: "Saving…".to_owned(),
-            dot: k.c.warning.icon,
-            pulse: true,
-        },
-        EngineStatus::Recording { .. } => Status {
-            label: format!("Recording {}", format_clock(s.elapsed_secs)),
-            dot: k.c.danger.icon,
-            pulse: true,
-        },
-        EngineStatus::Error(_) => quiet("Capture failed", k.c.danger.icon),
-    }
-}
-
 pub(super) fn dot(color: rune::Color, pulse: bool) -> El {
     let dot = el().size(8.0, 8.0).radius(4.0).fill(color).a11y_hidden();
     if pulse {
@@ -101,41 +66,6 @@ pub(super) fn dot(color: rune::Color, pulse: bool) -> El {
     } else {
         dot
     }
-}
-
-fn status_bar(s: &Ui, k: &Kit) -> El {
-    let shown = status(s, k);
-    let font = TextStyle {
-        features: TABULAR,
-        ..k.ty.ui_medium
-    };
-    let mut bar = row()
-        .key("nav-status")
-        .w_full()
-        .h(32.0)
-        .pl(4.0)
-        .gap(8.0)
-        .center_y()
-        .child(dot(shown.dot, shown.pulse))
-        .child(
-            text(shown.label)
-                .key("nav-status-label")
-                .font(font)
-                .color(k.c.text_base)
-                .truncate(),
-        )
-        .child(el().grow(1.0).a11y_hidden());
-    if matches!(s.status, EngineStatus::Recording { .. }) {
-        bar = bar.child(
-            Button::new("Save clip")
-                .variant(ButtonVariant::Neutral)
-                .control_size(ControlSize::Small)
-                .on_press(|ui: &mut Ui| ui.send(EngineCmd::SaveClipNow))
-                .build(k)
-                .key("nav-save-clip"),
-        );
-    }
-    bar
 }
 
 fn search(s: &Ui, k: &Kit) -> El {

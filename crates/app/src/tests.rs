@@ -13,6 +13,7 @@ mod death_review;
 mod keybinds;
 mod match_flow;
 mod nav;
+mod nav_status;
 mod review_flow;
 mod selection;
 mod settings_sheet;

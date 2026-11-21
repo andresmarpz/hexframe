@@ -1,4 +1,5 @@
 mod icons;
+mod status;
 
 use rune::tok::type_;
 use rune::{El, Icon, col, el, row, text};
@@ -56,6 +57,7 @@ pub(in crate::view) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
         .min_h(0.0)
         .fill(k.c.bg_deep)
         .child(brand(k, titlebar_inset))
+        .child(col().w_full().px(PAD).pb(10.0).child(status::block(s, k)))
         .child(col().w_full().grow(1.0).min_h(0.0).child(list))
         .child(
             col()
