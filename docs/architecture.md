@@ -258,6 +258,7 @@ Generation (`engine/src/storyboard.rs`) runs on the `storyboards` thread, at bac
 | `sidebar_collapsed` | `bool` | `false` |
 | `nav_width` | `u32` points, 180 to 320 | `220` |
 | `list_width` | `u32` points, 240 to 440 | `300` |
+| `window_size` | `(u32, u32)` points or none, 1000x600 to 8192x8192 | none (opens at 1180x680) |
 | `client_id` | `Option<String>` | `None` (a random UUID is stored the first time feedback is sent) |
 | `first_run_done` | `bool`, set by Done on Home's first-run card. A settings file from before the field counts as done; no settings file means first run | `false` with no file, `true` for an old file |
 
