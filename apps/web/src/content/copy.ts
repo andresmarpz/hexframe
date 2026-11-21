@@ -28,7 +28,7 @@ export const hero = {
     "Sits in your Windows tray, records full matches and key clips on your GPU, and maps every play on a timeline for review.",
   primaryCta: "Download for Windows",
   secondaryCta: "View on GitHub",
-  screenAlt: "The Greyscreen Status screen while a League game is being recorded.",
+  screenAlt: "The Greyscreen window while a League game is being recorded, with the games list and the live event feed.",
 };
 
 export const trust = [
@@ -89,7 +89,7 @@ export const howItWorks = {
       body: "Open the library after your match to jump to any kill, death, or objective on the timeline, or grab the clips already saved for you.",
     },
   ],
-  screenAlt: "The Greyscreen Status screen showing the last recorded game.",
+  screenAlt: "The Greyscreen Home screen showing the last recorded game.",
 };
 
 export const review = {
@@ -114,7 +114,7 @@ export const review = {
       body: "Adjust playback speed to inspect close fights.",
     },
   ],
-  recordingsAlt: "The Greyscreen Recordings screen listing recorded games by champion.",
+  recordingsAlt: "The Greyscreen Games screen with the games list, the video player and the event timeline.",
 };
 
 export const safe = {
@@ -206,7 +206,7 @@ export const download = {
     'Open Settings to pick your quality preset (Balanced, High, or Max), frame rate (30 or 60 fps), cursor option, and whether Greyscreen starts with Windows.',
     'Leave Greyscreen in the tray with "Record games" turned on, then start a match.',
   ],
-  firstRunAlt: "The Greyscreen Settings screen.",
+  firstRunAlt: "The Greyscreen settings sheet.",
   cliTitle: "Command-line tool",
   cliBody:
     "Use greyscreen-cli.exe to check your encoder (greyscreen-cli doctor) or run a 10-second test recording (greyscreen-cli record --seconds 10).",

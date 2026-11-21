@@ -99,9 +99,9 @@
     <text x="240" y="36" fill="#7D8087" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12">7 / 3 / 11  ·  33:12</text>
 
     <!-- Clips count pill top right -->
-    <rect x="404" y="21" width="72" height="22" rx="11" fill="#1E2F44"/>
-    <circle cx="416" cy="32" r="3.5" fill="#4392F7"/>
-    <text x="425" y="36" fill="#6BB0FF" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11" font-weight="500">6 clips</text>
+    <rect x="368" y="21" width="108" height="22" rx="11" fill="#3A2224"/>
+    <circle cx="380" cy="32" r="3.5" fill="#F0645E"/>
+    <text x="389" y="36" fill="#F59A96" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11" font-weight="500">Review deaths</text>
 
     <line x1="1" y1="60" x2="495" y2="60" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
@@ -140,10 +140,10 @@
 
     <!-- Active event hover detail strip -->
     <rect x="20" y="340" width="308" height="54" rx="8" fill="#1F2126" stroke="#31343D" stroke-width="1"/>
-    <circle cx="36" cy="360" r="4" fill="#6BB0FF"/>
-    <text x="48" y="364" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12.5" font-weight="500">Double Kill · Lux and Leona</text>
-    <text x="278" y="364" fill="#7D8087" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="11">10:01</text>
-    <text x="48" y="382" fill="#8C9098" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Auto-clip saved · 09:46 – 10:11</text>
+    <circle cx="36" cy="360" r="4" fill="#F0645E"/>
+    <text x="48" y="364" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12.5" font-weight="500">Death · Killed by Jinx</text>
+    <text x="278" y="364" fill="#7D8087" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="11">13:22</text>
+    <text x="48" y="382" fill="#8C9098" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Tagged: Bad trade, Teamfight</text>
 
     <!-- Right side Event list rail -->
     <rect x="344" y="76" width="132" height="318" rx="8" fill="#18191D" stroke="#292B31" stroke-width="1"/>

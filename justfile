@@ -63,6 +63,7 @@ brand:
     rm -rf $d
     rsvg-convert -w 180 -h 180 brand/app-icon.svg -o apps/web/public/apple-touch-icon.png
     rsvg-convert -w 1200 -h 630 brand/og-image.svg -o apps/web/public/og.png
+    sed 's|viewBox="0 0 1200 630"|viewBox="0 15 1200 600"|' brand/og-image.svg | rsvg-convert -w 1280 -h 640 -o brand/social-preview.png
 
 web-tokens:
     cargo run -q --locked -p greyscreen --example export_tokens > apps/web/src/styles/rune-tokens.css
