@@ -1,6 +1,6 @@
 #![cfg(windows)]
 
-mod aac;
+pub mod aac;
 pub mod audio;
 pub mod clock;
 pub mod com;
