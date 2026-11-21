@@ -9,6 +9,14 @@
 <p align="center">Automatic League of Legends recorder and death review for Windows.</p>
 
 <p align="center">
+  <a href="https://github.com/andresmarpz/greyscreen/actions/workflows/tests.yml"><img src="https://github.com/andresmarpz/greyscreen/actions/workflows/tests.yml/badge.svg?branch=main" alt="Tests"></a>
+  <a href="https://github.com/andresmarpz/greyscreen/actions/workflows/windows.yml"><img src="https://github.com/andresmarpz/greyscreen/actions/workflows/windows.yml/badge.svg?branch=main" alt="Windows build"></a>
+  <a href="https://github.com/andresmarpz/greyscreen/actions/workflows/macos.yml"><img src="https://github.com/andresmarpz/greyscreen/actions/workflows/macos.yml/badge.svg?branch=main" alt="macOS build"></a>
+  <a href="https://github.com/andresmarpz/greyscreen/releases/latest"><img src="https://img.shields.io/github/v/release/andresmarpz/greyscreen?include_prereleases&label=release" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/andresmarpz/greyscreen" alt="License"></a>
+</p>
+
+<p align="center">
   <a href="https://greyscreen-lake.vercel.app">Website</a> ·
   <a href="https://github.com/andresmarpz/greyscreen/releases/latest">Latest release</a> ·
   <a href="#install">Install</a> ·

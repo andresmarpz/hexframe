@@ -44,6 +44,10 @@ ci: check spell check-win
 mac-app:
     packaging/macos/build-app.sh
 
+# Same bundle without installing it, the way CI builds it.
+mac-bundle:
+    packaging/macos/build-app.sh --no-install
+
 # Regenerates every raster from the SVG sources in brand/.
 brand:
     mkdir -p apps/web/public

@@ -7,12 +7,15 @@ cd "$root"
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 app=dist/mac/Greyscreen.app
 target_app="$HOME/Applications/Greyscreen.app"
+profile=${BUILD_PROFILE:-release}
+install=true
+[ "${1:-}" = "--no-install" ] && install=false
 
-cargo build --release --locked -p greyscreen -p greyscreen-cli
+cargo build --profile "$profile" --locked -p greyscreen -p greyscreen-cli
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp target/release/greyscreen target/release/greyscreen-cli "$app/Contents/MacOS/"
+cp "target/$profile/greyscreen" "target/$profile/greyscreen-cli" "$app/Contents/MacOS/"
 sed "s/@VERSION@/$version/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
 
 work=$(mktemp -d)
@@ -30,6 +33,11 @@ iconutil -c icns "$iconset" -o "$app/Contents/Resources/Greyscreen.icns"
 
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict "$app"
+
+if [ "$install" = false ]; then
+    echo "Built $app (version $version)"
+    exit 0
+fi
 
 osascript -e 'tell application id "dev.greyscreen.app" to quit' >/dev/null 2>&1 || true
 sleep 1
