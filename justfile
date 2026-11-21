@@ -104,6 +104,8 @@ web-deploy:
 
 # Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
+# The full gate and the Windows build run side by side.
+[parallel]
 release tag: ci dist
     git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
     git fetch -q origin && test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || { echo "push main first"; exit 1; }
