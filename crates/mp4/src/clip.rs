@@ -176,7 +176,7 @@ fn plan(audio: Option<&AudioFormat>, packets: &[Arc<Packet>]) -> Result<Layout> 
     })
 }
 
-fn ends_before(packet: &Packet, sample_rate: u32, idr_dts: i64) -> bool {
+pub(crate) fn ends_before(packet: &Packet, sample_rate: u32, idr_dts: i64) -> bool {
     let end = packet.dts + i64::from(packet.duration);
     i128::from(end) * i128::from(VideoFormat::TIMESCALE)
         <= i128::from(idr_dts) * i128::from(sample_rate)

@@ -14,6 +14,7 @@ use crate::reader::{BoxRef, Boxes, boxes};
 use crate::{Mp4Error, Result};
 
 const PLACEHOLDER_LEN: u64 = 16;
+const FINALIZED_FREE_LEN: u64 = 8;
 const IS_NON_SYNC: u32 = 0x1_0000;
 const TFHD_BASE_DATA_OFFSET: u32 = 0x1;
 const TFHD_SAMPLE_DESCRIPTION: u32 = 0x2;
@@ -112,6 +113,10 @@ pub fn recover(part: &Path) -> Result<PathBuf> {
         .ok_or_else(|| Mp4Error::Invalid("not a .mp4.part file".into()))?
         .to_owned();
     let finished = part.with_file_name(&stem);
+    if already_finalized(part)? {
+        std::fs::rename(part, &finished)?;
+        return Ok(finished);
+    }
     match rebuild(part) {
         Ok(()) => {
             std::fs::rename(part, &finished)?;
@@ -122,6 +127,24 @@ pub fn recover(part: &Path) -> Result<PathBuf> {
             Err(error)
         }
     }
+}
+
+fn already_finalized(part: &Path) -> Result<bool> {
+    let mut file = File::open(part)?;
+    let len = file.metadata()?.len();
+    let Some(ftyp) = header_at(&mut file, 0, len)?.filter(|h| &h.fourcc == b"ftyp") else {
+        return Ok(false);
+    };
+    let Some(next) = header_at(&mut file, ftyp.size, len)? else {
+        return Ok(false);
+    };
+    if &next.fourcc == b"mdat" {
+        return Ok(true);
+    }
+    if &next.fourcc != b"free" || next.size != FINALIZED_FREE_LEN {
+        return Ok(false);
+    }
+    Ok(header_at(&mut file, ftyp.size + next.size, len)?.is_some_and(|h| &h.fourcc == b"mdat"))
 }
 
 fn rebuild(part: &Path) -> Result<()> {

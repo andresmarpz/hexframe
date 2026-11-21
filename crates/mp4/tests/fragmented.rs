@@ -362,3 +362,57 @@ fn placeholder_switches_to_64_bit_mdat_past_4_gib() {
     let size = u64::from_be_bytes(large[8..16].try_into().unwrap_or_default());
     assert_eq!(size, moov_offset - 28);
 }
+
+#[test]
+fn file_is_rebased_to_the_first_video_key_frame() {
+    require_ffmpeg!();
+    let media = media();
+    let file = TempPath::new("rebase");
+    let mut writer =
+        FragmentedWriter::create(file.path(), &media.video_format, Some(&media.audio_format))
+            .unwrap_or_else(|e| panic!("create: {e}"));
+    let shift = 3000;
+    let mut all = packets(&media, 2, true);
+    for packet in all.iter_mut().filter(|p| p.track == Track::Video) {
+        packet.dts += shift;
+        packet.pts += shift;
+    }
+    all.sort_by(|a, b| {
+        let secs = |p: &Packet| {
+            let rate = if p.track == Track::Video {
+                90_000.0
+            } else {
+                48_000.0
+            };
+            p.dts as f64 / rate
+        };
+        secs(a).total_cmp(&secs(b))
+    });
+    for packet in &all {
+        writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
+    }
+    writer.finish().unwrap_or_else(|e| panic!("finish: {e}"));
+
+    let first_pts = |stream: &str| -> f64 {
+        let out = ffprobe(
+            file.path(),
+            &[
+                "-select_streams",
+                stream,
+                "-show_entries",
+                "packet=pts_time",
+                "-read_intervals",
+                "%+#1",
+            ],
+        );
+        field(&out, "packets.packet.0.pts_time")
+            .parse()
+            .unwrap_or(f64::NAN)
+    };
+    let video = first_pts("v");
+    let audio = first_pts("a");
+    eprintln!("first video {video}, first audio {audio}");
+    assert!(video.abs() < 1e-6);
+    assert!(audio.abs() <= 0.021);
+    assert_decodes_cleanly(file.path());
+}

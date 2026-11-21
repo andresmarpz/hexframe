@@ -6,6 +6,7 @@ use std::sync::Arc;
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 
 use crate::bytes::BoxWriter;
+use crate::clip::ends_before;
 use crate::moov::{
     AUDIO_TRACK_ID, Chunk, Chunking, NON_SYNC_SAMPLE_FLAGS, SYNC_SAMPLE_FLAGS, SampleRow,
     SampleTables, VIDEO_TRACK_ID, write_ftyp, write_init_moov,
@@ -101,6 +102,9 @@ pub struct FragmentedWriter {
     pos: u64,
     sequence: u32,
     synced_video_ticks: u64,
+    origin: Option<i64>,
+    audio_shift: Option<i64>,
+    audio_backlog: Vec<Packet>,
 }
 
 impl FragmentedWriter {
@@ -126,6 +130,9 @@ impl FragmentedWriter {
             pos: head.len() as u64,
             sequence: 0,
             synced_video_ticks: 0,
+            origin: None,
+            audio_shift: None,
+            audio_backlog: Vec::new(),
         })
     }
 
@@ -138,24 +145,58 @@ impl FragmentedWriter {
                         "audio packet without audio format".into(),
                     ));
                 }
-                self.audio.accept(packet)?;
-                self.audio.pending = Some(packet.clone());
-                Ok(())
+                match self.origin {
+                    Some(origin) => self.push_audio(packet, origin),
+                    None => {
+                        self.audio_backlog.push(packet.clone());
+                        Ok(())
+                    }
+                }
             }
         }
     }
 
-    fn push_video(&mut self, packet: &Packet) -> Result<()> {
-        if self.video.pending.is_none() && self.video.rows.is_empty() && !packet.key {
-            return Err(Mp4Error::Invalid(
-                "first video packet is not a key frame".into(),
-            ));
+    fn push_audio(&mut self, packet: &Packet, origin: i64) -> Result<()> {
+        let rate = self.audio_format.as_ref().map_or(1, |f| f.sample_rate);
+        if self.audio_shift.is_none() {
+            if ends_before(packet, rate, origin) {
+                return Ok(());
+            }
+            self.audio_shift = Some(packet.dts);
         }
-        self.video.accept(packet)?;
-        if packet.key && !self.video.queued.is_empty() {
+        let shift = self.audio_shift.unwrap_or(0);
+        let mut shifted = packet.clone();
+        shifted.dts -= shift;
+        shifted.pts -= shift;
+        self.audio.accept(&shifted)?;
+        self.audio.pending = Some(shifted);
+        Ok(())
+    }
+
+    fn push_video(&mut self, packet: &Packet) -> Result<()> {
+        let origin = match self.origin {
+            Some(origin) => origin,
+            None if packet.key => {
+                self.origin = Some(packet.dts);
+                for audio in std::mem::take(&mut self.audio_backlog) {
+                    self.push_audio(&audio, packet.dts)?;
+                }
+                packet.dts
+            }
+            None => {
+                return Err(Mp4Error::Invalid(
+                    "first video packet is not a key frame".into(),
+                ));
+            }
+        };
+        let mut shifted = packet.clone();
+        shifted.dts -= origin;
+        shifted.pts -= origin;
+        self.video.accept(&shifted)?;
+        if shifted.key && !self.video.queued.is_empty() {
             self.flush()?;
         }
-        self.video.pending = Some(packet.clone());
+        self.video.pending = Some(shifted);
         Ok(())
     }
 

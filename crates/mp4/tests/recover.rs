@@ -350,3 +350,25 @@ fn rejects_a_file_that_is_not_a_part_file() {
     assert!(recover(&other).is_err());
     assert!(other.exists());
 }
+
+#[test]
+fn finalized_part_is_only_renamed() {
+    require_ffmpeg!();
+    let media = media();
+    let dir = TempDir::new("recover-finalized");
+    let part = dir.join("game.mp4.part");
+    let mut writer =
+        FragmentedWriter::create(&part, &media.video_format, Some(&media.audio_format))
+            .unwrap_or_else(|e| panic!("create: {e}"));
+    for packet in &packets(&media, 2, true) {
+        writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
+    }
+    writer.finish().unwrap_or_else(|e| panic!("finish: {e}"));
+    let before = std::fs::read(&part).unwrap_or_default();
+    let out = recover(&part).unwrap_or_else(|e| panic!("recover: {e}"));
+    assert_eq!(out, dir.join("game.mp4"));
+    assert!(!part.exists());
+    assert_eq!(std::fs::read(&out).unwrap_or_default(), before);
+    assert_streams(&out, true);
+    assert_decodes_cleanly(&out);
+}
