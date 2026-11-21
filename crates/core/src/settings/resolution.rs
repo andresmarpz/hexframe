@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-pub const RESOLUTION_LADDER: [u32; 6] = [2160, 1440, 1200, 1080, 900, 720];
-pub const MIN_HEIGHT: u32 = 144;
-pub const MAX_HEIGHT: u32 = 4320;
+pub(crate) const RESOLUTION_LADDER: [u32; 6] = [2160, 1440, 1200, 1080, 900, 720];
+pub(crate) const MIN_HEIGHT: u32 = 144;
+pub(crate) const MAX_HEIGHT: u32 = 4320;
 const DEFAULT_HEIGHT: u32 = 1080;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

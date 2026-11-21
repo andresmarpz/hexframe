@@ -234,7 +234,7 @@ pub fn parse_sps_dims(sps: &[u8]) -> Option<(u32, u32, u8, u8)> {
     parse_sps(sps).map(|f| (f.width, f.height, f.profile, f.level))
 }
 
-pub fn write_avcc_box(w: &mut BoxWriter, sps: &[u8], pps: &[u8]) {
+pub(crate) fn write_avcc_box(w: &mut BoxWriter, sps: &[u8], pps: &[u8]) {
     let byte = |i: usize| sps.get(i).copied().unwrap_or(0);
     let profile = byte(1);
     w.boxed(b"avcC", |w| {

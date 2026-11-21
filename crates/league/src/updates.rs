@@ -7,8 +7,9 @@ use greyscreen_core::update::{self, Asset, EXE_ASSET, Release};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-pub const API_BASE: &str = "https://api.github.com";
-pub const DOWNLOAD_PREFIX: &str = "https://github.com/andresmarpz/greyscreen/releases/download/";
+pub(crate) const API_BASE: &str = "https://api.github.com";
+pub(crate) const DOWNLOAD_PREFIX: &str =
+    "https://github.com/andresmarpz/greyscreen/releases/download/";
 const RELEASES_PER_PAGE: u32 = 20;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const LIST_TIMEOUT: Duration = Duration::from_secs(30);

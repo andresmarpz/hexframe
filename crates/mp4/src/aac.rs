@@ -70,7 +70,7 @@ fn descriptor(tag: u8, body: &[u8]) -> Vec<u8> {
     out
 }
 
-pub fn write_esds(w: &mut BoxWriter, asc: &[u8], avg_bitrate: u32) {
+pub(crate) fn write_esds(w: &mut BoxWriter, asc: &[u8], avg_bitrate: u32) {
     let mut decoder_config = vec![0x40, 0x15, 0, 0, 0];
     decoder_config.extend_from_slice(&avg_bitrate.to_be_bytes());
     decoder_config.extend_from_slice(&avg_bitrate.to_be_bytes());

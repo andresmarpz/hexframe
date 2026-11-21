@@ -50,7 +50,7 @@ mod backend {
     }
 }
 
-pub fn grab(video: &Path, at_secs: f64, max_width: u32) -> Result<Frame, ThumbError> {
+pub(crate) fn grab(video: &Path, at_secs: f64, max_width: u32) -> Result<Frame, ThumbError> {
     backend::grab(video, at_secs.max(0.0), max_width)
 }
 

@@ -11,7 +11,7 @@ use crate::client::{ClientError, LiveClient};
 use crate::locator::GameLocator;
 use crate::parse::{event_id, event_secs, to_game_event, to_game_info};
 
-pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+pub(crate) const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_REFUSED_POLLS: u32 = 3;
 const MAX_IDENTIFY_ATTEMPTS: u32 = 5;
 

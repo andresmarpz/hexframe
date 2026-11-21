@@ -125,9 +125,9 @@ pub struct AudioTimeline {
 }
 
 impl AudioTimeline {
-    pub const RESYNC: Hns = 300_000;
-    pub const FIRST_DISTRUST: Hns = 5_000_000;
-    pub const TIMEOUT_SAFETY: Hns = 600_000;
+    pub(crate) const RESYNC: Hns = 300_000;
+    pub(crate) const FIRST_DISTRUST: Hns = 5_000_000;
+    pub(crate) const TIMEOUT_SAFETY: Hns = 600_000;
 
     pub fn new(t0: Hns, rate: u32) -> Self {
         Self {
@@ -163,7 +163,7 @@ impl AudioTimeline {
         self.on_packet(ts, frames, silent)
     }
 
-    pub fn on_packet(&mut self, ts: Option<Hns>, frames: usize, silent: bool) -> Vec<Span> {
+    pub(crate) fn on_packet(&mut self, ts: Option<Hns>, frames: usize, silent: bool) -> Vec<Span> {
         let ts = if self.trust_device_clock { ts } else { None };
         self.place(ts, frames, silent)
     }

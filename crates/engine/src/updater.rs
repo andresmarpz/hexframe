@@ -35,7 +35,7 @@ impl UpdateSource for GithubReleases {
     }
 }
 
-pub type Launcher = Box<dyn Fn(&Path) -> io::Result<()> + Send>;
+pub(crate) type Launcher = Box<dyn Fn(&Path) -> io::Result<()> + Send>;
 
 pub struct UpdateConfig {
     pub source: Arc<dyn UpdateSource>,

@@ -61,7 +61,7 @@ impl Version {
         })
     }
 
-    pub fn is_prerelease(&self) -> bool {
+    pub(crate) fn is_prerelease(&self) -> bool {
         !self.pre.is_empty()
     }
 }

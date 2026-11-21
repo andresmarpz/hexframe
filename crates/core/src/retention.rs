@@ -9,7 +9,7 @@ pub struct GameUsage {
 }
 
 impl GameUsage {
-    pub fn total_bytes(&self) -> u64 {
+    pub(crate) fn total_bytes(&self) -> u64 {
         self.video_bytes + self.other_bytes
     }
 }

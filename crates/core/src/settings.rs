@@ -12,9 +12,7 @@ use crate::paths;
 mod overrides;
 mod resolution;
 
-pub use resolution::{
-    MAX_HEIGHT, MIN_HEIGHT, RESOLUTION_LADDER, Resolution, ResolutionOption, resolution_options,
-};
+pub use resolution::{Resolution, ResolutionOption, resolution_options};
 
 const AUDIO_BITRATE: u32 = 192_000;
 const REFERENCE_PIXELS: f64 = 1920.0 * 1080.0;

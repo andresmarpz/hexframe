@@ -2,7 +2,7 @@
 
 pub mod aac;
 pub mod avc;
-pub mod bytes;
+pub(crate) mod bytes;
 pub mod clip;
 pub mod finalize;
 pub mod fragmented;

@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 
 mod scrub;
 
-pub use scrub::{home_variants, scrub_logs, tail_lines};
+pub use scrub::home_variants;
+use scrub::scrub_logs;
 
 pub const MAX_MESSAGE_CHARS: usize = 5000;
 pub const LOG_TAIL_LINES: usize = 300;

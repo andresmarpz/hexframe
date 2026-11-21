@@ -1,11 +1,11 @@
-pub mod client;
+pub(crate) mod client;
 pub mod ddragon;
-pub mod dto;
-pub mod feedback;
+pub(crate) mod dto;
+pub(crate) mod feedback;
 pub mod locator;
-pub mod parse;
-pub mod poller;
-pub mod updates;
+pub(crate) mod parse;
+pub(crate) mod poller;
+pub(crate) mod updates;
 
 pub use client::{ClientError, LiveClient};
 pub use ddragon::{ChampionIcons, ChampionIndex, DdragonError, SyncReport};

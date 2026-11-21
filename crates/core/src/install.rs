@@ -34,7 +34,7 @@ pub fn run_command(exe: &Path) -> String {
     format!("\"{}\" {HIDDEN_FLAG}", exe.display())
 }
 
-pub fn uninstall_command(exe: &Path) -> String {
+pub(crate) fn uninstall_command(exe: &Path) -> String {
     format!("\"{}\" {UNINSTALL_FLAG}", exe.display())
 }
 

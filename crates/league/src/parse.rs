@@ -4,15 +4,15 @@ use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
 
 use crate::dto::{GameStats, PlayerEntry};
 
-pub fn event_id(event: &Value) -> Option<u32> {
+pub(crate) fn event_id(event: &Value) -> Option<u32> {
     event.get("EventID")?.as_u64()?.try_into().ok()
 }
 
-pub fn event_secs(event: &Value) -> Option<f64> {
+pub(crate) fn event_secs(event: &Value) -> Option<f64> {
     event.get("EventTime")?.as_f64()
 }
 
-pub fn loose_bool(value: &Value) -> bool {
+pub(crate) fn loose_bool(value: &Value) -> bool {
     match value {
         Value::Bool(b) => *b,
         Value::String(s) => s.eq_ignore_ascii_case("true"),
@@ -20,7 +20,7 @@ pub fn loose_bool(value: &Value) -> bool {
     }
 }
 
-pub fn strip_tag(name: &str) -> &str {
+pub(crate) fn strip_tag(name: &str) -> &str {
     name.rsplit_once('#')
         .map_or(name, |(game_name, _)| game_name)
 }
@@ -81,7 +81,7 @@ fn unknown(name: &str) -> GameEvent {
     }
 }
 
-pub fn to_game_event(event: &Value) -> GameEvent {
+pub(crate) fn to_game_event(event: &Value) -> GameEvent {
     let name = event
         .get("EventName")
         .and_then(Value::as_str)
@@ -192,7 +192,7 @@ fn find_me<'a>(active_name: &str, players: &'a [PlayerEntry]) -> Option<&'a Play
         })
 }
 
-pub fn to_game_info(
+pub(crate) fn to_game_info(
     active_name: &str,
     players: &[PlayerEntry],
     stats: &GameStats,

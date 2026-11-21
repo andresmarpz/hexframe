@@ -1,5 +1,5 @@
-pub const BASE_URL: &str = "https://api.greyscreen.app";
-pub const BASE_URL_ENV: &str = "GREYSCREEN_API_URL";
+pub(crate) const BASE_URL: &str = "https://api.greyscreen.app";
+pub(crate) const BASE_URL_ENV: &str = "GREYSCREEN_API_URL";
 
 pub fn base_url() -> String {
     resolve_base_url(std::env::var(BASE_URL_ENV).ok().as_deref())

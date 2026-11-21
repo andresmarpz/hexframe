@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use super::scrub::tail_lines;
 use super::*;
 
 fn draft() -> FeedbackDraft {

@@ -43,7 +43,7 @@ impl ChampionIndex {
         serde_json::from_str(&raw).ok()
     }
 
-    pub fn id_for(&self, champion: &str) -> Option<&str> {
+    pub(crate) fn id_for(&self, champion: &str) -> Option<&str> {
         self.names.get(&normalize(champion)).map(String::as_str)
     }
 

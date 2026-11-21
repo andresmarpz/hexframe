@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use crate::game::{GameEvent, Player};
 use crate::library::EventEntry;
 
-pub const WINDOW_BEFORE_SECS: f64 = 12.0;
-pub const WINDOW_AFTER_SECS: f64 = 3.0;
-pub const SLOW_MO_TAIL_SECS: f64 = 4.0;
+pub(crate) const WINDOW_BEFORE_SECS: f64 = 12.0;
+pub(crate) const WINDOW_AFTER_SECS: f64 = 3.0;
+pub(crate) const SLOW_MO_TAIL_SECS: f64 = 4.0;
 pub const SLOW_MO_RATE: f32 = 0.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

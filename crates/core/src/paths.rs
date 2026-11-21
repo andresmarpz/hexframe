@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 const APP_DIR: &str = "Greyscreen";
 
-pub fn config_dir() -> PathBuf {
+pub(crate) fn config_dir() -> PathBuf {
     dirs::config_dir().unwrap_or_default().join(APP_DIR)
 }
 
@@ -17,7 +17,7 @@ pub fn logs_dir() -> PathBuf {
         .join("logs")
 }
 
-pub fn cache_dir() -> PathBuf {
+pub(crate) fn cache_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_default()
         .join(APP_DIR)
@@ -28,7 +28,7 @@ pub fn champion_icons_dir() -> PathBuf {
     cache_dir().join("champions")
 }
 
-pub fn default_output_dir() -> PathBuf {
+pub(crate) fn default_output_dir() -> PathBuf {
     match dirs::video_dir() {
         Some(videos) => videos.join(APP_DIR),
         None => dirs::home_dir()

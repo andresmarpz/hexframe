@@ -1,5 +1,3 @@
-//! Add an action as one line in `actions!` (action.rs), then handle it where it is dispatched.
-
 mod action;
 mod combo;
 mod keymap;

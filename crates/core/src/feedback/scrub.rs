@@ -14,7 +14,7 @@ const RIOT_KEYS: [&str; 7] = [
     "tagline",
 ];
 
-pub fn tail_lines(text: &str, count: usize) -> &str {
+pub(crate) fn tail_lines(text: &str, count: usize) -> &str {
     let mut start = 0;
     let mut seen = 0;
     let body = text.strip_suffix('\n').unwrap_or(text);
@@ -49,7 +49,7 @@ pub fn home_variants(home: &Path) -> Vec<String> {
     variants
 }
 
-pub fn scrub_logs(raw: &str, home_dirs: &[String]) -> String {
+pub(crate) fn scrub_logs(raw: &str, home_dirs: &[String]) -> String {
     let mut text = tail_lines(raw, LOG_TAIL_LINES).to_owned();
     for home in home_dirs.iter().filter(|home| !home.is_empty()) {
         text = replace_ignoring_case(&text, home, HOME_MARK);
