@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, encode_size};
+use greyscreen_core::problem::NO_FRAMES;
 use greyscreen_core::time::mono_now;
 use greyscreen_mp4::avc::{NAL_PPS, NAL_SPS, nal_type, split_annexb};
 
@@ -24,7 +25,7 @@ use crate::wgc::{WgcCapture, WgcOptions};
 
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(2);
 const FIRST_FRAME_POLL: Duration = Duration::from_millis(10);
-const NO_FRAMES: &str = "no frames from the game window: if League runs in exclusive fullscreen, switch it to Borderless";
+const BORDER_SHOWN: &str = "Windows shows a yellow border around the captured window while Greyscreen records. It is not in the video.";
 
 pub(crate) fn build(
     target: &CaptureTarget,
@@ -81,13 +82,16 @@ pub(crate) fn build(
     let encoder = H264Encoder::new(&gpu, size.0, size.1, cfg.fps, &video_cfg)
         .map_err(|e| format!("video encoder failed: {e}"))?
         .with_releaser(converter.releaser());
-    let mut warning = None;
+    let mut warnings = Vec::new();
+    if !wgc.border_hidden() {
+        warnings.push(BORDER_SHOWN.to_owned());
+    }
     tracing::info!(step = "audio", enabled = cfg.audio, "capture setup");
     let audio = if cfg.audio {
         match AudioPipe::start(target, qpc, cfg.audio_bitrate) {
             Ok(audio) => Some(audio),
             Err(message) => {
-                warning = Some(format!("recording without audio: {message}"));
+                warnings.push(format!("recording without audio: {message}"));
                 None
             }
         }
@@ -109,7 +113,7 @@ pub(crate) fn build(
             encoder: encoder.encoder_name(),
         },
     );
-    if let Some(message) = warning {
+    for message in warnings {
         sink.warning(message);
     }
     if cfg.diagnostics {

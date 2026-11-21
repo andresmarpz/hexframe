@@ -10,6 +10,7 @@ use rune::{PointerPress, TextEdit};
 use crate::sfx::Sfx;
 
 mod feedback;
+mod first_run;
 mod format;
 mod keys;
 pub(crate) mod library;
@@ -28,6 +29,7 @@ pub(crate) mod fake_player;
 mod tests;
 
 pub(crate) use feedback::{FeedbackPhase, FeedbackUi, MESSAGE_KEY as FEEDBACK_MESSAGE_KEY};
+pub(crate) use first_run::TestRun;
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use keys::MAC;
 pub(crate) use library::{Detail, ListItem, RecordingsFilter};
@@ -102,6 +104,8 @@ pub(crate) struct Ui {
     pub death_note: TextEdit,
     pub dock: DockState,
     pub feedback: FeedbackUi,
+    pub first_test: TestRun,
+    pub tray: Option<crate::tray::Link>,
 }
 
 impl Ui {
@@ -153,6 +157,8 @@ impl Ui {
             death_note: TextEdit::new(String::new()),
             dock: DockState::default(),
             feedback: FeedbackUi::default(),
+            first_test: TestRun::default(),
+            tray: None,
             settings,
         }
     }
@@ -241,6 +247,7 @@ impl Ui {
         self.settings.validate();
         self.sync_review_default();
         self.send(EngineCmd::ApplySettings(self.settings.clone()));
+        self.sync_tray();
     }
 
     pub(crate) fn edit_clip_secs(&mut self) {

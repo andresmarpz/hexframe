@@ -1,7 +1,14 @@
-use greyscreen_engine::EngineStatus;
+use greyscreen_core::problem::NO_FRAMES;
+use greyscreen_engine::{EngineStatus, RecordingEntry};
 
 use super::{Scene, death, first_run, game, home};
-use crate::ui::{Screen, Ui, preview};
+use crate::ui::{Screen, TestRun, Ui, preview};
+
+fn test_recording() -> RecordingEntry {
+    let mut entry = preview::demo_recordings().remove(0);
+    entry.meta.duration_secs = 10.0;
+    entry
+}
 
 fn demo(ui: &mut Ui) {
     home(ui);
@@ -16,6 +23,26 @@ pub(super) const SCENES: &[Scene] = &[
     ("demo", demo),
     ("home-first-run", |ui| {
         first_run(ui);
+        ui.settings.first_run_done = false;
+        ui.go(Screen::Home);
+    }),
+    ("first-run-testing", |ui| {
+        first_run(ui);
+        ui.settings.first_run_done = false;
+        ui.first_test = TestRun::Running;
+        ui.go(Screen::Home);
+    }),
+    ("first-run-works", |ui| {
+        first_run(ui);
+        ui.settings.first_run_done = false;
+        ui.first_test = TestRun::Passed(Box::new(test_recording()));
+        ui.go(Screen::Home);
+    }),
+    ("first-run-failed", |ui| {
+        first_run(ui);
+        ui.settings.first_run_done = false;
+        ui.first_test = TestRun::Failed;
+        ui.status = EngineStatus::Error(NO_FRAMES.to_owned());
         ui.go(Screen::Home);
     }),
     ("idle-off", |ui| {

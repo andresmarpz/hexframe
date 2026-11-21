@@ -33,7 +33,7 @@ This is the contract every ticket builds against. Each decision cites the resear
 
 ```
 crates/
-  core/     greyscreen-core     Pure logic. Settings, keybinds, events, event categories, classification, clips, session machine, library schema, death review, storage retention, update rules, feedback report, install rules, shared media types. No threads, no OS calls except settings and library file I/O.
+  core/     greyscreen-core     Pure logic. Settings, keybinds, events, event categories, classification, clips, session machine, library schema, death review, storage retention, update rules, feedback report, install rules, plain-language setup problems (`problem`), shared media types. No threads, no OS calls except settings and library file I/O.
   mp4/      greyscreen-mp4      Pure-Rust MP4: H.264 and AAC helpers, fragmented writer, finalize, clip writer, recovery, read-only inspect (sample tables of a finished or unfinished file).
   league/   greyscreen-league   Live Client Data API client and poller, champion icon download, GitHub release client for updates, feedback HTTP client. The Windows game-window locator sits behind cfg(windows).
   capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session, global hotkeys, installer, single-instance event, crash filter.
@@ -161,7 +161,7 @@ Idle/Armed/Cooldown/Starting(game) --Skipped--> Cooldown
 ```
 
 - `Finalized` goes to Idle, not Cooldown, when `Gone` arrived during Tail or Finalizing, or the recording was manual.
-- A failed start returns to Armed and retries `StartMedia` every 5 s, at most 5 times, then reports an error and goes to Cooldown. Starting with no `MediaStarted` within 15 s counts as a failed start.
+- A failed start returns to Armed and retries `StartMedia` every 5 s, at most 5 times, then reports an error and goes to Cooldown. A failure that time cannot fix (`Problem::retry_helps`: unusable folder, low disk, no encoder, old Windows) reports the error at once. Starting with no `MediaStarted` within 15 s counts as a failed start.
 - Cooldown also accepts `WindowFound` with a different pid.
 - A recording longer than 3 hours stops.
 - `Input::SettingsChanged { auto_record }` turning off stops a game recording and ignores `WindowFound`. In that case the status is `GameRunning` while a game is on. Turning it on starts recording a game that is already running. `Input::Retry` (the Retry button) leaves Cooldown and starts again.
@@ -245,6 +245,7 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `nav_width` | `u32` points, 180 to 320 | `220` |
 | `list_width` | `u32` points, 240 to 440 | `300` |
 | `client_id` | `Option<String>` | `None` (a random UUID is stored the first time feedback is sent) |
+| `first_run_done` | `bool`, set by Done on Home's first-run card. A settings file from before the field counts as done; no settings file means first run | `false` with no file, `true` for an old file |
 
 An old `save_clip_hotkey` key is read once and moved into `keybinds`. It is never written back. `Settings::validate` clamps every range above when settings load.
 
@@ -271,7 +272,9 @@ The Keybinds settings page lists every action, rebinds on click, and refuses a k
 `Ui` holds the state and `view::root` draws it. `Ui::apply(UiMsg)` is the only way engine messages change it. Rune scenes (`--snap out.png --scene NAME`) render the screens headless, and the `Runtime` tests drive the same code.
 
 - **Screens.** `Screen` is `Home`, `Games` or `Clips`. Settings is a sheet over the current screen, not a screen. There is no Recordings page.
-- **Home.** A state card (Idle, Off, Waiting, Recording with a clock, Finalizing, Error, with Save clip, Retry, Stop and "Test recording (10 s)"), then the last game, recent clips and a week summary. A first-run welcome card shows while the library is empty. While recording, Home shows the live feed of events.
+- **Home.** A state card (Idle, Off, Waiting, Recording with a clock, Finalizing, Error, with Save clip, Retry, Stop and "Test recording (10 s)"), then the last game, recent clips and a week summary. While `first_run_done` is off, a kit card below the state card walks through three steps: the recordings folder (Change… opens the folder picker), Quality (the Settings control) and a 10-second test recording that ends with "It works" and the clip, or a note that points at the error on the state card. Done hides it for good and saves the setting. While it shows, the state card has no test button of its own. While recording, Home shows the live feed of events.
+- **Setup errors.** `Status::Error(raw)` carries the raw text of a failure. `core::problem::Problem::from_error` sorts it into a plain-language problem with a title, the one thing to do, an optional second hint, a short sidebar and dock line, and a FAQ anchor. Home's state card shows title and action, with Retry, Learn more (opens the FAQ) and, for an unusable folder or a full disk, Choose folder…; an unknown failure also shows the raw text and Open logs folder. The sidebar status block and the dock's pill and tooltip show the same problem. The engine checks that the recordings folder can be created and written before it starts capture, and its notices use the same plain text for a known problem (`Problem::notice`).
+- **Tray.** `crates/app/src/tray` owns a Rune tray icon. Its menu is Open Greyscreen, Pause recording or Resume recording (the Record games switch), Save clip (enabled only while recording) and Quit; a left click opens the window. The tooltip is "Greyscreen — Recording 12:34", "Waiting for League", "Recording paused", "League is loading", "Saving" or the problem's title. The icon is `tray-recording` while recording. `Ui` sends a `TrayState` to the tray thread on every status or settings change; the thread rebuilds the icon only when the recording flag flips and updates the tooltip once a second while recording (Rune's tray has no icon setter).
 - **Games.** The games list (search by champion, mode or result, grouped by day, right-click menu with Open, Review deaths, Show in folder and Delete) is the first column inside the content card, then a hairline divider, then the review player with its events and clips panel. Games and the list can be picked with Up and Down.
 - **Clips.** Recent clips across all games.
 - **Death review.** Review deaths (D) plays each of the user's deaths in turn, from 12 s before to 3 s after. A switch slows the last 4 s to half speed. Each death takes tags and a free note, saved to `review` in the sidecar. A summary follows the last death.
@@ -285,6 +288,23 @@ The Keybinds settings page lists every action, rebinds on click, and refuses a k
 - **Setup window** (`crates/app/src/setup`). A fixed 460 by 420 window titled "Greyscreen Setup", with its own `Phase` state (`Ready`, `Closing`, `Copying`, `Done`, `Failed`). Windows only starts it when `greyscreen.exe` runs from outside the install folder and no installed copy matches it. It installs to `%LOCALAPPDATA%\Programs\Greyscreen`, with a Start with Windows option, a Start Menu shortcut and an Installed apps entry; the user can also run it without installing. An update launch (`--update`) or a run that matches the installed copy installs silently instead. `GREYSCREEN_NO_INSTALL` skips all of this. `--hidden` starts the app without a window.
 - **Update banner.** See Updates.
 - **Feedback dialog.** See Feedback.
+
+## Help anchors
+
+The website's FAQ page (`https://greyscreen-lake.vercel.app/faq`) needs one section per anchor below. The app links each failure to `/faq#<anchor>` (`greyscreen_core::problem::Problem::anchor`).
+
+| Anchor | Shown when | What the FAQ should say |
+|---|---|---|
+| `fullscreen` | Capture got no frames from the League window | Switch League to Borderless in its video settings. If League runs as administrator, run Greyscreen as administrator too |
+| `league-not-found` | The League window closed or was not found while capture started | Make sure League is running, then retry |
+| `recordings-folder` | The recordings folder is missing, read-only or cannot be created | Choose another folder in Settings > Storage |
+| `low-disk` | The drive has no space left | Free some space or choose another folder |
+| `no-encoder` | No hardware H.264 encoder or GPU was usable | Update the graphics driver and restart Greyscreen |
+| `windows-version` | Windows Graphics Capture is not supported | Update to Windows 10 version 1903 or newer |
+| `capture-blocked` | Windows refused access to the window (access denied) | Run Greyscreen as administrator if League does; check Settings > Privacy & security > Screen capture |
+| `capture-failed` | Any other capture failure | Retry; open the logs folder; send feedback |
+
+On Windows 10 builds that cannot hide the capture border, a start warning says Windows draws a yellow border around the captured window and that it is not in the video. It has no anchor.
 
 ## Recording health and diagnostics
 

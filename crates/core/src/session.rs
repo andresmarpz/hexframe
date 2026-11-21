@@ -1,5 +1,6 @@
 use crate::game::{GameInfo, GameResult, TimedEvent};
 use crate::media::CaptureTarget;
+use crate::problem::Problem;
 use crate::time::{HNS_PER_SEC, Hns};
 
 const TAIL: Hns = 5 * HNS_PER_SEC;
@@ -436,8 +437,9 @@ impl Session {
             effects.push(Effect::Status(Status::Error(reason)));
             return (SessionState::Idle, effects);
         };
+        let retry_helps = Problem::from_error(&reason).retry_helps();
         match game {
-            Some(game) if retries < MAX_START_RETRIES => (
+            Some(game) if retries < MAX_START_RETRIES && retry_helps => (
                 SessionState::Armed {
                     hwnd,
                     pid,

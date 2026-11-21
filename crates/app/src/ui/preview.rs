@@ -21,7 +21,10 @@ pub(super) use health::{healthy, struggling};
 pub(super) use thumbs::copy_playable;
 
 pub(super) fn ui() -> Ui {
-    let mut ui = Ui::blank(Settings::default());
+    let mut ui = Ui::blank(Settings {
+        first_run_done: true,
+        ..Settings::default()
+    });
     ui.display_sizes = Vec::new;
     ui.status = EngineStatus::Recording {
         since: 0,

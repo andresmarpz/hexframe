@@ -1,0 +1,33 @@
+{
+  "about": "A full disk offers Choose folder…. Home's card names it in plain words with one thing to do and a Learn more link.",
+  "scene": "error-disk",
+  "size": [
+    960,
+    620
+  ],
+  "steps": [
+    {
+      "check": "home",
+      "has": [
+        "state-card",
+        "error-action",
+        "retry-capture",
+        "error-learn-more",
+        "error-choose-folder"
+      ],
+      "text": [
+        "Not enough disk space"
+      ]
+    },
+    {
+      "tap": "error-learn-more"
+    },
+    {
+      "check": "after-link",
+      "has": [
+        "state-card"
+      ],
+      "snap": false
+    }
+  ]
+}

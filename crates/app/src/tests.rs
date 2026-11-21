@@ -14,6 +14,7 @@ mod death_review;
 mod delete_dialog;
 mod dock;
 mod feedback;
+mod first_run;
 mod instant_pages;
 mod keybinds;
 mod match_flow;
@@ -33,6 +34,7 @@ mod review_volume;
 mod search_clear;
 mod selection;
 mod settings_sheet;
+mod setup_errors;
 mod sounds;
 mod storage_limit;
 mod update;
@@ -57,7 +59,13 @@ fn runtime() -> Runtime<Ui> {
 
 fn live_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
     let (cmd, rx) = unbounded();
-    let mut ui = Ui::live(Settings::default(), cmd);
+    let mut ui = Ui::live(
+        Settings {
+            first_run_done: true,
+            ..Settings::default()
+        },
+        cmd,
+    );
     ui.recordings = Ui::preview().recordings;
     (runtime_with(ui), rx)
 }

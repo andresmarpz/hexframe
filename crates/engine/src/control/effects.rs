@@ -8,10 +8,12 @@ use greyscreen_core::health::HealthTracker;
 use greyscreen_core::highlight::classify;
 use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
 use greyscreen_core::media::{CaptureTarget, MediaEvent};
+use greyscreen_core::problem::Problem;
 use greyscreen_core::session::{Effect, Input, SessionState, Status};
 use greyscreen_core::time::{Hns, hns_to_secs, mono_now, secs_to_hns};
 use jiff::Zoned;
 
+use super::folder;
 use super::meta::{self, Recording};
 use super::{Control, Internal, StartedMedia};
 use crate::api::{FeedItem, NoticeLevel, RecordingEntry, UiMsg};
@@ -57,7 +59,10 @@ impl Control {
             Ok(()) => self.send(UiMsg::Status(status)),
             Err(err) => {
                 tracing::error!(%err, "cannot begin recording");
-                self.notice(NoticeLevel::Error, format!("Cannot start recording: {err}"));
+                self.notice(
+                    NoticeLevel::Error,
+                    Problem::notice("Cannot start recording", &err),
+                );
                 self.feed(Input::MediaFailed(err));
             }
         }
@@ -66,7 +71,9 @@ impl Control {
     fn start_media(&mut self, target: CaptureTarget) {
         let cfg = self.settings.capture_config(NATIVE_HEIGHT_CEILING);
         let (tx, rx) = bounded(MEDIA_QUEUE);
-        match self.media.start(target, cfg, tx) {
+        let started = folder::check_writable(&self.settings.output_dir)
+            .and_then(|()| self.media.start(target, cfg, tx));
+        match started {
             Ok(session) => {
                 self.media_gen += 1;
                 self.media_session = Some(session);
@@ -77,7 +84,7 @@ impl Control {
                 tracing::error!(%err, "media start failed");
                 self.notice(
                     NoticeLevel::Error,
-                    format!("Capture failed to start: {err}"),
+                    Problem::notice("Capture failed to start", &err),
                 );
                 self.feed(Input::MediaFailed(err));
             }
@@ -189,7 +196,7 @@ impl Control {
                     if let Some(recording) = self.recording.as_mut() {
                         recording.health.on_failure();
                     }
-                    self.notice(NoticeLevel::Error, format!("Capture failed: {text}"));
+                    self.notice(NoticeLevel::Error, Problem::notice("Capture failed", &text));
                 } else {
                     tracing::info!(%text, "capture ended after the game window closed");
                 }
@@ -250,7 +257,8 @@ impl Control {
             .ok_or_else(|| "capture started without formats".to_owned())?;
         let started_at = Zoned::now();
         let info = game.unwrap_or_else(meta::manual_game);
-        let folder = meta::create_folder(&self.settings.output_dir, started_at.clone(), &info)?;
+        let folder = meta::create_folder(&self.settings.output_dir, started_at.clone(), &info)
+            .map_err(|err| format!("{}: {err}", greyscreen_core::problem::FOLDER_UNUSABLE))?;
         let writer = self.spawn_writer(&folder, &started);
         let health = HealthTracker::new(
             since,
@@ -372,7 +380,7 @@ impl Control {
                 tracing::error!(%err, "game video not finalized");
                 self.notice(
                     NoticeLevel::Error,
-                    format!("The game video could not be saved: {err}"),
+                    Problem::notice("The game video could not be saved", &err),
                 );
                 recording.meta.video = String::new();
                 recording.meta.duration_secs = elapsed;

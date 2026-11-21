@@ -1,3 +1,4 @@
+use greyscreen_core::problem::Problem;
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Cursor, El, TextStyle, Transition, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, Switch};
@@ -165,7 +166,14 @@ fn armed(s: &Ui, k: &Kit) -> El {
         EngineStatus::Error(_) => "Error",
         _ => "Rec",
     };
-    row()
+    let tip = match &s.status {
+        EngineStatus::Error(message) => {
+            let problem = Problem::from_error(message);
+            format!("{}. {}", problem.title(), problem.action())
+        }
+        _ => String::new(),
+    };
+    let armed = row()
         .key("dock-armed")
         .w_full()
         .px(12.0)
@@ -182,7 +190,12 @@ fn armed(s: &Ui, k: &Kit) -> El {
                 .on_toggle(|ui: &mut Ui| ui.change(|s| s.auto_record = !s.auto_record))
                 .build(k)
                 .key("record-games"),
-        )
+        );
+    if tip.is_empty() {
+        armed
+    } else {
+        armed.help(tip)
+    }
 }
 
 fn live(s: &Ui, k: &Kit, who: &str, show_champion: bool) -> El {

@@ -664,3 +664,30 @@ fn the_diagnostics_setting_round_trips_and_older_files_without_it_load_as_off() 
     assert_eq!(old.fps, 30);
     assert!(!old.recording_diagnostics);
 }
+
+#[test]
+fn a_missing_settings_file_is_a_first_run() {
+    let dir = scratch_dir();
+    let settings = Settings::load(&dir.join("settings.json"));
+    assert!(!settings.first_run_done);
+}
+
+#[test]
+fn a_settings_file_from_before_the_first_run_card_counts_as_done() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"auto_record": false}"#).unwrap();
+    assert!(Settings::load(&path).first_run_done);
+}
+
+#[test]
+fn finishing_the_first_run_survives_a_save_and_load() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    let mut settings = Settings::default();
+    settings.save(&path).unwrap();
+    assert!(!Settings::load(&path).first_run_done);
+    settings.first_run_done = true;
+    settings.save(&path).unwrap();
+    assert!(Settings::load(&path).first_run_done);
+}

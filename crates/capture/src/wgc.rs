@@ -90,6 +90,7 @@ pub struct WgcCapture {
     session: Option<GraphicsCaptureSession>,
     frame_token: Option<i64>,
     closed_token: Option<i64>,
+    border_hidden: bool,
 }
 
 impl std::fmt::Debug for WgcCapture {
@@ -150,6 +151,7 @@ impl WgcCapture {
             session: None,
             frame_token: None,
             closed_token: None,
+            border_hidden: true,
         };
         tracing::info!(step = "session", "graphics capture");
         capture.attach(options)?;
@@ -189,7 +191,7 @@ impl WgcCapture {
         }))?);
         let session = pool.CreateCaptureSession(&item)?;
         self.session = Some(session.clone());
-        configure_session(&session, options);
+        self.border_hidden = configure_session(&session, options);
         tracing::info!(step = "start", "graphics capture");
         session.StartCapture()
     }
@@ -220,6 +222,10 @@ impl WgcCapture {
 
     pub fn is_closed(&self) -> bool {
         self.shared.closed.load(Ordering::Acquire)
+    }
+
+    pub fn border_hidden(&self) -> bool {
+        self.border_hidden
     }
 
     pub fn stop(mut self) {
@@ -430,7 +436,7 @@ fn create_item(target: &CaptureTarget) -> windows::core::Result<GraphicsCaptureI
     }
 }
 
-fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) {
+fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) -> bool {
     let WgcOptions { fps, cursor } = options;
     tracing::info!(cursor, "graphics capture cursor");
     if let Err(error) = session.SetIsCursorCaptureEnabled(cursor) {
@@ -438,15 +444,20 @@ fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) {
     }
     tracing::info!(step = "borderless access", "graphics capture");
     request_borderless();
-    if let Err(error) = session.SetIsBorderRequired(false) {
-        tracing::warn!(%error, "disable capture border failed");
-    }
+    let border_hidden = match session.SetIsBorderRequired(false) {
+        Ok(()) => true,
+        Err(error) => {
+            tracing::warn!(%error, "disable capture border failed");
+            false
+        }
+    };
     let interval = TimeSpan {
         Duration: HNS_PER_SEC * 9 / 10 / i64::from(fps.max(1)),
     };
     if let Err(error) = session.SetMinUpdateInterval(interval) {
         tracing::warn!(%error, "set minimum update interval failed");
     }
+    border_hidden
 }
 
 fn request_borderless() {

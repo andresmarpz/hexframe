@@ -1,0 +1,32 @@
+{
+  "about": "Blocked capture points at administrator rights. Home's card names it in plain words with one thing to do and a Learn more link.",
+  "scene": "error-blocked",
+  "size": [
+    960,
+    620
+  ],
+  "steps": [
+    {
+      "check": "home",
+      "has": [
+        "state-card",
+        "error-action",
+        "retry-capture",
+        "error-learn-more"
+      ],
+      "text": [
+        "Windows blocked screen capture"
+      ]
+    },
+    {
+      "tap": "error-learn-more"
+    },
+    {
+      "check": "after-link",
+      "has": [
+        "state-card"
+      ],
+      "snap": false
+    }
+  ]
+}

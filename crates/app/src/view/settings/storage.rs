@@ -1,5 +1,5 @@
 use greyscreen_core::settings::STORAGE_LIMITS_GB;
-use rune::{El, FileDialogOptions, col, row, text};
+use rune::{El, col, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Progress, Select, SelectAppearance};
 
 use super::catalog::Row;
@@ -29,18 +29,7 @@ fn folder(s: &Ui, k: &Kit) -> El {
     let change = Button::new("Change")
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Large)
-        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| {
-            let options = FileDialogOptions {
-                title: "Choose the recordings folder".into(),
-                directory: Some(ui.settings.output_dir.clone()),
-                ..Default::default()
-            };
-            tx.open_folder(options, |ui: &mut Ui, answer, _| {
-                if let Ok(Some(dir)) = answer {
-                    ui.change(|s| s.output_dir = dir);
-                }
-            });
-        })
+        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.choose_folder(tx))
         .build(k)
         .key("change-folder");
     let open = Button::new("Open")

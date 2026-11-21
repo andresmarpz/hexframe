@@ -1,3 +1,4 @@
+use greyscreen_core::problem::Problem;
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Color, Cursor, El, LoopSpec, Side, TextStyle, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
@@ -34,7 +35,14 @@ fn status(s: &Ui, k: &Kit) -> Status {
         EngineStatus::GameRunning => quiet("Not recording", "A game is running", k.c.text_faint),
         EngineStatus::Waiting => quiet("League is running", "Game is loading", k.c.warning.icon),
         EngineStatus::Finalizing => quiet("Saving", "Finishing the video", k.c.warning.icon),
-        EngineStatus::Error(_) => quiet("Capture failed", "Open Home to retry", k.c.danger.icon),
+        EngineStatus::Error(message) => {
+            let problem = Problem::from_error(message);
+            quiet(
+                problem.status_title(),
+                problem.status_detail(),
+                k.c.danger.icon,
+            )
+        }
         EngineStatus::Recording { game, .. } => Status {
             title: "Recording".to_owned(),
             detail: match game {

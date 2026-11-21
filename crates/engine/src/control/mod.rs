@@ -1,5 +1,6 @@
 mod clips;
 mod effects;
+mod folder;
 mod meta;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};

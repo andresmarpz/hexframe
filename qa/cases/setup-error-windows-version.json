@@ -1,0 +1,32 @@
+{
+  "about": "An old Windows version is named. Home's card names it in plain words with one thing to do and a Learn more link.",
+  "scene": "error-windows",
+  "size": [
+    960,
+    620
+  ],
+  "steps": [
+    {
+      "check": "home",
+      "has": [
+        "state-card",
+        "error-action",
+        "retry-capture",
+        "error-learn-more"
+      ],
+      "text": [
+        "Windows is too old to record"
+      ]
+    },
+    {
+      "tap": "error-learn-more"
+    },
+    {
+      "check": "after-link",
+      "has": [
+        "state-card"
+      ],
+      "snap": false
+    }
+  ]
+}

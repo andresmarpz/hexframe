@@ -371,7 +371,7 @@ fn capture_failure_while_recording_is_an_error_notice() {
     assert!(
         error_notices(&msgs)
             .iter()
-            .any(|text| text.starts_with("Capture failed")),
+            .any(|text| text.starts_with("League window not found")),
         "{:?}",
         error_notices(&msgs)
     );

@@ -4,6 +4,7 @@ use greyscreen_engine::{EngineCmd, EngineStatus, NoticeLevel, UiMsg};
 use rune::Tx;
 
 use super::{FEED_CAP, Notice, STOP_CONFIRM_AFTER_SECS, Ui};
+use crate::tray::TrayState;
 
 const STOP_CONFIRM_SECS: f64 = 3.0;
 const NOTICE_SECS: f64 = 4.0;
@@ -21,6 +22,15 @@ impl Ui {
             let until = now + STOP_CONFIRM_SECS;
             self.stop_confirm_until = Some(until);
             tx.wake_at(until);
+        }
+    }
+
+    pub(crate) fn sync_tray(&self) {
+        if let Some(tray) = &self.tray {
+            tray.send(TrayState {
+                status: self.status.clone(),
+                auto_record: self.settings.auto_record,
+            });
         }
     }
 
@@ -49,6 +59,7 @@ impl Ui {
                 self.show_notice(NoticeLevel::Info, text, tx);
             }
             UiMsg::RecordingSaved(entry) => {
+                self.first_test_saved(&entry);
                 let text = format!("Recording saved: {}", entry.meta.game.info.me.champion);
                 self.last_game = Some(entry.clone());
                 match self
@@ -91,11 +102,13 @@ impl Ui {
         if !matches!(status, EngineStatus::Recording { .. }) {
             self.stop_confirm_until = None;
         }
+        self.first_test_status(&status);
         self.status = status;
         if !self.live_row_visible() {
             self.live_selected = false;
         }
         self.install_if_idle();
+        self.sync_tray();
     }
 
     pub(crate) fn show_notice(&mut self, level: NoticeLevel, text: String, tx: &mut Tx) {

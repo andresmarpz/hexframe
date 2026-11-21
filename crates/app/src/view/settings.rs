@@ -15,6 +15,7 @@ use super::widgets::clear_when_filled;
 use super::{card, hairline};
 use crate::ui::{SettingsSection, Ui};
 use catalog::Row;
+pub(super) use recording::quality_control;
 
 const MIN_BODY_HEIGHT: f32 = 160.0;
 const DIALOG_CHROME: f32 = 108.0;

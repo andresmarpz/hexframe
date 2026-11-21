@@ -11,6 +11,7 @@ pub mod keybinds;
 pub mod library;
 pub mod media;
 pub mod paths;
+pub mod problem;
 pub mod retention;
 pub mod review;
 pub mod session;

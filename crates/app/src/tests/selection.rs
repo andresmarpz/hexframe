@@ -123,14 +123,17 @@ fn enter_moves_focus_to_the_player() {
 }
 
 #[test]
-fn an_empty_library_shows_a_quiet_list_and_the_welcome_panel_on_home() {
+fn an_empty_library_shows_a_quiet_list_and_the_first_run_card_on_home() {
     let (mut rt, _rx) = live_runtime();
-    rt.update(|ui, _| ui.recordings.clear());
+    rt.update(|ui, _| {
+        ui.recordings.clear();
+        ui.settings.first_run_done = false;
+    });
     tap(&mut rt, "nav-games");
     assert!(rt.find("games-empty").is_some());
     assert!(rt.find("games-pick").is_some());
     tap(&mut rt, "nav-home");
-    assert!(rt.find("welcome").is_some());
+    assert!(rt.find("first-run").is_some());
 }
 
 #[test]

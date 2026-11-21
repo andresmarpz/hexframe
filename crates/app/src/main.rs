@@ -18,7 +18,7 @@ use greyscreen_core::install::HIDDEN_FLAG;
 use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::updater::UpdateConfig;
-use greyscreen_engine::{Engine, EngineConfig, FeedbackConfig, league_factory_default};
+use greyscreen_engine::{Engine, EngineConfig, EngineStatus, FeedbackConfig, league_factory_default};
 use rune::{App, AppSpec, Chrome};
 
 use sfx::Sfx;
@@ -91,13 +91,22 @@ fn main() {
         }
         champion_icons::start_prefetch(handle.clone());
         let cmd = engine.cmd.clone();
+        let tray = tray::start(
+            handle,
+            tray::TrayState {
+                status: EngineStatus::Idle,
+                auto_record: settings.auto_record,
+            },
+        );
+        let link = tray.clone();
         app = app.init(move || {
             let mut ui = Ui::live(settings, cmd);
             ui.sfx = Sfx::rune();
             ui.start_with_windows = platform::start_with_windows();
+            ui.tray = link;
             ui
         });
-        (tray::start(handle), Some(engine))
+        (tray, Some(engine))
     };
     app.run();
 }

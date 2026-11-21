@@ -598,3 +598,34 @@ fn retry_while_recording_changes_nothing() {
     assert!(s.step(Input::Retry).is_empty());
     assert!(matches!(s.state(), SessionState::Recording { .. }));
 }
+
+#[test]
+fn a_failed_start_that_time_cannot_fix_errors_at_once_without_retries() {
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Tick(SEC));
+    s.step(Input::Ready(info()));
+    let reason = format!("{}: D:\\Games", crate::problem::FOLDER_UNUSABLE);
+    assert_eq!(
+        s.step(Input::MediaFailed(reason.clone())),
+        vec![Effect::Status(Status::Error(reason))]
+    );
+    assert_eq!(*s.state(), SessionState::Cooldown);
+    assert!(s.step(Input::Tick(60 * SEC)).is_empty());
+}
+
+#[test]
+fn a_fullscreen_failure_still_retries() {
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Tick(SEC));
+    s.step(Input::Ready(info()));
+    assert!(
+        s.step(Input::MediaFailed(crate::problem::NO_FRAMES.into()))
+            .is_empty()
+    );
+    assert!(matches!(
+        s.state(),
+        SessionState::Armed { retry: Some(_), .. }
+    ));
+}

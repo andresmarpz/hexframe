@@ -68,7 +68,13 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
         ),
         Row::Quality => {
             let note = quality_note(s, native_height(&(s.display_sizes)()));
-            setting_row(k, "quality-row", "Quality", Some(&note), quality(s, k))
+            setting_row(
+                k,
+                "quality-row",
+                "Quality",
+                Some(&note),
+                quality_control(s, k, "quality"),
+            )
         }
         Row::Resolution => setting_row(
             k,
@@ -178,7 +184,7 @@ fn nav_style(s: &Ui, k: &Kit) -> El {
     .key("nav-style")
 }
 
-fn quality(s: &Ui, k: &Kit) -> El {
+pub(in crate::view) fn quality_control(s: &Ui, k: &Kit, key: &'static str) -> El {
     SegmentedControl::new(
         &QUALITIES.map(|(_, label)| label),
         QUALITIES.iter().position(|(q, _)| *q == s.settings.quality),
@@ -187,7 +193,7 @@ fn quality(s: &Ui, k: &Kit) -> El {
     .width(Some(QUALITY_WIDTH))
     .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
     .build(k)
-    .key("quality")
+    .key(key)
 }
 
 fn resolution(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {

@@ -1,0 +1,21 @@
+{
+  "about": "After a good test recording the card says It works and offers the clip.",
+  "scene": "first-run-works",
+  "size": [
+    1100,
+    700
+  ],
+  "steps": [
+    {
+      "check": "works",
+      "has": [
+        "first-run-passed",
+        "first-run-watch",
+        "first-run-done"
+      ],
+      "text": [
+        "It works"
+      ]
+    }
+  ]
+}

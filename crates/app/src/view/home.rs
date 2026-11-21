@@ -1,10 +1,11 @@
 mod actions;
 mod clips;
 mod feed;
+mod first_run;
 mod last_game;
 mod week;
-mod welcome;
 
+use greyscreen_core::problem::Problem;
 use greyscreen_engine::EngineStatus;
 use rune::{Color, El, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
@@ -14,19 +15,16 @@ use super::{card, title_style};
 use crate::ui::library::format::mode_label;
 use crate::ui::{Detail, Ui, format_clock};
 
-const LEAGUE_HINT: &str =
-    "If League runs in Fullscreen, switch it to Borderless or Windowed, then retry.";
-
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
     let page = col().key("home").w_full().gap(16.0).child(state_card(s, k));
     if s.detail() == Detail::Live {
         return page.h_full().min_h(0.0).child(feed::panel(s, k));
     }
-    if s.recordings.is_empty() {
-        return page.child(welcome::card_for(s, k));
-    }
     let now = crate::qa::now();
     let mut page = page;
+    if !s.settings.first_run_done {
+        page = page.child(first_run::card_for(s, k));
+    }
     if let Some(entry) = &s.last_game {
         page = page.child(last_game::panel(entry, k));
     }
@@ -101,22 +99,38 @@ fn headline(s: &Ui, k: &Kit) -> Headline {
                 danger: false,
             }
         }
-        EngineStatus::Error(message) => Headline {
-            pill: pill(k, "Error", k.c.danger.icon, k.c.danger.bg, k.c.danger.fg),
-            title: "Capture failed".to_owned(),
-            detail: col()
-                .gap(4.0)
-                .child(
-                    text(message.clone())
-                        .key("error-message")
-                        .font(k.ty.body)
-                        .color(k.c.text_base),
-                )
-                .child(muted(k, LEAGUE_HINT)),
-            clock: None,
-            danger: true,
-        },
+        EngineStatus::Error(message) => {
+            let problem = Problem::from_error(message);
+            Headline {
+                pill: pill(k, "Error", k.c.danger.icon, k.c.danger.bg, k.c.danger.fg),
+                title: problem.title().to_owned(),
+                detail: problem_detail(problem, message, k),
+                clock: None,
+                danger: true,
+            }
+        }
     }
+}
+
+fn problem_detail(problem: Problem, raw: &str, k: &Kit) -> El {
+    let mut lines = col().gap(4.0).child(
+        text(problem.action())
+            .key("error-action")
+            .font(k.ty.body)
+            .color(k.c.text_base),
+    );
+    if let Some(also) = problem.also() {
+        lines = lines.child(muted(k, also));
+    }
+    if problem == Problem::Other {
+        lines = lines.child(
+            text(raw.to_owned())
+                .key("error-message")
+                .font(k.ty.small)
+                .color(k.c.text_muted),
+        );
+    }
+    lines
 }
 
 fn pill_recording(k: &Kit) -> El {

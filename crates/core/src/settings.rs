@@ -148,6 +148,12 @@ pub struct Settings {
     pub nav_width: u32,
     pub list_width: u32,
     pub client_id: Option<String>,
+    #[serde(default = "yes")]
+    pub first_run_done: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -175,6 +181,7 @@ impl Default for Settings {
             nav_width: NAV_WIDTH.default,
             list_width: LIST_WIDTH.default,
             client_id: None,
+            first_run_done: false,
         }
     }
 }
