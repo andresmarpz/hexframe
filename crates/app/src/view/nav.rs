@@ -1,9 +1,15 @@
 use rune::tok::type_;
-use rune::{El, el, row, text};
+use rune::{El, Icon, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::hairline;
 use crate::ui::{Screen, Ui};
+
+static LOGO: Icon = Icon {
+    name: "greyscreen-logo",
+    view: 64.0,
+    body: r#"<polygon points="32,8 52.8,20 52.8,44 32,56 11.2,44 11.2,20" stroke="currentColor" stroke-width="6" stroke-linejoin="round" fill="none"/><polygon points="27,23 27,41 42,32" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>"#,
+};
 
 const ITEMS: [(Screen, &str, &str); 3] = [
     (Screen::Status, "nav-status", "Status"),
@@ -44,12 +50,7 @@ pub(super) fn bar(s: &Ui, k: &Kit) -> El {
                     row()
                         .gap(10.0)
                         .center_y()
-                        .child(
-                            el().size(10.0, 10.0)
-                                .radius(3.0)
-                                .fill(k.c.bg_accent)
-                                .a11y_hidden(),
-                        )
+                        .child(rune::icon(&LOGO, 20.0).color(k.c.bg_accent).a11y_hidden())
                         .child(text("Greyscreen").font(type_::SECTION).color(k.c.text_base)),
                 )
                 .child(tabs),

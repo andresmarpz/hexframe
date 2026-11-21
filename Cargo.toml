@@ -30,6 +30,8 @@ jiff = "0.2"
 dirs = "6"
 clap = { version = "4", features = ["derive"] }
 tiny_http = "0.12"
+winresource = "0.1"
+png = "0.18"
 rune = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e", features = ["native-file-dialog"] }
 rune-kit = { git = "https://github.com/anomalyco/rune", rev = "7a707454fbfb8d3fd200723c65778fb7b98fd31e", default-features = false }
 

@@ -40,6 +40,9 @@ fn main() {
     if !headless && let Err(err) = greyscreen_capture::probe::init_process() {
         tracing::warn!(%err, "cannot set process DPI awareness");
     }
+    if let Err(err) = rune::set_app_icon(include_bytes!("../assets/icon.png").as_slice()) {
+        tracing::warn!(%err, "cannot set app icon");
+    }
     let spec = AppSpec {
         min_size: Some((720.0, 520.0)),
         scenes: ui::SCENES,
