@@ -16,6 +16,7 @@ mod pacer;
 pub mod probe;
 pub mod recycle;
 mod session;
+pub mod video_log;
 pub mod vproc;
 mod watchdog;
 pub mod wgc;

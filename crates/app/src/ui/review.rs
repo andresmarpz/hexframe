@@ -20,18 +20,32 @@ pub(crate) trait ReviewPlayer: Debug {
     fn set_muted(&self, muted: bool);
     fn set_volume(&self, volume: f32);
     fn show(&self, frame: El) -> El;
+    fn follow(&self, _clock: f64) {}
+}
+
+fn log_call(player: &Player, call: std::fmt::Arguments) {
+    let kind = if player.is_audio() { "sound" } else { "video" };
+    tracing::debug!(
+        target: crate::logging::PLAYBACK_TARGET,
+        "{kind} {call} at {:.3} ({:?})",
+        Player::time(player),
+        Player::state(player)
+    );
 }
 
 impl ReviewPlayer for Player {
     fn play(&self) {
+        log_call(self, format_args!("play"));
         Player::play(self);
     }
 
     fn pause(&self) {
+        log_call(self, format_args!("pause"));
         Player::pause(self);
     }
 
     fn seek(&self, secs: f64) {
+        log_call(self, format_args!("seek {secs:.3}"));
         Player::seek(self, secs);
     }
 
@@ -52,14 +66,17 @@ impl ReviewPlayer for Player {
     }
 
     fn set_rate(&self, rate: f32) {
+        log_call(self, format_args!("rate {rate}"));
         Player::set_rate(self, rate);
     }
 
     fn set_muted(&self, muted: bool) {
+        log_call(self, format_args!("muted {muted}"));
         Player::set_muted(self, muted);
     }
 
     fn set_volume(&self, volume: f32) {
+        log_call(self, format_args!("volume {volume:.2}"));
         Player::set_volume(self, volume);
     }
 
@@ -70,10 +87,21 @@ impl ReviewPlayer for Player {
 
 pub(crate) type PlayerFactory = fn(&Path) -> Box<dyn ReviewPlayer>;
 
+#[cfg(not(windows))]
 pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
     let player = Player::file(path);
     player.set_muted(false);
     Box::new(player)
+}
+
+#[cfg(windows)]
+pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
+    let sound = Player::audio(path);
+    sound.preload();
+    Box::new(super::paired_sound::PairedSound::new(
+        Box::new(Player::file(path)),
+        Box::new(sound),
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -333,8 +361,11 @@ impl ReviewState {
             let at = player.time();
             player.pause();
             // Rune on Windows shows an old picture and time after a layered clip pauses.
-            player.seek(at);
-            self.settling = true;
+            // A hold past the last picture never lands, so the last second keeps no hold.
+            if at < self.duration() - END_GUARD_SECS {
+                player.seek(at);
+                self.settling = true;
+            }
         }
     }
 
@@ -402,6 +433,12 @@ impl ReviewState {
             .iter()
             .find(|e| e.id == hover.event_id)?;
         Some((event, hover.anchor.as_str()))
+    }
+
+    pub(crate) fn follow_player(&self, clock: f64) {
+        if let Some(player) = &self.player {
+            player.follow(clock);
+        }
     }
 
     pub(crate) fn needs_ticks(&mut self) -> bool {

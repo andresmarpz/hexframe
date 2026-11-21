@@ -37,6 +37,8 @@ mod update;
 
 #[cfg(test)]
 pub(crate) mod fake_player;
+#[cfg(any(windows, test))]
+mod paired_sound;
 #[cfg(test)]
 mod tests;
 
@@ -362,6 +364,7 @@ impl Ui {
             changed |= review.death_tick();
             changed |= review.changed_since_shown();
             changed |= review.hide_idle_controls(clock);
+            review.follow_player(clock);
             if review.needs_ticks() {
                 tx.wake_after(PLAYBACK_TICK);
             }

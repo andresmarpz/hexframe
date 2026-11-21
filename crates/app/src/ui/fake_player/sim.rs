@@ -5,10 +5,13 @@ use std::path::Path;
 
 use rune::{El, PlayerState};
 
-use super::{Call, record};
+use super::{Call, record, sound};
+use crate::ui::paired_sound::PairedSound;
 use crate::ui::review::ReviewPlayer;
 
 const HALF_FRAME: f64 = 1.0 / 120.0;
+const DECODED_AHEAD_FRAMES: f64 = 3.0;
+const SOUND_DEVICE_AHEAD: f64 = 0.11;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Media {
@@ -16,6 +19,7 @@ pub(crate) struct Media {
     pub pictures_end: f64,
     pub seek_latency: f64,
     pub layered: bool,
+    pub fps: f64,
 }
 
 impl Media {
@@ -25,6 +29,7 @@ impl Media {
             pictures_end: duration,
             seek_latency: 0.0,
             layered: false,
+            fps: 60.0,
         }
     }
 }
@@ -45,6 +50,9 @@ struct Sim {
     reported: f64,
     picture: f64,
     seek: Option<(f64, f64)>,
+    muted: bool,
+    volume: f32,
+    sound_ahead: f64,
 }
 
 thread_local! {
@@ -60,7 +68,11 @@ pub(crate) fn simulate(media: Media) {
         reported: 0.0,
         picture: 0.0,
         seek: None,
+        muted: true,
+        volume: 1.0,
+        sound_ahead: 0.0,
     }));
+    sound::forget();
 }
 
 fn with<T>(f: impl FnOnce(&mut Sim) -> T) -> T {
@@ -68,7 +80,11 @@ fn with<T>(f: impl FnOnce(&mut Sim) -> T) -> T {
 }
 
 pub(crate) fn advance(secs: f64) {
-    with(|sim| sim.advance(secs));
+    let clock = with(|sim| {
+        sim.advance(secs);
+        sim.seek.map_or(sim.position, |(to, _)| to)
+    });
+    sound::advance(secs, Some(clock));
 }
 
 pub(crate) fn picture() -> f64 {
@@ -94,6 +110,7 @@ impl Sim {
                 self.seek = None;
                 self.position = to;
                 self.show(to);
+                self.start_sound();
             }
             return;
         }
@@ -101,14 +118,39 @@ impl Sim {
             return;
         }
         self.position += secs * self.rate;
-        if self.position >= self.media.pictures_end {
-            self.position = self.media.pictures_end;
+        if self.position >= self.media.duration {
+            self.position = self.media.duration;
             self.run = Run::Ended;
-            self.picture = self.position;
+            self.picture = self.media.pictures_end;
             self.reported = self.media.duration;
-        } else if !self.media.layered {
-            self.show(self.position);
+            return;
         }
+        if !self.media.layered {
+            self.show(self.position.min(self.media.pictures_end));
+        }
+        self.play_sound(secs);
+    }
+
+    fn start_sound(&mut self) {
+        self.sound_ahead = DECODED_AHEAD_FRAMES / self.media.fps;
+    }
+
+    fn play_sound(&mut self, secs: f64) {
+        if self.muted || self.volume <= 0.0 || self.rate != 1.0 {
+            return;
+        }
+        let steady = if self.media.layered {
+            0.0
+        } else {
+            DECODED_AHEAD_FRAMES / self.media.fps
+        };
+        let heard = if steady >= SOUND_DEVICE_AHEAD {
+            secs
+        } else {
+            secs.min(self.sound_ahead)
+        };
+        self.sound_ahead = (self.sound_ahead - secs).max(0.0);
+        sound::hear(heard);
     }
 
     fn seek(&mut self, secs: f64) {
@@ -131,7 +173,8 @@ impl Sim {
         }
         self.run = Run::Playing;
         if self.seek.is_none() {
-            self.show(self.position);
+            self.show(self.position.min(self.media.pictures_end));
+            self.start_sound();
         }
     }
 
@@ -152,6 +195,12 @@ pub(crate) fn factory(path: &Path) -> Box<dyn ReviewPlayer> {
     let media = with(|sim| sim.media);
     simulate(media);
     Box::new(SimPlayer)
+}
+
+pub(crate) fn windows_factory(path: &Path) -> Box<dyn ReviewPlayer> {
+    let video = factory(path);
+    let duration = with(|sim| sim.media.duration);
+    Box::new(PairedSound::new(video, sound::open(duration)))
 }
 
 impl ReviewPlayer for SimPlayer {
@@ -201,10 +250,12 @@ impl ReviewPlayer for SimPlayer {
 
     fn set_muted(&self, muted: bool) {
         record(Call::Muted(muted));
+        with(|sim| sim.muted = muted);
     }
 
     fn set_volume(&self, volume: f32) {
         record(Call::Volume(volume));
+        with(|sim| sim.volume = volume);
     }
 
     fn show(&self, frame: El) -> El {

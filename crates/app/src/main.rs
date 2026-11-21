@@ -73,6 +73,9 @@ fn main() {
         return setup::run();
     }
     #[cfg(windows)]
+    let rune_video_log =
+        (!headless && logging::video_log_requested()).then(logging::send_rune_video_log);
+    #[cfg(windows)]
     let install_error = if headless { None } else { install_step() };
     #[cfg(windows)]
     if !headless {
@@ -90,6 +93,12 @@ fn main() {
     };
     let _log_guard = (!headless).then(logging::init).flatten();
     tracing::info!("greyscreen {} starting", env!("GREYSCREEN_BUILD"));
+    #[cfg(windows)]
+    match rune_video_log {
+        Some(Ok(path)) => tracing::info!(path = %path.display(), "Rune's video log is on"),
+        Some(Err(err)) => tracing::warn!(%err, "cannot open Rune's video log"),
+        None => {}
+    }
     #[cfg(windows)]
     if let Some(err) = &install_error {
         tracing::warn!(%err, "cannot install, running from this folder");

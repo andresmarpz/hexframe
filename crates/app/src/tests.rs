@@ -32,6 +32,7 @@ mod settings_sheet;
 mod storage_limit;
 mod update;
 mod update_banner;
+mod windows_playback;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
     runtime_sized(ui, (1280.0, 720.0))
