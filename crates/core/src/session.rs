@@ -21,6 +21,7 @@ pub enum Input {
     Finalized,
     UserStart,
     UserStop,
+    Retry,
     Tick(Hns),
     SettingsChanged { auto_record: bool },
 }
@@ -118,6 +119,7 @@ impl Session {
         match &input {
             Input::Tick(now) => self.now = *now,
             Input::SettingsChanged { auto_record } => return self.set_auto_record(*auto_record),
+            Input::Retry => return self.retry(),
             _ => {}
         }
         self.track_live(&input);
@@ -183,6 +185,20 @@ impl Session {
         let (next, effects) = self.stop_for_switch(state);
         self.state = next;
         effects
+    }
+
+    fn retry(&mut self) -> Vec<Effect> {
+        if matches!(self.state, SessionState::Cooldown) {
+            self.state = SessionState::Idle;
+        }
+        if let Some(resumed) = self.resume() {
+            return resumed;
+        }
+        match self.state {
+            SessionState::Armed { .. } => vec![Effect::Status(Status::Waiting)],
+            SessionState::Idle => vec![Effect::Status(self.idle_status())],
+            _ => Vec::new(),
+        }
     }
 
     fn stop_for_switch(&self, state: SessionState) -> (SessionState, Vec<Effect>) {

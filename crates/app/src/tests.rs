@@ -8,6 +8,7 @@ use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
 mod match_flow;
+mod status;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
     let mut rt = Runtime::new(ui, view::root, (960.0, 640.0), Env::new(true, 1.0));
@@ -65,14 +66,12 @@ fn test_recording_button_is_disabled_unless_idle() {
 }
 
 #[test]
-fn stop_and_save_clip_buttons_send_commands_while_recording() {
+fn save_clip_button_sends_the_command_while_recording() {
     let (mut rt, rx) = live_runtime();
     rt.update(|ui, _| ui.status = Ui::preview().status);
     rt.frame(1.0 / 60.0);
     tap(&mut rt, "save-clip");
-    tap(&mut rt, "stop-recording");
     assert_eq!(rx.try_recv(), Ok(EngineCmd::SaveClipNow));
-    assert_eq!(rx.try_recv(), Ok(EngineCmd::StopRecording));
 }
 
 #[test]

@@ -85,6 +85,8 @@ pub(crate) const MIN_CLIP_SECS: u32 = 1;
 pub(crate) const MAX_CLIP_SECS: u32 = 120;
 pub(crate) const FEED_CAP: usize = 500;
 pub(crate) const TEST_RECORDING_SECS: u32 = 10;
+pub(crate) const STOP_CONFIRM_AFTER_SECS: u32 = 60;
+const STOP_CONFIRM_SECS: f64 = 3.0;
 const NOTICE_SECS: f64 = 4.0;
 const TICK: Duration = Duration::from_millis(250);
 const PLAYBACK_TICK: Duration = Duration::from_millis(33);
@@ -116,6 +118,7 @@ pub(crate) struct Ui {
     pub cmd: Option<Sender<EngineCmd>>,
     pub recording_since_clock: Option<f64>,
     pub elapsed_secs: u32,
+    pub stop_confirm_until: Option<f64>,
     pub review: Option<ReviewState>,
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
@@ -147,6 +150,7 @@ impl Ui {
             cmd: None,
             recording_since_clock: None,
             elapsed_secs: 0,
+            stop_confirm_until: None,
             review: None,
             player_factory: review::rune_player,
             resolution_open: false,
@@ -176,6 +180,29 @@ impl Ui {
             && sender.send(cmd).is_err()
         {
             tracing::warn!("engine stopped");
+        }
+    }
+
+    pub(crate) fn request_stop(&mut self, tx: &mut Tx) {
+        let now = tx.clock();
+        let confirmed = self.stop_confirm_until.is_some_and(|until| now < until);
+        if self.elapsed_secs <= STOP_CONFIRM_AFTER_SECS || confirmed {
+            self.stop_confirm_until = None;
+            self.send(EngineCmd::StopRecording);
+        } else {
+            let until = now + STOP_CONFIRM_SECS;
+            self.stop_confirm_until = Some(until);
+            tx.wake_at(until);
+        }
+    }
+
+    pub(crate) fn retry_capture(&self) {
+        self.send(EngineCmd::Retry);
+    }
+
+    pub(crate) fn dismiss_error(&mut self) {
+        if matches!(self.status, EngineStatus::Error(_)) {
+            self.status = EngineStatus::Idle;
         }
     }
 
@@ -278,6 +305,9 @@ impl Ui {
             }
             _ => self.recording_since_clock = None,
         }
+        if !matches!(status, EngineStatus::Recording { .. }) {
+            self.stop_confirm_until = None;
+        }
         self.status = status;
     }
 
@@ -294,6 +324,12 @@ impl Ui {
             && clock >= *until
         {
             self.notice = None;
+            changed = true;
+        }
+        if let Some(until) = self.stop_confirm_until
+            && clock >= until
+        {
+            self.stop_confirm_until = None;
             changed = true;
         }
         if let Some(start) = self.recording_since_clock {

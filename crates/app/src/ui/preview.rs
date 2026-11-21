@@ -78,7 +78,7 @@ fn feed() -> Vec<FeedItem> {
         (
             655.0,
             vec![EnemyStructure(Structure::Inhibitor)],
-            "The enemy team lost the top inhibitor",
+            "Your team lost the top inhibitor",
         ),
         (
             702.0,

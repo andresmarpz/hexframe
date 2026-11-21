@@ -22,6 +22,7 @@ pub enum EngineCmd {
     ApplySettings(Settings),
     StartTestRecording { secs: u32 },
     StopRecording,
+    Retry,
     RescanLibrary,
     SaveClipNow,
     Shutdown,

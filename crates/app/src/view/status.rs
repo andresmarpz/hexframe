@@ -1,16 +1,20 @@
-use std::borrow::Cow;
+mod actions;
+mod feed;
+mod last_game;
+#[cfg(test)]
+mod tests;
 
-use greyscreen_core::game::GameResult;
-use greyscreen_core::highlight::Highlight;
-use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem, RecordingEntry};
-use rune::{Color, El, GrowthSpec, ScrollSpec, col, el, row, text};
-use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit, Switch};
+use greyscreen_engine::EngineStatus;
+use rune::{Color, El, col, el, row, text};
+use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
 
-use super::{card, hairline, title_style};
-use crate::ui::{TEST_RECORDING_SECS, Ui, format_clock};
+use super::champion::champion_icon;
+use super::{card, title_style};
+use crate::ui::library_format::mode_label;
+use crate::ui::{Ui, format_clock};
 
-const FEED_ROW_HEIGHT: f32 = 36.0;
-const BADGE_WIDTH: f32 = 140.0;
+const LEAGUE_HINT: &str =
+    "If League runs in Fullscreen, switch it to Borderless or Windowed, then retry.";
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
     col()
@@ -21,89 +25,91 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
         .gap(16.0)
         .child(state_card(s, k))
         .child(match &s.last_game {
-            Some(entry) => last_game_card(entry, k),
-            None => feed_card(s, k),
+            Some(entry) => last_game::panel(entry, k),
+            None => feed::panel(s, k),
         })
 }
 
 struct Headline {
     pill: El,
     title: String,
-    detail: String,
+    detail: El,
     clock: Option<String>,
     danger: bool,
 }
 
+fn muted(k: &Kit, line: impl Into<String>) -> El {
+    text(line.into()).font(k.ty.body).color(k.c.text_muted)
+}
+
 fn headline(s: &Ui, k: &Kit) -> Headline {
-    let (pill, title, detail, clock, danger) = match &s.status {
-        EngineStatus::Idle if s.settings.auto_record => (
-            pill(k, "Idle", k.c.text_faint, k.c.layer_02, k.c.text_muted),
-            "Waiting for a game".to_owned(),
-            "Greyscreen starts recording when a game starts.".to_owned(),
-            None,
-            false,
+    let quiet = |label: &str, title: &str, detail: &str| Headline {
+        pill: pill(k, label, k.c.text_faint, k.c.layer_02, k.c.text_muted),
+        title: title.to_owned(),
+        detail: muted(k, detail),
+        clock: None,
+        danger: false,
+    };
+    match &s.status {
+        EngineStatus::Idle if s.settings.auto_record => quiet(
+            "Idle",
+            "Waiting for a game",
+            "Greyscreen starts recording when a game starts.",
         ),
-        EngineStatus::Idle => (
-            pill(k, "Off", k.c.text_faint, k.c.layer_02, k.c.text_muted),
-            "Recording off".to_owned(),
-            "Games won't be recorded until you turn this on.".to_owned(),
-            None,
-            false,
+        EngineStatus::Idle => quiet(
+            "Off",
+            "Recording off",
+            "Games won't be recorded until you turn this on.",
         ),
-        EngineStatus::GameRunning => (
-            pill(k, "Off", k.c.text_faint, k.c.layer_02, k.c.text_muted),
-            "Game in progress, not recording".to_owned(),
-            "Turn on Record games to start recording this game.".to_owned(),
-            None,
-            false,
+        EngineStatus::GameRunning => quiet(
+            "Off",
+            "Game in progress, not recording",
+            "Turn on Record games to start recording this game.",
         ),
-        EngineStatus::Waiting => (
-            pill(k, "Waiting", k.c.text_faint, k.c.layer_02, k.c.text_muted),
-            "League is running".to_owned(),
-            "Waiting for the game to load.".to_owned(),
-            None,
-            false,
+        EngineStatus::Waiting => quiet(
+            "Waiting",
+            "League is running",
+            "Waiting for the game to load.",
         ),
+        EngineStatus::Finalizing => quiet("Saving", "Saving...", "Finishing the video file."),
         EngineStatus::Recording { game, .. } => {
             let (title, detail) = match game {
                 Some(info) => (
                     info.me.champion.clone(),
-                    format!("{} - recording the game", info.mode),
+                    row()
+                        .gap(8.0)
+                        .center_y()
+                        .child(champion_icon(k, &info.me.champion, 20.0))
+                        .child(muted(k, format!("{} · Recording", mode_label(&info.mode)))),
                 ),
                 None => (
                     "Test recording".to_owned(),
-                    "Recording the primary screen.".to_owned(),
+                    muted(k, "Recording the primary screen."),
                 ),
             };
-            (
-                pill_recording(k),
+            Headline {
+                pill: pill_recording(k),
                 title,
                 detail,
-                Some(format_clock(s.elapsed_secs)),
-                false,
-            )
+                clock: Some(format_clock(s.elapsed_secs)),
+                danger: false,
+            }
         }
-        EngineStatus::Finalizing => (
-            pill(k, "Saving", k.c.text_faint, k.c.layer_02, k.c.text_muted),
-            "Saving...".to_owned(),
-            "Finishing the video file.".to_owned(),
-            None,
-            false,
-        ),
-        EngineStatus::Error(message) => (
-            pill(k, "Error", k.c.danger.icon, k.c.danger.bg, k.c.danger.fg),
-            message.clone(),
-            "Check the logs folder in Settings for details.".to_owned(),
-            None,
-            true,
-        ),
-    };
-    Headline {
-        pill,
-        title,
-        detail,
-        clock,
-        danger,
+        EngineStatus::Error(message) => Headline {
+            pill: pill(k, "Error", k.c.danger.icon, k.c.danger.bg, k.c.danger.fg),
+            title: "Capture failed".to_owned(),
+            detail: col()
+                .gap(4.0)
+                .child(
+                    text(message.clone())
+                        .key("error-message")
+                        .font(k.ty.body)
+                        .color(k.c.text_base),
+                )
+                .child(muted(k, LEAGUE_HINT)),
+            clock: None,
+            danger: true,
+        },
     }
 }
 
@@ -117,46 +123,6 @@ fn pill_recording(k: &Kit) -> El {
     )
 }
 
-fn buttons(s: &Ui, k: &Kit) -> El {
-    let recording = matches!(s.status, EngineStatus::Recording { .. });
-    let idle = matches!(s.status, EngineStatus::Idle | EngineStatus::GameRunning);
-    let mut buttons = row().gap(10.0).center_y();
-    if recording {
-        buttons = buttons
-            .child(
-                Button::new("Stop")
-                    .variant(ButtonVariant::Neutral)
-                    .control_size(ControlSize::Large)
-                    .on_press(|ui: &mut Ui| ui.send(EngineCmd::StopRecording))
-                    .build(k)
-                    .key("stop-recording"),
-            )
-            .child(
-                Button::new("Save clip (last 30 s)")
-                    .variant(ButtonVariant::Neutral)
-                    .control_size(ControlSize::Large)
-                    .on_press(|ui: &mut Ui| ui.send(EngineCmd::SaveClipNow))
-                    .build(k)
-                    .key("save-clip"),
-            );
-    } else {
-        buttons = buttons.child(
-            Button::new("Test recording (10 s)")
-                .variant(ButtonVariant::Neutral)
-                .control_size(ControlSize::Large)
-                .disabled(!idle)
-                .on_press(|ui: &mut Ui| {
-                    ui.send(EngineCmd::StartTestRecording {
-                        secs: TEST_RECORDING_SECS,
-                    })
-                })
-                .build(k)
-                .key("test-recording"),
-        );
-    }
-    buttons
-}
-
 fn state_card(s: &Ui, k: &Kit) -> El {
     let h = headline(s, k);
     let title_color = if h.danger {
@@ -165,6 +131,8 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         k.c.text_base
     };
     let left = col()
+        .grow(1.0)
+        .min_w(0.0)
         .gap(10.0)
         .child(h.pill)
         .child(
@@ -176,11 +144,15 @@ fn state_card(s: &Ui, k: &Kit) -> El {
                         .font(title_style(k))
                         .color(title_color),
                 )
-                .child(text(h.detail).font(k.ty.body).color(k.c.text_muted)),
+                .child(h.detail),
         )
         .child(el().h(2.0))
-        .child(buttons(s, k));
-    let mut right = col().items_end().gap(14.0).child(record_switch(s, k));
+        .child(actions::bar(s, k));
+    let mut controls = row().gap(10.0).center_y().child(record_switch(s, k));
+    if h.danger {
+        controls = controls.child(dismiss_button(k));
+    }
+    let mut right = col().items_end().gap(14.0).child(controls);
     if let Some(clock) = h.clock {
         right = right.child(
             col()
@@ -201,6 +173,7 @@ fn state_card(s: &Ui, k: &Kit) -> El {
     }
     let body = row()
         .w_full()
+        .gap(16.0)
         .justify_between()
         .items_start()
         .child(left)
@@ -210,6 +183,17 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         card = card.border(1.0, k.c.danger.icon);
     }
     card.child(body)
+}
+
+fn dismiss_button(k: &Kit) -> El {
+    IconButton::new(&glyphs::CLOSE)
+        .label("Dismiss")
+        .help("Dismiss")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Small)
+        .on_press(|ui: &mut Ui| ui.dismiss_error())
+        .build(k)
+        .key("dismiss-error")
 }
 
 fn record_switch(s: &Ui, k: &Kit) -> El {
@@ -231,63 +215,6 @@ fn record_switch(s: &Ui, k: &Kit) -> El {
         )
 }
 
-fn last_game_card(entry: &RecordingEntry, k: &Kit) -> El {
-    let game = &entry.meta.game;
-    let result = match game.result {
-        GameResult::Win => Badge::new("WIN").variant(BadgeVariant::Accent).build(k),
-        GameResult::Loss => Badge::new("LOSS").variant(BadgeVariant::Subtle).build(k),
-        GameResult::Unknown => Badge::new("UNKNOWN")
-            .variant(BadgeVariant::Neutral)
-            .build(k),
-    };
-    let events = entry.meta.events.len();
-    let detail = format!(
-        "{} - {} - {} {}",
-        game.info.mode,
-        format_clock(entry.meta.duration_secs as u32),
-        events,
-        if events == 1 { "event" } else { "events" },
-    );
-    let open = Button::new("Open")
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
-        .on_press(|ui: &mut Ui| ui.open_last_game())
-        .build(k)
-        .key("open-last-game");
-    let summary = row()
-        .w_full()
-        .px(16.0)
-        .py(14.0)
-        .gap(12.0)
-        .center_y()
-        .child(
-            col()
-                .grow(1.0)
-                .min_w(0.0)
-                .gap(2.0)
-                .child(
-                    text(game.info.me.champion.clone())
-                        .font(k.ty.body_medium)
-                        .color(k.c.text_base)
-                        .truncate(),
-                )
-                .child(text(detail).font(k.ty.small).color(k.c.text_muted)),
-        )
-        .child(result)
-        .child(open);
-    card(k)
-        .key("last-game-card")
-        .child(
-            row().w_full().h(44.0).px(16.0).center_y().child(
-                text("Last game")
-                    .font(k.ty.body_medium)
-                    .color(k.c.text_base),
-            ),
-        )
-        .child(hairline(k))
-        .child(summary)
-}
-
 fn pill(k: &Kit, label: &str, dot: Color, fill: Color, ink: Color) -> El {
     row()
         .self_start()
@@ -299,118 +226,4 @@ fn pill(k: &Kit, label: &str, dot: Color, fill: Color, ink: Color) -> El {
         .fill(fill)
         .child(el().size(8.0, 8.0).radius(4.0).fill(dot).a11y_hidden())
         .child(text(label).font(k.ty.ui_medium).color(ink))
-}
-
-fn feed_card(s: &Ui, k: &Kit) -> El {
-    let count = s.feed.len();
-    let header = row()
-        .w_full()
-        .h(44.0)
-        .px(16.0)
-        .center_y()
-        .justify_between()
-        .child(
-            text("Live feed")
-                .font(k.ty.body_medium)
-                .color(k.c.text_base),
-        )
-        .child(
-            text(format!("{count} events"))
-                .font(k.ty.small)
-                .color(k.c.text_muted),
-        );
-    let list = if s.feed.is_empty() {
-        col().w_full().grow(1.0).center().child(
-            text("Game events show up here while you play.")
-                .font(k.ty.body)
-                .color(k.c.text_muted),
-        )
-    } else {
-        let kit = k.clone();
-        col()
-            .key("feed-scroll")
-            .w_full()
-            .grow(1.0)
-            .min_h(0.0)
-            .scroll(ScrollSpec { stick_bottom: true })
-            .clip_fade(0.0, 16.0, 0.0, 0.0)
-            .child(col().w_full().growth(GrowthSpec::default()).virtual_rows(
-                count,
-                FEED_ROW_HEIGHT,
-                |s: &Ui, i| Cow::Owned(format!("feed-{}", s.feed[i].id)),
-                move |s: &Ui, i| feed_row(&s.feed[i], &kit),
-            ))
-    };
-    card(k)
-        .key("feed-card")
-        .grow(1.0)
-        .min_h(0.0)
-        .child(header)
-        .child(hairline(k))
-        .child(list)
-}
-
-fn feed_row(item: &FeedItem, k: &Kit) -> El {
-    let (label, variant) = badge(item);
-    row()
-        .key(format!("feed-{}", item.id))
-        .w_full()
-        .h(FEED_ROW_HEIGHT)
-        .px(16.0)
-        .gap(12.0)
-        .center_y()
-        .child(
-            el().w(48.0).child(
-                text(format_clock(item.game_secs as u32))
-                    .font(k.ty.mono)
-                    .color(k.c.text_muted),
-            ),
-        )
-        .child(
-            el().w(BADGE_WIDTH)
-                .child(Badge::new(label).variant(variant).build(k)),
-        )
-        .child(
-            text(item.text.clone())
-                .font(k.ty.body)
-                .color(k.c.text_base)
-                .truncate(),
-        )
-}
-
-fn badge(item: &FeedItem) -> (String, BadgeVariant) {
-    match item.highlights.first() {
-        Some(highlight) => (spaced_upper(highlight.label()), badge_variant(highlight)),
-        None => ("EVENT".to_owned(), BadgeVariant::Neutral),
-    }
-}
-
-fn badge_variant(highlight: &Highlight) -> BadgeVariant {
-    match highlight {
-        Highlight::MyKill
-        | Highlight::MyMultikill { .. }
-        | Highlight::MyFirstBlood
-        | Highlight::MyAce
-        | Highlight::GameWon => BadgeVariant::Accent,
-        Highlight::MyDeath
-        | Highlight::EnemyKill
-        | Highlight::EnemyObjective(_)
-        | Highlight::EnemyStructure(_)
-        | Highlight::EnemyAce
-        | Highlight::GameLost => BadgeVariant::Subtle,
-        _ => BadgeVariant::Neutral,
-    }
-}
-
-fn spaced_upper(label: &str) -> String {
-    let mut out = String::with_capacity(label.len() + 2);
-    let mut prev_lower = false;
-    for ch in label.chars() {
-        if (ch.is_uppercase() || ch.is_ascii_digit()) && prev_lower {
-            out.push(' ');
-        }
-        prev_lower = ch.is_lowercase();
-        out.extend(ch.to_uppercase());
-    }
-    out
 }

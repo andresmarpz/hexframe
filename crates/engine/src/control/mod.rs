@@ -170,6 +170,7 @@ impl Control {
         match cmd {
             EngineCmd::Shutdown => self.shutting_down = true,
             EngineCmd::StopRecording => self.feed(Input::UserStop),
+            EngineCmd::Retry => self.feed(Input::Retry),
             EngineCmd::ApplySettings(settings) => self.apply_settings(settings),
             EngineCmd::StartTestRecording { secs } => self.start_test_recording(secs),
             EngineCmd::RescanLibrary => {

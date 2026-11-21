@@ -556,3 +556,45 @@ fn turning_off_during_a_manual_recording_keeps_it() {
         SessionState::Recording { manual: true, .. }
     ));
 }
+
+fn failed_for_good() -> Session {
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Tick(SEC));
+    s.step(Input::Ready(info()));
+    let mut now = SEC;
+    for _ in 0..5 {
+        s.step(Input::MediaFailed("no gpu".into()));
+        now += 5 * SEC;
+        s.step(Input::Tick(now));
+    }
+    s.step(Input::MediaFailed("no gpu".into()));
+    s
+}
+
+#[test]
+fn retry_after_a_capture_error_starts_capture_for_the_live_game() {
+    let mut s = failed_for_good();
+    assert_eq!(*s.state(), SessionState::Cooldown);
+    let effects = s.step(Input::Retry);
+    assert_eq!(
+        effects,
+        vec![Effect::StartMedia(WINDOW), Effect::Status(Status::Waiting)]
+    );
+    assert!(matches!(s.state(), SessionState::Starting { .. }));
+}
+
+#[test]
+fn retry_without_a_game_returns_to_idle() {
+    let mut s = failed_for_good();
+    s.step(Input::Gone);
+    assert_eq!(s.step(Input::Retry), vec![Effect::Status(Status::Idle)]);
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn retry_while_recording_changes_nothing() {
+    let mut s = recording_session(100);
+    assert!(s.step(Input::Retry).is_empty());
+    assert!(matches!(s.state(), SessionState::Recording { .. }));
+}
