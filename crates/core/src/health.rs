@@ -95,7 +95,7 @@ impl RecordingHealth {
     }
 }
 
-pub const HEALTH_SINCE: &str = "0.1.11-preview.14";
+pub const HEALTH_SINCE: &str = "0.1.12-preview.14";
 
 pub fn no_health_text() -> String {
     format!("No health data (recorded before {HEALTH_SINCE})")

@@ -89,7 +89,7 @@ fn a_recording_without_health_says_so() {
     tap(&mut rt, "review-health");
     assert!(has_text(
         &rt,
-        "No health data (recorded before 0.1.11-preview.14)"
+        "No health data (recorded before 0.1.12-preview.14)"
     ));
     assert!(rt.find("health-summary").is_none());
 }

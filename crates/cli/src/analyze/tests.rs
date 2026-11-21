@@ -263,7 +263,7 @@ fn json_output_carries_the_report_and_old_recordings_have_no_health() {
     assert!(json["verdicts"].as_array().is_some_and(|v| v.len() >= 7));
     let text = render::text(&report);
     assert!(
-        text.contains("No health data (recorded before 0.1.11-preview.14)"),
+        text.contains("No health data (recorded before 0.1.12-preview.14)"),
         "{text}"
     );
 }
