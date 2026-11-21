@@ -54,6 +54,8 @@ pub(crate) struct Native {
     opened: Option<Instant>,
     /// The clip's layer shows its pictures (`layer`): frames don't pull them one by one.
     layered: bool,
+    /// The layer presented pictures since the surface last got one: the surface is behind.
+    behind: bool,
 }
 
 /// The window's side of a clip's layer (`layer`): what the decoder has made of its ask.
@@ -90,6 +92,7 @@ pub(crate) fn layer(shared: &Arc<Shared>, ask: Option<(u32, u32)>) -> LayerStatu
         pipe.poke();
     }
     native.layered = showing;
+    native.behind |= showing;
     status
 }
 
@@ -341,12 +344,18 @@ impl Native {
         }
         if c.playing() != self.playing {
             self.playing = c.playing();
+            let on_layer = self.on_layer();
             let event = if self.playing {
                 Event::Play { target, lead, rate: f64::from(c.rate) }
             } else {
-                Event::Pause { at: self.shown.unwrap_or_else(|| self.at()) }
+                Event::Pause { at: on_layer.or(self.shown).unwrap_or_else(|| self.at()) }
             };
             self.event(shared, c, event);
+            // Paused on the layer: the time is the picture the layer shows, which the surface
+            // gets when the window draws the clip again (`show`).
+            if let (false, Some(at)) = (self.playing, on_layer) {
+                c.time = clip_time(c, at);
+            }
         }
         if c.rate != self.rate {
             self.rate = c.rate;
@@ -369,6 +378,13 @@ impl Native {
         {
             self.event(shared, c, Event::Open { play: c.playing() });
         }
+    }
+
+    /// The picture the clip's layer shows, while it shows the pictures.
+    fn on_layer(&self) -> Option<f64> {
+        let pipe = self.pipe.as_ref().filter(|_| self.layered)?;
+        let generation = self.seeks.current().0;
+        pipe.lock().layer_presented.filter(|(_, g)| *g == generation).map(|(pts, _)| pts)
     }
 
     /// The phase's time, for a pause before any picture showed.
@@ -410,6 +426,15 @@ impl Native {
                 inbox.frames.pop_front();
             }
             match self.phase {
+                // Held after the layer showed the pictures: the surface gets the one the layer
+                // showed last, which the decoder keeps at the queue's front.
+                Phase::Paused { at } | Phase::Ended { at } if self.behind => {
+                    let mut held = None;
+                    while inbox.frames.front().is_some_and(|f| f.pts <= at) {
+                        held = inbox.frames.pop_front();
+                    }
+                    held
+                }
                 Phase::Buffering { .. } => inbox.frames.pop_front(),
                 Phase::Paused { .. } if self.shown.is_none() => inbox.frames.pop_front(),
                 Phase::Playing { clock } => {
@@ -424,6 +449,13 @@ impl Native {
             }
         };
         let Some(frame) = picked else {
+            if let (true, Phase::Paused { at }) = (self.behind, self.phase) {
+                // The layer's picture left the queue: decode it again.
+                self.behind = false;
+                self.event(shared, c, Event::Seek { to: at });
+                return;
+            }
+            self.behind = false;
             self.check_end(shared, c, &pipe, generation, target);
             return;
         };
@@ -490,7 +522,8 @@ impl Native {
             c.generation += 1;
         }
         self.shown = Some(frame.pts);
-        c.time = if duration > 0.0 { frame.pts.rem_euclid(duration).min(duration) } else { frame.pts };
+        self.behind = false;
+        c.time = clip_time(c, frame.pts);
         if let Some(opened) = self.opened.take() {
             rune_core::marks::mark("video.first_frame.shown");
             if decoder::logging() {
@@ -514,5 +547,13 @@ impl Native {
         let pos = next.unwrap_or(shown + frame);
         let _ = c;
         (true, Some(clock.when(pos).max(now)))
+    }
+}
+
+/// Unwrapped seconds as the clip's own time.
+fn clip_time(c: &Control, pts: f64) -> f64 {
+    match c.duration.filter(|d| *d > 0.0) {
+        Some(duration) => pts.rem_euclid(duration).min(duration),
+        None => pts,
     }
 }

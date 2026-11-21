@@ -60,6 +60,8 @@ pub(super) struct Inbox {
     pub layer_handle: Option<usize>,
     /// The size of the last picture presented on the layer, and the generation it belongs to.
     pub layer_shown: Option<((u32, u32), u32)>,
+    /// The newest picture presented on the layer and kept in `frames`: its time and generation.
+    pub layer_presented: Option<(f64, u32)>,
     /// The clip can't have a layer (a rotated clip, software pictures, no video processor): the
     /// UI keeps drawing it.
     pub layer_refused: bool,
@@ -437,6 +439,7 @@ impl Decoder {
                                 }
                             }
                             s.touched = Some(Instant::now());
+                            s.layer_presented = Some((pts, generation));
                         }
                         drop(s);
                         if let Some(ring) = &mut self.ring {
