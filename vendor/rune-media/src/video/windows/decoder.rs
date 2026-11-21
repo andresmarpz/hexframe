@@ -41,6 +41,9 @@ const LAYER_LATE: Duration = Duration::from_millis(50);
 /// The layer shows a picture at least this often, however late the pictures are.
 const LAYER_GAP: Duration = Duration::from_millis(250);
 
+/// A decoder wait or read this long goes to the app's log.
+const LONG_WAIT: Duration = Duration::from_millis(500);
+
 /// How long a clip that opens before Rune has a GPU waits for it (`rune_device`).
 const GPU_WAIT: Duration = Duration::from_secs(3);
 
@@ -392,6 +395,9 @@ impl Decoder {
         let mut handled_at = Instant::now();
         // The last reason the decoder waited, for `RUNE_VIDEO_LOG`.
         let mut waits: Option<(bool, bool, bool, bool)> = None;
+        // Since when the decoder waits, and whether the app's log heard of it.
+        let mut wait_began: Option<Instant> = None;
+        let mut wait_noted = false;
         loop {
             // Take the UI's asks, then wait for room in the queue and a free texture.
             {
@@ -442,6 +448,9 @@ impl Decoder {
                         if logging() {
                             log!("seek to {to:.3} (generation {generation}, fast {}) took {} us", seek.fast, began.elapsed().as_micros());
                         }
+                        if began.elapsed() > LONG_WAIT {
+                            tracing::info!("video decoder: the source's seek to {to:.3} took {} ms", began.elapsed().as_millis());
+                        }
                         s = pipe.lock();
                         continue;
                     }
@@ -468,8 +477,20 @@ impl Decoder {
                     let texture = self.ring.as_ref().is_none_or(Ring::free);
                     let sound_full = self.output.as_ref().is_some_and(Output::full);
                     if !ended && room && texture && !(sound_full && !self.video_open) {
-                        waits = None;
+                        if wait_noted {
+                            tracing::info!("video decoder waited {} ms, decodes again", wait_began.map_or(0, |b| b.elapsed().as_millis()));
+                        }
+                        (waits, wait_began, wait_noted) = (None, None, false);
                         break;
+                    }
+                    let since = *wait_began.get_or_insert_with(Instant::now);
+                    // A full queue while paused or undrawn is normal; no texture, or no room while
+                    // the clock runs, is not.
+                    let starved = !ended && (!texture || (!room && job.clock.get().is_some()));
+                    if starved && !wait_noted && since.elapsed() > LONG_WAIT {
+                        wait_noted = true;
+                        let what = if texture { "room in its queue while the clock runs" } else { "a free texture" };
+                        tracing::info!("video decoder waits {} ms for {what} (room {room}, texture {texture}, sound full {sound_full})", since.elapsed().as_millis());
                     }
                     if logging() && waits != Some((ended, room, texture, sound_full)) {
                         log!("decoder waits: ended {ended}, room {room}, texture {texture}, sound full {sound_full}");
@@ -502,6 +523,9 @@ impl Decoder {
             let mut read = mf::read(&self.reader, MF_SOURCE_READER_ANY_STREAM.0 as u32)?;
             if logging() && began.elapsed() > Duration::from_millis(200) {
                 log!("a read took {} ms", began.elapsed().as_millis());
+            }
+            if began.elapsed() > LONG_WAIT {
+                tracing::info!("video decoder: a read took {} ms", began.elapsed().as_millis());
             }
             if read.flags & MF_SOURCE_READERF_ERROR.0 != 0 {
                 return Err("the decoder stopped with an error".into());

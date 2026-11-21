@@ -90,6 +90,14 @@ Upstream: no issue filed yet.
 - Change: the window hands the textures of pictures it drops as stale to the decoder (`Inbox::unread`, `Inbox::drop_stale`), which frees them at once, and the decoder does the same for the queue a seek flushes. A slot is freed only if it still holds that picture (`Ring::unread` takes the fence value it was written with). The layer path already freed its dropped pictures this way.
 - Files: `decoder.rs`, `gpu.rs`, `mod.rs`. Tests: `a_storm_of_seeks_while_playing_plays_on_from_the_last` and `a_scrub_shows_keyframes_then_plays_on_from_where_it_stops` in `qa/tests.rs` (both failed before, with the log showing `decoder waits: ... texture false` after the first seeks). The scrub test now names the fixture's keyframe spacing (every 32 pictures), and a PC without ffmpeg skips the long-seek test.
 
+## 8. Playback events reach the app's log without `RUNE_VIDEO_LOG`
+
+Upstream: none (Rune logs only to stderr under `RUNE_VIDEO_LOG`).
+
+- Problem: a freeze on a user's PC left no trace: the player's own log is off in shipped builds, and the app's stall report only sees `Player::time`, which keeps moving while the layer's clock runs.
+- Change: `watch.rs` and a few calls log through `tracing`, a few lines per seek or pause and nothing per picture: each phase change with its time, each seek (from, to, generation, fast), each wedged-seek restart and decoder failure, a decoder wait over 500 ms for a texture or for room while the clock runs, a source seek or read over 500 ms, and one `picture frozen: clock advanced N s since the last presented picture` warning when the clock runs over 1 s with no new picture on the surface or the layer (and one line when it moves again).
+- Files: `Cargo.toml` (`tracing`), `watch.rs` (new), `mod.rs`, `decoder.rs`.
+
 ## Known gaps
 
 - A clip with sound that nobody draws (window minimised, scrolled away) keeps its sound and clock running while its decoder waits with a full picture queue. Drawn again, the pictures stall and the clock goes back to the newest picture, so some sound plays twice. Upstream behaves the same; seeking the decoder to the clock would fix it.

@@ -54,6 +54,8 @@ symphonia = { version = "0.5.5", optional = true, default-features = false, feat
 opuscule = { version = "0.2.2", optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+# Low-volume playback events (`video::windows::watch`) for the app's log.
+tracing = "0.1"
 wgpu = { version = "~30.0.1", default-features = false, features = ["dx12"] }
 # D3D12 shared textures (`native_surface::windows`), Media Foundation, D3D11 and WASAPI (`video::windows`):
 # COM interfaces only; their DLLs load on the first clip through `GetProcAddress`, so the import table gains nothing.

@@ -3320,6 +3320,7 @@ dependencies = [
  "rune-image",
  "rune-staging",
  "symphonia",
+ "tracing",
  "wgpu",
  "windows",
  "windows-sys 0.61.2",

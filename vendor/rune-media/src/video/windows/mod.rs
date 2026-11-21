@@ -23,6 +23,7 @@ mod mf;
 mod qa;
 mod still;
 mod vsync;
+mod watch;
 
 use super::*;
 use decoder::{Decoded, Facts, Job, News, Pic, Pipe, Seek};
@@ -61,6 +62,8 @@ pub(crate) struct Native {
     behind: bool,
     /// When the phase began to wait for its picture (Buffering), for `machine::overdue`.
     waiting: Option<Instant>,
+    /// Whether a new picture shows while the clock runs, for the app's log.
+    freeze: watch::Freeze,
 }
 
 /// The window's side of a clip's layer (`layer`): what the decoder has made of its ask.
@@ -252,6 +255,7 @@ pub(super) fn pull(shared: &Arc<Shared>, surface: &NativeSurface, target: Instan
     let shown = native.shown;
     native.show(shared, &mut c, surface, target, lead);
     c.landing = native.waiting.is_some();
+    native.look_for_freeze(now);
     let (active, due) = native.next(&c, now);
     native.due = due;
     let cost = now.elapsed().as_nanos();
@@ -268,8 +272,11 @@ impl Native {
     fn event(&mut self, shared: &Arc<Shared>, c: &Control, event: Event) {
         let before = self.phase;
         let effects = machine::step(&mut self.phase, event);
-        if decoder::logging() && std::mem::discriminant(&before) != std::mem::discriminant(&self.phase) {
-            decoder::log!("{:?} -> {:?}", before, self.phase);
+        if std::mem::discriminant(&before) != std::mem::discriminant(&self.phase) {
+            tracing::info!("video {} -> {}", watch::phase(before), watch::phase(self.phase));
+            if decoder::logging() {
+                decoder::log!("{:?} -> {:?}", before, self.phase);
+            }
         }
         let mut sought = false;
         for effect in effects {
@@ -277,6 +284,7 @@ impl Native {
                 Effect::Open { at } => self.open(shared, c, at),
                 Effect::Seek { to, fast } => {
                     let generation = self.seeks.next().0;
+                    tracing::info!("video seek from {} to {to:.3} (generation {generation}{})", watch::phase(before), if fast { ", fast" } else { "" });
                     if let Some(pipe) = &self.pipe {
                         pipe.lock().seek = Some(Seek { to, generation, fast });
                         pipe.poke();
@@ -297,6 +305,7 @@ impl Native {
 
     /// The decoder never delivered the picture at `at`: it stops, and a new one opens there.
     fn restart(&mut self, shared: &Arc<Shared>, c: &Control, at: f64) {
+        tracing::warn!("video waited {:?} for the picture at {at:.3}: the decoder starts again there", machine::STUCK);
         if decoder::logging() {
             decoder::log!("waited {:?} for the picture at {at:.3}: the decoder starts again there", machine::STUCK);
         }
@@ -352,6 +361,7 @@ impl Native {
                     self.event(shared, c, Event::Opened);
                 }
                 News::Failed(e) => {
+                    tracing::warn!("video decoder failed: {e}");
                     if decoder::logging() {
                         decoder::log!("failed: {e}");
                     }
@@ -423,6 +433,16 @@ impl Native {
             self.event(shared, c, Event::Open { play: c.playing() });
         }
         c.landing = self.waiting.is_some();
+    }
+
+    /// Notes, for the app's log, a clock that runs on while no new picture shows.
+    fn look_for_freeze(&mut self, now: Instant) {
+        let clock = match self.phase {
+            Phase::Playing { clock } => Some(clock),
+            _ => None,
+        };
+        let picture = if self.layered { self.on_layer() } else { self.shown };
+        self.freeze.look(clock, picture, self.layered, now);
     }
 
     /// The picture the clip's layer shows, while it shows the pictures.
