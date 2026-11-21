@@ -103,11 +103,7 @@ pub(crate) fn analyze(rows: &[SampleRow], fps: u32, audio: Option<AudioBytes>) -
     let frames = rows.len() as u64;
     VideoReport {
         frames,
-        nominal_fps: if nominal > 0 {
-            (timescale / nominal) as u32
-        } else {
-            0
-        },
+        nominal_fps: timescale.checked_div(nominal).unwrap_or(0) as u32,
         duration_secs,
         average_fps: if duration_secs > 0.0 {
             frames as f64 / duration_secs
@@ -128,8 +124,8 @@ pub(crate) fn analyze(rows: &[SampleRow], fps: u32, audio: Option<AudioBytes>) -
 }
 
 fn nominal_ticks(rows: &[SampleRow], fps: u32) -> u64 {
-    if fps > 0 {
-        return u64::from(VideoFormat::TIMESCALE / fps);
+    if let Some(ticks) = VideoFormat::TIMESCALE.checked_div(fps) {
+        return u64::from(ticks);
     }
     let mut durations: Vec<u32> = rows.iter().map(|r| r.duration).collect();
     durations.sort_unstable();

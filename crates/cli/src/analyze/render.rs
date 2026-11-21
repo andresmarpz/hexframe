@@ -5,12 +5,24 @@ use super::diag::DiagReport;
 
 const HISTOGRAM_BAR: usize = 30;
 
+macro_rules! line {
+    ($out:expr, $($arg:tt)*) => {
+        writeln!($out, $($arg)*).ok()
+    };
+}
+
+macro_rules! put {
+    ($out:expr, $($arg:tt)*) => {
+        write!($out, $($arg)*).ok()
+    };
+}
+
 pub(super) fn text(report: &Report) -> String {
     let mut out = String::new();
     let file = &report.file;
-    let _ = writeln!(out, "Greyscreen recording analysis");
-    let _ = writeln!(out, "file:    {}", file.path.display());
-    let _ = writeln!(
+    line!(out, "Greyscreen recording analysis");
+    line!(out, "file:    {}", file.path.display());
+    line!(
         out,
         "size:    {:.1} MB, {}x{} at {} fps target, {}",
         file.bytes as f64 / 1_000_000.0,
@@ -23,10 +35,10 @@ pub(super) fn text(report: &Report) -> String {
             "not finalized"
         }
     );
-    let _ = writeln!(out, "length:  {}", clock(report.video.duration_secs));
-    let _ = writeln!(out, "\nOVERALL: {}\n", report.overall.label());
+    line!(out, "length:  {}", clock(report.video.duration_secs));
+    line!(out, "\nOVERALL: {}\n", report.overall.label());
     for verdict in &report.verdicts {
-        let _ = writeln!(
+        line!(
             out,
             "[{:<7}] {:<22} {}",
             verdict.level.label(),
@@ -40,7 +52,7 @@ pub(super) fn text(report: &Report) -> String {
 
 fn details(out: &mut String, report: &Report) {
     let video = &report.video;
-    let _ = writeln!(
+    line!(
         out,
         "\nFrame intervals (nominal {} fps):",
         video.nominal_fps
@@ -48,7 +60,7 @@ fn details(out: &mut String, report: &Report) {
     let total = video.frames.max(1);
     for bucket in &video.histogram {
         let bar = (bucket.count as f64 / total as f64 * HISTOGRAM_BAR as f64).round() as usize;
-        let _ = writeln!(
+        line!(
             out,
             "  {:<15} {:>9}  {}",
             bucket.label,
@@ -57,14 +69,14 @@ fn details(out: &mut String, report: &Report) {
         );
     }
     if !video.gaps.listed.is_empty() {
-        let _ = writeln!(
+        line!(
             out,
             "\nVideo gaps (showing {} of {}):",
             video.gaps.listed.len(),
             video.gaps.count
         );
         for gap in &video.gaps.listed {
-            let _ = writeln!(
+            line!(
                 out,
                 "  at {}  {:>6.0} ms  {} frames missed",
                 clock(gap.at_secs),
@@ -76,14 +88,14 @@ fn details(out: &mut String, report: &Report) {
     if let Some(audio) = &report.audio
         && !audio.gaps.is_empty()
     {
-        let _ = writeln!(
+        line!(
             out,
             "\nAudio gaps (showing {} of {}):",
             audio.gaps.len(),
             audio.gap_count
         );
         for gap in &audio.gaps {
-            let _ = writeln!(
+            line!(
                 out,
                 "  at {}  {:>6.0} ms",
                 clock(gap.at_secs),
@@ -96,13 +108,13 @@ fn details(out: &mut String, report: &Report) {
         diagnostics(out, diag);
     }
     if report.health.is_none() {
-        let _ = writeln!(
+        line!(
             out,
             "\nNo health summary in game.json (recorded before 0.1.12)."
         );
     }
     if report.diagnostics.is_none() {
-        let _ = writeln!(
+        line!(
             out,
             "No diagnostics.jsonl (turn on Detailed recording diagnostics in Settings to get one)."
         );
@@ -114,26 +126,26 @@ fn bitrate_table(out: &mut String, report: &Report) {
     if rate.windows_kbps.len() < 2 {
         return;
     }
-    let _ = writeln!(out, "\nBitrate per {} s (Mbps): ", rate.window_secs);
+    line!(out, "\nBitrate per {} s (Mbps): ", rate.window_secs);
     let mut line = String::from("  ");
     for (index, kbps) in rate.windows_kbps.iter().enumerate() {
-        let _ = write!(line, "{:.1} ", f64::from(*kbps) / 1000.0);
+        put!(line, "{:.1} ", f64::from(*kbps) / 1000.0);
         if (index + 1) % 12 == 0 {
-            let _ = writeln!(out, "{}", line.trim_end());
+            line!(out, "{}", line.trim_end());
             line = String::from("  ");
         }
     }
-    if line.trim().len() > 0 {
-        let _ = writeln!(out, "{}", line.trim_end());
+    if !line.trim().is_empty() {
+        line!(out, "{}", line.trim_end());
     }
 }
 
 fn diagnostics(out: &mut String, diag: &DiagReport) {
-    let _ = writeln!(out, "\nDiagnostics ({} seconds):", diag.seconds);
+    line!(out, "\nDiagnostics ({} seconds):", diag.seconds);
     if let Some(setup) = &diag.setup {
         let text = |key: &str| setup[key].as_str().unwrap_or("?").to_owned();
         let number = |key: &str| setup[key].as_u64().unwrap_or(0);
-        let _ = writeln!(
+        line!(
             out,
             "  GPU {} (driver {}), display {}x{} at {} Hz, window {}x{}, encode {}x{}",
             text("adapter"),
@@ -148,13 +160,13 @@ fn diagnostics(out: &mut String, diag: &DiagReport) {
         );
     }
     if let (Some(avg), Some(max)) = (diag.cpu_pct_avg, diag.cpu_pct_max) {
-        let _ = writeln!(
+        line!(
             out,
             "  Greyscreen CPU {avg:.0}% average, {max:.0}% peak (100% is one core)"
         );
     }
     if let Some(mem) = diag.mem_mb_max {
-        let _ = writeln!(out, "  Greyscreen memory peak {mem} MB");
+        line!(out, "  Greyscreen memory peak {mem} MB");
     }
 }
 
