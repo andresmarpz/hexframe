@@ -664,3 +664,14 @@ fn a_saved_height_outside_the_ladder_stays_selectable() {
     open_resolution_menu(&mut rt);
     assert!(visible_texts(&rt).iter().any(|t| t == "800p"));
 }
+
+#[test]
+fn the_quality_note_follows_the_injected_display() {
+    let mut ui = Ui::preview();
+    ui.display_sizes = || vec![(2560, 1440), (1920, 1080)];
+    ui.settings.resolution = Resolution::Native;
+    let mut rt = runtime_with(ui);
+    tap(&mut rt, "nav-settings");
+
+    assert!(visible_texts(&rt).iter().any(|t| t.contains("(1440p)")));
+}

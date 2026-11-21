@@ -20,6 +20,7 @@ pub(super) use thumbs::copy_playable;
 
 pub(super) fn ui() -> Ui {
     let mut ui = Ui::blank(Settings::default());
+    ui.display_sizes = Vec::new;
     ui.status = EngineStatus::Recording {
         since: 0,
         game: Some(game_info("Ahri", "CLASSIC")),

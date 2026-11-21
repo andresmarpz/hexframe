@@ -5,7 +5,6 @@ use rune_kit::{Kit, SegmentedControl, Select, SelectAppearance};
 
 use super::catalog::Row;
 use super::{setting_row, toggle_row};
-use crate::platform;
 use crate::ui::{Ui, format_size_rate};
 
 const QUALITIES: [(Quality, &str); 3] = [
@@ -64,7 +63,7 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
             |ui| ui.change(|s| s.record_full_game = !s.record_full_game),
         ),
         Row::Quality => {
-            let note = quality_note(s, native_height(&platform::connected_display_sizes()));
+            let note = quality_note(s, native_height(&(s.display_sizes)()));
             setting_row(k, "quality-row", "Quality", Some(&note), quality(s, k))
         }
         Row::Resolution => setting_row(
@@ -134,7 +133,7 @@ fn quality(s: &Ui, k: &Kit) -> El {
 }
 
 fn resolution(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
-    let options = resolution_options(&platform::connected_display_sizes(), s.settings.resolution);
+    let options = resolution_options(&(s.display_sizes)(), s.settings.resolution);
     let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
     let current = options
         .iter()
