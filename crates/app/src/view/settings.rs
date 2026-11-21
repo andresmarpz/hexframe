@@ -16,11 +16,13 @@ use catalog::Row;
 
 const SHEET_WIDTH: f32 = 760.0;
 const BODY_HEIGHT: f32 = 484.0;
+const MIN_BODY_HEIGHT: f32 = 160.0;
+const DIALOG_CHROME: f32 = 108.0;
 const NAV_WIDTH: f32 = 188.0;
 const SCROLL_FADE: f32 = 20.0;
 const SUBTITLE: &str = "Changes are saved automatically.";
 
-pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
+pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<f32>) {
     if !s.settings_open {
         return;
     }
@@ -34,7 +36,7 @@ pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
     let body = col()
         .key("settings-sheet")
         .w_full()
-        .h(BODY_HEIGHT)
+        .h(body_height(window_height))
         .child(search_bar(s, k))
         .child(hairline(k))
         .child(
@@ -55,6 +57,12 @@ pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
         .child(body)
         .build(k, layer);
     layer.extend(popups);
+}
+
+fn body_height(window_height: Option<f32>) -> f32 {
+    window_height.map_or(BODY_HEIGHT, |h| {
+        (h - DIALOG_CHROME).clamp(MIN_BODY_HEIGHT, BODY_HEIGHT)
+    })
 }
 
 fn search_bar(s: &Ui, k: &Kit) -> El {

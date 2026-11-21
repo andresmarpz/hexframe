@@ -189,3 +189,47 @@ fn recording_shows_the_next_game_notice() {
     let rt = open_sheet();
     assert!(rt.find("settings-next-game").is_some());
 }
+
+fn short_sheet(open_menu: bool) -> rune::Runtime<crate::ui::Ui> {
+    let mut rt = open_sheet();
+    rt.set_viewport((1000.0, 480.0), 1.0);
+    settle(&mut rt);
+    if open_menu {
+        tap(&mut rt, "resolution-trigger");
+        settle(&mut rt);
+    }
+    rt
+}
+
+fn bounds(rt: &rune::Runtime<crate::ui::Ui>, key: &str) -> [f32; 4] {
+    rt.presented(key)
+        .unwrap_or_else(|| panic!("no element {key}"))
+        .0
+}
+
+#[test]
+fn the_sheet_fits_a_short_window() {
+    let rt = short_sheet(false);
+    let sheet = bounds(&rt, "settings-dialog");
+    assert!(sheet[1] >= 0.0 && sheet[1] + sheet[3] <= 480.0, "{sheet:?}");
+    let body = bounds(&rt, "settings-sheet");
+    assert!(body[3] > 200.0, "{body:?}");
+}
+
+#[test]
+fn the_resolution_menu_stays_inside_the_sheet_in_a_short_window() {
+    let rt = short_sheet(true);
+    let sheet = bounds(&rt, "settings-dialog");
+    let menu = bounds(&rt, "resolution-content");
+    assert!(menu[1] >= sheet[1], "{menu:?} {sheet:?}");
+    assert!(
+        menu[1] + menu[3] <= sheet[1] + sheet[3],
+        "{menu:?} {sheet:?}"
+    );
+}
+
+#[test]
+fn the_sheet_keeps_its_full_height_in_a_tall_window() {
+    let rt = open_sheet();
+    assert_eq!(bounds(&rt, "settings-sheet")[3], 484.0);
+}

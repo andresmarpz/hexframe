@@ -31,7 +31,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
         layer.push(card);
     }
     if theater.is_none() {
-        settings::sheet(s, &k, &mut layer);
+        settings::sheet(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));
     }
     row_menu::menu(s, &k, &mut layer);
     if let Some(rec) = s.pending_delete_entry() {
