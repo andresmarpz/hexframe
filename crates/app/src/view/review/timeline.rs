@@ -22,11 +22,11 @@ pub(super) fn event_color(k: &Kit, highlights: &[String]) -> Color {
     tone_color(k, tone)
 }
 
-pub(super) fn marker_x(rec_secs: f64, duration: f64, width: f32) -> f32 {
+pub(super) fn fraction(secs: f64, duration: f64) -> f32 {
     if duration <= 0.0 {
         return 0.0;
     }
-    (rec_secs / duration).clamp(0.0, 1.0) as f32 * width
+    (secs / duration).clamp(0.0, 1.0) as f32
 }
 
 pub(super) fn drag_target(x: f32, width: f32, duration: f64) -> f64 {
@@ -36,34 +36,28 @@ pub(super) fn drag_target(x: f32, width: f32, duration: f64) -> f64 {
     f64::from((x / width).clamp(0.0, 1.0)) * duration
 }
 
-fn centered(x: f32, width: f32, track_width: f32) -> f32 {
-    (x - width / 2.0).clamp(0.0, (track_width - width).max(0.0))
-}
-
-pub(super) fn thumb_rail(thumb: El, size: f32, height: f32, progress: f32) -> El {
+fn rail(item: El, size: f32, height: f32, progress: f32) -> El {
     rune::row()
         .pin(Some(0.0), Some(0.0), Some(0.0), None)
         .h(height)
         .px(size / 2.0)
         .center_y()
+        .child(el().w_frac(progress).h(height))
+        .child(item)
+}
+
+pub(super) fn thumb_rail(thumb: El, size: f32, height: f32, progress: f32) -> El {
+    rail(thumb.ml(-size / 2.0), size, height, progress)
         .instant_changes()
         .a11y_hidden()
-        .child(el().w_frac(progress).h(height))
-        .child(thumb.ml(-size / 2.0))
 }
 
 fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
-    let x = centered(
-        marker_x(event.rec_secs, review.duration(), review.track_width),
-        MARKER_WIDTH,
-        review.track_width,
-    );
     let rec_secs = event.rec_secs;
     let key = format!("marker-{}", event.id);
     let marker = el()
         .key(key.clone())
         .size(MARKER_WIDTH, MARKER_HEIGHT)
-        .absolute(x, (HEIGHT - MARKER_HEIGHT) / 2.0)
         .center()
         .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)))
         .child(
@@ -71,18 +65,31 @@ fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
                 .radius(DOT / 2.0)
                 .fill(event_color(k, &event.highlights)),
         );
-    hoverable(marker, event.id, key)
+    rail(
+        hoverable(marker.ml(-MARKER_WIDTH / 2.0), event.id, key),
+        MARKER_WIDTH,
+        HEIGHT,
+        fraction(rec_secs, review.duration()),
+    )
 }
 
 fn band(clip: &ClipEntry, review: &ReviewState, k: &Kit) -> El {
-    let (duration, width) = (review.duration(), review.track_width);
-    let start = marker_x(clip.start_secs, duration, width);
-    let end = marker_x(clip.end_secs, duration, width);
-    el().size((end - start).max(0.0), BAND_HEIGHT)
-        .absolute(start, (HEIGHT - BAND_HEIGHT) / 2.0)
+    let duration = review.duration();
+    let start = fraction(clip.start_secs, duration);
+    let end = fraction(clip.end_secs, duration);
+    let band = el()
+        .w_frac((end - start).max(0.0))
+        .h(BAND_HEIGHT)
         .radius(3.0)
         .fill(k.c.text_base.alpha(BAND_ALPHA))
+        .a11y_hidden();
+    rune::row()
+        .pin(Some(0.0), Some(0.0), Some(0.0), None)
+        .h(HEIGHT)
+        .center_y()
         .a11y_hidden()
+        .child(el().w_frac(start).h(HEIGHT))
+        .child(band)
 }
 
 fn thumb(size: f32, k: &Kit) -> El {
@@ -124,11 +131,6 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
         .w_full()
         .h(HEIGHT)
         .hover_group()
-        .on_layout(|ui: &mut Ui, rect: [f32; 4]| {
-            if let Some(review) = &mut ui.review {
-                review.track_width = rect[2];
-            }
-        })
         .on_drag(move |ui: &mut Ui, drag: &mut Drag, _| {
             if matches!(drag.phase, Phase::Down | Phase::Move) {
                 ui.review_seek(drag_target(drag.x, drag.w, duration));

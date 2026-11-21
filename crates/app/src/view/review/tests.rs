@@ -1,14 +1,14 @@
 #![allow(clippy::expect_used)]
 
-use super::timeline::{drag_target, marker_x};
+use super::timeline::{drag_target, fraction};
 use crate::ui::seek_target;
 
 #[test]
 fn markers_sit_at_their_share_of_the_duration() {
-    assert_eq!(marker_x(5.0, 10.0, 400.0), 200.0);
-    assert_eq!(marker_x(0.0, 10.0, 400.0), 0.0);
-    assert_eq!(marker_x(12.0, 10.0, 400.0), 400.0);
-    assert_eq!(marker_x(5.0, 0.0, 400.0), 0.0);
+    assert_eq!(fraction(5.0, 10.0), 0.5);
+    assert_eq!(fraction(0.0, 10.0), 0.0);
+    assert_eq!(fraction(12.0, 10.0), 1.0);
+    assert_eq!(fraction(5.0, 0.0), 0.0);
 }
 
 #[test]

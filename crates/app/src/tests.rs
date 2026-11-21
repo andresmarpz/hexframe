@@ -23,6 +23,7 @@ mod nav_status;
 mod panes;
 mod playback;
 mod review_flow;
+mod review_markers;
 mod review_narrow;
 mod review_volume;
 mod search_clear;
