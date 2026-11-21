@@ -6,8 +6,8 @@ use std::rc::Rc;
 use rune::{El, Key, LoopSpec, Tx, col, el, text};
 use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, glyphs};
 
-use super::grip::grip;
 use super::clearable::clear_when_filled;
+use super::grip::grip;
 use crate::ui::library_format::summary;
 use crate::ui::{ListItem, PaneEdge, Ui};
 
