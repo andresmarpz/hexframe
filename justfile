@@ -31,3 +31,11 @@ dist: build-win
     cp target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt dist/
 
 ci: lint check-win test
+
+# Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
+# A tag with a dash (v0.2.0-preview.1) becomes a prerelease.
+release tag notes="": ci dist
+    git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
+    git fetch -q origin && test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || { echo "push main first"; exit 1; }
+    version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1); case "{{tag}}" in v$version*) ;; *) echo "tag {{tag}} does not match version $version"; exit 1;; esac
+    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt -R andresmarpz/greyscreen --target main --title "{{tag}}" --notes "{{notes}}" {{ if tag =~ '-' { "--prerelease" } else { "" } }}
