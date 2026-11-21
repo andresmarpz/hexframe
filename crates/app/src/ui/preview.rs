@@ -119,13 +119,30 @@ fn entry(row: Row) -> RecordingEntry {
         "2026-11-{day:02}_{hour:02}-{minute:02}-00_{}_{}",
         row.champion, row.mode
     );
-    let events = vec![EventEntry {
-        id: 1,
-        game_secs: 95.0,
-        rec_secs: 103.0,
-        kind: GameEvent::GameStart,
-        highlights: vec!["MyKill".into()],
-    }];
+    let (kills, deaths, assists) = (
+        row.clips + 1,
+        (row.size_mb / 500) as usize,
+        row.minutes as usize / 3,
+    );
+    let me = || String::from("Summoner");
+    let fights = (0..kills)
+        .map(|_| (me(), "Zed".to_owned(), Vec::new()))
+        .chain((0..deaths).map(|_| ("Lee Sin".to_owned(), me(), Vec::new())))
+        .chain((0..assists).map(|_| ("Jinx".to_owned(), "Lux".to_owned(), vec![me()])));
+    let events = fights
+        .zip(1u32..)
+        .map(|((killer, victim, assisters), id)| EventEntry {
+            id,
+            game_secs: f64::from(id) * 60.0,
+            rec_secs: f64::from(id) * 60.0 + 8.0,
+            kind: GameEvent::ChampionKill {
+                killer,
+                victim,
+                assisters,
+            },
+            highlights: Vec::new(),
+        })
+        .collect();
     let clips = (0..row.clips)
         .map(|i| ClipEntry {
             file: format!("clips/{i:02}-00_MyKill.mp4"),

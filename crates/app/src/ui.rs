@@ -12,6 +12,7 @@ pub(crate) mod event_detail;
 mod format;
 mod jump;
 mod keys;
+pub(crate) mod library_format;
 mod preview;
 mod review;
 

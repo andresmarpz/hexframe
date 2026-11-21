@@ -1,5 +1,6 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+mod icons;
 mod logging;
 mod tray;
 mod ui;
@@ -88,6 +89,7 @@ fn main() {
         min_size: Some((720.0, 520.0)),
         scenes: ui::SCENES,
         poll: Some(Ui::poll),
+        setup: Some(|_, waker| view::champion::set_waker(waker)),
         on_key: Some(Ui::on_key),
         ..AppSpec::new("Greyscreen", (960.0, 640.0), Ui::preview, view::root)
     };
@@ -133,6 +135,7 @@ fn main() {
                 );
             });
         }
+        icons::start_prefetch(handle.clone());
         let cmd = engine.cmd.clone();
         app = app.init(move || {
             #[allow(unused_mut)]

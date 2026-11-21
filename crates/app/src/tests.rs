@@ -83,11 +83,11 @@ fn opening_recordings_asks_the_engine_to_rescan() {
 }
 
 #[test]
-fn review_button_opens_the_review_screen_with_the_id() {
+fn clicking_a_recording_row_opens_review_with_the_id() {
     let (mut rt, _rx) = live_runtime();
     tap(&mut rt, "nav-recordings");
-    let id = rt.state.recordings[0].meta.id.clone();
-    tap(&mut rt, &format!("review-{id}"));
+    let id = rt.state.recordings[1].meta.id.clone();
+    tap(&mut rt, &id);
     assert_eq!(rt.state.screen, Screen::Review);
     assert_eq!(
         rt.state.review.as_ref().map(|r| r.entry.meta.id.clone()),
@@ -95,6 +95,16 @@ fn review_button_opens_the_review_screen_with_the_id() {
     );
     tap(&mut rt, "review-back");
     assert_eq!(rt.state.screen, Screen::Recordings);
+}
+
+#[test]
+fn the_folder_button_does_not_open_review() {
+    let (mut rt, _rx) = live_runtime();
+    tap(&mut rt, "nav-recordings");
+    let id = rt.state.recordings[0].meta.id.clone();
+    tap(&mut rt, &format!("show-{id}"));
+    assert_eq!(rt.state.screen, Screen::Recordings);
+    assert!(rt.state.review.is_none());
 }
 
 #[test]

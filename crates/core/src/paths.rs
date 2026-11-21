@@ -13,6 +13,17 @@ pub fn logs_dir() -> PathBuf {
         .join("logs")
 }
 
+pub fn cache_dir() -> PathBuf {
+    dirs::data_local_dir()
+        .unwrap_or_default()
+        .join(APP_DIR)
+        .join("cache")
+}
+
+pub fn champion_icons_dir() -> PathBuf {
+    cache_dir().join("champions")
+}
+
 pub fn default_output_dir() -> PathBuf {
     match dirs::video_dir() {
         Some(videos) => videos.join(APP_DIR),

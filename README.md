@@ -133,6 +133,6 @@ greyscreen is an early preview. It is built and tested on macOS and in CI, and r
 
 MIT. See [LICENSE](LICENSE).
 
----
+## Legal
 
-greyscreen is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games; League of Legends is a trademark of Riot Games, Inc.
+Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

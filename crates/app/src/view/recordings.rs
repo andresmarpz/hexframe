@@ -2,52 +2,66 @@ use std::borrow::Cow;
 
 use greyscreen_core::game::GameResult;
 use greyscreen_engine::{RecordingEntry, reveal};
-use rune::{El, GrowthSpec, ScrollSpec, col, el, row, text};
-use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit};
+use jiff::Zoned;
+use rune::{Color, Cursor, El, GrowthSpec, Icon, ScrollSpec, col, el, row, text};
+use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, glyphs};
 
+use super::champion::champion_icon;
 use super::{card, hairline, page_header};
-use crate::ui::{Ui, format_clock, format_date, format_size};
+use crate::ui::library_format::{Kda, kda, mode_label, summary, when};
+use crate::ui::{Ui, format_clock, format_size};
 
-const ROW_HEIGHT: f32 = 52.0;
-const COL_DATE: f32 = 120.0;
+const ROW_HEIGHT: f32 = 64.0;
+const ICON_SIZE: f32 = 40.0;
+const ACCENT_WIDTH: f32 = 3.0;
 const COL_RESULT: f32 = 60.0;
-const COL_DURATION: f32 = 62.0;
-const COL_SIZE: f32 = 64.0;
+const COL_KDA: f32 = 72.0;
+const COL_WHEN: f32 = 112.0;
+const COL_DURATION: f32 = 58.0;
 const COL_CLIPS: f32 = 44.0;
-const COL_ACTIONS: f32 = 132.0;
-const EMPTY_TEXT: &str = "No recordings yet. Play a game, or run a test recording from Status.";
+const COL_SIZE: f32 = 62.0;
+const COL_ACTION: f32 = 32.0;
+const COLUMN_GAP: f32 = 12.0;
+const TABULAR: &str = "'tnum' 1";
+
+static CLIP: Icon = Icon {
+    name: "greyscreen-clip",
+    view: 16.0,
+    body: concat!(
+        r#"<rect x="1.5" y="3.5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>"#,
+        r#"<path d="M10.5 7 14.5 4.8v6.4L10.5 9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>"#
+    ),
+};
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
-    let subtitle = format!(
-        "{} recordings in {}",
-        s.recordings.len(),
-        s.settings.output_dir.display()
-    );
     let open = Button::new("Open folder")
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Large)
         .on_press(|ui: &mut Ui| ui.reveal_output_dir())
         .build(k)
         .key("open-folder");
-    col()
+    let folder = s.settings.output_dir.display().to_string();
+    let mut page = col()
         .key("recordings")
         .w_full()
         .h_full()
         .min_h(0.0)
-        .gap(16.0)
-        .child(page_header(k, "Recordings", &subtitle, Some(open)))
-        .child(table(s, k))
+        .gap(12.0)
+        .child(page_header(k, "Recordings", &folder, Some(open)));
+    if !s.recordings.is_empty() {
+        page = page.child(
+            text(summary(&s.recordings))
+                .key("recordings-summary")
+                .font(k.ty.ui.features(TABULAR))
+                .color(k.c.text_muted),
+        );
+    }
+    page.child(table(s, k))
 }
 
 fn table(s: &Ui, k: &Kit) -> El {
     let body = if s.recordings.is_empty() {
-        col()
-            .key("recordings-empty")
-            .w_full()
-            .grow(1.0)
-            .center()
-            .px(24.0)
-            .child(text(EMPTY_TEXT).font(k.ty.body).color(k.c.text_muted))
+        empty(k)
     } else {
         let kit = k.clone();
         col()
@@ -65,114 +79,209 @@ fn table(s: &Ui, k: &Kit) -> El {
                 move |s: &Ui, i| rec_row(&s.recordings[i], &kit),
             ))
     };
-    card(k)
+    let mut card = card(k)
         .key("recordings-card")
         .grow(1.0)
         .min_h(0.0)
-        .child(header_row(k))
-        .child(hairline(k))
-        .child(body)
+        .clip_rounded(super::CARD_RADIUS);
+    if !s.recordings.is_empty() {
+        card = card.child(header_row(k)).child(hairline(k));
+    }
+    card.child(body)
 }
 
-fn cell(width: f32, child: El) -> El {
-    el().w(width).child(child)
+fn empty(k: &Kit) -> El {
+    col()
+        .key("recordings-empty")
+        .w_full()
+        .grow(1.0)
+        .center()
+        .gap(14.0)
+        .px(24.0)
+        .child(
+            el().size(48.0, 48.0)
+                .radius(12.0)
+                .fill(k.c.layer_02)
+                .center()
+                .a11y_hidden()
+                .child(rune::icon(&CLIP, 22.0).color(k.c.icon_muted)),
+        )
+        .child(
+            col()
+                .items_center()
+                .gap(4.0)
+                .child(
+                    text("No recordings yet")
+                        .font(k.ty.body_medium)
+                        .color(k.c.text_base),
+                )
+                .child(
+                    text("Play a game, or run a test recording from Status.")
+                        .font(k.ty.body)
+                        .color(k.c.text_muted),
+                ),
+        )
 }
 
-fn right_cell(width: f32, child: El) -> El {
-    row().w(width).justify_end().child(child)
+fn left(width: f32, child: El) -> El {
+    row().w(width).center_y().child(child)
+}
+
+fn right(width: f32, child: El) -> El {
+    row().w(width).center_y().justify_end().child(child)
 }
 
 fn header_row(k: &Kit) -> El {
     let head = |label: &str| {
         text(label.to_owned())
-            .font(k.ty.small_medium)
+            .font(k.ty.small_medium.features(TABULAR))
             .color(k.c.text_muted)
     };
     row()
+        .key("recordings-header")
         .w_full()
-        .h(36.0)
-        .px(16.0)
-        .gap(10.0)
+        .h(34.0)
+        .pr(16.0)
+        .gap(COLUMN_GAP)
         .center_y()
-        .child(cell(COL_DATE, head("Date")))
+        .child(el().w(ACCENT_WIDTH))
+        .child(el().w(ICON_SIZE))
         .child(el().grow(1.0).min_w(0.0).child(head("Champion")))
-        .child(cell(COL_RESULT, head("Result")))
-        .child(right_cell(COL_DURATION, head("Duration")))
-        .child(right_cell(COL_SIZE, head("Size")))
-        .child(right_cell(COL_CLIPS, head("Clips")))
-        .child(el().w(COL_ACTIONS))
+        .child(left(COL_RESULT, head("Result")))
+        .child(right(COL_KDA, head("KDA")))
+        .child(left(COL_WHEN, head("When")))
+        .child(right(COL_DURATION, head("Duration")))
+        .child(right(COL_CLIPS, head("Clips")))
+        .child(right(COL_SIZE, head("Size")))
+        .child(el().w(COL_ACTION))
 }
 
-fn actions(rec: &RecordingEntry, k: &Kit) -> El {
-    let id = rec.meta.id.clone();
+fn accent(rec: &RecordingEntry, k: &Kit) -> El {
+    let color = match rec.meta.game.result {
+        GameResult::Win => k.c.success.icon,
+        GameResult::Loss => k.c.danger.icon,
+        GameResult::Unknown => k.c.border_strong,
+    };
+    el().w(ACCENT_WIDTH)
+        .h(ROW_HEIGHT - 20.0)
+        .radius(ACCENT_WIDTH / 2.0)
+        .fill(color)
+        .a11y_hidden()
+}
+
+fn result_cell(result: GameResult, k: &Kit) -> El {
+    let (label, color) = match result {
+        GameResult::Win => ("Victory", k.c.success.fg),
+        GameResult::Loss => ("Defeat", k.c.danger.fg),
+        GameResult::Unknown => ("—", k.c.text_muted),
+    };
+    text(label).font(k.ty.ui.features(TABULAR)).color(color)
+}
+
+fn kda_cell(kda: Kda, k: &Kit) -> El {
+    let font = k.ty.ui.features(TABULAR);
+    let figure = |n: u32, color: Color| text(n.to_string()).font(font).color(color);
+    let slash = || text(" / ").font(font).color(k.c.text_faint);
+    row()
+        .child(figure(kda.kills, k.c.text_base))
+        .child(slash())
+        .child(figure(kda.deaths, k.c.danger.fg))
+        .child(slash())
+        .child(figure(kda.assists, k.c.text_base))
+}
+
+fn when_cell(rec: &RecordingEntry, k: &Kit) -> El {
+    let font = k.ty.ui.features(TABULAR);
+    let shown = when(&rec.meta.started_at, &Zoned::now());
+    row()
+        .gap(5.0)
+        .child(text(shown.day).font(font).color(k.c.text_base))
+        .child(text(shown.time).font(font).color(k.c.text_muted))
+}
+
+fn clips_cell(count: usize, k: &Kit) -> El {
+    if count == 0 {
+        return el();
+    }
+    row()
+        .gap(4.0)
+        .center_y()
+        .child(rune::icon(&CLIP, 13.0).color(k.c.icon_muted).a11y_hidden())
+        .child(
+            text(count.to_string())
+                .font(k.ty.ui.features(TABULAR))
+                .color(k.c.text_muted),
+        )
+}
+
+fn show_button(rec: &RecordingEntry, k: &Kit) -> El {
     let video = rec.folder.join(&rec.meta.video);
-    let show = Button::new("Show")
-        .variant(ButtonVariant::Ghost)
+    IconButton::new(&glyphs::FOLDER)
+        .label("Show in folder")
+        .help("Show in folder")
+        .variant(IconButtonVariant::Ghost)
         .control_size(ControlSize::Small)
         .on_press(move |_: &mut Ui| reveal(&video))
         .build(k)
-        .key(format!("show-{id}"));
-    let review = Button::new("Review")
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Small)
-        .on_press({
-            let id = id.clone();
-            move |ui: &mut Ui| ui.open_review(id.clone())
-        })
-        .build(k)
-        .key(format!("review-{id}"));
-    row()
-        .w(COL_ACTIONS)
-        .gap(6.0)
-        .justify_end()
-        .child(show)
-        .child(review)
+        .key(format!("show-{}", rec.meta.id))
+        .group_opacity(0.0, 1.0)
 }
 
 fn rec_row(rec: &RecordingEntry, k: &Kit) -> El {
-    let muted = |label: String| text(label).font(k.ty.body).color(k.c.text_muted);
     let game = &rec.meta.game;
-    let result = match game.result {
-        GameResult::Win => Badge::new("WIN").variant(BadgeVariant::Accent).build(k),
-        GameResult::Loss => Badge::new("LOSS").variant(BadgeVariant::Subtle).build(k),
-        GameResult::Unknown => muted("-".into()),
-    };
+    let champion = game.info.me.champion.as_str();
+    let id = rec.meta.id.clone();
+    let font = k.ty.ui.features(TABULAR);
     row()
         .key(rec.meta.id.clone())
+        .role("button")
+        .label(format!("Review {champion} game"))
         .w_full()
         .h(ROW_HEIGHT)
-        .px(16.0)
-        .gap(10.0)
+        .pr(16.0)
+        .gap(COLUMN_GAP)
         .center_y()
-        .child(cell(COL_DATE, muted(format_date(&rec.meta.started_at))))
+        .hover(k.c.hover)
+        .hover_group()
+        .cursor(Cursor::Pointer)
+        .on_press(move |ui: &mut Ui| ui.open_review(id.clone()))
+        .child(accent(rec, k))
+        .child(champion_icon(k, champion, ICON_SIZE))
         .child(
             col()
                 .grow(1.0)
                 .min_w(0.0)
                 .child(
-                    text(game.info.me.champion.clone())
+                    text(champion.to_owned())
                         .font(k.ty.body_medium)
                         .color(k.c.text_base)
                         .truncate(),
                 )
                 .child(
-                    text(game.info.mode.clone())
+                    text(mode_label(&game.info.mode))
                         .font(k.ty.small)
                         .color(k.c.text_muted)
                         .truncate(),
                 ),
         )
-        .child(cell(COL_RESULT, result))
-        .child(right_cell(
+        .child(left(COL_RESULT, result_cell(game.result, k)))
+        .child(right(
+            COL_KDA,
+            kda_cell(kda(&rec.meta.events, &game.info.me), k),
+        ))
+        .child(left(COL_WHEN, when_cell(rec, k)))
+        .child(right(
             COL_DURATION,
             text(format_clock(rec.meta.duration_secs as u32))
-                .font(k.ty.body)
+                .font(font)
                 .color(k.c.text_base),
         ))
-        .child(right_cell(COL_SIZE, muted(format_size(rec.size_bytes))))
-        .child(right_cell(
-            COL_CLIPS,
-            muted(rec.meta.clips.len().to_string()),
+        .child(right(COL_CLIPS, clips_cell(rec.meta.clips.len(), k)))
+        .child(right(
+            COL_SIZE,
+            text(format_size(rec.size_bytes))
+                .font(font)
+                .color(k.c.text_muted),
         ))
-        .child(actions(rec, k))
+        .child(right(COL_ACTION, show_button(rec, k)))
 }

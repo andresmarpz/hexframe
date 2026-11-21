@@ -17,3 +17,9 @@ fn directories_are_named_after_the_app() {
     assert!(logs_dir().ends_with(Path::new("Greyscreen").join("logs")));
     assert!(default_output_dir().ends_with("Greyscreen"));
 }
+
+#[test]
+fn champion_icons_live_in_the_cache_dir() {
+    assert!(cache_dir().ends_with(Path::new("Greyscreen").join("cache")));
+    assert_eq!(champion_icons_dir(), cache_dir().join("champions"));
+}
