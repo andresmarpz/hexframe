@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -14,6 +14,7 @@ use greyscreen_core::library::{ClipEntry, RecordingMeta};
 
 use crate::api::{self, RecordingEntry, UiMsg};
 use crate::control::Sink;
+use crate::storyboard::Queue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Job {
@@ -51,7 +52,7 @@ pub(crate) fn jobs_for(entry: &RecordingEntry) -> Vec<Job> {
         .collect()
 }
 
-pub(crate) fn wrap(sink: Sink) -> Sink {
+pub(crate) fn wrap(sink: Sink, storyboards: Queue) -> Sink {
     let (jobs, queue) = unbounded();
     let notify = sink.clone();
     let spawned = thread::Builder::new()
@@ -64,7 +65,10 @@ pub(crate) fn wrap(sink: Sink) -> Sink {
     Arc::new(move |msg| {
         let wanted = match &msg {
             UiMsg::Library(entries) => entries.iter().flat_map(jobs_for).collect(),
-            UiMsg::RecordingSaved(entry) => jobs_for(entry),
+            UiMsg::RecordingSaved(entry) => {
+                storyboards.request(entry.folder.clone());
+                jobs_for(entry)
+            }
             UiMsg::ClipSaved(api::ClipEntry { clip, folder }) => vec![clip_job(folder, clip)],
             _ => Vec::new(),
         };

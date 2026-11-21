@@ -4,6 +4,7 @@ mod doctor;
 mod fake_league;
 mod record;
 mod recover;
+mod storyboard;
 mod thumb;
 
 use std::path::PathBuf;
@@ -69,6 +70,9 @@ enum Command {
     Recover {
         path: PathBuf,
     },
+    Storyboard {
+        folder: PathBuf,
+    },
     Thumb {
         video: PathBuf,
         #[arg(long, default_value_t = 1.0)]
@@ -117,6 +121,7 @@ fn main() -> ExitCode {
             peak_mbps: peak,
         }),
         Command::Recover { path } => finish(recover::run(&path)),
+        Command::Storyboard { folder } => finish(storyboard::run(&folder)),
         Command::Thumb { video, at, out } => finish(thumb::run(&video, at, &out)),
     }
 }

@@ -207,12 +207,18 @@ impl Ui {
 
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
         self.close_settings();
-        self.review = Some(ReviewState::open(
+        let review = ReviewState::open(
             entry,
             self.player_factory,
             self.sound,
             self.settings.review_events,
-        ));
+        );
+        if review.wants_storyboard() {
+            self.send(EngineCmd::BuildStoryboard {
+                folder: review.entry.folder.clone(),
+            });
+        }
+        self.review = Some(review);
         self.live_selected = false;
         self.screen = Screen::Games;
     }

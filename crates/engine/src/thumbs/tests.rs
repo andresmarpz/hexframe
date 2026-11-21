@@ -13,7 +13,7 @@ use jiff::Zoned;
 use super::*;
 use crate::FakeMediaSource;
 
-fn entry(folder: &Path, clips: &[&str]) -> RecordingEntry {
+pub(crate) fn entry(folder: &Path, clips: &[&str]) -> RecordingEntry {
     let player = Player {
         name: "Me".into(),
         champion: "Ahri".into(),
@@ -90,7 +90,8 @@ fn clip_jobs_aim_inside_the_clip() {
     assert_eq!(job.video, Path::new("/lib/g/clips/a.mp4"));
 }
 
-fn fixture_clip(path: &Path) {
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) fn fixture_clip(path: &Path, length: f64) {
     let (tx, rx) = bounded(1024);
     let cfg: CaptureConfig = Settings::default().capture_config(2160);
     let session = FakeMediaSource::fast()
@@ -103,7 +104,7 @@ fn fixture_clip(path: &Path) {
             MediaEvent::Started { video, audio, .. } => formats = Some((video, audio)),
             MediaEvent::Packet(packet) => {
                 let secs = packet.dts as f64 / f64::from(VideoFormat::TIMESCALE);
-                let done = packet.track == Track::Video && secs >= 3.0;
+                let done = packet.track == Track::Video && secs >= length;
                 packets.push(Arc::new(packet));
                 if done {
                     break;
@@ -124,14 +125,18 @@ fn the_worker_turns_real_clips_into_jpeg_thumbnails_and_tells_the_ui() {
     let dir = tempfile::tempdir().unwrap();
     let clips = dir.path().join("clips");
     std::fs::create_dir_all(&clips).unwrap();
-    fixture_clip(&clips.join("00-02_Kill.mp4"));
+    fixture_clip(&clips.join("00-02_Kill.mp4"), 3.0);
     let mut rec = entry(dir.path(), &["clips/00-02_Kill.mp4"]);
     rec.meta.video = String::new();
     rec.meta.clips[0].end_secs = rec.meta.clips[0].start_secs + 3.0;
 
     let seen = Arc::new(Mutex::new(Vec::new()));
     let inner = seen.clone();
-    let sink = wrap(Arc::new(move |msg| inner.lock().unwrap().push(msg)));
+    let inner_sink: Sink = Arc::new(move |msg| inner.lock().unwrap().push(msg));
+    let sink = wrap(
+        inner_sink.clone(),
+        crate::storyboard::spawn(inner_sink, Default::default()),
+    );
     sink(UiMsg::Library(vec![rec]));
 
     let thumb = clips.join("00-02_Kill.jpg");

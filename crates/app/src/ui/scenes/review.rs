@@ -7,6 +7,17 @@ fn set_health(ui: &mut Ui, health: Option<greyscreen_core::health::RecordingHeal
     }
 }
 
+fn seek_preview(ui: &mut Ui, fraction: f64, with_tile: bool) {
+    game(ui);
+    if let Some(review) = &mut ui.review {
+        if !with_tile {
+            review.storyboard = None;
+        }
+        let at = review.duration() * fraction;
+        review.hover_seek(Some(at));
+    }
+}
+
 pub(super) const SCENES: &[Scene] = &[
     ("review", game),
     ("review-clips", |ui| {
@@ -53,6 +64,10 @@ pub(super) const SCENES: &[Scene] = &[
         game(ui);
         ui.review_set_volume(0.6);
         ui.review_volume_hover(|hover| hover.button = true);
+    }),
+    ("review-seek-preview", |ui| seek_preview(ui, 0.4, true)),
+    ("review-seek-preview-time", |ui| {
+        seek_preview(ui, 0.4, false)
     }),
     ("review-theater", |ui| {
         game(ui);

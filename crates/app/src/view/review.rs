@@ -5,6 +5,7 @@ mod deaths;
 mod health;
 mod icons;
 mod panel;
+mod seek_preview;
 mod theater;
 mod timeline;
 mod toolbar;
@@ -27,6 +28,7 @@ const NO_VIDEO: &str = "No video for this game";
 
 pub(super) use card::hover_card;
 pub(super) use controls::layer as controls_layer;
+pub(super) use seek_preview::seek_preview;
 pub(super) use theater::screen as theater;
 pub(super) use toolbar::{result_label, toolbar};
 

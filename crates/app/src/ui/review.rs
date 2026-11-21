@@ -4,12 +4,14 @@ mod events;
 pub(crate) mod jump;
 mod player;
 mod scrub;
+mod seek_preview;
 mod sound;
 mod trace;
 
 use std::path::{Path, PathBuf};
 
 use greyscreen_core::categories::{CategorySet, EventCategory, categorize};
+use greyscreen_core::library::storyboard::Storyboard;
 use greyscreen_engine::RecordingEntry;
 use rune::PlayerState;
 
@@ -62,6 +64,8 @@ pub(crate) struct ReviewState {
     pub drawer: bool,
     pub death: Option<DeathReviewState>,
     pub scrub: Option<Scrub>,
+    pub storyboard: Option<Storyboard>,
+    pub seek_hover: Option<f64>,
     /// The app clock at the last poll.
     pub clock: f64,
     pub file: PathBuf,
@@ -116,10 +120,13 @@ impl ReviewState {
             drawer: false,
             death: None,
             scrub: None,
+            storyboard: None,
+            seek_hover: None,
             clock: 0.0,
             file: path,
             watch: trace::Watch::default(),
         };
+        review.load_storyboard();
         review.apply_audio();
         review.fall_back_to_first_clip(make);
         review

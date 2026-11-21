@@ -35,6 +35,7 @@ mod review_narrow;
 mod review_volume;
 mod scrub;
 mod search_clear;
+mod seek_preview;
 mod selection;
 mod settings_sheet;
 mod setup_errors;

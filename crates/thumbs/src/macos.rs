@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use objc2::rc::Retained;
 use objc2_av_foundation::{AVAssetImageGenerator, AVURLAsset};
 use objc2_core_foundation::{CGPoint, CGRect, CGSize};
 use objc2_core_graphics::{
@@ -21,7 +22,35 @@ fn zero() -> CMTime {
     }
 }
 
+const KEYFRAME_TOLERANCE_SECS: f64 = 0.5;
+
 pub(super) fn grab(video: &Path, at_secs: f64, max_width: u32) -> Result<Frame, ThumbError> {
+    let generator = generator(video, max_width, zero())?;
+    image_at(&generator, at_secs)
+}
+
+pub(super) fn keyframes(
+    video: &Path,
+    times: &[f64],
+    max_width: u32,
+    each: &mut dyn FnMut(usize, Option<Frame>) -> bool,
+) -> Result<(), ThumbError> {
+    // SAFETY: builds a plain time value.
+    let tolerance = unsafe { CMTime::with_seconds(KEYFRAME_TOLERANCE_SECS, TIMESCALE) };
+    let generator = generator(video, max_width, tolerance)?;
+    for (index, at) in times.iter().enumerate() {
+        if !each(index, image_at(&generator, *at).ok()) {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn generator(
+    video: &Path,
+    max_width: u32,
+    tolerance: CMTime,
+) -> Result<Retained<AVAssetImageGenerator>, ThumbError> {
     if !video.is_file() {
         return Err(ThumbError::Decode(format!(
             "no such file: {}",
@@ -31,16 +60,19 @@ pub(super) fn grab(video: &Path, at_secs: f64, max_width: u32) -> Result<Frame, 
     let path = std::path::absolute(video).unwrap_or_else(|_| video.to_path_buf());
     let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
     // SAFETY: plain Objective-C object construction and property writes on objects this thread owns.
-    let generator = unsafe {
+    Ok(unsafe {
         let asset = AVURLAsset::URLAssetWithURL_options(&url, None);
         let generator = AVAssetImageGenerator::assetImageGeneratorWithAsset(&asset);
         generator.setAppliesPreferredTrackTransform(true);
-        generator.setRequestedTimeToleranceBefore(zero());
-        generator.setRequestedTimeToleranceAfter(zero());
+        generator.setRequestedTimeToleranceBefore(tolerance);
+        generator.setRequestedTimeToleranceAfter(tolerance);
         let edge = f64::from(max_width);
         generator.setMaximumSize(CGSize::new(edge, edge));
         generator
-    };
+    })
+}
+
+fn image_at(generator: &AVAssetImageGenerator, at_secs: f64) -> Result<Frame, ThumbError> {
     // SAFETY: a blocking decode; the actual-time out pointer may be null.
     #[allow(deprecated)]
     let image = unsafe {

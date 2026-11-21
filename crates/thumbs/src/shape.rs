@@ -8,35 +8,37 @@ pub const THUMB_WIDTH: u32 = 400;
 pub const THUMB_HEIGHT: u32 = 225;
 
 pub(crate) fn encode_jpeg(frame: &Frame, quality: u8) -> Result<Vec<u8>, ThumbError> {
-    let shaped = cover(frame)?;
-    let rgb: Vec<u8> = shaped
+    encode_rgba(&cover(frame)?, quality)
+}
+
+pub(crate) fn encode_rgba(image: &RgbaImage, quality: u8) -> Result<Vec<u8>, ThumbError> {
+    let rgb: Vec<u8> = image
         .pixels()
         .flat_map(|p| [p.0[0], p.0[1], p.0[2]])
         .collect();
     let mut out = Vec::new();
     JpegEncoder::new_with_quality(&mut out, quality)
-        .encode(
-            &rgb,
-            shaped.width(),
-            shaped.height(),
-            ExtendedColorType::Rgb8,
-        )
+        .encode(&rgb, image.width(), image.height(), ExtendedColorType::Rgb8)
         .map_err(|err| ThumbError::Write(err.to_string()))?;
     Ok(out)
 }
 
 pub(crate) fn cover(frame: &Frame) -> Result<RgbaImage, ThumbError> {
+    cover_to(frame, THUMB_WIDTH, THUMB_HEIGHT)
+}
+
+pub(crate) fn cover_to(frame: &Frame, width: u32, height: u32) -> Result<RgbaImage, ThumbError> {
     let image = RgbaImage::from_raw(frame.width, frame.height, frame.rgba.clone())
         .ok_or_else(|| ThumbError::Decode("frame size does not match its bytes".into()))?;
     let (x, y, w, h) = crop_16_9(frame.width, frame.height);
     let cropped = imageops::crop_imm(&image, x, y, w, h).to_image();
-    if w <= THUMB_WIDTH {
+    if w <= width {
         return Ok(cropped);
     }
     Ok(imageops::resize(
         &cropped,
-        THUMB_WIDTH,
-        THUMB_HEIGHT,
+        width,
+        height,
         FilterType::Triangle,
     ))
 }

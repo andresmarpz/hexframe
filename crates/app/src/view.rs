@@ -30,6 +30,9 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     if let Some(card) = review::hover_card(s, &k) {
         layer.push(card);
     }
+    if let Some(card) = review::seek_preview(s, &k) {
+        layer.push(card);
+    }
     review::controls_layer(s, &k, &mut layer);
     if theater.is_none() {
         settings::sheet(

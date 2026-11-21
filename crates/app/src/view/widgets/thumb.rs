@@ -72,12 +72,16 @@ fn image_for(path: &Path) -> Option<Image> {
     })
 }
 
+pub(crate) fn ready_image(path: &Path) -> Option<Image> {
+    image_for(path).filter(|image| image.is_ready() && image.error().is_none())
+}
+
 const RADIUS: f32 = 6.0;
 const PLAY_CHIP: f32 = 28.0;
 const PLAY_CHIP_SMALL: f32 = 20.0;
 
 fn picture(k: &Kit, path: &Path) -> El {
-    let shown = image_for(path).filter(|image| image.is_ready() && image.error().is_none());
+    let shown = ready_image(path);
     let frame = el().w_full().h_full().a11y_hidden();
     match shown {
         Some(image) => frame.pixels(image.pixels()),

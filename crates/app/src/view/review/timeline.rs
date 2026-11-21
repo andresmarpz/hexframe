@@ -1,6 +1,6 @@
 use greyscreen_core::highlight::{Tone, describe_label, dominant_label};
 use greyscreen_core::library::{ClipEntry, EventEntry};
-use rune::{Color, Drag, El, Phase, el};
+use rune::{Color, Drag, El, Phase, PointerPress, el};
 use rune_kit::Kit;
 
 use super::card::hoverable;
@@ -16,6 +16,7 @@ const MARKER_HEIGHT: f32 = 16.0;
 const THUMB: f32 = 12.0;
 const THUMB_HOVER: f32 = 14.0;
 const BAND_ALPHA: f32 = 0.22;
+pub(super) const PREVIEW_ANCHOR: &str = "timeline-preview-anchor";
 
 pub(super) fn event_color(k: &Kit, highlights: &[String]) -> Color {
     let tone = dominant_label(highlights.iter().map(String::as_str))
@@ -106,6 +107,15 @@ fn thumb(size: f32, k: &Kit) -> El {
         .a11y_hidden()
 }
 
+fn preview_anchor(at: f32) -> El {
+    rune::row()
+        .pin(Some(0.0), Some(0.0), Some(0.0), None)
+        .h(HEIGHT)
+        .a11y_hidden()
+        .child(el().w_frac(at).h(HEIGHT))
+        .child(el().key(PREVIEW_ANCHOR).w(1.0).h(HEIGHT))
+}
+
 pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
     let duration = review.duration();
     let progress = if duration > 0.0 {
@@ -146,6 +156,12 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
             Phase::Down | Phase::Move => ui.review_scrub_to(drag_target(drag.x, drag.w, duration)),
             Phase::Up => ui.review_scrub_end(),
         })
+        .on_pointer_move(|ui: &mut Ui, at: PointerPress| ui.review_seek_hover(Some(at.x)))
+        .on_hover_change(|ui: &mut Ui, inside, _| {
+            if !inside {
+                ui.review_seek_hover(None);
+            }
+        })
         .child(track);
     if review.source == Source::Game {
         for clip in &review.entry.meta.clips {
@@ -154,6 +170,9 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
         for event in review.shown_events() {
             line = line.child(marker(event, review, k));
         }
+    }
+    if let Some(secs) = review.seek_preview() {
+        line = line.child(preview_anchor(fraction(secs, duration)));
     }
     let hover = thumb(THUMB_HOVER, k)
         .key("timeline-thumb-hover")

@@ -28,6 +28,7 @@ use crate::hotkey::{self, HotkeyBackend};
 use crate::library;
 use crate::settings_save::SettingsSaver;
 use crate::storage::ActiveFolder;
+use crate::storyboard::Queue;
 use crate::updater::{self, UpdateCmd, UpdateConfig, UpdateHandle};
 use crate::writer::Report;
 use meta::Recording;
@@ -52,6 +53,8 @@ pub(crate) struct Spec {
     pub(crate) feedback: Option<FeedbackConfig>,
     pub(crate) hotkeys: Option<Box<dyn HotkeyBackend>>,
     pub(crate) free_space: Arc<dyn FreeSpace>,
+    pub(crate) active_folder: ActiveFolder,
+    pub(crate) storyboards: Queue,
     pub(crate) cmd: Sender<EngineCmd>,
 }
 
@@ -85,6 +88,7 @@ struct Control {
     hotkeys: Box<dyn HotkeyBackend>,
     applied_hotkeys: Vec<(Action, KeyCombo)>,
     active_folder: ActiveFolder,
+    storyboards: Queue,
     free_space: Arc<dyn FreeSpace>,
     disk_checked: Option<Instant>,
     disk_refused: bool,
@@ -134,6 +138,8 @@ impl Control {
             feedback,
             hotkeys,
             free_space,
+            active_folder,
+            storyboards,
             cmd,
         } = spec;
         let (internal_tx, internal_rx) = unbounded();
@@ -146,7 +152,8 @@ impl Control {
             settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
             hotkeys: hotkeys.unwrap_or_else(|| hotkey::platform(cmd, sink.clone())),
             applied_hotkeys: settings.keymap().global(),
-            active_folder: ActiveFolder::default(),
+            active_folder,
+            storyboards,
             free_space,
             disk_checked: None,
             disk_refused: false,
@@ -230,6 +237,7 @@ impl Control {
                 library::spawn_scan(self.settings.output_dir.clone(), self.sink.clone());
             }
             EngineCmd::DeleteRecording { id } => self.delete_recording(id),
+            EngineCmd::BuildStoryboard { folder } => self.storyboards.request(folder),
             EngineCmd::SaveClipNow => self.save_clip_now(),
             EngineCmd::CheckForUpdates => self.update_cmd(UpdateCmd::Check),
             EngineCmd::InstallUpdate => self.update_cmd(UpdateCmd::Install),

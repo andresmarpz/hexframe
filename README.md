@@ -154,7 +154,7 @@ GREYSCREEN_LIVE_URL=http://127.0.0.1:2999 cargo run -p greyscreen
 | Path | Description |
 | --- | --- |
 | `crates/app` | The Rune UI binary. |
-| `crates/cli` | The `doctor`, `record`, `recover`, `fake-league`, `thumb` and `demo` CLI tool. |
+| `crates/cli` | The `doctor`, `record`, `recover`, `fake-league`, `thumb`, `storyboard` and `demo` CLI tool. |
 | `crates/core` | Settings, events, the session state machine, and clip logic. |
 | `crates/engine` | The recording engine. |
 | `crates/capture` | Windows capture and hardware encoding. |

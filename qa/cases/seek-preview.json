@@ -1,0 +1,14 @@
+{
+  "about": "Hovering the seek bar shows the frame and the time above the pointer; dragging the thumb makes the card follow; leaving the bar hides it.",
+  "scene": "review",
+  "steps": [
+    {"check": "idle", "has": ["timeline"], "lacks": ["seek-preview"], "snap": false},
+    {"hover": "timeline"},
+    {"check": "hover", "has": ["seek-preview", "seek-preview-tile"], "snap": true},
+    {"drag": "timeline", "dx": 120},
+    {"check": "dragged", "has": ["seek-preview", "seek-preview-tile"], "snap": true},
+    {"hover": "review-play"},
+    {"wait": 0.6},
+    {"check": "left", "lacks": ["seek-preview"], "snap": false}
+  ]
+}

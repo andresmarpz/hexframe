@@ -1498,6 +1498,7 @@ name = "greyscreen-thumbs"
 version = "0.1.14-preview.16"
 dependencies = [
  "image",
+ "objc2 0.6.5",
  "objc2-av-foundation",
  "objc2-core-foundation",
  "objc2-core-graphics",

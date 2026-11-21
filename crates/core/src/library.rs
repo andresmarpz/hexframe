@@ -9,6 +9,7 @@ use crate::game::{GameEvent, GameInfo, GameResult};
 use crate::health::RecordingHealth;
 use crate::review::ReviewData;
 
+pub mod storyboard;
 pub mod thumb;
 
 pub const META_FILE: &str = "game.json";

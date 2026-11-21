@@ -21,6 +21,13 @@ Goal: a small picture for every game and clip in the library, from MP4s that `cr
 - UI: `view::thumb` keeps a small memo of rune `Image`s by path (cleared at 160 entries). A `Thumbnail` message drops that path from the memo, so the file loads on the next frame. A missing file shows a flat placeholder.
 - `greyscreen-cli thumb <video> --at <secs> --out <jpg>` runs the decoder alone, to check it on a machine.
 
+## Storyboards
+
+The seek bar preview reuses the two decoders for many frames of one file (`greyscreen_thumbs::write_sheets`, layout in `docs/architecture.md`, Storyboards). Opening the file once matters most: `grab` builds a new asset or source reader for every call.
+
+- macOS: one `AVAssetImageGenerator` for all times, with a ±0.5 s tolerance instead of zero, so AVFoundation picks the nearest key frame and decodes nothing else. `AVAssetReader` was rejected: it decodes every frame (72,000 for 20 minutes at 60 fps).
+- Windows: one `IMFSourceReader`; each frame is a `SetCurrentPosition` and the first sample, which is the key frame at or before the time. Not run on Windows yet: time `greyscreen-cli storyboard <recording folder>` on a 20 minute game.
+
 ## Checked
 
 - macOS: an engine test cuts a clip from the fake media source (real H.264 test pattern), runs the worker and checks a 400x225 JPEG with many distinct colours. Running the real app on a seeded library made 22 of 22 thumbnails in the background.

@@ -102,3 +102,141 @@ fn crop_selects_the_requested_window() {
         crate::nv12::nv12_to_rgba(&nv12_plane(8, 8, 235, 128, 128), 8, 8, (2, 2, 4, 4), false);
     assert_eq!((frame.width, frame.height, frame.rgba.len()), (4, 4, 64));
 }
+
+mod storyboard {
+    use std::path::PathBuf;
+
+    use super::flat;
+    use crate::sheet::Packer;
+    use crate::{Pass, SheetLayout, write_sheets};
+
+    const LAYOUT: SheetLayout = SheetLayout {
+        tile_width: 16,
+        tile_height: 9,
+        columns: 4,
+        rows: 2,
+    };
+
+    fn sheet_in(dir: &std::path::Path) -> impl Fn(usize) -> PathBuf + '_ {
+        move |index| dir.join(format!("sheet-{index}.jpg"))
+    }
+
+    fn pixel(sheet: &std::path::Path, x: u32, y: u32) -> [u8; 3] {
+        let image = image::open(sheet).unwrap().to_rgb8();
+        image.get_pixel(x, y).0
+    }
+
+    #[test]
+    fn tiles_fill_a_sheet_row_by_row_and_a_full_sheet_is_written_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = sheet_in(dir.path());
+        let mut packer = Packer::new(LAYOUT);
+        for index in 0..8u8 {
+            packer
+                .push(Some(&flat(160, 90, [index * 30, 0, 0])), &dest)
+                .unwrap();
+        }
+        assert_eq!(packer.written, 1);
+        let sheet = dest(0);
+        assert_eq!(image::image_dimensions(&sheet).unwrap(), (64, 18));
+        assert!(pixel(&sheet, 2, 2)[0] < 12);
+        let second = pixel(&sheet, 18, 2)[0];
+        assert!((i32::from(second) - 30).abs() < 12, "{second}");
+        let fifth = pixel(&sheet, 2, 11)[0];
+        assert!((i32::from(fifth) - 120).abs() < 12, "{fifth}");
+    }
+
+    #[test]
+    fn a_partial_last_sheet_is_written_on_flush() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = sheet_in(dir.path());
+        let mut packer = Packer::new(LAYOUT);
+        for _ in 0..9 {
+            packer.push(Some(&flat(64, 36, [0, 90, 0])), &dest).unwrap();
+        }
+        packer.flush(&dest).unwrap();
+        assert_eq!(packer.written, 2);
+        assert!(dest(1).is_file());
+        packer.flush(&dest).unwrap();
+        assert_eq!(packer.written, 2);
+    }
+
+    #[test]
+    fn a_failed_frame_repeats_the_tile_before_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = sheet_in(dir.path());
+        let mut packer = Packer::new(LAYOUT);
+        packer
+            .push(Some(&flat(160, 90, [0, 0, 200])), &dest)
+            .unwrap();
+        packer.push(None, &dest).unwrap();
+        packer.flush(&dest).unwrap();
+        let blue = pixel(&dest(0), 18, 2);
+        assert!(blue[2] > 170, "{blue:?}");
+    }
+
+    #[test]
+    fn a_missing_video_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = write_sheets(
+            &dir.path().join("nope.mp4"),
+            &[0.0, 1.0],
+            LAYOUT,
+            &sheet_in(dir.path()),
+            &|| false,
+        );
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    fn fixture() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../app/fixtures/review.mp4")
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn a_real_video_gives_one_distinct_tile_per_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let layout = SheetLayout {
+            tile_width: 160,
+            tile_height: 90,
+            columns: 4,
+            rows: 3,
+        };
+        let times: Vec<f64> = (0..10).map(f64::from).collect();
+        let pass = write_sheets(&fixture(), &times, layout, &sheet_in(dir.path()), &|| false)
+            .expect("storyboard");
+        assert_eq!(pass, Pass::Finished { sheets: 1 });
+        let sheet = image::open(dir.path().join("sheet-0.jpg"))
+            .unwrap()
+            .to_rgb8();
+        assert_eq!(sheet.dimensions(), (640, 270));
+        let tile = |slot: u32| -> Vec<u8> {
+            let (x, y) = (slot % 4 * 160, slot / 4 * 90);
+            image::imageops::crop_imm(&sheet, x, y, 160, 90)
+                .to_image()
+                .into_raw()
+        };
+        assert!(
+            tile(0).iter().any(|v| *v > 20),
+            "the first tile is not black"
+        );
+        assert_ne!(tile(0), tile(8), "tiles at different times differ");
+        assert!(
+            sheet.get_pixel(560, 225).0.iter().all(|v| *v < 8),
+            "unused slots stay black"
+        );
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn a_stop_request_ends_the_pass_without_writing_a_sheet() {
+        let dir = tempfile::tempdir().unwrap();
+        let times: Vec<f64> = (0..10).map(f64::from).collect();
+        let pass = write_sheets(&fixture(), &times, LAYOUT, &sheet_in(dir.path()), &|| true)
+            .expect("pass");
+        assert_eq!(pass, Pass::Stopped);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+}

@@ -67,6 +67,33 @@ pub(super) fn grab(video: &Path, at_secs: f64, _max_width: u32) -> Result<Frame,
     convert(&sample, picture)
 }
 
+pub(super) fn keyframes(
+    video: &Path,
+    times: &[f64],
+    _max_width: u32,
+    each: &mut dyn FnMut(usize, Option<Frame>) -> bool,
+) -> Result<(), ThumbError> {
+    if !video.is_file() {
+        return Err(ThumbError::Decode(format!(
+            "no such file: {}",
+            video.display()
+        )));
+    }
+    let _startup = Startup::begin()?;
+    let path = std::path::absolute(video).unwrap_or_else(|_| video.to_path_buf());
+    let (reader, picture) = open(&path)?;
+    for (index, at) in times.iter().enumerate() {
+        let frame = seek(&reader, at.max(0.0))
+            .and_then(|()| read_first(&reader))
+            .and_then(|sample| convert(&sample, picture))
+            .ok();
+        if !each(index, frame) {
+            break;
+        }
+    }
+    Ok(())
+}
+
 fn open(path: &Path) -> Result<(IMFSourceReader, Picture), ThumbError> {
     let stream = MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32;
     let mut attributes: Option<IMFAttributes> = None;
@@ -141,6 +168,26 @@ fn seek(reader: &IMFSourceReader, secs: f64) -> Result<(), ThumbError> {
             .SetCurrentPosition(&GUID::zeroed(), &at)
             .map_err(decode)
     }
+}
+
+fn read_first(reader: &IMFSourceReader) -> Result<IMFSample, ThumbError> {
+    let stream = MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32;
+    for _ in 0..MAX_READS {
+        let (mut flags, mut sample) = (0u32, None);
+        // SAFETY: a blocking read into locals.
+        unsafe {
+            reader
+                .ReadSample(stream, 0, None, Some(&mut flags), None, Some(&mut sample))
+                .map_err(decode)?;
+        }
+        if let Some(sample) = sample {
+            return Ok(sample);
+        }
+        if flags & MF_SOURCE_READERF_ENDOFSTREAM.0 as u32 != 0 {
+            break;
+        }
+    }
+    Err(ThumbError::Decode("no frame at that time".into()))
 }
 
 fn read_at(reader: &IMFSourceReader, at_secs: f64) -> Result<IMFSample, ThumbError> {

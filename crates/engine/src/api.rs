@@ -19,6 +19,8 @@ use crate::control;
 use crate::disk::{FreeSpace, SystemFreeSpace};
 use crate::feedback::FeedbackConfig;
 use crate::hotkey::HotkeyBackend;
+use crate::storage::ActiveFolder;
+use crate::storyboard;
 use crate::updater::UpdateConfig;
 
 pub use greyscreen_core::session::Status as EngineStatus;
@@ -34,6 +36,7 @@ pub enum EngineCmd {
     Retry,
     RescanLibrary,
     DeleteRecording { id: String },
+    BuildStoryboard { folder: PathBuf },
     SaveClipNow,
     GlobalAction(Action),
     CheckForUpdates,
@@ -105,6 +108,7 @@ pub enum UiMsg {
     Feedback(FeedbackResult),
     Export(ExportEvent),
     Thumbnail(PathBuf),
+    Storyboard(PathBuf),
     Encoder(EncoderCheck),
 }
 
@@ -189,6 +193,9 @@ impl Engine {
         let (cmd, cmd_rx) = unbounded();
         let (league_tx, league_rx) = unbounded();
         let guard = league(league_tx);
+        let sink: Arc<dyn Fn(UiMsg) + Send + Sync> = Arc::from(sink);
+        let active_folder = ActiveFolder::default();
+        let storyboards = storyboard::spawn(sink.clone(), active_folder.clone());
         let thread = control::spawn(
             control::Spec {
                 settings,
@@ -198,12 +205,14 @@ impl Engine {
                 feedback,
                 hotkeys,
                 free_space: free_space.unwrap_or_else(|| Arc::new(SystemFreeSpace)),
+                active_folder,
+                storyboards: storyboards.clone(),
                 cmd: cmd.clone(),
             },
             guard,
             league_rx,
             cmd_rx,
-            crate::thumbs::wrap(Arc::from(sink)),
+            crate::thumbs::wrap(sink, storyboards),
         );
         EngineHandle { cmd, thread }
     }

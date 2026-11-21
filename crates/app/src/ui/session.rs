@@ -75,6 +75,7 @@ impl Ui {
             }
             UiMsg::Library(recordings) => self.apply_library(recordings),
             UiMsg::Thumbnail(path) => crate::view::thumb::invalidate(&path),
+            UiMsg::Storyboard(folder) => self.storyboard_ready(&folder),
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
             UiMsg::NoticeWithAction {
                 level,

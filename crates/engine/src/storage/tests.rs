@@ -380,3 +380,29 @@ fn the_low_disk_notice_counts_the_videos() {
         "Low disk space: deleted 3 old game videos to make room."
     );
 }
+
+fn storyboard_files(folder: &Path) {
+    fs::write(folder.join("storyboard.json"), vec![0u8; 50]).expect("index");
+    fs::write(folder.join("storyboard-0.jpg"), vec![0u8; 2_000]).expect("sheet");
+}
+
+#[test]
+fn a_storyboard_counts_with_its_video_and_goes_with_it() {
+    let out = output_dir("storyboard");
+    let old = game(&out, "old", 1, 10_000, 1_000);
+    let new = game(&out, "new", 2, 10_000, 1_000);
+    storyboard_files(&old);
+    storyboard_files(&new);
+    let usage = usages(&out)
+        .into_iter()
+        .find(|usage| usage.id == "old")
+        .expect("usage");
+    assert_eq!(usage.video_bytes, 10_000 + 2_050);
+    let cleanup = enforce(&out, total(&out) - 100, &none_active());
+    assert_eq!(cleanup.videos, 1);
+    assert!(!old.join(VIDEO_FILE).exists());
+    assert!(!old.join("storyboard.json").exists());
+    assert!(!old.join("storyboard-0.jpg").exists());
+    assert!(old.join("clips/a.mp4").is_file());
+    assert!(new.join("storyboard-0.jpg").is_file());
+}

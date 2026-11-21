@@ -7,3 +7,6 @@ deaths.mp4: 60 s, 640x360, 24 fps, for the death review scenes.
 Made with:
 
 ffmpeg -y -f lavfi -i testsrc=size=640x360:rate=24:duration=60 -f lavfi -i sine=frequency=330:duration=60 -c:v libx264 -preset slow -crf 40 -g 24 -pix_fmt yuv420p -c:a aac -b:a 24k -shortest -movflags +faststart deaths.mp4
+
+storyboard.json and storyboard-0.jpg: the seek bar preview sheet of review.mp4 (11 tiles, one per second, 160x90).
+Made with: greyscreen-cli storyboard <a folder whose game.json names review.mp4 with duration_secs 10>

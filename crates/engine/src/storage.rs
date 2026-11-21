@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use greyscreen_core::library::storyboard;
 use greyscreen_core::library::{self as core_library, RecordingMeta};
 use greyscreen_core::retention::{Deletion, GameUsage, plan, plan_free_space};
 
@@ -83,7 +84,8 @@ fn usage(output_dir: &Path, meta: &RecordingMeta) -> Option<GameUsage> {
     let video_bytes = fs::symlink_metadata(folder.join(VIDEO_FILE))
         .ok()
         .filter(|m| m.is_file())
-        .map_or(0, |m| m.len());
+        .map_or(0, |m| m.len())
+        + storyboard::bytes(&folder);
     Some(GameUsage {
         id: meta.id.clone(),
         started_at: meta.started_at.timestamp(),
@@ -93,6 +95,7 @@ fn usage(output_dir: &Path, meta: &RecordingMeta) -> Option<GameUsage> {
 }
 
 fn delete_video(folder: &Path) -> io::Result<()> {
+    storyboard::remove(folder);
     match fs::remove_file(folder.join(VIDEO_FILE)) {
         Ok(()) => {}
         Err(err) if err.kind() == io::ErrorKind::NotFound => {}

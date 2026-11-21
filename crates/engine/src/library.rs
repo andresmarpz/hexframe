@@ -22,7 +22,7 @@ pub(crate) fn size_bytes(folder: &Path) -> u64 {
             .map(|meta| meta.len())
             .sum()
     });
-    file + clips
+    file + clips + library::storyboard::bytes(folder)
 }
 
 pub fn entries(output_dir: &Path) -> Vec<RecordingEntry> {
