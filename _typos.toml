@@ -5,3 +5,4 @@ extend-exclude = ["Cargo.lock", "docs/research/**"]
 trak = "trak"
 trun = "trun"
 PN = "PN"
+SEH = "SEH"
