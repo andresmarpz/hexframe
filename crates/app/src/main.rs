@@ -140,6 +140,7 @@ fn main() {
                 env!("CARGO_PKG_VERSION"),
                 can_install_updates(),
             )),
+            hotkeys: None,
         });
         #[cfg(windows)]
         if install_error.is_some() {

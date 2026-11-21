@@ -205,6 +205,17 @@ impl ReviewState {
         }
     }
 
+    pub(crate) fn step_speed(&mut self, delta: i32) {
+        let last = SPEEDS.len() - 1;
+        let next = self.speed.saturating_add_signed(delta as isize).min(last);
+        if next != self.speed {
+            self.speed = next;
+            if let Some(player) = &self.player {
+                player.set_rate(self.speed_rate());
+            }
+        }
+    }
+
     pub(crate) fn toggle_mute(&mut self) {
         self.muted = !self.muted;
         if let Some(player) = &self.player {

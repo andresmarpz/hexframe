@@ -22,6 +22,12 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 - Libraries return `thiserror` errors. Binaries use `anyhow`.
 - `just ci` passes before every push. It runs fmt, clippy on macOS and on Windows through cargo-xwin, and the tests.
 
+## Keybinds
+
+- Every key action is one line in `actions!` in `crates/core/src/keybinds/action.rs`: id, label, group, scope (Global works in game through `RegisterHotKey`, App only in the window) and default keys. `Mod` means Ctrl on Windows and Cmd on macOS.
+- Handle the new action in `Ui::run_action` (`crates/app/src/ui/keys.rs`) for App scope, or in the engine's `global_action` for Global scope. The Keybinds page, conflict checks and settings storage need no change.
+- Never match raw keys in app code. Users' overrides live in `settings.keybinds`, only the changed ones.
+
 ## Commands
 
 - `just ci`: fmt check, host clippy, typos, Windows clippy through cargo-xwin, tests.

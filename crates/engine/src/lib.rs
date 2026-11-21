@@ -18,3 +18,4 @@ pub use api::{
     reveal,
 };
 pub use fake::FakeMediaSource;
+pub use hotkey::HotkeyBackend;

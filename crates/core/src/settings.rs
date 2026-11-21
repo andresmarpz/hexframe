@@ -1,16 +1,17 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::keybinds::Keymap;
 use crate::media::CaptureConfig;
 use crate::paths;
 
-mod hotkey;
+mod overrides;
 mod resolution;
 
-pub use hotkey::{Hotkey, ParseHotkeyError};
 pub use resolution::{
     MAX_HEIGHT, MIN_HEIGHT, RESOLUTION_LADDER, Resolution, ResolutionOption, resolution_options,
 };
@@ -96,8 +97,14 @@ pub struct Settings {
     pub audio: bool,
     pub capture_cursor: bool,
     pub clips: ClipSettings,
-    #[serde(deserialize_with = "hotkey::deserialize_lenient")]
-    pub save_clip_hotkey: Option<Hotkey>,
+    #[serde(deserialize_with = "overrides::lenient_overrides")]
+    pub keybinds: BTreeMap<String, String>,
+    #[serde(
+        rename = "save_clip_hotkey",
+        deserialize_with = "overrides::legacy_hotkey",
+        skip_serializing
+    )]
+    pub legacy_save_clip_hotkey: Option<Option<String>>,
     pub storage_limit_gb: Option<u32>,
     pub check_updates: bool,
 }
@@ -114,7 +121,8 @@ impl Default for Settings {
             audio: true,
             capture_cursor: true,
             clips: ClipSettings::default(),
-            save_clip_hotkey: Some(Hotkey::default()),
+            keybinds: BTreeMap::new(),
+            legacy_save_clip_hotkey: None,
             storage_limit_gb: None,
             check_updates: true,
         }
@@ -132,8 +140,14 @@ impl Settings {
                 return Settings::default();
             }
         };
-        match serde_json::from_str(&text) {
-            Ok(settings) => settings,
+        match serde_json::from_str::<Settings>(&text) {
+            Ok(mut settings) => {
+                overrides::migrate_legacy(
+                    &mut settings.legacy_save_clip_hotkey,
+                    &mut settings.keybinds,
+                );
+                settings
+            }
             Err(err) => {
                 tracing::warn!(path = %path.display(), %err, "invalid settings file, using defaults");
                 Settings::default()
@@ -163,6 +177,10 @@ impl Settings {
         self.clips.pre_secs = self.clips.pre_secs.clamp(1, MAX_CLIP_SECS);
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
         self.storage_limit_gb = self.storage_limit_gb.map(nearest_storage_limit);
+    }
+
+    pub fn keymap(&self) -> Keymap {
+        Keymap::from_overrides(&self.keybinds)
     }
 
     pub fn storage_limit_bytes(&self) -> Option<u64> {

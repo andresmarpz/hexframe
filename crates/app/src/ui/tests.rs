@@ -3,7 +3,7 @@ use greyscreen_engine::{ClipEntry, EngineStatus, FeedItem, NoticeLevel, Recordin
 use rune::Tx;
 
 use super::jump::{next_target, previous_target};
-use super::{FEED_CAP, Ui, format_size_estimate};
+use super::{FEED_CAP, Ui, format_size_rate};
 
 fn ui() -> Ui {
     Ui::blank(Settings::default())
@@ -197,13 +197,13 @@ fn events_in_the_first_seconds_land_at_zero() {
 }
 
 #[test]
-fn size_estimate_rounds_and_marks_native() {
+fn size_rate_rounds_and_marks_native() {
     assert_eq!(
-        format_size_estimate(63.4, None),
-        "About 65 MB per minute, about 1.9 GB for a 30-minute game"
+        format_size_rate(63.4, None),
+        "About 65 MB per minute at these settings."
     );
     assert_eq!(
-        format_size_estimate(412.0, Some(1440)),
-        "About 410 MB per minute, about 12 GB for a 30-minute game (at 1440p)"
+        format_size_rate(412.0, Some(1440)),
+        "About 410 MB per minute at these settings (1440p)."
     );
 }

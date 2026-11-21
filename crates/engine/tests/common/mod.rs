@@ -94,6 +94,7 @@ pub(crate) fn start_engine(
         sink,
         settings_path: Some(settings_path.clone()),
         updates: None,
+        hotkeys: None,
     });
     Harness {
         engine: Some(engine),

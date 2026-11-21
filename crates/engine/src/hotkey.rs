@@ -1,67 +1,77 @@
-use crossbeam_channel::Sender;
-use greyscreen_core::settings::Hotkey;
+use greyscreen_core::keybinds::{Action, KeyCombo};
 
+#[cfg(windows)]
+use crossbeam_channel::Sender;
+
+#[cfg(windows)]
 use crate::api::EngineCmd;
+#[cfg(windows)]
 use crate::control::Sink;
 
-#[cfg(windows)]
-pub(crate) struct Hotkeys {
-    listener: Option<greyscreen_capture::hotkey::Listener>,
+pub trait HotkeyBackend: Send {
+    fn set(&self, bindings: &[(Action, KeyCombo)]);
 }
 
 #[cfg(windows)]
-impl Hotkeys {
-    pub(crate) fn start(cmd: Sender<EngineCmd>, sink: Sink) -> Self {
-        use crate::api::UiMsg;
-        use greyscreen_capture::hotkey::{Event, spawn};
-        let listener = spawn(move |event| match event {
-            Event::Pressed => {
-                if cmd.send(EngineCmd::HotkeyPressed).is_err() {
-                    tracing::debug!("engine stopped before the hotkey was handled");
-                }
-            }
-            Event::Registered(hotkey) => {
-                tracing::info!(hotkey = ?hotkey.map(|h| h.to_string()), "save clip hotkey registered");
-                sink(UiMsg::HotkeyStatus { error: None });
-            }
-            Event::Failed { hotkey, in_use } => {
-                tracing::warn!(%hotkey, in_use, "cannot register the save clip hotkey");
-                let why = if in_use {
-                    "is already used by another app"
-                } else {
-                    "cannot be used"
-                };
-                sink(UiMsg::HotkeyStatus {
-                    error: Some(format!("{hotkey} {why}. Choose a different key.")),
-                });
-            }
-        });
-        match listener {
-            Ok(listener) => Self {
-                listener: Some(listener),
-            },
-            Err(err) => {
-                tracing::warn!(%err, "cannot start the hotkey thread");
-                Self { listener: None }
+struct Windows {
+    listener: greyscreen_capture::hotkey::Listener,
+}
+
+#[cfg(windows)]
+impl HotkeyBackend for Windows {
+    fn set(&self, bindings: &[(Action, KeyCombo)]) {
+        self.listener.set(bindings);
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn platform(cmd: Sender<EngineCmd>, sink: Sink) -> Box<dyn HotkeyBackend> {
+    use crate::api::UiMsg;
+    use greyscreen_capture::hotkey::{Event, spawn};
+    let listener = spawn(move |event| match event {
+        Event::Pressed(action) => {
+            if cmd.send(EngineCmd::GlobalAction(action)).is_err() {
+                tracing::debug!("engine stopped before the hotkey was handled");
             }
         }
-    }
-
-    pub(crate) fn set(&self, hotkey: Option<&Hotkey>) {
-        if let Some(listener) = &self.listener {
-            listener.set(hotkey);
+        Event::Applied(failed) => {
+            let errors = failed
+                .into_iter()
+                .map(|failure| {
+                    let why = if failure.in_use {
+                        "is already used by another app"
+                    } else {
+                        "cannot be used"
+                    };
+                    tracing::warn!(action = failure.action.id(), combo = %failure.combo, in_use = failure.in_use, "cannot register a hotkey");
+                    (
+                        failure.action,
+                        format!("{} {why}. Choose a different key.", failure.combo.display(false)),
+                    )
+                })
+                .collect();
+            sink(UiMsg::HotkeyStatus { errors });
+        }
+    });
+    match listener {
+        Ok(listener) => Box::new(Windows { listener }),
+        Err(err) => {
+            tracing::warn!(%err, "cannot start the hotkey thread");
+            Box::new(Unavailable)
         }
     }
 }
 
 #[cfg(not(windows))]
-pub(crate) struct Hotkeys;
+pub(crate) fn platform(
+    _cmd: crossbeam_channel::Sender<crate::api::EngineCmd>,
+    _sink: crate::control::Sink,
+) -> Box<dyn HotkeyBackend> {
+    Box::new(Unavailable)
+}
 
-#[cfg(not(windows))]
-impl Hotkeys {
-    pub(crate) fn start(_cmd: Sender<EngineCmd>, _sink: Sink) -> Self {
-        Hotkeys
-    }
+struct Unavailable;
 
-    pub(crate) fn set(&self, _hotkey: Option<&Hotkey>) {}
+impl HotkeyBackend for Unavailable {
+    fn set(&self, _bindings: &[(Action, KeyCombo)]) {}
 }

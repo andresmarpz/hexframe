@@ -9,16 +9,17 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, never, select, tick, unbounded};
+use greyscreen_core::keybinds::{Action, KeyCombo};
 use greyscreen_core::media::{MediaEvent, MediaSession, MediaSource};
 use greyscreen_core::session::{Input, Session, SessionState, Status};
-use greyscreen_core::settings::{Hotkey, Settings};
+use greyscreen_core::settings::Settings;
 use greyscreen_core::time::{Hns, mono_now, secs_to_hns};
 use greyscreen_league::LeagueMsg;
 
 use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
 use crate::delete;
-use crate::hotkey::Hotkeys;
+use crate::hotkey::{self, HotkeyBackend};
 use crate::library;
 use crate::settings_save::SettingsSaver;
 use crate::storage::ActiveFolder;
@@ -42,6 +43,7 @@ pub(crate) struct Spec {
     pub(crate) media: Arc<dyn MediaSource>,
     pub(crate) settings_path: Option<PathBuf>,
     pub(crate) updates: Option<UpdateConfig>,
+    pub(crate) hotkeys: Option<Box<dyn HotkeyBackend>>,
     pub(crate) cmd: Sender<EngineCmd>,
 }
 
@@ -71,8 +73,8 @@ struct Control {
     settings_saver: SettingsSaver,
     updater: Option<UpdateHandle>,
     update_busy: bool,
-    hotkeys: Hotkeys,
-    applied_hotkey: Option<Hotkey>,
+    hotkeys: Box<dyn HotkeyBackend>,
+    applied_hotkeys: Vec<(Action, KeyCombo)>,
     active_folder: ActiveFolder,
 }
 
@@ -116,6 +118,7 @@ impl Control {
             media,
             settings_path,
             updates,
+            hotkeys,
             cmd,
         } = spec;
         let (internal_tx, internal_rx) = unbounded();
@@ -125,8 +128,8 @@ impl Control {
             updater,
             update_busy: false,
             settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
-            hotkeys: Hotkeys::start(cmd, sink.clone()),
-            applied_hotkey: settings.save_clip_hotkey.clone(),
+            hotkeys: hotkeys.unwrap_or_else(|| hotkey::platform(cmd, sink.clone())),
+            applied_hotkeys: settings.keymap().global(),
             active_folder: ActiveFolder::default(),
             test_stop_at: None,
             session: Session::new(settings.auto_record),
@@ -148,7 +151,7 @@ impl Control {
 
     fn run(mut self, mut cmd_rx: Receiver<EngineCmd>, mut league_rx: Receiver<LeagueMsg>) {
         let ticker = tick(TICK);
-        self.hotkeys.set(self.applied_hotkey.as_ref());
+        self.hotkeys.set(&self.applied_hotkeys);
         library::spawn_startup(
             self.settings.output_dir.clone(),
             self.settings.storage_limit_bytes(),
@@ -207,11 +210,15 @@ impl Control {
             EngineCmd::SaveClipNow => self.save_clip_now(),
             EngineCmd::CheckForUpdates => self.update_cmd(UpdateCmd::Check),
             EngineCmd::InstallUpdate => self.update_cmd(UpdateCmd::Install),
-            EngineCmd::HotkeyPressed => {
-                if matches!(self.session.state(), SessionState::Recording { .. }) {
-                    self.save_clip_now();
-                }
-            }
+            EngineCmd::GlobalAction(action) => self.global_action(action),
+        }
+    }
+
+    fn global_action(&mut self, action: Action) {
+        if action == Action::SaveClip
+            && matches!(self.session.state(), SessionState::Recording { .. })
+        {
+            self.save_clip_now();
         }
     }
 
@@ -234,9 +241,10 @@ impl Control {
         let auto_record = settings.auto_record;
         self.update_cmd_quiet(UpdateCmd::Auto(settings.check_updates));
         self.settings_saver.save(settings.clone());
-        if settings.save_clip_hotkey != self.applied_hotkey {
-            self.applied_hotkey = settings.save_clip_hotkey.clone();
-            self.hotkeys.set(self.applied_hotkey.as_ref());
+        let global = settings.keymap().global();
+        if global != self.applied_hotkeys {
+            self.applied_hotkeys = global;
+            self.hotkeys.set(&self.applied_hotkeys);
         }
         self.settings = settings;
         self.feed(Input::SettingsChanged { auto_record });

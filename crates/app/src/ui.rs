@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use crossbeam_channel::Sender;
+use greyscreen_core::keybinds::Action;
 use greyscreen_core::settings::Settings;
 use greyscreen_core::update::{UpdateInfo, UpdateState};
 use greyscreen_engine::{
@@ -11,8 +12,9 @@ use rune::{TextEdit, Tx};
 
 pub(crate) mod event_detail;
 mod format;
-mod hotkey_capture;
 mod jump;
+pub(crate) mod key_event;
+mod keybinds;
 mod keys;
 pub(crate) mod library_format;
 mod preview;
@@ -26,7 +28,7 @@ pub(crate) mod fake_player;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use format::{format_clock, format_size, format_size_estimate};
+pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::{RecordingsFilter, ResultFilter, modes_present};
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
@@ -108,13 +110,27 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.screen = Screen::Settings;
         ui.apply_update(UpdateState::AvailableManual(update::preview_info()));
     }),
-    ("settings-hotkey", |ui| {
+    ("settings-keybinds", |ui| {
         ui.screen = Screen::Settings;
-        ui.hotkey_capture = true;
+        ui.settings_tab = SettingsTab::Keybinds;
     }),
-    ("settings-hotkey-taken", |ui| {
+    ("settings-keybinds-capture", |ui| {
         ui.screen = Screen::Settings;
-        ui.hotkey_error = Some("F9 is already used by another app. Choose a different key.".into());
+        ui.settings_tab = SettingsTab::Keybinds;
+        ui.rebinding = Some(Action::PlayPause);
+        ui.bind_hint = Some((
+            Action::PlayPause,
+            "F is already used by Toggle fullscreen.".into(),
+        ));
+    }),
+    ("settings-keybinds-changed", |ui| {
+        ui.screen = Screen::Settings;
+        ui.settings_tab = SettingsTab::Keybinds;
+        ui.settings.keybinds.insert("mute".into(), "N".into());
+        ui.hotkey_errors = vec![(
+            Action::SaveClip,
+            "F9 is already used by another app. Choose a different key.".into(),
+        )];
     }),
     ("review", |ui| {
         ui.open_review_entry(preview::review_entry());
@@ -146,6 +162,13 @@ pub(crate) enum Screen {
     Review,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum SettingsTab {
+    #[default]
+    General,
+    Keybinds,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Notice {
     pub level: NoticeLevel,
@@ -170,9 +193,10 @@ pub(crate) struct Ui {
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
     pub storage_open: bool,
-    pub hotkey_capture: bool,
-    pub hotkey_hint: Option<&'static str>,
-    pub hotkey_error: Option<String>,
+    pub settings_tab: SettingsTab,
+    pub rebinding: Option<Action>,
+    pub bind_hint: Option<(Action, String)>,
+    pub hotkey_errors: Vec<(Action, String)>,
     pub window_full_screen: bool,
     pub start_with_windows: bool,
     pub pre_secs: TextEdit,
@@ -209,9 +233,10 @@ impl Ui {
             player_factory: review::rune_player,
             resolution_open: false,
             storage_open: false,
-            hotkey_capture: false,
-            hotkey_hint: None,
-            hotkey_error: None,
+            settings_tab: SettingsTab::General,
+            rebinding: None,
+            bind_hint: None,
+            hotkey_errors: Vec::new(),
             window_full_screen: false,
             start_with_windows: false,
             pre_secs: TextEdit::new(settings.clips.pre_secs.to_string()),
@@ -268,8 +293,7 @@ impl Ui {
 
     pub(crate) fn go(&mut self, screen: Screen) {
         self.screen = screen;
-        self.hotkey_capture = false;
-        self.hotkey_hint = None;
+        self.stop_rebinding();
         if screen != Screen::Review {
             self.review = None;
         }
@@ -353,7 +377,7 @@ impl Ui {
             UiMsg::Library(recordings) => self.recordings = recordings,
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
             UiMsg::Update(state) => self.apply_update(state),
-            UiMsg::HotkeyStatus { error } => self.hotkey_error = error,
+            UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
         }
     }
 

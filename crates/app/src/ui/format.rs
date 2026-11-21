@@ -17,14 +17,8 @@ pub(crate) fn format_size(bytes: u64) -> String {
     }
 }
 
-pub(crate) fn format_size_estimate(mb_per_minute: f64, native_height: Option<u32>) -> String {
+pub(crate) fn format_size_rate(mb_per_minute: f64, native_height: Option<u32>) -> String {
     let per_minute = (mb_per_minute / 5.0).round().max(1.0) * 5.0;
-    let per_game = per_minute * 30.0 / 1000.0;
-    let game = if per_game < 10.0 {
-        format!("{per_game:.1}")
-    } else {
-        format!("{per_game:.0}")
-    };
-    let suffix = native_height.map_or(String::new(), |h| format!(" (at {h}p)"));
-    format!("About {per_minute:.0} MB per minute, about {game} GB for a 30-minute game{suffix}")
+    let suffix = native_height.map_or(String::new(), |h| format!(" ({h}p)"));
+    format!("About {per_minute:.0} MB per minute at these settings{suffix}.")
 }

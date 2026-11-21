@@ -1,43 +1,59 @@
+use greyscreen_core::keybinds::{Action, Scope};
 use greyscreen_core::library::EventEntry;
-use rune::{Key, KeyEvent, Tx};
+use rune::{KeyEvent, Tx};
 
 use super::jump::{next_target, previous_target};
+use super::key_event::combo_of;
 use super::{EventFilter, PanelTab, Screen, Source, Ui};
 
 const STEP_SECS: f64 = 5.0;
 
 impl Ui {
     pub(crate) fn on_key(&mut self, ev: &KeyEvent, tx: &mut Tx) -> bool {
-        if self.hotkey_capture {
-            return self.capture_hotkey(ev);
+        if self.rebinding.is_some() {
+            return self.capture_binding(ev);
         }
-        let m = ev.mods;
-        if self.screen != Screen::Review
-            || self.review.is_none()
-            || m.cmd
-            || m.ctrl
-            || m.alt
-            || m.logo
-        {
+        let Some(combo) = combo_of(ev) else {
+            return false;
+        };
+        match self.settings.keymap().action_for(Scope::App, &combo) {
+            Some(action) => self.run_action(action, tx),
+            None => false,
+        }
+    }
+
+    fn run_action(&mut self, action: Action, tx: &mut Tx) -> bool {
+        match action {
+            Action::OpenSettings => self.go(Screen::Settings),
+            Action::GoHome => self.go(Screen::Home),
+            Action::GoRecordings => self.go(Screen::Recordings),
+            _ => return self.run_review_action(action, tx),
+        }
+        true
+    }
+
+    fn run_review_action(&mut self, action: Action, tx: &mut Tx) -> bool {
+        if self.screen != Screen::Review || self.review.is_none() {
             return false;
         }
         let theater = self.in_theater();
-        match &ev.key {
-            Key::Escape if theater => self.set_theater(false, tx),
-            Key::Escape => self.go(Screen::Recordings),
-            Key::Left => self.review_step(-STEP_SECS),
-            Key::Right => self.review_step(STEP_SECS),
-            Key::Text(t) => match t.to_lowercase().as_str() {
-                " " => self.review_toggle(),
-                "f" => self.set_theater(!theater, tx),
-                "j" => self.review_jump(previous_target),
-                "l" => self.review_jump(next_target),
-                "," => self.review_frame(-1.0),
-                "." => self.review_frame(1.0),
-                "m" => self.review_mute(),
-                _ => return false,
-            },
-            _ => return false,
+        match action {
+            Action::ExitFullscreen if theater => self.set_theater(false, tx),
+            Action::ExitFullscreen => self.go(Screen::Recordings),
+            Action::ToggleFullscreen => self.set_theater(!theater, tx),
+            Action::PlayPause => self.review_toggle(),
+            Action::SeekBack => self.review_step(-STEP_SECS),
+            Action::SeekForward => self.review_step(STEP_SECS),
+            Action::PreviousEvent => self.review_jump(previous_target),
+            Action::NextEvent => self.review_jump(next_target),
+            Action::FrameBack => self.review_frame(-1.0),
+            Action::FrameForward => self.review_frame(1.0),
+            Action::Mute => self.review_mute(),
+            Action::SpeedDown => self.review_step_speed(-1),
+            Action::SpeedUp => self.review_step_speed(1),
+            Action::SaveClip | Action::OpenSettings | Action::GoHome | Action::GoRecordings => {
+                return false;
+            }
         }
         if let Some(review) = &mut self.review {
             review.wake_controls(tx.clock());
@@ -82,6 +98,12 @@ impl Ui {
     pub(crate) fn review_mute(&mut self) {
         if let Some(review) = &mut self.review {
             review.toggle_mute();
+        }
+    }
+
+    fn review_step_speed(&mut self, delta: i32) {
+        if let Some(review) = &mut self.review {
+            review.step_speed(delta);
         }
     }
 

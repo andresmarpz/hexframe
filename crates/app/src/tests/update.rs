@@ -251,6 +251,7 @@ fn the_card_walks_through_check_download_and_install_with_a_fake_source() {
             interval: Duration::from_secs(3600),
             busy_retry: Duration::from_secs(3600),
         }),
+        hotkeys: None,
     });
     let ui = Ui::live(Settings::default(), engine.cmd.clone());
     let mut rt = Runtime::new(ui, view::root, (960.0, 2600.0), Env::new(true, 1.0));

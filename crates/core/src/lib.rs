@@ -3,6 +3,7 @@ pub mod crop;
 pub mod game;
 pub mod highlight;
 pub mod install;
+pub mod keybinds;
 pub mod library;
 pub mod media;
 pub mod paths;

@@ -3,12 +3,12 @@ use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use greyscreen_core::settings::Hotkey;
+use greyscreen_core::keybinds::{Action, KeyCombo};
 use thiserror::Error;
 use windows::Win32::Foundation::{ERROR_HOTKEY_ALREADY_REGISTERED, LPARAM, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, RegisterHotKey,
+    HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, RegisterHotKey,
     UnregisterHotKey,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -16,7 +16,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_USER,
 };
 
-const HOTKEY_ID: i32 = 1;
 const WM_APPLY: u32 = WM_APP + 1;
 
 #[derive(Debug, Error)]
@@ -27,17 +26,25 @@ pub enum HotkeyError {
     NotReady,
 }
 
+pub type Bindings = Vec<(Action, KeyCombo)>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Failure {
+    pub action: Action,
+    pub combo: KeyCombo,
+    pub in_use: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    Pressed,
-    Registered(Option<Hotkey>),
-    Failed { hotkey: Hotkey, in_use: bool },
+    Pressed(Action),
+    Applied(Vec<Failure>),
 }
 
 #[derive(Debug)]
 pub struct Listener {
     thread_id: u32,
-    wanted: Sender<Option<Hotkey>>,
+    wanted: Sender<Bindings>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -56,8 +63,8 @@ pub fn spawn(on_event: impl Fn(Event) + Send + 'static) -> Result<Listener, Hotk
 }
 
 impl Listener {
-    pub fn set(&self, hotkey: Option<&Hotkey>) {
-        if self.wanted.send(hotkey.cloned()).is_err() {
+    pub fn set(&self, bindings: &[(Action, KeyCombo)]) {
+        if self.wanted.send(bindings.to_vec()).is_err() {
             tracing::warn!("the hotkey thread is gone");
             return;
         }
@@ -84,7 +91,7 @@ impl Drop for Listener {
     }
 }
 
-fn run(wanted: &Receiver<Option<Hotkey>>, on_event: &dyn Fn(Event), ready: &mpsc::Sender<u32>) {
+fn run(wanted: &Receiver<Bindings>, on_event: &dyn Fn(Event), ready: &mpsc::Sender<u32>) {
     let mut msg = MSG::default();
     // SAFETY: msg is a valid out pointer. Peeking makes Windows create this thread's queue.
     unsafe { PeekMessageW(&mut msg, None, WM_USER, WM_USER, PM_NOREMOVE) }.as_bool();
@@ -93,7 +100,7 @@ fn run(wanted: &Receiver<Option<Hotkey>>, on_event: &dyn Fn(Event), ready: &mpsc
     if ready.send(thread_id).is_err() {
         return;
     }
-    let mut current: Option<Hotkey> = None;
+    let mut registered: Vec<Action> = Vec::new();
     loop {
         // SAFETY: msg is a valid out pointer and the filter takes every message.
         let got = unsafe { GetMessageW(&mut msg, None, 0, 0) };
@@ -101,50 +108,53 @@ fn run(wanted: &Receiver<Option<Hotkey>>, on_event: &dyn Fn(Event), ready: &mpsc
             break;
         }
         match msg.message {
-            WM_HOTKEY if msg.wParam.0 == HOTKEY_ID as usize => on_event(Event::Pressed),
+            WM_HOTKEY => {
+                if let Some(action) = hotkey_action(&registered, msg.wParam.0) {
+                    on_event(Event::Pressed(action));
+                }
+            }
             WM_APPLY => {
                 while let Ok(next) = wanted.try_recv() {
-                    current = apply(current.take(), next, on_event);
+                    unregister_all(registered.len());
+                    let (now, failed) = register_all(&next);
+                    registered = now;
+                    on_event(Event::Applied(failed));
                 }
             }
             _ => {}
         }
     }
-    if current.is_some() {
-        unregister();
-    }
+    unregister_all(registered.len());
 }
 
-fn apply(
-    registered: Option<Hotkey>,
-    next: Option<Hotkey>,
-    on_event: &dyn Fn(Event),
-) -> Option<Hotkey> {
-    if registered.is_some() {
-        unregister();
-    }
-    let Some(hotkey) = next else {
-        on_event(Event::Registered(None));
-        return None;
-    };
-    match register(&hotkey) {
-        Ok(()) => {
-            on_event(Event::Registered(Some(hotkey.clone())));
-            Some(hotkey)
-        }
-        Err(in_use) => {
-            on_event(Event::Failed { hotkey, in_use });
-            None
-        }
-    }
+fn hotkey_action(registered: &[Action], id: usize) -> Option<Action> {
+    registered.get(id.checked_sub(1)?).copied()
 }
 
-fn modifiers(hotkey: &Hotkey) -> HOT_KEY_MODIFIERS {
+fn register_all(bindings: &[(Action, KeyCombo)]) -> (Vec<Action>, Vec<Failure>) {
+    let mut registered = Vec::new();
+    let mut failed = Vec::new();
+    for (action, combo) in bindings {
+        let id = i32::try_from(registered.len() + 1).unwrap_or(i32::MAX);
+        match register(id, combo) {
+            Ok(()) => registered.push(*action),
+            Err(in_use) => failed.push(Failure {
+                action: *action,
+                combo: combo.clone(),
+                in_use,
+            }),
+        }
+    }
+    (registered, failed)
+}
+
+fn modifiers(combo: &KeyCombo) -> HOT_KEY_MODIFIERS {
     let mut mods = MOD_NOREPEAT;
     for (held, flag) in [
-        (hotkey.ctrl, MOD_CONTROL),
-        (hotkey.alt, MOD_ALT),
-        (hotkey.shift, MOD_SHIFT),
+        (combo.ctrl, MOD_CONTROL),
+        (combo.alt, MOD_ALT),
+        (combo.shift, MOD_SHIFT),
+        (combo.meta, MOD_WIN),
     ] {
         if held {
             mods |= flag;
@@ -153,15 +163,18 @@ fn modifiers(hotkey: &Hotkey) -> HOT_KEY_MODIFIERS {
     mods
 }
 
-fn register(hotkey: &Hotkey) -> Result<(), bool> {
-    // SAFETY: registers on this thread's queue with no window. The id is unique here.
-    unsafe { RegisterHotKey(None, HOTKEY_ID, modifiers(hotkey), hotkey.virtual_key()) }
+fn register(id: i32, combo: &KeyCombo) -> Result<(), bool> {
+    // SAFETY: registers on this thread's queue with no window. The id is unique among live ones.
+    unsafe { RegisterHotKey(None, id, modifiers(combo), combo.virtual_key()) }
         .map_err(|error| error.code() == ERROR_HOTKEY_ALREADY_REGISTERED.to_hresult())
 }
 
-fn unregister() {
-    // SAFETY: only called on the thread that registered the id.
-    if let Err(error) = unsafe { UnregisterHotKey(None, HOTKEY_ID) } {
-        tracing::warn!(%error, "cannot unregister the hotkey");
+fn unregister_all(count: usize) {
+    for id in 1..=count {
+        let id = i32::try_from(id).unwrap_or(i32::MAX);
+        // SAFETY: only called on the thread that registered the ids.
+        if let Err(error) = unsafe { UnregisterHotKey(None, id) } {
+            tracing::warn!(%error, "cannot unregister a hotkey");
+        }
     }
 }

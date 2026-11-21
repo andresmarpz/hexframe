@@ -59,6 +59,7 @@ fn no_scheduled_check_runs_while_a_session_is_recording() {
             interval: Duration::from_millis(100),
             busy_retry: Duration::from_millis(100),
         }),
+        hotkeys: None,
     });
     engine
         .cmd
@@ -97,6 +98,7 @@ fn a_manual_check_without_an_updater_says_so() {
         }),
         settings_path: None,
         updates: None,
+        hotkeys: None,
     });
     engine
         .cmd

@@ -4,6 +4,7 @@ use std::thread::JoinHandle;
 
 use crossbeam_channel::{Sender, unbounded};
 use greyscreen_core::highlight::Highlight;
+use greyscreen_core::keybinds::Action;
 use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
@@ -12,6 +13,7 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_league::{GameLocator, LeagueMsg, LiveClient, Poller};
 
 use crate::control;
+use crate::hotkey::HotkeyBackend;
 use crate::updater::UpdateConfig;
 
 pub use greyscreen_core::session::Status as EngineStatus;
@@ -28,7 +30,7 @@ pub enum EngineCmd {
     RescanLibrary,
     DeleteRecording { id: String },
     SaveClipNow,
-    HotkeyPressed,
+    GlobalAction(Action),
     CheckForUpdates,
     InstallUpdate,
     Shutdown,
@@ -72,7 +74,7 @@ pub enum UiMsg {
     RecordingSaved(RecordingEntry),
     Library(Vec<RecordingEntry>),
     Notice { level: NoticeLevel, text: String },
-    HotkeyStatus { error: Option<String> },
+    HotkeyStatus { errors: Vec<(Action, String)> },
     Update(UpdateState),
 }
 
@@ -105,6 +107,7 @@ pub struct EngineConfig {
     pub sink: UiSink,
     pub settings_path: Option<PathBuf>,
     pub updates: Option<UpdateConfig>,
+    pub hotkeys: Option<Box<dyn HotkeyBackend>>,
 }
 
 impl std::fmt::Debug for EngineConfig {
@@ -132,6 +135,7 @@ impl Engine {
             sink,
             settings_path: Some(paths::settings_file()),
             updates: None,
+            hotkeys: None,
         })
     }
 
@@ -143,6 +147,7 @@ impl Engine {
             sink,
             settings_path,
             updates,
+            hotkeys,
         } = config;
         settings.validate();
         let (cmd, cmd_rx) = unbounded();
@@ -154,6 +159,7 @@ impl Engine {
                 media,
                 settings_path,
                 updates,
+                hotkeys,
                 cmd: cmd.clone(),
             },
             guard,

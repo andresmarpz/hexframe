@@ -1,4 +1,5 @@
 use super::*;
+use crate::keybinds::{Action, Keymap};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 fn scratch_dir() -> PathBuf {
@@ -334,12 +335,10 @@ fn old_settings_file_without_cursor_loads_with_cursor_on() {
 fn new_settings_default_to_f9_and_no_storage_limit() {
     let s = Settings::default();
     assert_eq!(
-        s.save_clip_hotkey
-            .as_ref()
-            .map(ToString::to_string)
-            .as_deref(),
-        Some("F9")
+        s.keymap().global(),
+        vec![(Action::SaveClip, "F9".parse().unwrap())]
     );
+    assert!(s.keybinds.is_empty());
     assert_eq!(s.storage_limit_gb, None);
     assert_eq!(s.storage_limit_bytes(), None);
 }
@@ -351,45 +350,94 @@ fn an_old_settings_file_gets_the_new_defaults() {
     fs::write(&path, r#"{"quality":"Max","fps":30}"#).unwrap();
     let s = Settings::load(&path);
     assert_eq!(s.quality, Quality::Max);
-    assert_eq!(s.save_clip_hotkey, Some(Hotkey::default()));
+    assert!(s.keybinds.is_empty());
     assert_eq!(s.storage_limit_gb, None);
 }
 
 #[test]
-fn hotkey_and_storage_limit_survive_a_save() {
+fn keybinds_and_storage_limit_survive_a_save() {
     let dir = scratch_dir();
     let path = dir.join("settings.json");
     let s = Settings {
-        save_clip_hotkey: "Ctrl+Shift+K".parse().ok(),
+        keybinds: BTreeMap::from([
+            ("save_clip".to_owned(), "Ctrl+Shift+K".to_owned()),
+            ("mute".to_owned(), "none".to_owned()),
+        ]),
         storage_limit_gb: Some(250),
         ..Settings::default()
     };
     s.save(&path).unwrap();
-    assert!(
-        fs::read_to_string(&path)
-            .unwrap()
-            .contains("\"Ctrl+Shift+K\"")
-    );
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("\"Ctrl+Shift+K\""));
+    assert!(!text.contains("save_clip_hotkey"));
     assert_eq!(Settings::load(&path), s);
 }
 
 #[test]
-fn a_hotkey_set_to_null_stays_off() {
+fn an_old_hotkey_moves_into_the_keymap() {
     let dir = scratch_dir();
     let path = dir.join("settings.json");
-    fs::write(&path, r#"{"save_clip_hotkey":null}"#).unwrap();
-    assert_eq!(Settings::load(&path).save_clip_hotkey, None);
+    fs::write(&path, r#"{"fps":30,"save_clip_hotkey":"Ctrl+Shift+K"}"#).unwrap();
+    let s = Settings::load(&path);
+    assert_eq!(s.fps, 30);
+    assert_eq!(
+        s.keymap().global(),
+        vec![(Action::SaveClip, "Ctrl+Shift+K".parse().unwrap())]
+    );
+    s.save(&path).unwrap();
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(!text.contains("save_clip_hotkey"), "{text}");
+    assert_eq!(Settings::load(&path).keymap(), s.keymap());
 }
 
 #[test]
-fn a_broken_hotkey_falls_back_without_losing_other_settings() {
+fn an_old_hotkey_set_to_null_stays_off() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"save_clip_hotkey":null}"#).unwrap();
+    assert!(Settings::load(&path).keymap().global().is_empty());
+}
+
+#[test]
+fn a_new_keybind_wins_over_the_old_hotkey() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(
+        &path,
+        r#"{"save_clip_hotkey":"F5","keybinds":{"save_clip":"F6"}}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        Settings::load(&path).keymap().global(),
+        vec![(Action::SaveClip, "F6".parse().unwrap())]
+    );
+}
+
+#[test]
+fn a_broken_old_hotkey_falls_back_without_losing_other_settings() {
     let dir = scratch_dir();
     let path = dir.join("settings.json");
     for bad in [r#""Hyper+Q""#, r#""K""#, r#""""#] {
         fs::write(&path, format!(r#"{{"fps":30,"save_clip_hotkey":{bad}}}"#)).unwrap();
         let s = Settings::load(&path);
         assert_eq!(s.fps, 30);
-        assert_eq!(s.save_clip_hotkey, Some(Hotkey::default()), "{bad}");
+        assert_eq!(
+            s.keymap().global(),
+            vec![(Action::SaveClip, "F9".parse().unwrap())],
+            "{bad}"
+        );
+    }
+}
+
+#[test]
+fn malformed_keybinds_do_not_lose_other_settings() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    for bad in [r#"[1]"#, r#""x""#, r#"{"mute":5}"#, r#"null"#] {
+        fs::write(&path, format!(r#"{{"fps":30,"keybinds":{bad}}}"#)).unwrap();
+        let s = Settings::load(&path);
+        assert_eq!(s.fps, 30, "{bad}");
+        assert_eq!(s.keymap(), Keymap::defaults(), "{bad}");
     }
 }
 

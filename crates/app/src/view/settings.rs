@@ -1,7 +1,7 @@
 use greyscreen_core::paths;
-use greyscreen_core::settings::{Hotkey, Quality, Resolution, STORAGE_LIMITS_GB, resolution_options};
+use greyscreen_core::settings::{Quality, Resolution, STORAGE_LIMITS_GB, resolution_options};
 use greyscreen_engine::reveal;
-use rune::{El, FileDialogOptions, Icon, col, row, text};
+use rune::{El, FileDialogOptions, col, row, text};
 use rune_kit::{
     Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, SelectAppearance, Switch,
     TextInput,
@@ -11,30 +11,43 @@ mod updates;
 
 use super::{card, hairline, page_header};
 
-use crate::ui::{Ui, format_size_estimate, parse_clip_secs};
+use crate::ui::{SettingsTab, Ui, format_size_rate, parse_clip_secs};
+
+mod keybinds;
 
 const QUALITIES: [(Quality, &str); 3] = [
     (Quality::Balanced, "Balanced"),
     (Quality::High, "High"),
     (Quality::Max, "Max"),
 ];
+const QUALITY_NOTE: &str = "Higher quality uses more disk space.";
 const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
 const FPS_OPTIONS: [u32; 2] = [30, 60];
 const CONTROL_WIDTH: f32 = 220.0;
+const QUALITY_WIDTH: f32 = 252.0;
+const FPS_WIDTH: f32 = 120.0;
 const RESOLUTION_WIDTH: f32 = 200.0;
 const STORAGE_WIDTH: f32 = 140.0;
 const STORAGE_OFF: &str = "Off";
 const STORAGE_LIMIT_NOTE: &str = "Oldest full-game videos are deleted permanently when recordings pass this size. Clips are kept as long as possible.";
-const PRESS_A_KEY: &str = "Press a key…";
 const RIOT_NOTICE: &str = "Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
 
-static INFO: Icon = Icon {
-    name: "greyscreen-info",
-    view: 16.0,
-    body: r#"<circle cx="8" cy="8" r="6.5" stroke="currentColor" fill="none"/><path d="M8 7.2V11.2" stroke="currentColor" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/>"#,
-};
+const TAB_LABELS: [(SettingsTab, &str); 2] = [
+    (SettingsTab::General, "General"),
+    (SettingsTab::Keybinds, "Keybinds"),
+];
 
 pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
+    let body = match s.settings_tab {
+        SettingsTab::General => col()
+            .w_full()
+            .gap(20.0)
+            .child(recording_section(s, k, layer))
+            .child(clips_section(s, k))
+            .child(storage_section(s, k, layer))
+            .child(about_section(s, k)),
+        SettingsTab::Keybinds => keybinds::page(s, k),
+    };
     col()
         .key("settings")
         .w_full()
@@ -43,17 +56,25 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
             k,
             "Settings",
             "Changes are saved automatically.",
-            None,
+            Some(tab_switcher(s, k)),
         ))
-        .child(
-            col()
-                .w_full()
-                .gap(20.0)
-                .child(recording_section(s, k, layer))
-                .child(clips_section(s, k))
-                .child(storage_section(s, k, layer))
-                .child(about_section(s, k)),
-        )
+        .child(body)
+}
+
+fn tab_switcher(s: &Ui, k: &Kit) -> El {
+    SegmentedControl::new(
+        &TAB_LABELS.map(|(_, label)| label),
+        TAB_LABELS
+            .iter()
+            .position(|(tab, _)| *tab == s.settings_tab),
+    )
+    .label("Settings section")
+    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| {
+        ui.settings_tab = TAB_LABELS[i].0;
+        ui.stop_rebinding();
+    })
+    .build(k)
+    .key("settings-tabs")
 }
 
 fn section(k: &Kit, key: &str, title: &str, rows: Vec<El>) -> El {
@@ -124,16 +145,17 @@ fn toggle_row(
 
 fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let settings = &s.settings;
+    let displays = connected_displays();
+    let quality_note = quality_note(s, native_height(&displays));
     let quality = SegmentedControl::new(
         &QUALITIES.map(|(_, label)| label),
         QUALITIES.iter().position(|(q, _)| *q == settings.quality),
     )
     .label("Quality")
-    .fit()
+    .width(Some(QUALITY_WIDTH))
     .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
     .build(k)
     .key("quality");
-    let displays = connected_displays();
     let options = resolution_options(&displays, settings.resolution);
     let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
     let current = options
@@ -161,7 +183,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
         FPS_OPTIONS.iter().position(|f| *f == settings.fps),
     )
     .label("Frame rate")
-    .fit()
+    .width(Some(FPS_WIDTH))
     .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]))
     .build(k)
     .key("fps");
@@ -186,13 +208,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 settings.record_full_game,
                 |ui| ui.change(|s| s.record_full_game = !s.record_full_game),
             ),
-            setting_row(
-                k,
-                "quality-row",
-                "Quality",
-                Some("Higher quality uses more disk space."),
-                quality,
-            ),
+            setting_row(k, "quality-row", "Quality", Some(&quality_note), quality),
             setting_row(
                 k,
                 "resolution-row",
@@ -207,7 +223,6 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 Some("60 is smoother, 30 uses less disk space."),
                 fps,
             ),
-            size_estimate(s, k, native_height(&displays)),
             toggle_row(
                 k,
                 "audio",
@@ -228,11 +243,11 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     )
 }
 
-fn size_estimate(s: &Ui, k: &Kit, display_height: Option<u32>) -> El {
+fn quality_note(s: &Ui, display_height: Option<u32>) -> String {
     let native_height = display_height.unwrap_or(FALLBACK_NATIVE_HEIGHT);
     let native = (s.settings.resolution == Resolution::Native).then_some(native_height);
-    let line = format_size_estimate(s.settings.estimated_mb_per_minute(native_height), native);
-    note_row(k, "size-estimate", &format!("{line}."))
+    let rate = format_size_rate(s.settings.estimated_mb_per_minute(native_height), native);
+    format!("{QUALITY_NOTE} {rate}")
 }
 
 fn native_height(displays: &[(u32, u32)]) -> Option<u32> {
@@ -275,7 +290,7 @@ fn clips_section(s: &Ui, k: &Kit) -> El {
     let post = secs_input(k, "post-secs", "Seconds after", &s.post_secs, |ui| {
         &mut ui.post_secs
     });
-    let mut rows = vec![
+    let rows = vec![
         toggle_row(
             k,
             "clips-enabled",
@@ -334,72 +349,8 @@ fn clips_section(s: &Ui, k: &Kit) -> El {
         toggle_row(k, "clip-aces", "Aces", None, clips.aces, |ui| {
             ui.change(|s| s.clips.aces = !s.clips.aces)
         }),
-        hotkey_row(s, k),
     ];
-    if let Some(line) = hotkey_note(s) {
-        rows.push(note_row(k, "hotkey-note", line));
-    }
     section(k, "clips-card", "Clips", rows)
-}
-
-fn hotkey_note(s: &Ui) -> Option<&str> {
-    if s.hotkey_capture {
-        return s.hotkey_hint;
-    }
-    s.hotkey_error.as_deref()
-}
-
-fn hotkey_row(s: &Ui, k: &Kit) -> El {
-    let label = if s.hotkey_capture {
-        PRESS_A_KEY.to_owned()
-    } else {
-        s.settings
-            .save_clip_hotkey
-            .as_ref()
-            .map_or_else(|| "Not set".to_owned(), Hotkey::to_string)
-    };
-    let pick = Button::new(label)
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
-        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.toggle_hotkey_capture(tx))
-        .build(k)
-        .key("hotkey-button");
-    let mut control = row().gap(8.0).center_y().child(pick);
-    if s.settings.save_clip_hotkey.is_some() && !s.hotkey_capture {
-        control = control.child(
-            Button::new("Turn off")
-                .variant(ButtonVariant::Ghost)
-                .control_size(ControlSize::Large)
-                .on_press(|ui: &mut Ui| ui.clear_hotkey())
-                .build(k)
-                .key("hotkey-off"),
-        );
-    }
-    let description = if s.hotkey_capture {
-        "Press the key or combination to use. Esc cancels."
-    } else {
-        "Saves the last 30 seconds while you play. Works while League is in front."
-    };
-    setting_row(
-        k,
-        "hotkey-row",
-        "Save clip hotkey",
-        Some(description),
-        control,
-    )
-}
-
-fn note_row(k: &Kit, key: &str, line: &str) -> El {
-    row()
-        .key(key.to_owned())
-        .w_full()
-        .px(16.0)
-        .py(8.0)
-        .gap(6.0)
-        .center_y()
-        .fill(k.c.layer_01)
-        .child(rune::icon(&INFO, 14.0).color(k.c.icon_muted).a11y_hidden())
-        .child(text(line.to_owned()).font(k.ty.small).color(k.c.text_muted))
 }
 
 fn storage_limit_label(gb: Option<u32>) -> String {

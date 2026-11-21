@@ -8,12 +8,13 @@ use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
 mod home;
-mod hotkey_storage;
+mod keybinds;
 mod match_flow;
 mod nav_settings;
 mod recordings;
 mod review_flow;
 mod sidebar;
+mod storage_limit;
 mod update;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
@@ -379,19 +380,6 @@ fn arrow_keys_seek_five_seconds() {
 }
 
 #[test]
-fn j_and_l_jump_between_event_markers() {
-    let mut rt = key_review_runtime();
-    fake_player::set_time(1.0);
-    press_char(&mut rt, "l");
-    assert_seeks_to(2.3);
-    fake_player::clear_calls();
-    fake_player::set_time(3.0);
-    press_char(&mut rt, "j");
-    assert_seeks_to(1.4);
-    fake_player::set_time(0.0);
-}
-
-#[test]
 fn keys_do_nothing_outside_the_review_screen() {
     let mut rt = runtime();
     rt.on_key = Some(Ui::on_key);
@@ -415,7 +403,6 @@ fn size_estimate_text(rt: &Runtime<Ui>) -> String {
 fn changing_quality_updates_the_size_estimate() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
-    assert!(rt.find("size-estimate").is_some());
     let before = size_estimate_text(&rt);
     let (x, y) = rt.find("quality").unwrap();
     rt.pointer_down(x + 60.0, y);
