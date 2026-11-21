@@ -340,6 +340,10 @@ impl Native {
         }
         let lead = vsync::period().as_secs_f64() / 2.0;
         if let Some(to) = c.seek.take() {
+            // A parked clip opens again to show the seek's picture.
+            if let Phase::Idle { .. } = self.phase {
+                self.shown = None;
+            }
             self.event(shared, c, Event::Seek { to });
         }
         if c.playing() != self.playing {
@@ -467,9 +471,9 @@ impl Native {
         }
     }
 
-    /// Playing with nothing due: the end, or a decoder that fell behind.
+    /// Playing with nothing due: the end, or a decoder that fell behind. Buffering with nothing
+    /// past the seek: the clip ends where it was asked to stand.
     fn check_end(&mut self, shared: &Arc<Shared>, c: &mut Control, pipe: &Pipe, generation: u32, target: Instant) {
-        let Phase::Playing { clock } = self.phase else { return };
         let (empty, ended) = {
             let inbox = pipe.lock();
             (inbox.frames.is_empty(), inbox.ended == Some(generation))
@@ -477,9 +481,15 @@ impl Native {
         if !empty {
             return;
         }
+        let duration = c.duration.unwrap_or(0.0);
+        let clock = match self.phase {
+            Phase::Playing { clock } => clock,
+            Phase::Buffering { at, play: true } if ended => return self.end(shared, c, at, duration),
+            Phase::Buffering { at, play: false } if ended => return self.event(shared, c, Event::Ended { at }),
+            _ => return,
+        };
         let pos = clock.position(target);
         let frame = self.facts.map_or(1.0 / 30.0, |f| f.meta.frame);
-        let duration = c.duration.unwrap_or(0.0);
         let shown = self.shown.unwrap_or(clock.pos);
         if ended {
             let end = if duration > 0.0 { (shown / duration).floor() * duration + duration } else { shown + frame };

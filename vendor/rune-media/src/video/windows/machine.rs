@@ -178,6 +178,11 @@ pub(super) fn step(phase: &mut Phase, event: Event) -> Effects<Effect> {
             *phase = P::Ended { at };
             Effects::one(Effect::Clock(None))
         }
+        // Nothing to show past a seek: a playing clip ends there, a paused one holds there.
+        (P::Buffering { play, .. }, Event::Ended { at }) => {
+            *phase = if play { P::Ended { at } } else { P::Paused { at } };
+            Effects::none()
+        }
         (P::Playing { clock }, Event::Resumed { target, at, lead }) => {
             let clock = anchor(target, at, lead, clock.rate);
             *phase = P::Playing { clock };
@@ -190,3 +195,6 @@ pub(super) fn step(phase: &mut Phase, event: Event) -> Effects<Effect> {
         _ => Effects::none(),
     }
 }
+
+#[cfg(test)]
+mod tests;

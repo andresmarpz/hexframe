@@ -339,6 +339,11 @@ impl Decoder {
         let mut waiting_since = Instant::now();
         // Audio alone: the clip's end, until the clock passes it and the clip hears so.
         let mut end_due: Option<f64> = None;
+        // This generation's newest picture dropped before `skip_before`, whether one was kept,
+        // and whether the end already went back for the last one.
+        let mut skipped: Option<f64> = None;
+        let mut delivered = false;
+        let mut retried = false;
         loop {
             // Take the UI's asks, then wait for room in the queue and a free texture.
             {
@@ -354,6 +359,7 @@ impl Decoder {
                         generation = g;
                         skip_before = to;
                         epoch = 0.0;
+                        (skipped, delivered, retried) = (None, false, false);
                         mf::seek(&self.reader, to)?;
                         self.reopen_streams();
                         if let Some(o) = &self.output {
@@ -412,10 +418,22 @@ impl Decoder {
             let video = self.video == Some(read.stream);
             if read.flags & MF_SOURCE_READERF_ENDOFSTREAM.0 != 0 {
                 if video { self.video_open = false } else { self.audio_open = false }
+                // A seek past the last picture kept none: decode the last one again, so the
+                // clip shows it and ends there.
+                if let (true, false, false, Some(last)) = (video, delivered, retried, skipped) {
+                    retried = true;
+                    skip_before = last;
+                    mf::seek(&self.reader, last)?;
+                    self.reopen_streams();
+                    continue;
+                }
             }
             if let Some(sample) = read.sample.take() {
                 if video {
-                    if read.time + self.facts.meta.frame * 0.5 >= skip_before {
+                    if read.time + self.facts.meta.frame * 0.5 < skip_before {
+                        skipped = Some(read.time);
+                    } else {
+                        delivered = true;
                         let (picture, texture) = self.picture(&sample)?;
                         let pts = epoch + read.time;
                         let blitted = self.blit_on_layer(pipe, job, texture);
@@ -474,6 +492,7 @@ impl Decoder {
                 if looping && self.facts.meta.duration > 0.0 {
                     epoch += self.facts.meta.duration;
                     skip_before = 0.0;
+                    (skipped, delivered, retried) = (None, false, false);
                     mf::seek(&self.reader, 0.0)?;
                     self.reopen_streams();
                 } else {
