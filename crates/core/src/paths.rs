@@ -28,6 +28,10 @@ pub fn champion_icons_dir() -> PathBuf {
     cache_dir().join("champions")
 }
 
+pub fn sounds_dir() -> PathBuf {
+    cache_dir().join("sounds")
+}
+
 pub(crate) fn default_output_dir() -> PathBuf {
     match dirs::video_dir() {
         Some(videos) => videos.join(APP_DIR),

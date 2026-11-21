@@ -174,6 +174,8 @@ Greyscreen is an early preview. It is built and tested on macOS and in CI, and r
 
 MIT. See [LICENSE](LICENSE).
 
+The sound effects in `crates/app/assets/sounds` come from [Hex](https://github.com/anomalyco/hex) (MIT, see `LICENSE-hex.txt` there).
+
 ## Legal
 
 Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

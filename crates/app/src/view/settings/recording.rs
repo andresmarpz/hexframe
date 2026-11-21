@@ -1,11 +1,12 @@
 use greyscreen_core::settings::{NavStyle, Quality, Resolution, resolution_options};
 use greyscreen_engine::EngineStatus;
-use rune::{El, row, text};
+use rune::{Drag, El, Phase, row, text};
 use rune_kit::{Kit, SegmentedControl, Select, SelectAppearance};
 
 use super::catalog::Row;
 use super::{setting_row, toggle_row};
 use crate::ui::{Ui, format_size_rate};
+use crate::view::widgets::{percent, volume_at, volume_slider};
 
 const QUALITIES: [(Quality, &str); 3] = [
     (Quality::Balanced, "Balanced"),
@@ -20,6 +21,8 @@ const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
 const FPS_OPTIONS: [u32; 2] = [30, 60];
 const QUALITY_WIDTH: f32 = 252.0;
 const FPS_WIDTH: f32 = 120.0;
+const SOUND_VOLUME_WIDTH: f32 = 200.0;
+const PERCENT_WIDTH: f32 = 32.0;
 const RESOLUTION_WIDTH: f32 = 180.0;
 const NEXT_GAME: &str =
     "Recording now. Quality, resolution and frame rate changes apply to your next game.";
@@ -96,14 +99,60 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
             settings.capture_cursor,
             |ui| ui.change(|s| s.capture_cursor = !s.capture_cursor),
         ),
-        _ => setting_row(
+        Row::NavStyle => setting_row(
             k,
             "nav-style-row",
             "Navigation style",
             Some("A side panel, or a floating dock at the bottom."),
             nav_style(s, k),
         ),
+        Row::SoundEffects => toggle_row(
+            k,
+            "sound-effects",
+            "Sound effects",
+            Some(
+                "A soft sound when a recording starts or ends, a clip is saved or something fails.",
+            ),
+            settings.sound_effects,
+            |ui| ui.change(|s| s.sound_effects = !s.sound_effects),
+        ),
+        _ => setting_row(
+            k,
+            "sound-volume-row",
+            "Sound volume",
+            None,
+            sound_volume(s, k),
+        ),
     }
+}
+
+fn sound_volume(s: &Ui, k: &Kit) -> El {
+    let share = s.settings.sound_volume as f32 / 100.0;
+    let slider = volume_slider(k, "sound-volume", share)
+        .on_step(|ui: &mut Ui, delta, _| ui.step_sound_volume(delta))
+        .on_step_limit(|ui: &mut Ui, max, _| {
+            ui.drag_sound_volume(if max { 100 } else { 0 });
+            ui.finish_sound_volume();
+        })
+        .on_drag(|ui: &mut Ui, drag: &mut Drag, _| {
+            if drag.phase == Phase::Up {
+                ui.finish_sound_volume();
+            } else {
+                ui.drag_sound_volume(percent(volume_at(drag.x, drag.w)));
+            }
+        });
+    row()
+        .w(SOUND_VOLUME_WIDTH)
+        .gap(12.0)
+        .center_y()
+        .child(slider)
+        .child(
+            text(format!("{}", s.settings.sound_volume))
+                .key("sound-volume-percent")
+                .font(k.ty.small_medium)
+                .color(k.c.text_muted)
+                .w(PERCENT_WIDTH),
+        )
 }
 
 fn nav_style(s: &Ui, k: &Kit) -> El {

@@ -35,6 +35,7 @@ impl Ui {
     }
 
     pub(crate) fn apply(&mut self, msg: UiMsg, tx: &mut Tx) {
+        self.sfx.on_msg(&self.settings, &msg, tx.clock());
         match msg {
             UiMsg::Status(status) => self.apply_status(status, tx),
             UiMsg::Feed(item) => {

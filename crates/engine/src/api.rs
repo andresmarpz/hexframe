@@ -39,6 +39,8 @@ pub enum EngineCmd {
     Shutdown,
 }
 
+pub const MANUAL_CLIP_LABEL: &str = "Manual";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeLevel {
     Info,

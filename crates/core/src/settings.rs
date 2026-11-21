@@ -24,6 +24,8 @@ const PEAK_FACTOR: f64 = 2.0;
 const QUALITY_MODE_SIZE_FACTOR: f64 = 0.6;
 const MAX_CLIP_SECS: u32 = 120;
 const BYTES_PER_GB: u64 = 1_000_000_000;
+pub const MAX_SOUND_VOLUME: u32 = 100;
+pub const DEFAULT_SOUND_VOLUME: u32 = 60;
 pub const STORAGE_LIMITS_GB: [u32; 4] = [50, 100, 250, 500];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +128,8 @@ pub struct Settings {
     pub fps: u32,
     pub audio: bool,
     pub capture_cursor: bool,
+    pub sound_effects: bool,
+    pub sound_volume: u32,
     pub clips: ClipSettings,
     pub review_events: CategorySet,
     #[serde(deserialize_with = "overrides::lenient_overrides")]
@@ -156,6 +160,8 @@ impl Default for Settings {
             fps: 60,
             audio: true,
             capture_cursor: true,
+            sound_effects: true,
+            sound_volume: DEFAULT_SOUND_VOLUME,
             clips: ClipSettings::default(),
             review_events: CategorySet::default(),
             keybinds: BTreeMap::new(),
@@ -219,6 +225,7 @@ impl Settings {
         self.clips.pre_secs = self.clips.pre_secs.clamp(1, MAX_CLIP_SECS);
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
         self.storage_limit_gb = self.storage_limit_gb.map(nearest_storage_limit);
+        self.sound_volume = self.sound_volume.min(MAX_SOUND_VOLUME);
         self.nav_width = NAV_WIDTH.clamp(self.nav_width);
         self.list_width = LIST_WIDTH.clamp(self.list_width);
     }

@@ -26,6 +26,15 @@ pub(super) const SCENES: &[Scene] = &[
         sheet(ui, SettingsSection::Recording);
         ui.settings_search = TextEdit::new("baron");
     }),
+    ("settings-sounds", |ui| {
+        sheet(ui, SettingsSection::Recording);
+        ui.settings_search = TextEdit::new("sound");
+    }),
+    ("settings-sounds-off", |ui| {
+        ui.settings.sound_effects = false;
+        sheet(ui, SettingsSection::Recording);
+        ui.settings_search = TextEdit::new("sound");
+    }),
     ("settings-storage", |ui| {
         ui.settings.storage_limit_gb = Some(50);
         sheet(ui, SettingsSection::Storage);

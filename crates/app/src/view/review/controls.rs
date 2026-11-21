@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rune::{Color, Drag, El, Phase, el, row, text};
+use rune::{Drag, El, Phase, row, text};
 use rune_kit::{
     Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, Menu, MenuItem,
     Placement, Popover,
@@ -9,15 +9,12 @@ use rune_kit::{
 use super::panel::filter;
 use super::{icons, tabular};
 use crate::ui::{NORMAL_SPEED, ReviewState, SPEEDS, Ui};
+use crate::view::widgets::{percent, volume_at, volume_slider};
 
 const SPEED_WIDTH: f32 = 60.0;
-const SLIDER_HEIGHT: f32 = 20.0;
-const TRACK_HEIGHT: f32 = 4.0;
-const THUMB: f32 = 12.0;
 const BODY_PADDING: f32 = 12.0;
 const BODY_GAP: f32 = 12.0;
 const PERCENT_WIDTH: f32 = 32.0;
-const VOLUME_STEP: f32 = 0.05;
 const HOVER_ENTER: Duration = Duration::from_millis(80);
 const HOVER_LEAVE: Duration = Duration::from_millis(250);
 
@@ -73,56 +70,8 @@ fn speed_overlay(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) {
     menu.build(k, layer);
 }
 
-fn percent(volume: f32) -> u32 {
-    (volume * 100.0).round() as u32
-}
-
-pub(super) fn volume_at(x: f32, width: f32) -> f32 {
-    let travel = width - THUMB;
-    if travel <= 0.0 {
-        return 0.0;
-    }
-    let value = ((x - THUMB / 2.0) / travel).clamp(0.0, 1.0);
-    (value * 100.0).round() / 100.0
-}
-
 fn slider(review: &ReviewState, k: &Kit) -> El {
-    let value = review.shown_volume();
-    let track = el()
-        .key("volume-track")
-        .pin(
-            Some(0.0),
-            Some((SLIDER_HEIGHT - TRACK_HEIGHT) / 2.0),
-            Some(0.0),
-            None,
-        )
-        .h(TRACK_HEIGHT)
-        .radius(TRACK_HEIGHT / 2.0)
-        .fill(k.c.layer_03);
-    let knob = row()
-        .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
-        .pr(THUMB)
-        .center_y()
-        .child(
-            el().key("volume-fill")
-                .w_frac(value)
-                .h(TRACK_HEIGHT)
-                .radius(TRACK_HEIGHT / 2.0)
-                .fill(k.c.bg_accent),
-        )
-        .child(
-            el().key("volume-thumb")
-                .size(THUMB, THUMB)
-                .radius(THUMB / 2.0)
-                .fill(Color::WHITE)
-                .border(1.0, k.c.border_strong),
-        );
-    el().key("volume-slider")
-        .label("Volume")
-        .range_value(f64::from(percent(value)), 0.0, 100.0)
-        .range_step(f64::from(percent(VOLUME_STEP)))
-        .grow(1.0)
-        .h(SLIDER_HEIGHT)
+    volume_slider(k, "volume", review.shown_volume())
         .on_step(|ui: &mut Ui, delta, _| ui.review_step_volume(delta))
         .on_step_limit(|ui: &mut Ui, max, _| ui.review_set_volume(if max { 1.0 } else { 0.0 }))
         .on_drag(|ui: &mut Ui, drag: &mut Drag, _| {
@@ -132,8 +81,6 @@ fn slider(review: &ReviewState, k: &Kit) -> El {
                 ui.review_set_volume(volume_at(drag.x, drag.w));
             }
         })
-        .child(track)
-        .child(knob)
 }
 
 fn popover_body(review: &ReviewState, k: &Kit) -> El {

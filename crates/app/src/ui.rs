@@ -7,6 +7,8 @@ use greyscreen_core::update::UpdateInfo;
 use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, reveal};
 use rune::{PointerPress, TextEdit};
 
+use crate::sfx::Sfx;
+
 mod feedback;
 mod format;
 mod keys;
@@ -17,6 +19,7 @@ mod scenes;
 mod session;
 mod settings_sheet;
 mod shell;
+mod sounds;
 mod update;
 
 #[cfg(test)]
@@ -81,6 +84,7 @@ pub(crate) struct Ui {
     pub player_factory: PlayerFactory,
     pub display_sizes: fn() -> Vec<(u32, u32)>,
     pub sound: Sound,
+    pub sfx: Sfx,
     pub resolution_open: bool,
     pub storage_open: bool,
     pub settings_open: bool,
@@ -131,6 +135,7 @@ impl Ui {
             player_factory: review::rune_player,
             display_sizes: crate::platform::connected_display_sizes,
             sound: Sound::default(),
+            sfx: Sfx::silent(),
             resolution_open: false,
             storage_open: false,
             settings_open: false,

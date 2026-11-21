@@ -23,3 +23,8 @@ fn champion_icons_live_in_the_cache_dir() {
     assert!(cache_dir().ends_with(Path::new("Greyscreen").join("cache")));
     assert_eq!(champion_icons_dir(), cache_dir().join("champions"));
 }
+
+#[test]
+fn sounds_live_in_the_cache_dir() {
+    assert_eq!(sounds_dir(), cache_dir().join("sounds"));
+}

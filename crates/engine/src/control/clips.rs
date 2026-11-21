@@ -4,12 +4,11 @@ use greyscreen_core::library::{self, ClipEntry};
 use greyscreen_core::time::{Hns, mono_now, secs_to_hns};
 
 use super::Control;
-use crate::api::{self, NoticeLevel, UiMsg};
+use crate::api::{self, MANUAL_CLIP_LABEL, NoticeLevel, UiMsg};
 use crate::clipjob::{self, ClipJob, ClipResult};
 use crate::library::CLIPS_DIR;
 
 pub(super) const MANUAL_CLIP_SECS: u32 = 30;
-const MANUAL_LABEL: &str = "Manual";
 
 impl Control {
     pub(super) fn plan_clip(&mut self, at: Hns, event_id: u32, highlights: &[Highlight]) {
@@ -40,7 +39,7 @@ impl Control {
             start: now - secs_to_hns(f64::from(MANUAL_CLIP_SECS)),
             end: now,
             moment: now,
-            label: MANUAL_LABEL.to_owned(),
+            label: MANUAL_CLIP_LABEL.to_owned(),
             events: Vec::new(),
         });
     }

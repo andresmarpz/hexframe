@@ -601,3 +601,38 @@ fn an_unknown_review_event_name_does_not_reset_the_settings() {
         [crate::categories::EventCategory::MyKills]
     );
 }
+
+#[test]
+fn sound_effects_default_on_and_read_from_an_old_file() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"quality":"Max"}"#).unwrap();
+    let s = Settings::load(&path);
+    assert!(s.sound_effects);
+    assert_eq!(s.sound_volume, 60);
+}
+
+#[test]
+fn sound_settings_survive_a_save() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    let s = Settings {
+        sound_effects: false,
+        sound_volume: 25,
+        ..Settings::default()
+    };
+    s.save(&path).unwrap();
+    let loaded = Settings::load(&path);
+    assert!(!loaded.sound_effects);
+    assert_eq!(loaded.sound_volume, 25);
+}
+
+#[test]
+fn validate_caps_the_sound_volume() {
+    let mut s = Settings {
+        sound_volume: 900,
+        ..Settings::default()
+    };
+    s.validate();
+    assert_eq!(s.sound_volume, 100);
+}

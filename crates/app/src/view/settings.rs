@@ -223,12 +223,16 @@ fn group(
     section: SettingsSection,
     rows: &[Row],
 ) -> El {
-    let dimmed = section == SettingsSection::Clips && !s.settings.clips.enabled;
+    let clips_off = section == SettingsSection::Clips && !s.settings.clips.enabled;
     let mut body = card(k).key(key);
     let last = rows.len().saturating_sub(1);
     for (i, row) in rows.iter().enumerate() {
         let built = render(s, k, layer, *row);
-        let off = dimmed && matches!(row, Row::Moments | Row::ClipWindow);
+        let off = match row {
+            Row::Moments | Row::ClipWindow => clips_off,
+            Row::SoundVolume => !s.settings.sound_effects,
+            _ => false,
+        };
         body = body.child(if off { built.opacity(0.45) } else { built });
         if i < last {
             body = body.child(hairline(k));
@@ -246,7 +250,9 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         | Row::FrameRate
         | Row::Audio
         | Row::Cursor
-        | Row::NavStyle => recording::render(s, k, layer, row),
+        | Row::NavStyle
+        | Row::SoundEffects
+        | Row::SoundVolume => recording::render(s, k, layer, row),
         Row::ClipsEnabled | Row::Moments | Row::ClipWindow | Row::ClipHotkey => {
             clips::render(s, k, row)
         }

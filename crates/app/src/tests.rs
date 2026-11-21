@@ -31,6 +31,7 @@ mod review_volume;
 mod search_clear;
 mod selection;
 mod settings_sheet;
+mod sounds;
 mod storage_limit;
 mod update;
 mod update_banner;

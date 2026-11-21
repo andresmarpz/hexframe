@@ -14,6 +14,8 @@ pub(super) enum Row {
     Audio,
     Cursor,
     NavStyle,
+    SoundEffects,
+    SoundVolume,
     ClipsEnabled,
     Moments,
     ClipWindow,
@@ -43,6 +45,10 @@ impl Row {
             Self::Audio => "audio sound game audio microphone discord",
             Self::Cursor => "cursor mouse pointer",
             Self::NavStyle => "navigation style layout sidebar dock menu tabs",
+            Self::SoundEffects => {
+                "sound effects sounds noise chime click beep notification mute quiet"
+            }
+            Self::SoundVolume => "sound effects volume loud quiet level sounds",
             Self::ClipsEnabled => "save highlight clips auto clips",
             Self::Moments => {
                 "moments kills deaths assists multikills objectives structures aces dragon baron herald turrets"
@@ -95,6 +101,8 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
             Row::Audio,
             Row::Cursor,
             Row::NavStyle,
+            Row::SoundEffects,
+            Row::SoundVolume,
         ],
         SettingsSection::Clips => vec![
             Row::ClipsEnabled,

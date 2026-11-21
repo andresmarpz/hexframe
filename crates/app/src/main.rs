@@ -5,6 +5,7 @@ mod logging;
 mod logo;
 mod platform;
 mod setup;
+mod sfx;
 mod tray;
 mod ui;
 mod view;
@@ -19,6 +20,7 @@ use greyscreen_engine::updater::UpdateConfig;
 use greyscreen_engine::{Engine, EngineConfig, FeedbackConfig, league_factory_default};
 use rune::{App, AppSpec, Chrome};
 
+use sfx::Sfx;
 use ui::Ui;
 
 fn main() {
@@ -90,6 +92,7 @@ fn main() {
         let cmd = engine.cmd.clone();
         app = app.init(move || {
             let mut ui = Ui::live(settings, cmd);
+            ui.sfx = Sfx::rune();
             ui.start_with_windows = platform::start_with_windows();
             ui
         });

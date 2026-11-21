@@ -16,8 +16,8 @@ mod writer;
 
 pub use api::{
     ClipEntry, Engine, EngineCmd, EngineConfig, EngineHandle, EngineStatus, FeedItem,
-    LeagueFactory, LeagueGuard, NoticeLevel, RecordingEntry, UiMsg, UiSink, league_factory_default,
-    reveal,
+    LeagueFactory, LeagueGuard, MANUAL_CLIP_LABEL, NoticeLevel, RecordingEntry, UiMsg, UiSink,
+    league_factory_default, reveal,
 };
 pub use fake::FakeMediaSource;
 pub use feedback::{FeedbackConfig, FeedbackTransport};
