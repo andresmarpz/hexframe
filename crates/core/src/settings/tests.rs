@@ -508,3 +508,49 @@ fn an_old_settings_file_reads_as_sidebar() {
     assert!(!s.sidebar_collapsed);
     assert_eq!(s.quality, Quality::Max);
 }
+
+#[test]
+fn pane_widths_default_and_read_from_an_old_file() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"quality":"Max"}"#).unwrap();
+    let s = Settings::load(&path);
+    assert_eq!((s.nav_width, s.list_width), (220, 300));
+}
+
+#[test]
+fn pane_widths_survive_a_save() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    let s = Settings {
+        nav_width: 260,
+        list_width: 380,
+        ..Settings::default()
+    };
+    s.save(&path).unwrap();
+    let loaded = Settings::load(&path);
+    assert_eq!((loaded.nav_width, loaded.list_width), (260, 380));
+}
+
+#[test]
+fn validate_clamps_pane_widths_into_their_range() {
+    let mut s = Settings {
+        nav_width: 10,
+        list_width: 9000,
+        ..Settings::default()
+    };
+    s.validate();
+    assert_eq!((s.nav_width, s.list_width), (180, 440));
+    s.nav_width = 9000;
+    s.list_width = 10;
+    s.validate();
+    assert_eq!((s.nav_width, s.list_width), (320, 240));
+}
+
+#[test]
+fn an_override_for_a_removed_action_changes_nothing() {
+    let mut overrides = BTreeMap::new();
+    overrides.insert("toggle_sidebar".to_owned(), "Mod+Shift+X".to_owned());
+    let keymap = Keymap::from_overrides(&overrides);
+    assert_eq!(keymap, Keymap::defaults());
+}

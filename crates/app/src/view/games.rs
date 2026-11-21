@@ -6,14 +6,25 @@ use std::rc::Rc;
 use rune::{El, Key, LoopSpec, Tx, col, el, text};
 use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, glyphs};
 
+use super::grip::grip;
 use crate::ui::library_format::summary;
-use crate::ui::{ListItem, Ui};
+use crate::ui::{ListItem, PaneEdge, Ui};
 
 pub(super) const ROW_HEIGHT: f32 = 60.0;
 const PULSE_SECS: f64 = 1.4;
 const TABULAR: &str = "'tnum' 1";
 
-pub(super) fn content(s: &Ui, k: &Kit) -> El {
+pub(super) fn list(s: &Ui, k: &Kit) -> El {
+    col()
+        .key("games-list")
+        .w(s.pane_width(PaneEdge::List) as f32)
+        .h_full()
+        .min_h(0.0)
+        .child(content(s, k))
+        .child(grip(s, PaneEdge::List, "list-grip", "Resize games list"))
+}
+
+fn content(s: &Ui, k: &Kit) -> El {
     let items: Rc<[ListItem]> = s.list_items().into();
     let mut sidebar = Sidebar::new()
         .label("Games")

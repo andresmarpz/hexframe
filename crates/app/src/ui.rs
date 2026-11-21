@@ -9,7 +9,6 @@ use greyscreen_engine::{
     EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg, reveal,
 };
 use rune::{PointerPress, TextEdit, Tx};
-use rune_kit::PaneState;
 
 mod death_review;
 mod dock;
@@ -20,6 +19,7 @@ pub(crate) mod key_event;
 mod keybinds;
 mod keys;
 pub(crate) mod library_format;
+mod panes;
 mod preview;
 mod preview_thumbs;
 pub(crate) mod recordings_filter;
@@ -42,6 +42,7 @@ pub(crate) use death_review::{DeathReviewState, title_line};
 pub(crate) use dock::DockState;
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
+pub(crate) use panes::{PaneDrag, PaneEdge};
 pub(crate) use recordings_filter::RecordingsFilter;
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use scenes::SCENES;
@@ -62,10 +63,6 @@ pub(crate) fn review_entry() -> RecordingEntry {
     preview::review_entry()
 }
 
-pub(crate) const SIDEBAR_WIDTH: f32 = 300.0;
-const SIDEBAR_MIN: f32 = 260.0;
-const SIDEBAR_MAX: f32 = 440.0;
-
 pub(crate) const MIN_CLIP_SECS: u32 = 1;
 pub(crate) const MAX_CLIP_SECS: u32 = 120;
 pub(crate) const FEED_CAP: usize = 500;
@@ -85,7 +82,7 @@ pub(crate) struct Notice {
 #[derive(Debug)]
 pub(crate) struct Ui {
     pub screen: Screen,
-    pub sidebar: PaneState,
+    pub pane_drag: Option<PaneDrag>,
     pub live_selected: bool,
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
@@ -133,7 +130,7 @@ impl Ui {
     pub(crate) fn blank(settings: Settings) -> Ui {
         Ui {
             screen: Screen::Home,
-            sidebar: PaneState::new(SIDEBAR_WIDTH).range(SIDEBAR_MIN, SIDEBAR_MAX),
+            pane_drag: None,
             live_selected: false,
             status: EngineStatus::Idle,
             feed: VecDeque::new(),

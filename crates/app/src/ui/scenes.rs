@@ -63,6 +63,20 @@ pub(crate) const SCENES: &[Scene] = &[
         docked(ui);
         ui.open_review_entry(preview::review_entry());
     }),
+    ("dock-pick", |ui| {
+        docked(ui);
+        ui.go(Screen::Games);
+    }),
+    ("games-wide", |ui| {
+        game(ui);
+        ui.settings.nav_width = 320;
+        ui.settings.list_width = 440;
+    }),
+    ("games-narrow", |ui| {
+        game(ui);
+        ui.settings.nav_width = 180;
+        ui.settings.list_width = 240;
+    }),
     ("home-first-run", |ui| {
         first_run(ui);
         ui.go(Screen::Home);

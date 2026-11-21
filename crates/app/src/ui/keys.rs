@@ -36,8 +36,6 @@ impl Ui {
             }
             Action::ToggleNav if self.settings.nav_style == NavStyle::Sidebar => self.toggle_nav(),
             Action::ToggleNav => return false,
-            Action::ToggleSidebar if self.screen == Screen::Games => self.sidebar.toggle(),
-            Action::ToggleSidebar => return false,
             Action::PreviousGame | Action::NextGame if self.screen != Screen::Games => {
                 return false;
             }
@@ -86,7 +84,6 @@ impl Ui {
             | Action::PreviousGame
             | Action::NextGame
             | Action::FocusPlayer
-            | Action::ToggleSidebar
             | Action::ToggleNav
             | Action::FocusSearch => return false,
         }

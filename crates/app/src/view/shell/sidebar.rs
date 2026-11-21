@@ -9,9 +9,9 @@ use rune::{El, Icon, ScrollSpec, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, SidebarRow};
 
 use self::icons::{CLIPS, GAMES, GEAR, HOME, LOGO, SIDEBAR};
-use crate::ui::{Screen, Ui};
+use crate::ui::{PaneEdge, Screen, Ui};
+use crate::view::grip::grip;
 
-pub(in crate::view) const WIDTH: f32 = 220.0;
 const BRAND_HEIGHT: f32 = 48.0;
 const LIGHTS_HEIGHT: f32 = 40.0;
 const PAD: f32 = 12.0;
@@ -78,7 +78,7 @@ fn expanded(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
         ));
     col()
         .key("nav")
-        .w(WIDTH)
+        .w(s.pane_width(PaneEdge::Nav) as f32)
         .h_full()
         .min_h(0.0)
         .fill(k.c.bg_deep)
@@ -95,6 +95,7 @@ fn expanded(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
                 .child(storage::block(s, k))
                 .child(settings(s, k)),
         )
+        .child(grip(s, PaneEdge::Nav, "nav-grip", "Resize navigation"))
 }
 
 fn middle(s: &Ui, k: &Kit, list: El) -> El {

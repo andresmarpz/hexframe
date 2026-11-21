@@ -1,5 +1,5 @@
 use greyscreen_engine::EngineStatus;
-use rune::{Key, KeyEvent, Mods, Runtime};
+use rune::{Key, KeyEvent, Runtime};
 
 use super::keybinds::platform;
 use super::{live_runtime, press, press_char, runtime, settle, tap};
@@ -144,21 +144,6 @@ fn the_search_key_goes_to_games_and_focuses_the_search() {
     let focused = elements.iter().find(|e| e.focused).expect("focus").rect;
     assert!(focused[0] >= search[0] && focused[0] + focused[2] <= search[0] + search[2] + 0.5);
     assert!(focused[1] >= search[1] && focused[1] + focused[3] <= search[1] + search[3] + 0.5);
-}
-
-#[test]
-fn the_games_list_toggle_key_does_nothing_on_home() {
-    let mut rt = idle_games();
-    chord(&mut rt, '1');
-    rt.key(KeyEvent {
-        key: Key::Command('b'),
-        mods: Mods {
-            shift: true,
-            ..platform()
-        },
-    });
-    settle(&mut rt);
-    assert!(rt.state.sidebar.is_open());
 }
 
 #[test]

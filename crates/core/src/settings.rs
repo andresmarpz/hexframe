@@ -27,6 +27,30 @@ const MAX_CLIP_SECS: u32 = 120;
 const BYTES_PER_GB: u64 = 1_000_000_000;
 pub const STORAGE_LIMITS_GB: [u32; 4] = [50, 100, 250, 500];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PaneWidth {
+    pub min: u32,
+    pub max: u32,
+    pub default: u32,
+}
+
+impl PaneWidth {
+    pub fn clamp(self, width: u32) -> u32 {
+        width.clamp(self.min, self.max)
+    }
+}
+
+pub const NAV_WIDTH: PaneWidth = PaneWidth {
+    min: 180,
+    max: 320,
+    default: 220,
+};
+pub const LIST_WIDTH: PaneWidth = PaneWidth {
+    min: 240,
+    max: 440,
+    default: 300,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Quality {
     Balanced,
@@ -116,6 +140,8 @@ pub struct Settings {
     pub check_updates: bool,
     pub nav_style: NavStyle,
     pub sidebar_collapsed: bool,
+    pub nav_width: u32,
+    pub list_width: u32,
 }
 
 impl Default for Settings {
@@ -136,6 +162,8 @@ impl Default for Settings {
             check_updates: true,
             nav_style: NavStyle::default(),
             sidebar_collapsed: false,
+            nav_width: NAV_WIDTH.default,
+            list_width: LIST_WIDTH.default,
         }
     }
 }
@@ -188,6 +216,8 @@ impl Settings {
         self.clips.pre_secs = self.clips.pre_secs.clamp(1, MAX_CLIP_SECS);
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
         self.storage_limit_gb = self.storage_limit_gb.map(nearest_storage_limit);
+        self.nav_width = NAV_WIDTH.clamp(self.nav_width);
+        self.list_width = LIST_WIDTH.clamp(self.list_width);
     }
 
     pub fn keymap(&self) -> Keymap {

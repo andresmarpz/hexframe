@@ -2,6 +2,7 @@ pub(crate) mod champion;
 mod clips;
 mod delete;
 mod games;
+mod grip;
 mod home;
 mod review;
 mod row_menu;
@@ -13,7 +14,7 @@ mod update_banner;
 use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::NoticeLevel;
 use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
-use rune_kit::{Kit, Page, SplitView, Toast, ToastRegion, Toolbar};
+use rune_kit::{Divider, Kit, Page, Toast, ToastRegion, Toolbar};
 
 use crate::ui::{Detail, Screen, Ui};
 
@@ -63,7 +64,6 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
                 .child(col().grow(1.0).min_w(0.0).h_full().child(screen(
                     s,
                     k,
-                    cx,
                     shell::sidebar::lights_overhang(folded, cx.titlebar_inset()),
                 )))
         }
@@ -77,17 +77,17 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
                     .w_full()
                     .grow(1.0)
                     .min_h(0.0)
-                    .child(screen(s, k, cx, cx.titlebar_inset())),
+                    .child(screen(s, k, cx.titlebar_inset())),
             )
             .children(shell::dock::hover_zone(s))
             .child(shell::dock::layer(s, k)),
     }
 }
 
-fn screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
+fn screen(s: &Ui, k: &Kit, inset: f32) -> El {
     match s.screen {
         Screen::Home => home_screen(s, k, inset),
-        Screen::Games => games_screen(s, k, cx, inset),
+        Screen::Games => games_screen(s, k, inset),
         Screen::Clips => clips_screen(s, k, inset),
     }
 }
@@ -113,7 +113,7 @@ fn clips_screen(s: &Ui, k: &Kit, inset: f32) -> El {
         .build(k)
 }
 
-fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
+fn games_screen(s: &Ui, k: &Kit, inset: f32) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
         (Detail::Game, Some(review)) => (review_page(s, k), review::toolbar(review, k)),
         (Detail::Live, _) => (
@@ -122,15 +122,16 @@ fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
         ),
         _ => (fixed_content(s, games::pick(s, k)), Toolbar::new()),
     };
-    SplitView::new(main)
-        .sidebar(
-            &s.sidebar,
-            |ui: &mut Ui| &mut ui.sidebar,
-            games::content(s, k),
-        )
+    let body = row()
+        .key("games-body")
+        .w_full()
+        .h_full()
+        .child(games::list(s, k))
+        .child(Divider::vertical().build(k))
+        .child(col().grow(1.0).min_w(0.0).h_full().child(main));
+    Page::new(body)
         .toolbar(toolbar)
         .titlebar_inset(inset)
-        .reduced_motion(cx.is_reduced_motion())
         .build(k)
 }
 

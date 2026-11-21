@@ -1,5 +1,5 @@
 use greyscreen_engine::EngineStatus;
-use rune::{Key, KeyEvent, Mods, Runtime};
+use rune::{Key, Runtime};
 
 use super::{live_runtime, runtime, settle, tap};
 use crate::ui::{Detail, ListItem, Ui};
@@ -143,25 +143,4 @@ fn deleting_the_open_game_returns_to_the_placeholder() {
     rt.update(move |ui, _| ui.apply_library(rest));
     settle(&mut rt);
     assert_eq!(rt.state.detail(), Detail::Pick);
-}
-
-#[test]
-fn the_toggle_sidebar_key_hides_and_shows_the_games_list() {
-    let mut rt = runtime();
-    rt.on_key = Some(Ui::on_key);
-    let toggle = KeyEvent {
-        key: Key::Command('b'),
-        mods: Mods {
-            cmd: true,
-            shift: true,
-            ..Mods::default()
-        },
-    };
-    assert!(rt.state.sidebar.is_open());
-    rt.key(toggle.clone());
-    rt.frame(1.0 / 60.0);
-    assert!(!rt.state.sidebar.is_open());
-    rt.key(toggle);
-    rt.frame(1.0 / 60.0);
-    assert!(rt.state.sidebar.is_open());
 }

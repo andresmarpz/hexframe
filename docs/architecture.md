@@ -210,6 +210,10 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `check_updates` | `bool` | `true` |
 | `nav_style` | `NavStyle { Sidebar, Dock }` | `Sidebar` |
 | `sidebar_collapsed` | `bool` | `false` |
+| `nav_width` | `u32` points, 180 to 320 | `220` |
+| `list_width` | `u32` points, 240 to 440 | `300` |
+
+Layout: on the Games screen the games list is the first column inside the inset content card, then a hairline divider, then the review (the same in both nav styles). The nav sidebar's edge and the list/review divider drag to resize; double-click a handle resets its default, and the widths clamp to the ranges above and save when the drag ends. The rail (56 points, also forced below 1200 points of window width) is not resizable. Values outside a range are clamped when settings load.
 
 Bitrate: the mean bitrate at 1080p60 is 8, 12 or 20 Mbps for Balanced, High or Max. It scales with pixel count to the power 0.75 and with fps/60 to the power 0.8. Peak is 2.0 times the mean. `CaptureConfig::for_encode_size` rescales with the same 0.75 exponent when the real encode size is smaller than `bitrate_pixels`.
 

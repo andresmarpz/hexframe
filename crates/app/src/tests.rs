@@ -17,6 +17,7 @@ mod nav;
 mod nav_rail;
 mod nav_recent;
 mod nav_status;
+mod panes;
 mod review_flow;
 mod selection;
 mod settings_sheet;
