@@ -12,13 +12,6 @@ pub(crate) fn video_log_requested() -> bool {
     std::env::var_os(VIDEO_LOG_ENV).is_some_and(|v| v == "1")
 }
 
-#[cfg(windows)]
-pub(crate) fn send_rune_video_log() -> Result<std::path::PathBuf, std::io::Error> {
-    let path = greyscreen_core::paths::logs_dir().join("rune-video.log");
-    greyscreen_capture::video_log::send_rune_video_log_to(&path)?;
-    Ok(path)
-}
-
 pub(crate) fn init() -> Option<WorkerGuard> {
     let dir = greyscreen_core::paths::logs_dir();
     let appender = tracing_appender::rolling::daily(dir, "greyscreen.log");

@@ -1,8 +1,9 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
-mod icons;
+mod champion_icons;
 mod logging;
 mod logo;
+mod platform;
 mod setup;
 mod tray;
 mod ui;
@@ -11,10 +12,7 @@ mod view;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
-
 use greyscreen_core::install::HIDDEN_FLAG;
-use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::updater::UpdateConfig;
@@ -23,92 +21,17 @@ use rune::{App, AppSpec, Chrome};
 
 use ui::Ui;
 
-#[cfg(windows)]
-const SINGLE_INSTANCE_ID: &str = "dev.greyscreen.app";
-
-#[cfg(windows)]
-fn media_source() -> Arc<dyn MediaSource> {
-    Arc::new(greyscreen_capture::WindowsMediaSource::new())
-}
-
-#[cfg(not(windows))]
-fn media_source() -> Arc<dyn MediaSource> {
-    Arc::new(greyscreen_engine::FakeMediaSource::new())
-}
-
-#[cfg(windows)]
-fn can_install_updates() -> bool {
-    greyscreen_capture::install::is_installed_copy()
-}
-
-#[cfg(not(windows))]
-fn can_install_updates() -> bool {
-    false
-}
-
-#[cfg(windows)]
-fn install_step() -> Option<greyscreen_capture::install::InstallError> {
-    use greyscreen_core::install::{StartPlan, UNINSTALL_FLAG};
-    if std::env::args().any(|arg| arg == UNINSTALL_FLAG) {
-        greyscreen_capture::install::uninstall();
-        std::process::exit(0);
-    }
-    match greyscreen_capture::install::current_start_plan() {
-        StartPlan::RunInPlace => None,
-        StartPlan::ShowSetup => {
-            setup::run();
-            std::process::exit(0)
-        }
-        StartPlan::InstallSilently => match greyscreen_capture::install::install_and_relaunch() {
-            Ok(true) => std::process::exit(0),
-            Ok(false) => None,
-            Err(err) => Some(err),
-        },
-    }
-}
-
 fn main() {
     let headless = rune::is_headless();
     if headless && setup::scene_requested() {
         return setup::run();
     }
-    #[cfg(windows)]
-    let rune_video_log =
-        (!headless && logging::video_log_requested()).then(logging::send_rune_video_log);
-    #[cfg(windows)]
-    let install_error = if headless { None } else { install_step() };
-    #[cfg(windows)]
-    if !headless {
-        greyscreen_capture::install::set_process_app_id();
-    }
-    #[cfg(windows)]
-    let instance = if headless {
-        None
-    } else {
-        // Rune's single_instance makes live resize lag on Windows, so the app keeps its own.
-        match greyscreen_capture::instance::claim(SINGLE_INSTANCE_ID) {
-            greyscreen_capture::instance::Claim::First(signal) => Some(signal),
-            greyscreen_capture::instance::Claim::AlreadyRunning => return,
-        }
+    let Some(mut launch) = platform::begin(headless) else {
+        return;
     };
     let _log_guard = (!headless).then(logging::init).flatten();
     tracing::info!("greyscreen {} starting", env!("GREYSCREEN_BUILD"));
-    #[cfg(windows)]
-    match rune_video_log {
-        Some(Ok(path)) => tracing::info!(path = %path.display(), "Rune's video log is on"),
-        Some(Err(err)) => tracing::warn!(%err, "cannot open Rune's video log"),
-        None => {}
-    }
-    #[cfg(windows)]
-    if let Some(err) = &install_error {
-        tracing::warn!(%err, "cannot install, running from this folder");
-    }
-    #[cfg(windows)]
-    greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
-    #[cfg(windows)]
-    if !headless && let Err(err) = greyscreen_capture::probe::init_process() {
-        tracing::warn!(%err, "cannot set process DPI awareness");
-    }
+    launch.configure_process();
     if let Err(err) = rune::set_app_icon(include_bytes!("../assets/icon.png").as_slice()) {
         tracing::warn!(%err, "cannot set app icon");
     }
@@ -139,37 +62,22 @@ fn main() {
         (None, None)
     } else {
         let handle = app.handle();
-        #[cfg(windows)]
-        if let Some(signal) = instance {
-            let shown = handle.clone();
-            let quitting = handle.clone();
-            signal.on_signal(
-                move || {
-                    shown.show();
-                    shown.focus();
-                },
-                move || {
-                    tracing::info!("quit requested by another copy");
-                    quitting.quit();
-                },
-            );
-        }
+        launch.serve_second_launch(&handle);
         let sink_handle = handle.clone();
         let engine = Engine::start_with(EngineConfig {
             settings: settings.clone(),
-            media: media_source(),
+            media: platform::media_source(),
             league: league_factory_default(),
             sink: Box::new(move |msg| sink_handle.update(move |ui: &mut Ui, tx| ui.apply(msg, tx))),
             settings_path: Some(paths::settings_file()),
             updates: Some(UpdateConfig::github(
                 env!("CARGO_PKG_VERSION"),
-                can_install_updates(),
+                platform::can_install_updates(),
             )),
             feedback: Some(FeedbackConfig::api(env!("CARGO_PKG_VERSION"))),
             hotkeys: None,
         });
-        #[cfg(windows)]
-        if install_error.is_some() {
+        if launch.install_failed() {
             handle.update(|ui: &mut Ui, tx| {
                 ui.show_notice(
                     greyscreen_engine::NoticeLevel::Warn,
@@ -178,15 +86,11 @@ fn main() {
                 );
             });
         }
-        icons::start_prefetch(handle.clone());
+        champion_icons::start_prefetch(handle.clone());
         let cmd = engine.cmd.clone();
         app = app.init(move || {
-            #[allow(unused_mut)]
             let mut ui = Ui::live(settings, cmd);
-            #[cfg(windows)]
-            {
-                ui.start_with_windows = greyscreen_capture::install::start_with_windows();
-            }
+            ui.start_with_windows = platform::start_with_windows();
             ui
         });
         (tray::start(handle), Some(engine))

@@ -5,12 +5,6 @@ use rune::TextEdit;
 use super::Ui;
 use super::library_format::mode_label;
 
-pub(crate) const BIN: &str = if cfg!(windows) {
-    "Recycle Bin"
-} else {
-    "Trash"
-};
-
 #[derive(Debug, Default)]
 pub(crate) struct RecordingsFilter {
     pub champion: TextEdit,

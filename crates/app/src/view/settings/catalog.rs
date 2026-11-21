@@ -1,5 +1,6 @@
 use greyscreen_core::keybinds::Action;
 
+use crate::platform;
 use crate::ui::SettingsSection;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,7 +96,7 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
                 Row::Logs,
                 Row::Feedback,
             ];
-            if cfg!(windows) {
+            if platform::CAN_START_WITH_WINDOWS {
                 rows.push(Row::StartWithWindows);
             }
             rows.push(Row::RiotNotice);

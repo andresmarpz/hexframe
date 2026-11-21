@@ -1,8 +1,8 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::platform::install::{self, Progress};
 use crossbeam_channel::{Receiver, unbounded};
-use greyscreen_capture::install::{self, Progress};
 use rune::{App, AppHandle};
 
 use super::state::{Cmd, Msg, SetupState};

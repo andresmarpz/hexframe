@@ -18,9 +18,8 @@ pub(crate) fn scene_requested() -> bool {
 
 pub(crate) fn run() {
     let headless = rune::is_headless();
-    #[cfg(windows)]
-    if !headless && let Err(err) = greyscreen_capture::probe::init_process() {
-        tracing::warn!(%err, "cannot set process DPI awareness");
+    if !headless {
+        crate::platform::init_dpi();
     }
     let _log_guard = (!headless).then(crate::logging::init).flatten();
     if let Err(err) = rune::set_app_icon(include_bytes!("../../assets/icon.png").as_slice()) {

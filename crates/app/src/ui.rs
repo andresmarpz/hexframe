@@ -177,15 +177,7 @@ impl Ui {
 
     pub(crate) fn toggle_start_with_windows(&mut self) {
         self.start_with_windows = !self.start_with_windows;
-        #[cfg(windows)]
-        {
-            let enabled = self.start_with_windows;
-            std::thread::spawn(move || {
-                if let Err(err) = greyscreen_capture::install::set_start_with_windows(enabled) {
-                    tracing::warn!(%err, "cannot change start with Windows");
-                }
-            });
-        }
+        crate::platform::set_start_with_windows(self.start_with_windows);
     }
 
     pub(crate) fn send(&self, cmd: EngineCmd) {

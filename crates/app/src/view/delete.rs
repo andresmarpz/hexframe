@@ -3,8 +3,8 @@ use jiff::Zoned;
 use rune::{El, col, row, text};
 use rune_kit::{Button, ButtonVariant, Dialog, Kit};
 
+use crate::platform::TRASH_NAME;
 use crate::ui::library_format::when;
-use crate::ui::recordings_filter::BIN;
 use crate::ui::{Ui, format_size};
 
 const WIDTH: f32 = 400.0;
@@ -34,7 +34,7 @@ pub(super) fn confirm_delete(rec: &RecordingEntry, k: &Kit, layer: &mut Vec<El>)
                 .wrap(),
         )
         .child(
-            text(format!("The game and its clips move to the {BIN}."))
+            text(format!("The game and its clips move to the {TRASH_NAME}."))
                 .font(k.ty.body)
                 .color(k.c.text_muted)
                 .wrap(),
