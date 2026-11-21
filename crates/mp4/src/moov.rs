@@ -5,11 +5,11 @@ use crate::avc::write_avcc_box;
 use crate::bytes::BoxWriter;
 
 const MOVIE_TIMESCALE: u32 = 1000;
-const VIDEO_TRACK_ID: u32 = 1;
-const AUDIO_TRACK_ID: u32 = 2;
+pub(crate) const VIDEO_TRACK_ID: u32 = 1;
+pub(crate) const AUDIO_TRACK_ID: u32 = 2;
 const MINOR_VERSION: u32 = 0x200;
-const SYNC_SAMPLE_FLAGS: u32 = 0x0200_0000;
-const NON_SYNC_SAMPLE_FLAGS: u32 = 0x0101_0000;
+pub(crate) const SYNC_SAMPLE_FLAGS: u32 = 0x0200_0000;
+pub(crate) const NON_SYNC_SAMPLE_FLAGS: u32 = 0x0101_0000;
 const IDENTITY_MATRIX: [u32; 9] = [0x0001_0000, 0, 0, 0, 0x0001_0000, 0, 0, 0, 0x4000_0000];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

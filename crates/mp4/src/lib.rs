@@ -3,12 +3,12 @@
 pub mod aac;
 pub mod avc;
 pub mod bytes;
-mod clip;
+pub mod clip;
 pub mod finalize;
 pub mod fragmented;
 pub mod moov;
 pub mod reader;
-mod recover;
+pub mod recover;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Mp4Error {

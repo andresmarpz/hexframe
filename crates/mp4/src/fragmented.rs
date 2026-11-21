@@ -6,19 +6,18 @@ use std::sync::Arc;
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 
 use crate::bytes::BoxWriter;
-use crate::moov::{Chunk, Chunking, SampleRow, SampleTables, write_ftyp, write_init_moov};
+use crate::moov::{
+    AUDIO_TRACK_ID, Chunk, Chunking, NON_SYNC_SAMPLE_FLAGS, SYNC_SAMPLE_FLAGS, SampleRow,
+    SampleTables, VIDEO_TRACK_ID, write_ftyp, write_init_moov,
+};
 use crate::{Mp4Error, Result};
 
 pub use crate::finalize::FinishedInfo;
 use crate::finalize::finalize;
 
-const VIDEO_TRACK_ID: u32 = 1;
-const AUDIO_TRACK_ID: u32 = 2;
-const BRANDS: [[u8; 4]; 4] = [*b"isom", *b"iso6", *b"avc1", *b"mp41"];
+pub(crate) const BRANDS: [[u8; 4]; 4] = [*b"isom", *b"iso6", *b"avc1", *b"mp41"];
 const PLACEHOLDER_LEN: u64 = 16;
 const SYNC_INTERVAL_SECS: u64 = 5;
-const SYNC_SAMPLE_FLAGS: u32 = 0x0200_0000;
-const NON_SYNC_SAMPLE_FLAGS: u32 = 0x0101_0000;
 const TFHD_DEFAULT_BASE_IS_MOOF: u32 = 0x02_0000;
 const TFHD_DEFAULT_SAMPLE_FLAGS: u32 = 0x20;
 const TRUN_VIDEO_FLAGS: u32 = 0x701;
