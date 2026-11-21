@@ -11,3 +11,5 @@ pub mod probe;
 mod session;
 pub mod vproc;
 pub mod wgc;
+
+pub use session::WindowsMediaSource;
