@@ -58,6 +58,7 @@ pub(crate) fn build(
     let frame = first_frame_size(&wgc, &flags)?;
     let mut client_area = ClientArea::for_target(target);
     let crop = client_area.crop(frame);
+    log_capture_path(frame, client_area.client_size());
     let native = crop.size();
     let size = encode_size(native, cfg.max_height);
     tracing::info!(
@@ -146,6 +147,24 @@ pub(crate) fn build(
         last_seq: 0,
         soft_errors: 0,
     })
+}
+
+fn log_capture_path(frame: (u32, u32), client: Option<(u32, u32)>) {
+    match client {
+        Some(client) if client != frame => tracing::info!(
+            frame_width = frame.0,
+            frame_height = frame.1,
+            client_width = client.0,
+            client_height = client.1,
+            "capture size differs from the window client size: Windows scales or composes the window"
+        ),
+        Some(_) => tracing::info!(
+            width = frame.0,
+            height = frame.1,
+            "capture size matches the window client size"
+        ),
+        None => {}
+    }
 }
 
 fn first_frame_size(wgc: &WgcCapture, flags: &Flags) -> Result<(u32, u32), String> {

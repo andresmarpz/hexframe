@@ -112,6 +112,7 @@ impl Video {
             audio.fill_stats(&mut self.stats.c);
         }
         self.sink.fill_stats(&mut self.stats.c);
+        self.wgc.fill_stats(&mut self.stats.c);
         if let Some(sampler) = &mut self.sampler {
             let (cpu, mem) = sampler.sample();
             self.stats.c.cpu_pct = cpu;

@@ -12,6 +12,8 @@ pub(crate) struct DiagReport {
     pub repeated_frames: u64,
     pub encode_ms_max: f64,
     pub step_ms_max: f64,
+    pub torn_frames: u64,
+    pub copy_wait_ms_max: f64,
     pub queue_writer_max: u64,
     pub queue_media_max: u64,
     pub queue_encoder_max: u64,
@@ -36,6 +38,8 @@ pub(crate) fn summarize(text: &str) -> DiagReport {
         repeated_frames: 0,
         encode_ms_max: 0.0,
         step_ms_max: 0.0,
+        torn_frames: 0,
+        copy_wait_ms_max: 0.0,
         queue_writer_max: 0,
         queue_media_max: 0,
         queue_encoder_max: 0,
@@ -76,6 +80,10 @@ fn add_second(report: &mut DiagReport, line: &Value, cpu_sum: &mut f64, cpu_n: &
     report.step_ms_max = report
         .step_ms_max
         .max(line["step_ms_max"].as_f64().unwrap_or(0.0));
+    report.torn_frames += line["torn"].as_u64().unwrap_or(0);
+    report.copy_wait_ms_max = report
+        .copy_wait_ms_max
+        .max(line["copy_wait_ms_max"].as_f64().unwrap_or(0.0));
     report.queue_writer_max = report
         .queue_writer_max
         .max(line["queue_writer"].as_u64().unwrap_or(0));

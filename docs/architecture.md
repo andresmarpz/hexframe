@@ -189,6 +189,13 @@ Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `e
 - At start the engine recovers any `game.mp4.part` left by a crash.
 - Storage limit: when `storage_limit_gb` is set, the engine checks after each game and at start. It deletes the `game.mp4` of the oldest games first (the sidecar and clips stay), then whole old games, and never the game being recorded. It posts an info notice.
 
+## Capture frame lifetime (`crates/capture`)
+
+- The WGC frame pool (2 BGRA buffers, `CreateFreeThreaded`) hands each frame to the `FrameArrived` callback. The callback copies the frame's content rect into one of three Greyscreen-owned textures, ends a `D3D11_QUERY_EVENT` query, flushes, and waits up to 12 ms for the query. Only then does it close the frame. WGC does not document whether work that is only queued on our device protects the pool buffer after `Close`, so the copy must be finished first. A copy that is still running at 12 ms skips its frame and counts as `copy_wait_timeouts`.
+- Nothing reads a pool texture after its frame is closed. The video thread reads only the owned textures, and the callback never writes the texture that is published or held.
+- Torn frame check (`core::tear`): the same queued work also copies the frame into a mip-chained texture, runs `GenerateMips` and reads back one mip of at most 64 pixels wide as luma. Each frame is held back until the next one arrives. A frame that differs sharply from both its neighbours while the neighbours match each other is dropped, and the previous frame stays published (`torn_dropped`). A held frame with no successor is published after 2.5 frame intervals. This costs at most one WGC frame of latency, one full-size copy and a mip build on the GPU, and a few KB of readback. If the thumbnail textures cannot be made, the check turns off and frames publish at once.
+- At start, capture logs once whether the captured frame size matches the window client size. A difference means Windows scales or composes the window (for example, a DPI-virtualised game).
+
 ## On disk
 
 ```
@@ -283,6 +290,7 @@ The Keybinds settings page lists every action, rebinds on click, and refuses a k
 
 Capture counts what it already knows. The video thread sends `MediaEvent::Stats(CaptureStats)` about once a second. Every field is cumulative since the start, except the two `window_*_max_us` gauges, which cover the last second:
 
+- `torn_dropped` (frames the torn frame check dropped), `copy_wait_slow` (copies that took 4 ms or more to finish on the GPU), `copy_wait_timeouts` (copies that did not finish in 12 ms; their frames were skipped) and the per-second `window_copy_wait_max_us`.
 - `ticks`, `captured` (WGC frames the game window delivered), `repeated` (ticks that re-encoded an unchanged frame), `dropped` (ticks lost because the encoder was not ready or a step failed), `skipped` and `resyncs` (ticks jumped over after a stall), `soft_errors`.
 - `encode` (a fixed 100-bucket `LatencyHistogram`, 0.5 ms each) is the time from submitting a frame to the encoder until its packet is read. The thread reads packets at its next poll, so a value near one frame interval means the encoder keeps up, and a value above two frame intervals means it lags. `window_encode_max_us` and `window_step_max_us` (the longest pass of the capture loop) are the per-second maxima.
 - Audio, from atomics the audio thread owns: `audio_packets`, `audio_discontinuities` (WASAPI data-discontinuity flags), `audio_gaps` with `audio_gap_longest_ms` and `audio_gap_total_ms` (silence filled because a packet arrived later than its slot; the first packet's padding from `t0` does not count), `audio_idle_ms` (silence filled by timeout while the game made no sound).
@@ -305,6 +313,7 @@ The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and e
 | `audio` (`packets`, `gaps`, `longest_gap_ms`, `discontinuities`, `idle_silence_ms`, `start_offset_ms`, `drift_ms`) | `gaps` counts audio dts holes plus filled gaps; `drift_ms` is audio minus video track length; `start_offset_ms` is the first kept audio packet against the first video frame; left out without an audio track |
 | `file_bytes`, `avg_bitrate_kbps` | the finalized file size and its average bitrate (video and audio) |
 | `capture_errors`, `capture_soft_errors` | `MediaEvent::Failed` count while recording, and recovered capture step failures |
+| `frames_torn_dropped`, `copy_wait_slow`, `copy_wait_timeouts` | the capture frame counters above; a Capture finding shows when frames were dropped (OK) or copies timed out (WARNING) |
 
 Verdicts (`greyscreen-core::health::verdict`, shared by the popover and the analyzer) are OK below the first number, WARNING from it and BAD from the second: dropped frames 0.5% and 2%, repeated frames 5% and 20%, longest video gap 100 ms and 500 ms, audio gap 50 ms and 250 ms, audio drift 50 ms and 250 ms, audio start offset 50 ms and 250 ms. Encode p95 above one frame interval warns and above two is bad. Any capture error is bad, any soft error warns, and an average bitrate under 1 Mbps at 720p or more over 30 s warns.
 
@@ -313,7 +322,7 @@ Verdicts (`greyscreen-core::health::verdict`, shared by the popover and the anal
 With `Settings.recording_diagnostics` on, `CaptureConfig.diagnostics` is true. Capture then sends one `MediaEvent::Setup(CaptureSetup)` after `Started`, and fills the CPU and memory gauges. The engine opens `diagnostics.jsonl` in the game folder. A `diag-writer` thread owns the file behind a `BufWriter` and a bounded channel: the control thread only does `try_send`, and a full queue drops the line, so a slow disk never stalls recording. Every line is one JSON object with a `type`:
 
 - `setup` (first line): `adapter`, `driver_version` (the DXGI user-mode driver version, with the NVIDIA panel number in brackets), `display_width`, `display_height`, `display_hz` (the monitor's current mode), `window_width`, `window_height` (the game's client area), `frame_width`, `frame_height` (the captured frame), `crop_left`, `crop_top`, `crop_width`, `crop_height`, `encode_width`, `encode_height`, `fps`, `encoder`, `bitrate`, `peak`, `quality`, `gop_frames`, `audio`.
-- `second` (one per second): `t` (seconds since capture start), `captured`, `encoded`, `dropped`, `repeated` (all counts for that second), `encode_ms_max`, `step_ms_max`, `audio_packets` (total), `av_skew_ms` (audio end minus video end as the engine has received them), `queue_writer` (packets waiting for the file writer, of 4096), `queue_media` (events waiting for the engine), `queue_encoder`, `queue_pcm`, `cpu_pct`, `mem_mb` (both absent when Windows refuses the read).
+- `second` (one per second): `t` (seconds since capture start), `captured`, `encoded`, `dropped`, `repeated` (all counts for that second), `encode_ms_max`, `step_ms_max`, `torn` (frames dropped by the torn frame check), `copy_wait_ms_max`, `audio_packets` (total), `av_skew_ms` (audio end minus video end as the engine has received them), `queue_writer` (packets waiting for the file writer, of 4096), `queue_media` (events waiting for the engine), `queue_encoder`, `queue_pcm`, `cpu_pct`, `mem_mb` (both absent when Windows refuses the read).
 
 GPU encoder load is not recorded: Windows exposes it only through performance counters, which cost more than this log may.
 

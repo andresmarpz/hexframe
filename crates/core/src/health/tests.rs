@@ -264,3 +264,41 @@ fn driver_versions_read_like_the_vendor_panel() {
     let other = (31i64 << 48) | (101i64 << 16) | 4577;
     assert_eq!(driver_version_text(other, 0x1002), "31.0.101.4577");
 }
+
+#[test]
+fn torn_frames_and_copy_waits_reach_samples_health_and_findings() {
+    let mut tracker = tracker();
+    let mut stats = CaptureStats {
+        at: 10_000_000,
+        torn_dropped: 3,
+        window_copy_wait_max_us: 2_500,
+        ..CaptureStats::default()
+    };
+    let first = tracker.on_stats(&stats, Queues::default());
+    assert_eq!((first.torn, first.copy_wait_ms_max), (3, 2.5));
+    stats.at = 20_000_000;
+    stats.torn_dropped = 5;
+    stats.copy_wait_slow = 2;
+    assert_eq!(tracker.on_stats(&stats, Queues::default()).torn, 2);
+
+    let mut health = tracker.finish(None);
+    assert_eq!(
+        (
+            health.frames_torn_dropped,
+            health.copy_wait_slow,
+            health.copy_wait_timeouts
+        ),
+        (5, 2, 0)
+    );
+    let capture = |health: &RecordingHealth| {
+        health
+            .findings()
+            .into_iter()
+            .find(|f| f.area == Area::Capture)
+            .map(|f| f.level)
+    };
+    assert_eq!(capture(&health), Some(Level::Ok));
+    health.copy_wait_timeouts = 1;
+    assert_eq!(capture(&health), Some(Level::Warn));
+    assert_eq!(capture(&RecordingHealth::default()), None);
+}

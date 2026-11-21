@@ -21,6 +21,8 @@ pub struct DiagSample {
     pub repeated: u64,
     pub encode_ms_max: f64,
     pub step_ms_max: f64,
+    pub torn: u64,
+    pub copy_wait_ms_max: f64,
     pub audio_packets: u64,
     pub av_skew_ms: f64,
     pub queue_writer: u32,
@@ -66,6 +68,7 @@ struct Marks {
     encoded: u64,
     dropped: u64,
     repeated: u64,
+    torn: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +147,7 @@ impl HealthTracker {
             encoded: self.video.packets,
             dropped,
             repeated: stats.repeated,
+            torn: stats.torn_dropped,
         };
         self.last = Some(stats.clone());
         DiagSample {
@@ -154,6 +158,8 @@ impl HealthTracker {
             repeated: stats.repeated.saturating_sub(marks.repeated),
             encode_ms_max: round1(f64::from(stats.window_encode_max_us) / 1000.0),
             step_ms_max: round1(f64::from(stats.window_step_max_us) / 1000.0),
+            torn: stats.torn_dropped.saturating_sub(marks.torn),
+            copy_wait_ms_max: round1(f64::from(stats.window_copy_wait_max_us) / 1000.0),
             audio_packets: self.audio.packets,
             av_skew_ms: round1(self.av_skew_ms()),
             queue_writer: queues.writer,
@@ -227,6 +233,9 @@ impl HealthTracker {
             },
             capture_errors: self.errors,
             capture_soft_errors: stats.soft_errors,
+            frames_torn_dropped: stats.torn_dropped,
+            copy_wait_slow: stats.copy_wait_slow,
+            copy_wait_timeouts: stats.copy_wait_timeouts,
         }
     }
 

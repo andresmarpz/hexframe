@@ -15,5 +15,6 @@ pub mod retention;
 pub mod review;
 pub mod session;
 pub mod settings;
+pub mod tear;
 pub mod time;
 pub mod update;

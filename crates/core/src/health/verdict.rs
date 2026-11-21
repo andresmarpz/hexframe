@@ -164,6 +164,21 @@ pub(super) fn findings(health: &RecordingHealth) -> Vec<Finding> {
             ),
         ));
     }
+    if health.frames_torn_dropped > 0 || health.copy_wait_timeouts > 0 {
+        let level = if health.copy_wait_timeouts > 0 {
+            Level::Warn
+        } else {
+            Level::Ok
+        };
+        out.push(finding(
+            Area::Capture,
+            level,
+            format!(
+                "{} torn frames from Windows capture replaced, {} late and {} slow GPU copies",
+                health.frames_torn_dropped, health.copy_wait_timeouts, health.copy_wait_slow
+            ),
+        ));
+    }
     let bitrate = if health.avg_bitrate_kbps < MIN_BITRATE_KBPS
         && health.height >= 720
         && health.duration_secs > 30.0

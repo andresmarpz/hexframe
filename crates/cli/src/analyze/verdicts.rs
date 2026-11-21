@@ -212,8 +212,8 @@ fn diagnostics(diag: &DiagReport, fps: u32) -> Vec<Verdict> {
             "Diagnostics: encoder",
             encode,
             format!(
-                "slowest second: encode {:.1} ms, capture step {:.1} ms",
-                diag.encode_ms_max, diag.step_ms_max
+                "slowest second: encode {:.1} ms, capture step {:.1} ms, GPU copy wait {:.1} ms; {} torn frames replaced",
+                diag.encode_ms_max, diag.step_ms_max, diag.copy_wait_ms_max, diag.torn_frames
             ),
         ),
         verdict(

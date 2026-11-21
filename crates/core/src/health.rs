@@ -33,6 +33,9 @@ pub struct RecordingHealth {
     pub avg_bitrate_kbps: u32,
     pub capture_errors: u32,
     pub capture_soft_errors: u64,
+    pub frames_torn_dropped: u64,
+    pub copy_wait_slow: u64,
+    pub copy_wait_timeouts: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]

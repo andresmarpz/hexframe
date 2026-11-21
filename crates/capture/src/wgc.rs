@@ -1,8 +1,10 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::CaptureTarget;
-use greyscreen_core::time::{HNS_PER_SEC, Hns};
+use greyscreen_core::tear::{Arrival, CopyWaits, HoldBack, Wait};
+use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
 use windows::Foundation::{TimeSpan, TypedEventHandler};
 use windows::Graphics::Capture::{
     Direct3D11CaptureFramePool, GraphicsCaptureAccess, GraphicsCaptureAccessKind,
@@ -12,11 +14,7 @@ use windows::Graphics::DirectX::DirectXPixelFormat;
 use windows::Graphics::SizeInt32;
 use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
 use windows::Win32::Foundation::{E_POINTER, HWND, POINT};
-use windows::Win32::Graphics::Direct3D11::{
-    D3D11_BIND_RENDER_TARGET, D3D11_BIND_SHADER_RESOURCE, D3D11_BOX, D3D11_TEXTURE2D_DESC,
-    D3D11_USAGE_DEFAULT, ID3D11Texture2D,
-};
-use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC};
+use windows::Win32::Graphics::Direct3D11::{D3D11_TEXTURE2D_DESC, ID3D11Texture2D};
 use windows::Win32::Graphics::Gdi::{HMONITOR, MONITOR_DEFAULTTOPRIMARY, MonitorFromPoint};
 use windows::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
 use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
@@ -24,10 +22,12 @@ use windows::core::{IInspectable, Interface, factory};
 
 use crate::clock::QpcMap;
 use crate::d3d::GpuDevice;
+use crate::frame_copy::{Copied, FrameCopier};
 
 const POOL_BUFFERS: i32 = 2;
 const POOL_FORMAT: DirectXPixelFormat = DirectXPixelFormat::B8G8R8A8UIntNormalized;
 const LOG_EVERY_FRAMES: u64 = 600;
+const LOG_TIMEOUT_EVERY: u64 = 100;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WgcError {
@@ -46,17 +46,33 @@ struct Latest {
     seq: u64,
 }
 
+#[derive(Default)]
+struct Published {
+    current: Option<Latest>,
+    pending: Option<Latest>,
+    seq: u64,
+}
+
 struct Worker {
-    texture: Option<ID3D11Texture2D>,
-    texture_size: (u32, u32),
+    copier: Option<FrameCopier>,
+    holdback: HoldBack,
     pool_size: (i32, i32),
+}
+
+struct Taken {
+    slot: usize,
+    size: (u32, u32),
+    copied: Copied,
 }
 
 struct Shared {
     gpu: GpuDevice,
     qpc: QpcMap,
-    latest: Mutex<Option<Latest>>,
+    published: Mutex<Published>,
     worker: Mutex<Worker>,
+    waits: Mutex<CopyWaits>,
+    torn: AtomicU64,
+    promote_after: Hns,
     closed: AtomicBool,
     frames: AtomicU64,
 }
@@ -110,16 +126,19 @@ impl WgcCapture {
             POOL_BUFFERS,
             item_size,
         )?;
+        let copier = FrameCopier::new(gpu)?;
         let shared = Arc::new(Shared {
             gpu: gpu.clone(),
-
             qpc,
-            latest: Mutex::new(None),
+            published: Mutex::new(Published::default()),
             worker: Mutex::new(Worker {
-                texture: None,
-                texture_size: (0, 0),
+                copier: Some(copier),
+                holdback: HoldBack::default(),
                 pool_size: (item_size.Width, item_size.Height),
             }),
+            waits: Mutex::new(CopyWaits::default()),
+            torn: AtomicU64::new(0),
+            promote_after: HNS_PER_SEC * 5 / 2 / i64::from(options.fps.max(1)),
             closed: AtomicBool::new(false),
             frames: AtomicU64::new(0),
         });
@@ -176,13 +195,27 @@ impl WgcCapture {
     }
 
     pub fn latest(&self) -> Option<(ID3D11Texture2D, (u32, u32), u64)> {
-        lock(&self.shared.latest)
+        let mut published = lock(&self.shared.published);
+        let stale = published
+            .pending
+            .as_ref()
+            .is_some_and(|pending| mono_now() - pending.at >= self.shared.promote_after);
+        if stale {
+            published.current = published.pending.take();
+        }
+        published
+            .current
             .as_ref()
             .map(|latest| (latest.texture.clone(), latest.size, latest.seq))
     }
 
-    pub fn latest_at(&self) -> Option<Hns> {
-        lock(&self.shared.latest).as_ref().map(|latest| latest.at)
+    pub fn fill_stats(&self, stats: &mut CaptureStats) {
+        let mut waits = lock(&self.shared.waits);
+        stats.copy_wait_slow = waits.slow;
+        stats.copy_wait_timeouts = waits.timeouts;
+        stats.window_copy_wait_max_us = waits.max_us;
+        waits.max_us = 0;
+        stats.torn_dropped = self.shared.torn.load(Ordering::Relaxed);
     }
 
     pub fn is_closed(&self) -> bool {
@@ -217,12 +250,18 @@ impl WgcCapture {
         {
             tracing::warn!(%error, "close frame pool failed");
         }
-        *lock(&self.shared.latest) = None;
+        *lock(&self.shared.published) = Published::default();
         let mut worker = lock(&self.shared.worker);
-        worker.texture = None;
-        worker.texture_size = (0, 0);
+        if let Some(copier) = &mut worker.copier {
+            copier.release();
+        }
+        worker.holdback.reset();
+        let waits = *lock(&self.shared.waits);
         tracing::info!(
             frames = self.shared.frames.load(Ordering::Relaxed),
+            torn_dropped = self.shared.torn.load(Ordering::Relaxed),
+            copy_wait_slow = waits.slow,
+            copy_wait_timeouts = waits.timeouts,
             "capture stopped"
         );
     }
@@ -241,14 +280,21 @@ impl Shared {
         };
         let content = frame.ContentSize()?;
         let at = self.qpc.to_mono(frame.SystemRelativeTime()?.Duration);
-        if content.Width > 0 && content.Height > 0 {
+        let mut worker = lock(&self.worker);
+        let copy = if content.Width > 0 && content.Height > 0 {
             let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
             // SAFETY: the surface is a live D3D11 texture owned by the checked-out frame.
             let source: ID3D11Texture2D = unsafe { access.GetInterface()? };
-            self.copy_and_publish(&source, content, at)?;
-        }
+            Some(worker.copy(&source, content)?)
+        } else {
+            None
+        };
+        // The copy has finished on the GPU, so the pool may now reuse this buffer.
         drop(frame);
-        self.resize_pool_if_needed(pool, content)?;
+        self.resize_pool_if_needed(pool, content, &mut worker)?;
+        if let Some(copy) = copy {
+            self.publish(&mut worker, copy, at);
+        }
         let count = self.frames.fetch_add(1, Ordering::Relaxed) + 1;
         if count.is_multiple_of(LOG_EVERY_FRAMES) {
             tracing::debug!(count, "capture frames");
@@ -256,92 +302,78 @@ impl Shared {
         Ok(())
     }
 
-    fn copy_and_publish(
-        &self,
-        source: &ID3D11Texture2D,
-        content: SizeInt32,
-        at: Hns,
-    ) -> windows::core::Result<()> {
-        let mut desc = D3D11_TEXTURE2D_DESC::default();
-        // SAFETY: `desc` is a live out value and `source` is a live texture.
-        unsafe { source.GetDesc(&mut desc) };
-        let size = (
-            (content.Width as u32).min(desc.Width),
-            (content.Height as u32).min(desc.Height),
-        );
-        let texture = {
-            let mut worker = lock(&self.worker);
-            match &worker.texture {
-                Some(texture) if worker.texture_size == size => texture.clone(),
-                _ => {
-                    let texture = self.create_texture(size)?;
-                    worker.texture = Some(texture.clone());
-                    worker.texture_size = size;
-                    texture
+    fn publish(&self, worker: &mut Worker, copy: Taken, at: Hns) {
+        let timeouts = {
+            let mut waits = lock(&self.waits);
+            waits.record(copy.copied.wait);
+            waits.timeouts
+        };
+        if let Wait::TimedOut(waited) = copy.copied.wait {
+            if timeouts % LOG_TIMEOUT_EVERY == 1 {
+                tracing::warn!(
+                    timeouts,
+                    waited_ms = waited.as_secs_f64() * 1000.0,
+                    "capture copy did not finish in time, frame skipped"
+                );
+            }
+            return;
+        }
+        let Worker {
+            copier, holdback, ..
+        } = worker;
+        let Some(texture) = copier.as_ref().and_then(|c| c.texture(copy.slot)) else {
+            return;
+        };
+        let checked = copy.copied.thumbed
+            && copier.as_ref().is_some_and(|copier| {
+                copier
+                    .read_thumb(holdback.thumb_mut(copy.slot))
+                    .inspect_err(|error| tracing::debug!(%error, "thumbnail read failed"))
+                    .is_ok()
+            });
+        let mut published = lock(&self.published);
+        if published.pending.is_none() && holdback.pending().is_some() {
+            holdback.promote();
+        }
+        published.seq += 1;
+        let entry = Latest {
+            texture,
+            size: copy.size,
+            at,
+            seq: published.seq,
+        };
+        if !checked {
+            holdback.publish_now(copy.slot);
+            published.pending = None;
+            published.current = Some(entry);
+            return;
+        }
+        match holdback.arrive(copy.slot) {
+            Arrival::Held => {}
+            Arrival::Published(_) => {
+                if let Some(pending) = published.pending.take() {
+                    published.current = Some(pending);
                 }
             }
-        };
-        let region = D3D11_BOX {
-            left: 0,
-            top: 0,
-            front: 0,
-            right: size.0,
-            bottom: size.1,
-            back: 1,
-        };
-        // SAFETY: both textures are live, the region lies inside both, and the context is multithread protected.
-        unsafe {
-            self.gpu
-                .context
-                .CopySubresourceRegion(&texture, 0, 0, 0, 0, source, 0, Some(&region));
+            Arrival::Dropped(_) => {
+                published.pending = None;
+                let torn = self.torn.fetch_add(1, Ordering::Relaxed) + 1;
+                tracing::debug!(torn, "torn capture frame replaced by the previous one");
+            }
         }
-        let mut latest = lock(&self.latest);
-        let seq = latest.as_ref().map_or(1, |previous| previous.seq + 1);
-        *latest = Some(Latest {
-            texture,
-            size,
-            at,
-            seq,
-        });
-        Ok(())
-    }
-
-    fn create_texture(&self, size: (u32, u32)) -> windows::core::Result<ID3D11Texture2D> {
-        let desc = D3D11_TEXTURE2D_DESC {
-            Width: size.0,
-            Height: size.1,
-            MipLevels: 1,
-            ArraySize: 1,
-            Format: DXGI_FORMAT_B8G8R8A8_UNORM,
-            SampleDesc: DXGI_SAMPLE_DESC {
-                Count: 1,
-                Quality: 0,
-            },
-            Usage: D3D11_USAGE_DEFAULT,
-            BindFlags: (D3D11_BIND_SHADER_RESOURCE.0 | D3D11_BIND_RENDER_TARGET.0) as u32,
-            CPUAccessFlags: 0,
-            MiscFlags: 0,
-        };
-        let mut texture = None;
-        // SAFETY: `desc` and the out pointer refer to live locals.
-        unsafe {
-            self.gpu
-                .device
-                .CreateTexture2D(&desc, None, Some(&mut texture))?;
-        }
-        texture.ok_or_else(|| windows::core::Error::from(E_POINTER))
+        published.pending = Some(entry);
     }
 
     fn resize_pool_if_needed(
         &self,
         pool: &Direct3D11CaptureFramePool,
         content: SizeInt32,
+        worker: &mut Worker,
     ) -> windows::core::Result<()> {
         if content.Width <= 0 || content.Height <= 0 {
             return Ok(());
         }
         let wanted = (content.Width, content.Height);
-        let mut worker = lock(&self.worker);
         if worker.pool_size == wanted {
             return Ok(());
         }
@@ -354,6 +386,29 @@ impl Shared {
         worker.pool_size = wanted;
         tracing::info!(width = wanted.0, height = wanted.1, "capture pool resized");
         Ok(())
+    }
+}
+
+impl Worker {
+    fn copy(
+        &mut self,
+        source: &ID3D11Texture2D,
+        content: SizeInt32,
+    ) -> windows::core::Result<Taken> {
+        let mut desc = D3D11_TEXTURE2D_DESC::default();
+        // SAFETY: `desc` is a live out value and `source` is a live texture.
+        unsafe { source.GetDesc(&mut desc) };
+        let size = (
+            (content.Width as u32).min(desc.Width),
+            (content.Height as u32).min(desc.Height),
+        );
+        let slot = self.holdback.write_slot();
+        let copier = self
+            .copier
+            .as_mut()
+            .ok_or_else(|| windows::core::Error::from(E_POINTER))?;
+        let copied = copier.copy(source, size, slot)?;
+        Ok(Taken { slot, size, copied })
     }
 }
 

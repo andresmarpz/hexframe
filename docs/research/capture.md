@@ -95,7 +95,7 @@ features = [
 - **WinRT device from D3D11.** `CreateDirect3D11DeviceFromDXGIDevice(&dev.cast::<IDXGIDevice>()?)?.cast::<IDirect3DDevice>()?`.
 - **Texture from a frame.** `frame.Surface()?.cast::<IDirect3DDxgiInterfaceAccess>()?.GetInterface::<ID3D11Texture2D>()?`.
 - **`SystemRelativeTime`.** Returns a `TimeSpan`. Microsoft: "QPC time that can be used to synchronize other media elements". Units are 100 ns ticks (the `TimeSpan` unit), derived from `QueryPerformanceCounter`. Convert with `ticks * 100 ns`. Audio capture on the same clock (WASAPI QPC positions) lines up directly. Note: OBS does not use it. That the zero point equals raw QPC counts divided by frequency is UNVERIFIED beyond the Microsoft sentence; test by comparing with `QueryPerformanceCounter` in the callback.
-- **Frame lifetime.** A frame is "checked out" by `TryGetNextFrame` and returned when the `Direct3D11CaptureFrame` object is dropped (windows-rs `Drop`, or call `frame.Close()`). Microsoft: do not keep references to frames or their surfaces after check-in.
+- **Frame lifetime.** A frame is "checked out" by `TryGetNextFrame` and returned when the `Direct3D11CaptureFrame` object is dropped (windows-rs `Drop`, or call `frame.Close()`). Microsoft: do not keep references to frames or their surfaces after check-in. Microsoft does not say whether GPU work that is only queued on your device still protects the buffer after check-in. Greyscreen waits for its copy (an event query) before closing the frame. See `architecture.md`, "Capture frame lifetime".
 
 ## Frame pacing and constant frame rate
 
