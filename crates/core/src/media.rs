@@ -60,6 +60,23 @@ pub struct CaptureConfig {
     pub gop_frames: u32,
     pub audio: bool,
     pub audio_bitrate: u32,
+    pub bitrate_pixels: u64,
+}
+
+impl CaptureConfig {
+    pub fn for_encode_size(&self, width: u32, height: u32) -> Self {
+        let pixels = u64::from(width) * u64::from(height);
+        if self.bitrate_pixels == 0 || pixels >= self.bitrate_pixels {
+            return self.clone();
+        }
+        let scale = |bits: u32| (u64::from(bits) * pixels / self.bitrate_pixels) as u32;
+        Self {
+            video_bitrate: scale(self.video_bitrate),
+            video_peak: scale(self.video_peak),
+            bitrate_pixels: pixels,
+            ..self.clone()
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

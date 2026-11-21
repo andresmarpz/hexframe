@@ -169,6 +169,7 @@ impl Settings {
             gop_frames: self.fps,
             audio: self.audio,
             audio_bitrate: AUDIO_BITRATE,
+            bitrate_pixels: pixels.round() as u64,
         }
     }
 }

@@ -227,3 +227,21 @@ fn encode_size_keeps_native_when_limit_is_above_it() {
 fn encode_size_keeps_four_by_three_aspect() {
     assert_eq!(encode_size((1600, 1200), Some(1080)), (1440, 1080));
 }
+
+#[test]
+fn bitrate_scales_down_to_a_smaller_encode_size() {
+    let cfg = CaptureConfig {
+        fps: 60,
+        max_height: None,
+        video_bitrate: 80_000_000,
+        video_peak: 120_000_000,
+        gop_frames: 60,
+        audio: true,
+        audio_bitrate: 192_000,
+        bitrate_pixels: 3840 * 2160,
+    };
+    let scaled = cfg.for_encode_size(1920, 1080);
+    assert_eq!(scaled.video_bitrate, 20_000_000);
+    assert_eq!(scaled.video_peak, 30_000_000);
+    assert_eq!(cfg.for_encode_size(3840, 2160), cfg);
+}

@@ -13,6 +13,7 @@ fn config() -> CaptureConfig {
         gop_frames: 60,
         audio: true,
         audio_bitrate: 192_000,
+        bitrate_pixels: 0,
     }
 }
 

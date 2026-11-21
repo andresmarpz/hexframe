@@ -42,7 +42,15 @@ pub(crate) fn build(
     let size = encode_size(native, cfg.max_height);
     let converter = VideoConverter::new(&gpu, size.0, size.1, cfg.fps)
         .map_err(|e| format!("video converter failed: {e}"))?;
-    let encoder = H264Encoder::new(&gpu, size.0, size.1, cfg.fps, cfg)
+    let video_cfg = cfg.for_encode_size(size.0, size.1);
+    tracing::info!(
+        width = size.0,
+        height = size.1,
+        bitrate = video_cfg.video_bitrate,
+        peak = video_cfg.video_peak,
+        "encode size"
+    );
+    let encoder = H264Encoder::new(&gpu, size.0, size.1, cfg.fps, &video_cfg)
         .map_err(|e| format!("video encoder failed: {e}"))?
         .with_releaser(converter.releaser());
     let t0 = mono_now();
