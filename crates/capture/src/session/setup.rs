@@ -9,6 +9,7 @@ use greyscreen_mp4::avc::{NAL_PPS, NAL_SPS, nal_type, split_annexb};
 use super::Flags;
 use super::audio::AudioPipe;
 use super::emit::{Sink, StartInfo};
+use super::facts;
 use super::video::Video;
 use crate::client_area::ClientArea;
 use crate::clock::QpcMap;
@@ -16,6 +17,7 @@ use crate::com::{ComGuard, MfGuard};
 use crate::d3d::GpuDevice;
 use crate::h264::H264Encoder;
 use crate::pacer::{Pacer, Stats};
+use crate::procstats::ProcessSampler;
 use crate::vproc::VideoConverter;
 use crate::watchdog::Watchdog;
 use crate::wgc::{WgcCapture, WgcOptions};
@@ -55,7 +57,8 @@ pub(crate) fn build(
     tracing::info!(step = "first frame", "capture setup");
     let frame = first_frame_size(&wgc, &flags)?;
     let mut client_area = ClientArea::for_target(target);
-    let native = client_area.crop(frame).size();
+    let crop = client_area.crop(frame);
+    let native = crop.size();
     let size = encode_size(native, cfg.max_height);
     tracing::info!(
         step = "video converter",
@@ -108,6 +111,18 @@ pub(crate) fn build(
     if let Some(message) = warning {
         sink.warning(message);
     }
+    if cfg.diagnostics {
+        sink.setup(facts::describe(facts::Inputs {
+            target,
+            cfg: &video_cfg,
+            gpu: &gpu,
+            frame,
+            crop,
+            window: client_area.client_size(),
+            encode: size,
+            encoder: encoder.encoder_name(),
+        }));
+    }
     if let Some((sps, pps)) = parameter_sets(encoder.sequence_header()) {
         sink.set_fallback(sps, pps);
     }
@@ -126,7 +141,9 @@ pub(crate) fn build(
         com,
         scratch: Vec::new(),
         stats: Stats::new(),
+        sampler: cfg.diagnostics.then(ProcessSampler::new),
         seq: 0,
+        last_seq: 0,
         soft_errors: 0,
     })
 }

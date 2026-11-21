@@ -90,6 +90,24 @@ pub struct CaptureStats {
     pub mem_mb: Option<u32>,
 }
 
+const NVIDIA_VENDOR: u32 = 0x10DE;
+
+pub fn driver_version_text(version: i64, vendor_id: u32) -> String {
+    let v = version as u64;
+    let parts = [
+        (v >> 48) & 0xFFFF,
+        (v >> 32) & 0xFFFF,
+        (v >> 16) & 0xFFFF,
+        v & 0xFFFF,
+    ];
+    let raw = format!("{}.{}.{}.{}", parts[0], parts[1], parts[2], parts[3]);
+    if vendor_id == NVIDIA_VENDOR {
+        let (c, d) = (parts[2], parts[3]);
+        return format!("{raw} (NVIDIA {}{}.{:02})", c % 10, d / 100, d % 100);
+    }
+    raw
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct CaptureSetup {
     pub adapter: String,

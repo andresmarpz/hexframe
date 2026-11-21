@@ -6,7 +6,7 @@ mod stats;
 mod tracker;
 pub mod verdict;
 
-pub use stats::{CaptureSetup, CaptureStats, LatencyHistogram};
+pub use stats::{CaptureSetup, CaptureStats, LatencyHistogram, driver_version_text};
 pub use tracker::{DiagSample, HealthTracker, Queues};
 pub use verdict::{Area, Finding, Level, audio_level};
 

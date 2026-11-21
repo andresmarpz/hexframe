@@ -14,6 +14,7 @@ pub mod install;
 pub mod instance;
 mod pacer;
 pub mod probe;
+mod procstats;
 pub mod recycle;
 mod session;
 pub mod video_log;

@@ -2,12 +2,15 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
+use greyscreen_core::health::{CaptureSetup, CaptureStats, LatencyHistogram};
 use greyscreen_core::media::{AudioFormat, MediaEvent, Packet, Track, VideoFormat};
-use greyscreen_core::time::Hns;
+use greyscreen_core::time::{Hns, mono_now};
 use greyscreen_mp4::avc::annexb_to_avcc;
 
 use super::matching::{match_tick, parameter_fault};
 use crate::h264::EncodedVideo;
+
+const MAX_TRACKED_SUBMITS: usize = 256;
 
 #[derive(Debug, Clone)]
 pub(crate) struct StartInfo {
@@ -28,6 +31,9 @@ pub(crate) struct Sink {
     pending: Vec<MediaEvent>,
     out_index: u64,
     in_flight: VecDeque<(u64, Hns)>,
+    submit_times: VecDeque<(u64, Hns)>,
+    encode: LatencyHistogram,
+    window_encode_max_us: u32,
     last_tick: Option<u64>,
     frame_ticks: i64,
     parameters: Option<(Vec<u8>, Vec<u8>)>,
@@ -48,6 +54,9 @@ impl Sink {
             pending: Vec::new(),
             out_index: 0,
             in_flight: VecDeque::new(),
+            submit_times: VecDeque::new(),
+            encode: LatencyHistogram::default(),
+            window_encode_max_us: 0,
             last_tick: None,
             frame_ticks,
             parameters: None,
@@ -72,6 +81,40 @@ impl Sink {
 
     pub(crate) fn submitted(&mut self, tick: u64, pts: Hns) {
         self.in_flight.push_back((tick, pts));
+        self.submit_times.push_back((tick, mono_now()));
+        if self.submit_times.len() > MAX_TRACKED_SUBMITS {
+            self.submit_times.pop_front();
+        }
+    }
+
+    fn record_latency(&mut self, tick: u64, now: Hns) {
+        while self.submit_times.front().is_some_and(|&(t, _)| t < tick) {
+            self.submit_times.pop_front();
+        }
+        if let Some(&(t, at)) = self.submit_times.front()
+            && t == tick
+        {
+            self.submit_times.pop_front();
+            let us = u32::try_from((now - at).max(0) / 10).unwrap_or(u32::MAX);
+            self.encode.record(us);
+            self.window_encode_max_us = self.window_encode_max_us.max(us);
+        }
+    }
+
+    pub(crate) fn fill_stats(&mut self, stats: &mut CaptureStats) {
+        stats.encode = self.encode.clone();
+        stats.window_encode_max_us = std::mem::take(&mut self.window_encode_max_us);
+        stats.in_flight = u32::try_from(self.in_flight.len()).unwrap_or(u32::MAX);
+    }
+
+    pub(crate) fn stats(&mut self, stats: Box<CaptureStats>) {
+        if self.started {
+            self.send(MediaEvent::Stats(stats));
+        }
+    }
+
+    pub(crate) fn setup(&mut self, setup: CaptureSetup) {
+        self.queue(MediaEvent::Setup(Box::new(setup)));
     }
 
     fn next_tick(&mut self, output_pts: Hns) -> u64 {
@@ -111,6 +154,7 @@ impl Sink {
     }
 
     pub(crate) fn video(&mut self, encoded: &mut Vec<EncodedVideo>) {
+        let now = mono_now();
         for item in encoded.drain(..) {
             if self.fault.is_some() {
                 continue;
@@ -149,7 +193,9 @@ impl Sink {
             if sample.is_empty() {
                 continue;
             }
-            let ticks = self.next_tick(item.pts_hns) as i64 * self.frame_ticks;
+            let tick = self.next_tick(item.pts_hns);
+            self.record_latency(tick, now);
+            let ticks = tick as i64 * self.frame_ticks;
             self.out_index += 1;
             self.packet(Packet {
                 track: Track::Video,

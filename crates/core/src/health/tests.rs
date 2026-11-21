@@ -253,3 +253,14 @@ fn thresholds_grade_each_area() {
             .any(|f| f.area == Area::Encoder && f.level == Level::Bad)
     );
 }
+
+#[test]
+fn driver_versions_read_like_the_vendor_panel() {
+    let nvidia = (31i64 << 48) | (15i64 << 16) | 5123;
+    assert_eq!(
+        driver_version_text(nvidia, 0x10DE),
+        "31.0.15.5123 (NVIDIA 551.23)"
+    );
+    let other = (31i64 << 48) | (101i64 << 16) | 4577;
+    assert_eq!(driver_version_text(other, 0x1002), "31.0.101.4577");
+}

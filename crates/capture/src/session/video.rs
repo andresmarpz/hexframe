@@ -1,4 +1,5 @@
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use greyscreen_core::time::mono_now;
 use windows::Win32::Graphics::Dxgi::{DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET};
@@ -12,6 +13,7 @@ use crate::com::{ComGuard, MfGuard};
 use crate::d3d::GpuDevice;
 use crate::h264::{EncodedVideo, H264Encoder, H264Error};
 use crate::pacer::{Pacer, Stats};
+use crate::procstats::ProcessSampler;
 use crate::vproc::{VideoConverter, VprocError};
 use crate::watchdog::Watchdog;
 use crate::wgc::WgcCapture;
@@ -40,7 +42,9 @@ pub(crate) struct Video {
     pub(super) com: ComGuard,
     pub(super) scratch: Vec<EncodedVideo>,
     pub(super) stats: Stats,
+    pub(super) sampler: Option<ProcessSampler>,
     pub(super) seq: u64,
+    pub(super) last_seq: u64,
     pub(super) soft_errors: u32,
 }
 
@@ -55,14 +59,22 @@ impl Video {
             if !self.pacer.wait(&self.flags.stop) {
                 return Exit::Stopped;
             }
+            let before = self.pacer.tick();
             if self.pacer.resync(mono_now()) {
-                self.stats.skips += 1;
+                self.stats.c.resyncs += 1;
+                self.stats.c.skipped += self.pacer.tick() - before;
             }
+            let started = Instant::now();
             if let Err(exit) = self.step() {
                 return exit;
             }
+            self.stats.step_done(started);
             self.pacer.advance();
-            self.stats.report_if_due(self.seq, self.sink.encoded());
+            self.stats.c.ticks += 1;
+            self.stats.report_if_due(self.sink.encoded());
+            if self.stats.snapshot_due() {
+                self.publish_stats();
+            }
         }
     }
 
@@ -84,7 +96,7 @@ impl Video {
             return Err(Exit::Failed("encoder stopped producing frames".into()));
         }
         if let Some(audio) = &self.audio {
-            self.stats.audio += audio.drain(&mut self.sink);
+            self.stats.c.audio_packets += audio.drain(&mut self.sink);
         }
         if self.wgc.is_closed() {
             return Err(Exit::Closed);
@@ -95,15 +107,30 @@ impl Video {
         Ok(())
     }
 
+    fn publish_stats(&mut self) {
+        if let Some(audio) = &self.audio {
+            audio.fill_stats(&mut self.stats.c);
+        }
+        self.sink.fill_stats(&mut self.stats.c);
+        if let Some(sampler) = &mut self.sampler {
+            let (cpu, mem) = sampler.sample();
+            self.stats.c.cpu_pct = cpu;
+            self.stats.c.mem_mb = mem;
+        }
+        let snapshot = self.stats.take_snapshot(mono_now());
+        self.sink.stats(snapshot);
+    }
+
     fn process_frame(&mut self) -> Result<bool, Exit> {
         let Some((texture, size, seq)) = self.wgc.latest() else {
             return Ok(false);
         };
         self.seq = seq;
+        self.stats.c.captured = seq;
         match self.wait_for_input() {
             Ok(true) => {}
             Ok(false) => {
-                self.stats.dropped += 1;
+                self.stats.c.dropped += 1;
                 return Ok(true);
             }
             Err(error) => return self.soft_frame("encoder poll", &error, lost_h264(&error)),
@@ -128,6 +155,10 @@ impl Video {
             return self.soft_frame("encoder submit", &error, lost_h264(&error));
         }
         self.sink.submitted(self.pacer.tick(), pts);
+        if seq == self.last_seq {
+            self.stats.c.repeated += 1;
+        }
+        self.last_seq = seq;
         self.soft_errors = 0;
         Ok(true)
     }
@@ -172,7 +203,8 @@ impl Video {
             )));
         }
         tracing::warn!(%error, what, "capture step failed");
-        self.stats.dropped += 1;
+        self.stats.c.dropped += 1;
+        self.stats.c.soft_errors += 1;
         self.soft_errors += 1;
         if self.soft_errors >= MAX_SOFT_ERRORS {
             return Err(Exit::Failed(format!("{what} keeps failing: {error}")));

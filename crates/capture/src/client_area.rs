@@ -32,6 +32,14 @@ impl ClientArea {
         Self { hwnd, cached: None }
     }
 
+    pub(crate) fn client_size(&self) -> Option<(u32, u32)> {
+        let metrics = read_metrics(self.hwnd?)?;
+        Some((
+            u32::try_from(metrics.size.0).ok()?,
+            u32::try_from(metrics.size.1).ok()?,
+        ))
+    }
+
     pub(crate) fn crop(&mut self, frame: (u32, u32)) -> CropRect {
         let now = Instant::now();
         if let Some(cached) = &self.cached

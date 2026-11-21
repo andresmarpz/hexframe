@@ -2,12 +2,13 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crossbeam_channel::{Receiver, Sender};
+use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::{AudioFormat, CaptureTarget, Packet, Track};
 use greyscreen_core::time::Hns;
 
 use super::emit::Sink;
 use crate::aac::AacEncoder;
-use crate::audio::{AudioCapture, AudioTarget, PcmBlock};
+use crate::audio::{AudioCapture, AudioCounters, AudioTarget, PcmBlock};
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
 
@@ -28,12 +29,15 @@ pub(crate) struct AudioPipe {
     worker: JoinHandle<()>,
     rx: Receiver<AudioMsg>,
     t0_tx: Sender<Hns>,
+    counters: Arc<AudioCounters>,
+    pcm_probe: Receiver<PcmBlock>,
     pub(crate) format: AudioFormat,
 }
 
 impl AudioPipe {
     pub(crate) fn start(target: &CaptureTarget, qpc: QpcMap, bitrate: u32) -> Result<Self, String> {
         let (pcm_tx, pcm_rx) = crossbeam_channel::bounded(PCM_QUEUE);
+        let pcm_probe = pcm_rx.clone();
         let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
         let worker = std::thread::Builder::new()
@@ -56,7 +60,9 @@ impl AudioPipe {
             CaptureTarget::PrimaryMonitor => AudioTarget::System,
         };
         let (t0_tx, t0_rx) = crossbeam_channel::bounded(1);
-        let capture = match AudioCapture::start(audio_target, qpc, t0_rx, pcm_tx) {
+        let counters = Arc::new(AudioCounters::default());
+        let capture = match AudioCapture::start(audio_target, qpc, t0_rx, pcm_tx, counters.clone())
+        {
             Ok(capture) => capture,
             Err(error) => {
                 join(worker);
@@ -68,6 +74,8 @@ impl AudioPipe {
             worker,
             rx: msg_rx,
             t0_tx,
+            counters,
+            pcm_probe,
             format: AudioFormat {
                 sample_rate: SAMPLE_RATE,
                 channels: CHANNELS,
@@ -75,6 +83,11 @@ impl AudioPipe {
                 asc,
             },
         })
+    }
+
+    pub(crate) fn fill_stats(&self, stats: &mut CaptureStats) {
+        self.counters.fill(stats);
+        stats.pcm_queue = u32::try_from(self.pcm_probe.len()).unwrap_or(u32::MAX);
     }
 
     pub(crate) fn begin(&self, t0: Hns) {

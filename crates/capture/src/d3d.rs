@@ -1,3 +1,4 @@
+use greyscreen_core::health::driver_version_text;
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
 use windows::Win32::Foundation::{HMODULE, HWND, LUID};
 use windows::Win32::Graphics::Direct3D::{
@@ -23,6 +24,7 @@ pub struct GpuDevice {
     pub context: ID3D11DeviceContext,
     pub adapter_luid: LUID,
     pub adapter_name: String,
+    pub driver_version: String,
 }
 
 impl GpuDevice {
@@ -61,6 +63,11 @@ impl GpuDevice {
         let desc = unsafe { adapter.GetDesc1()? };
         let adapter_name = wide_to_string(&desc.Description);
         let base: IDXGIAdapter = adapter.cast()?;
+        // SAFETY: the interface id is a valid constant and the call only reads the live adapter.
+        let driver_version = unsafe { base.CheckInterfaceSupport(&IDXGIDevice::IID) }.map_or_else(
+            |_| "unknown".to_owned(),
+            |v| driver_version_text(v, desc.VendorId),
+        );
         let levels = [D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0];
         let mut device = None;
         let mut context = None;
@@ -89,6 +96,7 @@ impl GpuDevice {
             context,
             adapter_luid: desc.AdapterLuid,
             adapter_name,
+            driver_version,
         })
     }
 }

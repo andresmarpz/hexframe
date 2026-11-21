@@ -1,9 +1,10 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::{AudioTimeline, Span};
 use greyscreen_core::time::{Hns, mono_now};
 use wasapi::{
@@ -23,6 +24,57 @@ const RATE: u32 = 48_000;
 const CHANNELS: usize = 2;
 const BYTES_PER_FRAME: usize = CHANNELS * size_of::<f32>();
 const TICK_MS: u32 = 50;
+
+#[derive(Debug, Default)]
+pub struct AudioCounters {
+    discontinuities: AtomicU64,
+    gaps: AtomicU64,
+    gap_longest_ms: AtomicU32,
+    gap_total_ms: AtomicU64,
+    idle_ms: AtomicU64,
+}
+
+impl AudioCounters {
+    fn gap(&self, frames: usize) {
+        let ms = frames_to_ms(frames);
+        self.gaps.fetch_add(1, Ordering::Relaxed);
+        self.gap_total_ms
+            .fetch_add(u64::from(ms), Ordering::Relaxed);
+        self.gap_longest_ms.fetch_max(ms, Ordering::Relaxed);
+    }
+
+    fn idle(&self, frames: usize) {
+        self.idle_ms
+            .fetch_add(u64::from(frames_to_ms(frames)), Ordering::Relaxed);
+    }
+
+    pub fn fill(&self, stats: &mut CaptureStats) {
+        stats.audio_discontinuities = self.discontinuities.load(Ordering::Relaxed);
+        stats.audio_gaps = self.gaps.load(Ordering::Relaxed);
+        stats.audio_gap_longest_ms = self.gap_longest_ms.load(Ordering::Relaxed);
+        stats.audio_gap_total_ms = self.gap_total_ms.load(Ordering::Relaxed);
+        stats.audio_idle_ms = self.idle_ms.load(Ordering::Relaxed);
+    }
+}
+
+fn frames_to_ms(frames: usize) -> u32 {
+    u32::try_from(frames as u64 * 1000 / u64::from(RATE)).unwrap_or(u32::MAX)
+}
+
+fn gap_frames(spans: &[Span], silent: bool) -> usize {
+    let gap_spans = if silent {
+        spans.len().saturating_sub(1)
+    } else {
+        spans.len()
+    };
+    spans[..gap_spans]
+        .iter()
+        .map(|span| match *span {
+            Span::Silence(frames) => frames,
+            Span::Data { .. } => 0,
+        })
+        .sum()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PcmBlock {
@@ -60,13 +112,14 @@ impl AudioCapture {
         qpc: QpcMap,
         t0: Receiver<Hns>,
         out: Sender<PcmBlock>,
+        counters: Arc<AudioCounters>,
     ) -> Result<Self, AudioError> {
         let stop = Arc::new(AtomicBool::new(false));
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
         let thread_stop = Arc::clone(&stop);
         let thread = std::thread::Builder::new()
             .name("greyscreen-audio".into())
-            .spawn(move || run(target, qpc, t0, out, thread_stop, ready_tx))?;
+            .spawn(move || run(target, qpc, t0, out, counters, thread_stop, ready_tx))?;
         match ready_rx.recv() {
             Ok(Ok(())) => Ok(Self {
                 stop,
@@ -178,6 +231,7 @@ fn run(
     qpc: QpcMap,
     t0: Receiver<Hns>,
     out: Sender<PcmBlock>,
+    counters: Arc<AudioCounters>,
     stop: Arc<AtomicBool>,
     ready: Sender<Result<(), AudioError>>,
 ) {
@@ -198,7 +252,7 @@ fn run(
     };
     notify(&ready, Ok(()));
     if let Some(t0) = wait_for_t0(&t0, &stop) {
-        capture_loop(&stream, qpc, t0, &out, &stop);
+        capture_loop(&stream, qpc, t0, &out, &counters, &stop);
     }
     if let Err(error) = stream.client.stop_stream() {
         tracing::warn!(%error, "stopping audio stream failed");
@@ -218,7 +272,14 @@ fn wait_for_t0(t0: &Receiver<Hns>, stop: &AtomicBool) -> Option<Hns> {
     }
 }
 
-fn capture_loop(stream: &Stream, qpc: QpcMap, t0: Hns, out: &Sender<PcmBlock>, stop: &AtomicBool) {
+fn capture_loop(
+    stream: &Stream,
+    qpc: QpcMap,
+    t0: Hns,
+    out: &Sender<PcmBlock>,
+    counters: &AudioCounters,
+    stop: &AtomicBool,
+) {
     let mut timeline = AudioTimeline::new(t0, RATE);
     let mut buffer = Vec::new();
     while !stop.load(Ordering::Acquire) {
@@ -226,6 +287,7 @@ fn capture_loop(stream: &Stream, qpc: QpcMap, t0: Hns, out: &Sender<PcmBlock>, s
             Ok(()) => {}
             Err(WasapiError::EventTimeout) => {
                 if let Some(Span::Silence(frames)) = timeline.on_timeout(mono_now()) {
+                    counters.idle(frames);
                     let block = PcmBlock {
                         first_frame: timeline.frames_out() - frames as u64,
                         samples: vec![0; frames * CHANNELS],
@@ -241,7 +303,7 @@ fn capture_loop(stream: &Stream, qpc: QpcMap, t0: Hns, out: &Sender<PcmBlock>, s
                 return;
             }
         }
-        match drain(stream, qpc, &mut timeline, &mut buffer, out) {
+        match drain(stream, qpc, &mut timeline, &mut buffer, out, counters) {
             Ok(true) => {}
             Ok(false) => return,
             Err(error) => {
@@ -258,6 +320,7 @@ fn drain(
     timeline: &mut AudioTimeline,
     buffer: &mut Vec<u8>,
     out: &Sender<PcmBlock>,
+    counters: &AudioCounters,
 ) -> Result<bool, WasapiError> {
     while let Some(frames) = stream.capture.get_next_packet_size()? {
         if frames == 0 {
@@ -271,12 +334,20 @@ fn drain(
             break;
         }
         if info.flags.data_discontinuity {
+            counters.discontinuities.fetch_add(1, Ordering::Relaxed);
             tracing::debug!("audio data discontinuity");
         }
         let ts = (!info.flags.timestamp_error && info.timestamp != 0)
             .then(|| qpc.to_mono(info.timestamp as Hns));
         let first_frame = timeline.frames_out();
+        let first_packet = first_frame == 0;
         let spans = timeline.on_packet_now(ts, now, read as usize, info.flags.silent);
+        let missing = gap_frames(&spans, info.flags.silent);
+        if first_packet {
+            counters.idle(missing);
+        } else if missing > 0 {
+            counters.gap(missing);
+        }
         let samples = render(&spans, &buffer[..read as usize * BYTES_PER_FRAME]);
         if samples.is_empty() {
             continue;
