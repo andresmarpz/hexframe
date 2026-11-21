@@ -161,10 +161,12 @@ fn video(review: &ReviewState, k: &Kit, stacked: bool) -> El {
 }
 
 fn video_frame(review: &ReviewState, k: &Kit, frame: El) -> El {
-    let frame = frame.on_double_press_tx(|ui: &mut Ui, tx: &mut Tx| {
-        let on = !ui.in_theater();
-        ui.set_theater(on, tx);
-    });
+    let frame = frame
+        .on_press_tx(|ui: &mut Ui, tx: &mut Tx| ui.video_click(tx))
+        .on_double_press_tx(|ui: &mut Ui, tx: &mut Tx| {
+            let on = !ui.in_theater();
+            ui.set_theater(on, tx);
+        });
     let message = |label: String| {
         frame
             .clone()

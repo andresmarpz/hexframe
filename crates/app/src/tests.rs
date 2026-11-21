@@ -32,6 +32,7 @@ mod settings_sheet;
 mod storage_limit;
 mod update;
 mod update_banner;
+mod video_click;
 mod windows_playback;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {

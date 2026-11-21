@@ -99,6 +99,10 @@ impl Ui {
         true
     }
 
+    pub(crate) fn video_click(&mut self, tx: &mut Tx) {
+        self.run_review_action(Action::PlayPause, tx);
+    }
+
     fn wake_after_key(&mut self, tx: &mut Tx) {
         if let Some(review) = &mut self.review {
             review.wake_controls(tx.clock());

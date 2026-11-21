@@ -100,6 +100,7 @@ fn top_bar(review: &ReviewState, k: &Kit) -> El {
         .pt(TOP_PAD_TOP)
         .pb(TOP_PAD_BOTTOM)
         .linear_gradient(0.0, scrim())
+        .on_background_press(|_: &mut Ui| {})
         .child(
             row()
                 .w_full()
@@ -125,6 +126,7 @@ fn bottom_bar(review: &ReviewState, k: &Kit) -> El {
         .pt(BAR_PAD_TOP)
         .pb(BAR_PAD_BOTTOM)
         .linear_gradient(PI, scrim())
+        .on_background_press(|_: &mut Ui| {})
         .child(transport::transport(review, k, true, None))
 }
 
@@ -136,6 +138,7 @@ fn drawer(review: &ReviewState, k: &Kit) -> El {
         .radius(10.0)
         .fill(Color::BLACK.alpha(0.82))
         .clip_rounded(10.0)
+        .on_background_press(|_: &mut Ui| {})
         .transition(Transition::offset(DRAWER_SLIDE, 0.0).combined(Transition::opacity()))
         .child(events_body(review, k))
 }
