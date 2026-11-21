@@ -6,7 +6,6 @@ use rune::{El, PlayerState};
 use super::review::ReviewPlayer;
 
 pub(crate) mod sim;
-pub(crate) mod sound;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Call {
@@ -17,12 +16,6 @@ pub(crate) enum Call {
     Rate(f32),
     Muted(bool),
     Volume(f32),
-    SoundPlay,
-    SoundPause,
-    SoundSeek(f64),
-    SoundRate(f32),
-    SoundMuted(bool),
-    SoundVolume(f32),
 }
 
 thread_local! {

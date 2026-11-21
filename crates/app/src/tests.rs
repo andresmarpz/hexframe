@@ -384,7 +384,7 @@ fn arrow_keys_seek_five_seconds() {
     let mut rt = key_review_runtime();
     fake_player::set_time(6.0);
     press(&mut rt, Key::Right);
-    assert_seeks_to(9.0);
+    assert_seeks_to(10.0);
     fake_player::clear_calls();
     press(&mut rt, Key::Left);
     assert_seeks_to(1.0);

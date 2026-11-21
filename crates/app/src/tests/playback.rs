@@ -268,16 +268,12 @@ fn play_after_the_death_review_paused_replays_the_death() {
 }
 
 #[test]
-fn pause_tells_the_player_to_hold_where_it_was_shown() {
+fn pause_only_pauses_the_player() {
     let mut s = session(windows_like(60.0));
     s.run(2.0);
-    let at = s.time();
     fake_player::clear_calls();
     s.space();
-    match fake_player::calls().as_slice() {
-        [Call::Pause, Call::Seek(to)] => assert!(close(*to, at), "held at {to}"),
-        other => panic!("unexpected calls {other:?}"),
-    }
+    assert_eq!(fake_player::calls(), vec![Call::Pause]);
 }
 
 #[test]

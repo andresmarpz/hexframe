@@ -15,7 +15,6 @@ pub(crate) trait ReviewPlayer: Debug {
     fn set_muted(&self, muted: bool);
     fn set_volume(&self, volume: f32);
     fn show(&self, frame: El) -> El;
-    fn follow(&self, _clock: f64) {}
 }
 
 fn log_call(player: &Player, call: std::fmt::Arguments) {
@@ -82,19 +81,8 @@ impl ReviewPlayer for Player {
 
 pub(crate) type PlayerFactory = fn(&Path) -> Box<dyn ReviewPlayer>;
 
-#[cfg(not(windows))]
 pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
     let player = Player::file(path);
     player.set_muted(false);
     Box::new(player)
-}
-
-#[cfg(windows)]
-pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
-    let sound = Player::audio(path);
-    sound.preload();
-    Box::new(super::paired_sound::PairedSound::new(
-        Box::new(Player::file(path)),
-        Box::new(sound),
-    ))
 }

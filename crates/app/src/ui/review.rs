@@ -2,8 +2,6 @@ mod deaths;
 pub(crate) mod event_detail;
 mod events;
 pub(crate) mod jump;
-#[cfg(any(windows, test))]
-pub(crate) mod paired_sound;
 mod player;
 mod sound;
 
@@ -61,7 +59,6 @@ pub(crate) struct ReviewState {
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
-const END_GUARD_SECS: f64 = 1.0;
 
 impl ReviewState {
     pub(crate) fn open(
@@ -197,8 +194,7 @@ impl ReviewState {
 
     pub(crate) fn seek(&mut self, secs: f64) {
         if let Some(player) = &self.player {
-            let last = (self.duration() - END_GUARD_SECS).max(0.0);
-            player.seek(secs.clamp(0.0, last));
+            player.seek(secs.clamp(0.0, self.duration().max(0.0)));
             self.settling = true;
             if let Some(death) = &mut self.death {
                 death.finished = false;
@@ -207,16 +203,8 @@ impl ReviewState {
     }
 
     pub(crate) fn pause(&mut self) {
-        let Some(player) = &self.player else { return };
-        if player.is_playing() {
-            let at = player.time();
+        if let Some(player) = self.player.as_ref().filter(|p| p.is_playing()) {
             player.pause();
-            // Rune on Windows shows an old picture and time after a layered clip pauses.
-            // A hold past the last picture never lands, so the last second keeps no hold.
-            if at < self.duration() - END_GUARD_SECS {
-                player.seek(at);
-                self.settling = true;
-            }
         }
     }
 
@@ -255,12 +243,6 @@ impl ReviewState {
         self.settling = false;
         self.hovered = None;
         self.filter_menu = false;
-    }
-
-    pub(crate) fn follow_player(&self, clock: f64) {
-        if let Some(player) = &self.player {
-            player.follow(clock);
-        }
     }
 
     pub(crate) fn needs_ticks(&mut self) -> bool {

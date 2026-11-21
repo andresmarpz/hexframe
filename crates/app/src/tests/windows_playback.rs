@@ -2,25 +2,23 @@ use rune::{Key, PlayerState, Runtime};
 
 use super::{press, press_char, rect, runtime_sized};
 use crate::ui::fake_player::sim::{self, Media};
-use crate::ui::fake_player::sound::{self, SYNC_SLACK};
 use crate::ui::{ReviewState, Ui, review_entry};
 
 const TICK: f64 = 1.0 / 30.0;
 
 struct Session {
     rt: Runtime<Ui>,
-    clock: f64,
 }
 
 fn windows(media: Media) -> Session {
     sim::simulate(media);
     let mut ui = Ui::preview();
-    ui.player_factory = sim::windows_factory;
+    ui.player_factory = sim::factory;
     let mut rt = runtime_sized(ui, (1400.0, 680.0));
     rt.on_key = Some(Ui::on_key);
     rt.update(|ui, _| ui.open_review_entry(review_entry()));
     rt.frame(1.0 / 60.0);
-    let mut s = Session { rt, clock: 0.0 };
+    let mut s = Session { rt };
     s.run(TICK);
     s
 }
@@ -33,21 +31,12 @@ fn layered(duration: f64) -> Media {
     }
 }
 
-fn drawn(duration: f64) -> Media {
-    Media {
-        seek_latency: 0.2,
-        ..Media::new(duration)
-    }
-}
-
 impl Session {
     fn run(&mut self, secs: f64) {
         for _ in 0..(secs / TICK).round() as usize {
             sim::advance(TICK);
-            self.clock += TICK;
-            let clock = self.clock;
-            self.rt.update(move |ui, tx| {
-                ui.poll(clock, tx);
+            self.rt.update(|ui, tx| {
+                ui.poll(0.0, tx);
             });
             self.rt.frame(TICK);
         }
@@ -78,9 +67,9 @@ impl Session {
     }
 
     fn heard_over(&mut self, secs: f64) -> f64 {
-        sound::reset_heard();
+        sim::reset_heard();
         self.run(secs);
-        sound::heard()
+        sim::heard()
     }
 }
 
@@ -89,27 +78,14 @@ fn assert_heard(heard: f64, secs: f64, what: &str) {
         heard >= secs - 0.5,
         "{what}: heard {heard:.2} s of {secs} s"
     );
-    assert!(
-        sound::drift() <= SYNC_SLACK,
-        "{what}: sound {:.2} s off the picture",
-        sound::drift()
-    );
 }
 
 #[test]
-fn sound_plays_on_the_layer() {
+fn the_video_plays_its_own_sound_on_the_layer() {
     let mut s = windows(layered(60.0));
     s.run(0.5);
     let heard = s.heard_over(4.0);
     assert_heard(heard, 4.0, "layered playback");
-}
-
-#[test]
-fn sound_plays_when_the_window_draws_the_pictures() {
-    let mut s = windows(drawn(60.0));
-    s.run(0.5);
-    let heard = s.heard_over(4.0);
-    assert_heard(heard, 4.0, "drawn playback");
 }
 
 #[test]
@@ -145,15 +121,6 @@ fn sound_comes_back_after_mute_and_unmute() {
 }
 
 #[test]
-fn a_volume_change_while_the_clip_opens_keeps_the_sound() {
-    let mut s = windows(layered(60.0));
-    s.rt.update(|ui, _| ui.review_set_volume(0.6));
-    s.run(0.5);
-    let heard = s.heard_over(3.0);
-    assert_heard(heard, 3.0, "volume set while opening");
-}
-
-#[test]
 fn no_sound_while_paused_or_at_other_speeds() {
     let mut s = windows(layered(60.0));
     s.run(1.0);
@@ -165,12 +132,27 @@ fn no_sound_while_paused_or_at_other_speeds() {
 }
 
 #[test]
+fn a_seek_past_the_last_picture_shows_it_and_ends() {
+    let mut s = windows(Media {
+        pictures_end: 59.5,
+        ..layered(60.0)
+    });
+    s.drag_to(0.999);
+    s.run(0.5);
+    assert!(sim::landed(), "the seek to the tail never landed");
+    assert_eq!(sim::picture(), 59.5);
+    s.run(1.0);
+    let state = s.review().player.as_ref().map(|p| p.state());
+    assert_eq!(state, Some(PlayerState::Ended), "at {:.2}", s.time());
+}
+
+#[test]
 fn pausing_after_the_last_picture_does_not_wedge_the_player() {
     let mut s = windows(Media {
         pictures_end: 59.5,
         ..layered(60.0)
     });
-    s.drag_to(0.99);
+    s.drag_to(0.97);
     s.run(1.0);
     assert!(sim::landed(), "the seek to the tail never landed");
     while s.time() < 59.6 {
