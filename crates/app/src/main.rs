@@ -37,6 +37,8 @@ fn main() {
     }
     let _log_guard = (!headless).then(logging::init).flatten();
     #[cfg(windows)]
+    greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
+    #[cfg(windows)]
     if !headless && let Err(err) = greyscreen_capture::probe::init_process() {
         tracing::warn!(%err, "cannot set process DPI awareness");
     }

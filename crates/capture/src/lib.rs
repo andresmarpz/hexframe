@@ -4,6 +4,7 @@ pub mod aac;
 pub mod audio;
 pub mod clock;
 pub mod com;
+pub mod crash;
 pub mod d3d;
 pub mod h264;
 mod pacer;

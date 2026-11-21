@@ -101,6 +101,7 @@ pub(crate) fn init_windows() {
         .with_ansi(false)
         .with_env_filter(filter)
         .init();
+    greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
     if let Err(err) = greyscreen_capture::probe::init_process() {
         eprintln!("dpi awareness: {err}");
     }

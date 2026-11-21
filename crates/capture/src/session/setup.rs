@@ -29,18 +29,29 @@ pub(crate) fn build(
     out: Sender<MediaEvent>,
     flags: Flags,
 ) -> Result<Video, String> {
+    tracing::info!(step = "com", "capture setup");
     let com = ComGuard::mta().map_err(|e| format!("COM init failed: {e}"))?;
+    tracing::info!(step = "media foundation", "capture setup");
     let mf = MfGuard::start().map_err(|e| format!("Media Foundation start failed: {e}"))?;
+    tracing::info!(step = "gpu", "capture setup");
     let gpu = match *target {
         CaptureTarget::GameWindow { hwnd, .. } => GpuDevice::for_window(hwnd),
         CaptureTarget::PrimaryMonitor => GpuDevice::for_primary_monitor(),
     }
     .map_err(|e| format!("no usable GPU: {e}"))?;
     let qpc = QpcMap::now();
+    tracing::info!(step = "graphics capture", adapter = %gpu.adapter_name, "capture setup");
     let wgc = WgcCapture::start(&gpu, target, qpc, cfg.fps)
         .map_err(|e| format!("screen capture failed to start: {e}"))?;
+    tracing::info!(step = "first frame", "capture setup");
     let native = first_frame_size(&wgc, &flags)?;
     let size = encode_size(native, cfg.max_height);
+    tracing::info!(
+        step = "video converter",
+        width = size.0,
+        height = size.1,
+        "capture setup"
+    );
     let converter = VideoConverter::new(&gpu, size.0, size.1, cfg.fps)
         .map_err(|e| format!("video converter failed: {e}"))?;
     let video_cfg = cfg.for_encode_size(size.0, size.1);
@@ -51,10 +62,12 @@ pub(crate) fn build(
         peak = video_cfg.video_peak,
         "encode size"
     );
+    tracing::info!(step = "encoder", "capture setup");
     let encoder = H264Encoder::new(&gpu, size.0, size.1, cfg.fps, &video_cfg)
         .map_err(|e| format!("video encoder failed: {e}"))?
         .with_releaser(converter.releaser());
     let mut warning = None;
+    tracing::info!(step = "audio", enabled = cfg.audio, "capture setup");
     let audio = if cfg.audio {
         match AudioPipe::start(target, qpc, cfg.audio_bitrate) {
             Ok(audio) => Some(audio),

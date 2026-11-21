@@ -83,9 +83,16 @@ impl WgcCapture {
         if !GraphicsCaptureSession::IsSupported()? {
             return Err(WgcError::Unsupported);
         }
+        tracing::info!(step = "item", "graphics capture");
         let item = create_item(target)?;
         let item_size = item.Size()?;
         let winrt_device = gpu.winrt_device()?;
+        tracing::info!(
+            step = "frame pool",
+            width = item_size.Width,
+            height = item_size.Height,
+            "graphics capture"
+        );
         let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
             &winrt_device,
             POOL_FORMAT,
@@ -114,6 +121,7 @@ impl WgcCapture {
             frame_token: None,
             closed_token: None,
         };
+        tracing::info!(step = "session", "graphics capture");
         capture.attach(fps)?;
         tracing::info!(
             width = item_size.Width,
@@ -152,6 +160,7 @@ impl WgcCapture {
         let session = pool.CreateCaptureSession(&item)?;
         self.session = Some(session.clone());
         configure_session(&session, fps);
+        tracing::info!(step = "start", "graphics capture");
         session.StartCapture()
     }
 
@@ -356,6 +365,7 @@ fn configure_session(session: &GraphicsCaptureSession, fps: u32) {
     if let Err(error) = session.SetIsCursorCaptureEnabled(false) {
         tracing::warn!(%error, "disable cursor capture failed");
     }
+    tracing::info!(step = "borderless access", "graphics capture");
     request_borderless();
     if let Err(error) = session.SetIsBorderRequired(false) {
         tracing::warn!(%error, "disable capture border failed");
