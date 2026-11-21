@@ -12,6 +12,7 @@ use rune::{PointerPress, TextEdit, Tx};
 use rune_kit::PaneState;
 
 mod death_review;
+mod dock;
 pub(crate) mod event_detail;
 mod format;
 mod jump;
@@ -38,6 +39,7 @@ pub(crate) mod fake_player;
 mod tests;
 
 pub(crate) use death_review::{DeathReviewState, title_line};
+pub(crate) use dock::DockState;
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::RecordingsFilter;
@@ -114,6 +116,7 @@ pub(crate) struct Ui {
     pub update: UpdateUi,
     pub update_available: Option<UpdateInfo>,
     pub death_note: TextEdit,
+    pub dock: DockState,
 }
 
 impl Ui {
@@ -160,6 +163,7 @@ impl Ui {
             update: UpdateUi::default(),
             update_available: None,
             death_note: TextEdit::new(String::new()),
+            dock: DockState::default(),
             settings,
         }
     }
@@ -347,6 +351,7 @@ impl Ui {
             }
             tx.wake_after(TICK);
         }
+        changed |= self.sync_dock(clock);
         if let Some(review) = &mut self.review {
             changed |= review.death_tick();
             changed |= review.changed_since_shown();

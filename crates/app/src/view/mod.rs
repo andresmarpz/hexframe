@@ -73,6 +73,7 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
                     .min_h(0.0)
                     .child(screen(s, k, cx, cx.titlebar_inset())),
             )
+            .children(shell::dock::hover_zone(s))
             .child(shell::dock::layer(s, k)),
     }
 }
@@ -108,7 +109,7 @@ fn clips_screen(s: &Ui, k: &Kit, inset: f32) -> El {
 
 fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
-        (Detail::Game, Some(review)) => (review::page(s, k), review::toolbar(review, k)),
+        (Detail::Game, Some(review)) => (review_page(s, k), review::toolbar(review, k)),
         (Detail::Live, _) => (
             fixed_content(s, home::page(s, k)),
             Toolbar::new().title("Recording"),
@@ -125,6 +126,23 @@ fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
         .titlebar_inset(inset)
         .reduced_motion(cx.is_reduced_motion())
         .build(k)
+}
+
+fn review_page(s: &Ui, k: &Kit) -> El {
+    let page = review::page(s, k);
+    if s.settings.nav_style == NavStyle::Sidebar {
+        return page;
+    }
+    let room = if s.dock.visible {
+        shell::dock::REVIEW_ROOM
+    } else {
+        0.0
+    };
+    col()
+        .w_full()
+        .h_full()
+        .child(page.grow(1.0).min_h(0.0))
+        .child(el().key("dock-reserve").w_full().h(room).a11y_hidden())
 }
 
 fn content_column() -> El {
