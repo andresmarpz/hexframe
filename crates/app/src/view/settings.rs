@@ -1,11 +1,12 @@
 use greyscreen_core::paths;
 use greyscreen_core::settings::{Quality, Resolution, resolution_options};
 use greyscreen_engine::reveal;
-use rune::{El, FileDialogOptions, col, row, text};
+use rune::{El, FileDialogOptions, Icon, col, row, text};
 use rune_kit::{
-    Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, Switch, TextInput,
+    Button, ButtonVariant, ControlSize, Kit, Select, SelectAppearance, Switch, TextInput,
 };
 
+use super::segmented::segmented;
 use super::{card, hairline, page_header};
 
 use crate::ui::{Ui, format_size_estimate, parse_clip_secs};
@@ -19,6 +20,13 @@ const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
 const FPS_OPTIONS: [u32; 2] = [30, 60];
 const CONTROL_WIDTH: f32 = 220.0;
 const RESOLUTION_WIDTH: f32 = 200.0;
+const RIOT_NOTICE: &str = "Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
+
+static INFO: Icon = Icon {
+    name: "greyscreen-info",
+    view: 16.0,
+    body: r#"<circle cx="8" cy="8" r="6.5" stroke="currentColor" fill="none"/><path d="M8 7.2V11.2" stroke="currentColor" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/>"#,
+};
 
 pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     col()
@@ -108,15 +116,14 @@ fn toggle_row(
 
 fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let settings = &s.settings;
-    let quality = SegmentedControl::new(
+    let quality = segmented(
+        k,
+        "quality",
+        "Quality",
         &QUALITIES.map(|(_, label)| label),
         QUALITIES.iter().position(|(q, _)| *q == settings.quality),
-    )
-    .label("Quality")
-    .fit()
-    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0))
-    .build(k)
-    .key("quality");
+        |ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.quality = QUALITIES[i].0),
+    );
     let displays = connected_displays();
     let options = resolution_options(&displays, settings.resolution);
     let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
@@ -127,6 +134,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let resolution = Select::new("resolution", &labels)
         .current(current)
         .open(s.resolution_open)
+        .appearance(SelectAppearance::Field)
         .width(RESOLUTION_WIDTH)
         .label("Resolution")
         .on_toggle(|ui: &mut Ui| ui.resolution_open = !ui.resolution_open)
@@ -139,15 +147,14 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
             }
         })
         .build(k, layer);
-    let fps = SegmentedControl::new(
+    let fps = segmented(
+        k,
+        "fps",
+        "Frame rate",
         &FPS_OPTIONS.map(|f| f.to_string()),
         FPS_OPTIONS.iter().position(|f| *f == settings.fps),
-    )
-    .label("Frame rate")
-    .fit()
-    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]))
-    .build(k)
-    .key("fps");
+        |ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.fps = FPS_OPTIONS[i]),
+    );
     section(
         k,
         "recording-card",
@@ -156,8 +163,8 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
             toggle_row(
                 k,
                 "auto-record",
-                "Record automatically",
-                Some("Start when a League game starts, stop when it ends."),
+                "Record games",
+                Some("Start recording when a League game starts."),
                 settings.auto_record,
                 |ui| ui.change(|s| s.auto_record = !s.auto_record),
             ),
@@ -195,7 +202,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 k,
                 "audio",
                 "Record game audio",
-                None,
+                Some("Records League's own audio. Discord and your microphone aren't recorded."),
                 settings.audio,
                 |ui| ui.change(|s| s.audio = !s.audio),
             ),
@@ -219,8 +226,16 @@ fn size_estimate(s: &Ui, k: &Kit, display_height: Option<u32>) -> El {
         .key("size-estimate")
         .w_full()
         .px(16.0)
-        .py(10.0)
-        .child(text(line).font(k.ty.small).color(k.c.text_muted))
+        .py(8.0)
+        .gap(6.0)
+        .center_y()
+        .fill(k.c.layer_01)
+        .child(rune::icon(&INFO, 14.0).color(k.c.icon_muted).a11y_hidden())
+        .child(
+            text(format!("{line}."))
+                .font(k.ty.small)
+                .color(k.c.text_muted),
+        )
 }
 
 fn native_height(displays: &[(u32, u32)]) -> Option<u32> {
@@ -412,5 +427,14 @@ fn about_section(s: &Ui, k: &Kit) -> El {
             Ui::toggle_start_with_windows,
         ));
     }
+    rows.push(
+        row().key("riot-notice").w_full().px(16.0).py(10.0).child(
+            text(RIOT_NOTICE)
+                .wrap()
+                .w_full()
+                .font(k.ty.small)
+                .color(k.c.text_muted),
+        ),
+    );
     section(k, "about-card", "About", rows)
 }

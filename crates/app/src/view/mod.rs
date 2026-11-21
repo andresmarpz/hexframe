@@ -2,6 +2,7 @@ pub(crate) mod champion;
 mod nav;
 mod recordings;
 mod review;
+mod segmented;
 mod settings;
 mod status;
 

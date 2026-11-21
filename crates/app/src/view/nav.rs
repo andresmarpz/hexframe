@@ -1,9 +1,10 @@
+use greyscreen_engine::EngineStatus;
 use rune::tok::type_;
-use rune::{El, Icon, row, text};
+use rune::{El, Icon, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::hairline;
-use crate::ui::{Screen, Ui};
+use crate::ui::{Screen, Ui, format_clock};
 
 static LOGO: Icon = Icon {
     name: "greyscreen-logo",
@@ -17,6 +18,7 @@ const ITEMS: [(Screen, &str, &str); 3] = [
     (Screen::Settings, "nav-settings", "Settings"),
 ];
 
+const PILL_HEIGHT: f32 = 26.0;
 const LEADING_PAD: f32 = 20.0;
 const TRAFFIC_LIGHT_GAP: f32 = 12.0;
 
@@ -43,6 +45,9 @@ pub(super) fn bar(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
                 .build(k)
                 .key(key),
         );
+        if screen == Screen::Status && recording_elsewhere(s) {
+            tabs = tabs.child(recording_pill(s, k));
+        }
     }
     rune::col()
         .key("nav")
@@ -66,4 +71,35 @@ pub(super) fn bar(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
                 .child(tabs),
         )
         .child(hairline(k))
+}
+
+fn recording_elsewhere(s: &Ui) -> bool {
+    s.screen != Screen::Status && matches!(s.status, EngineStatus::Recording { .. })
+}
+
+fn recording_pill(s: &Ui, k: &Kit) -> El {
+    let clock = format_clock(s.elapsed_secs);
+    let font = rune::TextStyle {
+        features: "'tnum' 1".into(),
+        ..k.ty.ui_medium
+    };
+    row()
+        .key("nav-recording")
+        .role("button")
+        .label(format!("Recording, {clock}. Go to Status"))
+        .focusable(true)
+        .h(PILL_HEIGHT)
+        .px(10.0)
+        .gap(6.0)
+        .center_y()
+        .radius(PILL_HEIGHT / 2.0)
+        .fill(k.c.danger.bg)
+        .child(
+            el().size(8.0, 8.0)
+                .radius(4.0)
+                .fill(k.c.danger.icon)
+                .a11y_hidden(),
+        )
+        .child(text(clock).font(font).color(k.c.danger.fg).a11y_hidden())
+        .on_press(|ui: &mut Ui| ui.go(Screen::Status))
 }

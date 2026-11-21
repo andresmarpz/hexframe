@@ -8,6 +8,7 @@ use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
 mod match_flow;
+mod nav_settings;
 mod recordings;
 mod review_flow;
 mod status;
