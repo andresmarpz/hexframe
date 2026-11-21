@@ -1,5 +1,3 @@
-use jiff::Zoned;
-
 pub(crate) fn format_clock(secs: u32) -> String {
     let (h, m, s) = (secs / 3600, secs / 60 % 60, secs % 60);
     if h > 0 {
@@ -17,10 +15,6 @@ pub(crate) fn format_size(bytes: u64) -> String {
     } else {
         format!("{mb:.0} MB")
     }
-}
-
-pub(crate) fn format_date(at: &Zoned) -> String {
-    at.strftime("%Y-%m-%d %H:%M").to_string()
 }
 
 pub(crate) fn format_size_estimate(mb_per_minute: f64, native_height: Option<u32>) -> String {

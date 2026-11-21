@@ -9,6 +9,7 @@ use crate::view;
 
 mod match_flow;
 mod recordings;
+mod review_flow;
 mod status;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
@@ -182,10 +183,10 @@ fn assert_seeks_to(secs: f64) {
 }
 
 #[test]
-fn tapping_a_marker_seeks_three_seconds_before_the_event() {
+fn tapping_a_marker_seeks_five_seconds_before_the_event() {
     let mut rt = review_runtime();
     tap(&mut rt, "marker-9");
-    assert_seeks_to(5.2);
+    assert_seeks_to(3.2);
 }
 
 #[test]
@@ -201,8 +202,8 @@ fn pressing_the_track_seeks_to_that_share_of_the_video() {
 #[test]
 fn tapping_an_event_row_seeks_like_its_marker() {
     let mut rt = review_runtime();
-    tap(&mut rt, "event-5");
-    assert_seeks_to(1.6);
+    tap(&mut rt, "event-6");
+    assert_seeks_to(0.5);
 }
 
 #[test]
@@ -215,12 +216,14 @@ fn tapping_the_play_button_plays_a_paused_player() {
 #[test]
 fn tapping_a_clip_swaps_the_source_and_back_restores_the_game() {
     let mut rt = review_runtime();
+    tap(&mut rt, "tab-clips");
     tap(&mut rt, "clip-1");
     assert_eq!(
         rt.state.review.as_ref().map(|r| r.source),
         Some(Source::Clip(1))
     );
     assert!(matches!(fake_player::calls()[0], Call::Open(_)));
+    rt.frame(1.0);
     tap(&mut rt, "review-game");
     assert_eq!(
         rt.state.review.as_ref().map(|r| r.source),
@@ -319,6 +322,7 @@ fn theater_shows_the_timeline_and_hides_the_navigation() {
     assert!(rt.find("nav-status").is_none());
     assert!(rt.find("review-header").is_none());
     assert!(rt.find("event-5").is_none());
+    assert!(rt.find("theater-top").is_some());
 }
 
 #[test]
@@ -348,7 +352,7 @@ fn a_marker_seeks_the_same_way_in_theater() {
     press_char(&mut rt, "f");
     fake_player::clear_calls();
     tap(&mut rt, "marker-9");
-    assert_seeks_to(5.2);
+    assert_seeks_to(3.2);
 }
 
 #[test]
@@ -373,12 +377,13 @@ fn arrow_keys_seek_five_seconds() {
 #[test]
 fn j_and_l_jump_between_event_markers() {
     let mut rt = key_review_runtime();
-    fake_player::set_time(5.0);
+    fake_player::set_time(1.0);
     press_char(&mut rt, "l");
-    assert_seeks_to(6.1);
+    assert_seeks_to(2.3);
     fake_player::clear_calls();
+    fake_player::set_time(3.0);
     press_char(&mut rt, "j");
-    assert_seeks_to(3.4);
+    assert_seeks_to(1.4);
     fake_player::set_time(0.0);
 }
 

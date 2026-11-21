@@ -23,10 +23,10 @@ pub(crate) mod fake_player;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use format::{format_clock, format_date, format_size, format_size_estimate};
+pub(crate) use format::{format_clock, format_size, format_size_estimate};
 pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::{RecordingsFilter, ResultFilter, modes_present};
-pub(crate) use review::{PlayerFactory, ReviewState, Source};
+pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use tone::tone_color;
 
 #[cfg(test)]

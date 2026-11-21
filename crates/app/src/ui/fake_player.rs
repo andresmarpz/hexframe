@@ -11,6 +11,8 @@ pub(crate) enum Call {
     Play,
     Pause,
     Seek(f64),
+    Rate(f32),
+    Muted(bool),
 }
 
 thread_local! {
@@ -74,6 +76,14 @@ impl ReviewPlayer for FakePlayer {
         } else {
             PlayerState::Ready
         }
+    }
+
+    fn set_rate(&self, rate: f32) {
+        record(Call::Rate(rate));
+    }
+
+    fn set_muted(&self, muted: bool) {
+        record(Call::Muted(muted));
     }
 
     fn show(&self, frame: El) -> El {

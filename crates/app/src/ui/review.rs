@@ -12,6 +12,8 @@ pub(crate) trait ReviewPlayer: Debug {
     fn time(&self) -> f64;
     fn duration(&self) -> Option<f64>;
     fn state(&self) -> PlayerState;
+    fn set_rate(&self, rate: f32);
+    fn set_muted(&self, muted: bool);
     fn show(&self, frame: El) -> El;
 }
 
@@ -40,6 +42,14 @@ impl ReviewPlayer for Player {
         Player::state(self)
     }
 
+    fn set_rate(&self, rate: f32) {
+        Player::set_rate(self, rate);
+    }
+
+    fn set_muted(&self, muted: bool) {
+        Player::set_muted(self, muted);
+    }
+
     fn show(&self, frame: El) -> El {
         frame.video(self, SurfaceFit::Fit)
     }
@@ -57,6 +67,66 @@ pub(crate) fn rune_player(path: &Path) -> Box<dyn ReviewPlayer> {
 pub(crate) enum Source {
     Game,
     Clip(usize),
+}
+
+pub(crate) const SPEEDS: [f32; 5] = [0.25, 0.5, 1.0, 1.5, 2.0];
+const NORMAL_SPEED: usize = 2;
+const FRAME_SECS: f64 = 1.0 / 60.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum PanelTab {
+    #[default]
+    Events,
+    Clips,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum EventFilter {
+    #[default]
+    All,
+    Deaths,
+    Kills,
+    Objectives,
+}
+
+impl EventFilter {
+    pub(crate) const EVERY: [EventFilter; 4] = [
+        EventFilter::All,
+        EventFilter::Deaths,
+        EventFilter::Kills,
+        EventFilter::Objectives,
+    ];
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            EventFilter::All => "All",
+            EventFilter::Deaths => "Deaths",
+            EventFilter::Kills => "Kills",
+            EventFilter::Objectives => "Objectives",
+        }
+    }
+
+    pub(crate) fn matches(self, event: &EventEntry) -> bool {
+        let any = |wanted: fn(&str) -> bool| event.highlights.iter().any(|h| wanted(h));
+        match self {
+            EventFilter::All => true,
+            EventFilter::Deaths => any(|h| h == "MyDeath"),
+            EventFilter::Kills => any(is_kill_label),
+            EventFilter::Objectives => any(is_objective_label),
+        }
+    }
+}
+
+fn is_kill_label(label: &str) -> bool {
+    matches!(label, "MyKill" | "MyAssist" | "FirstBlood" | "Ace") || label.starts_with("Multikill")
+}
+
+fn is_objective_label(label: &str) -> bool {
+    let label = label.strip_prefix("Enemy").unwrap_or(label);
+    matches!(
+        label,
+        "Baron" | "Dragon" | "Herald" | "VoidGrub" | "Turret" | "Inhibitor"
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +149,11 @@ pub(crate) struct ReviewState {
     pub controls_visible: bool,
     pub last_move: f64,
     pub hovered: Option<EventHover>,
+    pub tab: PanelTab,
+    pub filter: EventFilter,
+    pub speed: usize,
+    pub muted: bool,
+    pub drawer: bool,
 }
 
 const CONTROLS_HIDE_SECS: f64 = 2.5;
@@ -90,7 +165,7 @@ impl ReviewState {
         if let Some(player) = &player {
             player.play();
         }
-        ReviewState {
+        let review = ReviewState {
             entry,
             player,
             source: Source::Game,
@@ -102,6 +177,81 @@ impl ReviewState {
             controls_visible: true,
             last_move: 0.0,
             hovered: None,
+            tab: PanelTab::Events,
+            filter: EventFilter::All,
+            speed: NORMAL_SPEED,
+            muted: false,
+            drawer: false,
+        };
+        review.apply_audio();
+        review
+    }
+
+    pub(crate) fn speed_rate(&self) -> f32 {
+        SPEEDS[self.speed]
+    }
+
+    pub(crate) fn cycle_speed(&mut self) {
+        self.speed = (self.speed + 1) % SPEEDS.len();
+        if let Some(player) = &self.player {
+            player.set_rate(self.speed_rate());
+        }
+    }
+
+    pub(crate) fn toggle_mute(&mut self) {
+        self.muted = !self.muted;
+        if let Some(player) = &self.player {
+            player.set_muted(self.muted);
+        }
+    }
+
+    pub(crate) fn step_frame(&mut self, direction: f64) {
+        if !self.is_playing() {
+            self.seek(self.time() + direction * FRAME_SECS);
+        }
+    }
+
+    pub(crate) fn shown_events(&self) -> impl Iterator<Item = &EventEntry> {
+        let filter = self.filter;
+        self.entry
+            .meta
+            .events
+            .iter()
+            .filter(move |e| filter.matches(e))
+    }
+
+    pub(crate) fn active_event(&self) -> Option<u32> {
+        if self.source != Source::Game {
+            return None;
+        }
+        let now = self.time();
+        self.shown_events()
+            .filter(|e| e.rec_secs <= now)
+            .max_by(|a, b| a.rec_secs.total_cmp(&b.rec_secs))
+            .map(|e| e.id)
+    }
+
+    pub(crate) fn active_clip(&self) -> Option<usize> {
+        match self.source {
+            Source::Clip(i) => Some(i),
+            Source::Game => {
+                let now = self.time();
+                self.entry
+                    .meta
+                    .clips
+                    .iter()
+                    .position(|c| c.start_secs <= now && now <= c.end_secs)
+            }
+        }
+    }
+
+    fn apply_audio(&self) {
+        let Some(player) = &self.player else { return };
+        if self.speed != NORMAL_SPEED {
+            player.set_rate(self.speed_rate());
+        }
+        if self.muted {
+            player.set_muted(true);
         }
     }
 
@@ -184,6 +334,7 @@ impl ReviewState {
         if let Some(player) = &self.player {
             player.play();
         }
+        self.apply_audio();
         self.shown_state = None;
         self.shown_time = 0.0;
         self.settling = false;

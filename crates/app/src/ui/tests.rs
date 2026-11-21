@@ -172,20 +172,20 @@ fn events() -> Vec<greyscreen_core::library::EventEntry> {
 
 #[test]
 fn next_event_is_the_first_landing_spot_after_now() {
-    assert_eq!(next_target(&events(), 0.0), Some(7.0));
-    assert_eq!(next_target(&events(), 7.0), Some(17.0));
-    assert_eq!(next_target(&events(), 16.0), Some(17.0));
-    assert_eq!(next_target(&events(), 17.0), Some(27.0));
-    assert_eq!(next_target(&events(), 27.0), None);
+    assert_eq!(next_target(&events(), 0.0), Some(5.0));
+    assert_eq!(next_target(&events(), 5.0), Some(15.0));
+    assert_eq!(next_target(&events(), 14.0), Some(15.0));
+    assert_eq!(next_target(&events(), 15.0), Some(25.0));
+    assert_eq!(next_target(&events(), 25.0), None);
     assert_eq!(next_target(&[], 0.0), None);
 }
 
 #[test]
 fn previous_event_is_the_last_landing_spot_before_now() {
-    assert_eq!(previous_target(&events(), 100.0), Some(27.0));
-    assert_eq!(previous_target(&events(), 27.0), Some(17.0));
-    assert_eq!(previous_target(&events(), 17.5), Some(7.0));
-    assert_eq!(previous_target(&events(), 7.0), None);
+    assert_eq!(previous_target(&events(), 100.0), Some(25.0));
+    assert_eq!(previous_target(&events(), 25.0), Some(15.0));
+    assert_eq!(previous_target(&events(), 15.5), Some(5.0));
+    assert_eq!(previous_target(&events(), 5.0), None);
     assert_eq!(previous_target(&[], 5.0), None);
 }
 

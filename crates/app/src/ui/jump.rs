@@ -1,6 +1,6 @@
 use greyscreen_core::library::EventEntry;
 
-pub(crate) const SEEK_LEAD_SECS: f64 = 3.0;
+pub(crate) const SEEK_LEAD_SECS: f64 = 5.0;
 const NEXT_MARGIN_SECS: f64 = 0.5;
 const PREVIOUS_MARGIN_SECS: f64 = 1.0;
 
