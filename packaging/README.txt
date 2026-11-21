@@ -4,7 +4,7 @@ Greyscreen records your League of Legends games and saves clips of the highlight
 
 Install
 
-1. Download greyscreen.exe and run it.
+1. Download GreyscreenSetup.exe and run it.
    It installs itself for your user (no admin needed), adds Greyscreen to the Start Menu and starts.
 2. To uninstall, open Windows Settings > Apps, find Greyscreen and choose Uninstall.
    Your recordings and settings are kept.

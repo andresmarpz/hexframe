@@ -1,4 +1,5 @@
-export const APP_ASSET = "greyscreen.exe";
+export const APP_ASSET = "GreyscreenSetup.exe";
+const LEGACY_APP_ASSET = "greyscreen.exe";
 export const CLI_ASSET = "greyscreen-cli.exe";
 
 export interface Asset {
@@ -47,7 +48,7 @@ function toDownloads(raw: ApiRelease): Downloads | null {
     date: raw.published_at,
     prerelease: raw.prerelease === true,
     pageUrl: raw.html_url,
-    app: findAsset(assets, APP_ASSET),
+    app: findAsset(assets, APP_ASSET) ?? findAsset(assets, LEGACY_APP_ASSET),
     cli: findAsset(assets, CLI_ASSET),
   };
 }
