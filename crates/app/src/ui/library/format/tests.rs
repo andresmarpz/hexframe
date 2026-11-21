@@ -52,6 +52,7 @@ fn kill(killer: &str, victim: &str, assisters: &[&str]) -> EventEntry {
 fn modes_are_named_for_people() {
     assert_eq!(mode_label("CLASSIC"), "Summoner's Rift");
     assert_eq!(mode_label("ARAM"), "ARAM");
+    assert_eq!(mode_label("KIWI"), "ARAM Mayhem");
     assert_eq!(mode_label("PRACTICETOOL"), "Practice Tool");
     assert_eq!(mode_label("CHERRY"), "Arena");
     assert_eq!(mode_label("URF"), "URF");

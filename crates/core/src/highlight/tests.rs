@@ -222,6 +222,10 @@ fn structures_use_the_id_team() {
         classify(&inhib, &info()),
         vec![Highlight::EnemyStructure(Structure::Inhibitor)]
     );
+    assert_eq!(
+        classify(&turret("Turret_TChaos_L1_P3_671196429_0"), &info()),
+        vec![Highlight::TeamStructure(Structure::Turret)]
+    );
     assert!(classify(&turret("Turret_Unknown"), &info()).is_empty());
 }
 
@@ -229,6 +233,14 @@ fn structures_use_the_id_team() {
 fn structure_team_reads_research_ids() {
     assert_eq!(structure_team("Turret_T1_L_03_A"), Some(Team::Order));
     assert_eq!(structure_team("Barracks_T2_L1"), Some(Team::Chaos));
+    assert_eq!(
+        structure_team("Turret_TChaos_L1_P3_671196429_0"),
+        Some(Team::Chaos)
+    );
+    assert_eq!(
+        structure_team("Inhib_TOrder_L1_P1_2432143522_0"),
+        Some(Team::Order)
+    );
     assert_eq!(structure_team("Turret_T200_X"), None);
     assert_eq!(structure_team(""), None);
 }

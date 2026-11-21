@@ -23,6 +23,8 @@ pub(crate) struct Detail {
     pub lines: Vec<Line>,
 }
 
+const HOWLING_ABYSS: u32 = 12;
+
 fn strong(text: impl Into<String>) -> Span {
     Span::Strong(text.into())
 }
@@ -57,7 +59,7 @@ fn person(info: &GameInfo, name: &str) -> Vec<Span> {
     if name.starts_with("Minion_") {
         return vec![strong("Minions")];
     }
-    if let Some(structure) = structure_name(name) {
+    if let Some(structure) = structure_name(name, info.map) {
         return vec![strong(structure)];
     }
     vec![strong(name)]
@@ -90,10 +92,34 @@ fn turret_tier(lane_code: &str, number: &str) -> Option<&'static str> {
     }
 }
 
-pub(crate) fn structure_name(id: &str) -> Option<String> {
+fn named_structure(parts: &[&str], team: Team, map: Option<u32>) -> Option<String> {
+    let [kind, _, _lane, position, ..] = parts else {
+        return None;
+    };
+    let position: u8 = position.strip_prefix('P')?.parse().ok()?;
+    let side = side(team);
+    match *kind {
+        "Inhib" => Some(format!("{side} inhibitor")),
+        "Turret" if map == Some(HOWLING_ABYSS) => match position {
+            3 => Some(format!("{side} outer turret")),
+            2 => Some(format!("{side} inner turret")),
+            4 | 5 => Some(format!("{side} nexus turret")),
+            _ => Some(format!("{side} turret")),
+        },
+        "Turret" => Some(format!("{side} turret")),
+        _ => None,
+    }
+}
+
+pub(crate) fn structure_name(id: &str, map: Option<u32>) -> Option<String> {
     let team = structure_team(id)?;
     let parts: Vec<&str> = id.split('_').collect();
     match parts.as_slice() {
+        [_, team_part, ..]
+            if team_part.starts_with("TOrder") || team_part.starts_with("TChaos") =>
+        {
+            named_structure(&parts, team, map)
+        }
         ["Turret", _, "C", number @ ("01" | "02"), ..] => {
             turret_tier("C", number).map(|tier| format!("{} {tier}", side(team)))
         }
@@ -110,8 +136,20 @@ pub(crate) fn structure_name(id: &str) -> Option<String> {
     }
 }
 
-fn structure_label(id: &str) -> String {
-    structure_name(id).unwrap_or_else(|| id.to_owned())
+fn structure_label(id: &str, info: &GameInfo) -> String {
+    structure_name(id, info.map).unwrap_or_else(|| generic_structure(id))
+}
+
+fn generic_structure(id: &str) -> String {
+    let kind = match id.split('_').next() {
+        Some("Turret") => "Turret",
+        Some("Inhib" | "Barracks") => "Inhibitor",
+        _ => "Structure",
+    };
+    match structure_team(id) {
+        Some(team) => format!("{} {}", side(team), kind.to_ascii_lowercase()),
+        None => kind.to_owned(),
+    }
 }
 
 fn assist_lines(info: &GameInfo, assisters: &[String]) -> Vec<Line> {
@@ -184,7 +222,7 @@ fn structure_credit(
     info: &GameInfo,
 ) -> (Vec<Span>, Vec<Line>) {
     (
-        vec![strong(format!("{} destroyed", structure_label(id)))],
+        vec![strong(format!("{} destroyed", structure_label(id, info)))],
         credit(info, "Killed by", killer, assisters),
     )
 }
@@ -233,12 +271,15 @@ pub(crate) fn describe(
         GameEvent::InhibRespawningSoon { inhib } => (
             vec![strong(format!(
                 "{} respawning soon",
-                structure_label(inhib)
+                structure_label(inhib, info)
             ))],
             Vec::new(),
         ),
         GameEvent::InhibRespawned { inhib } => (
-            vec![strong(format!("{} respawned", structure_label(inhib)))],
+            vec![strong(format!(
+                "{} respawned",
+                structure_label(inhib, info)
+            ))],
             Vec::new(),
         ),
         GameEvent::DragonKill {

@@ -33,6 +33,7 @@ pub(crate) fn mode_label(mode: &str) -> String {
     match mode.to_ascii_uppercase().as_str() {
         "CLASSIC" => "Summoner's Rift".into(),
         "ARAM" => "ARAM".into(),
+        "KIWI" => "ARAM Mayhem".into(),
         "PRACTICETOOL" => "Practice Tool".into(),
         "CHERRY" => "Arena".into(),
         "URF" => "URF".into(),

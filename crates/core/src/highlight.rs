@@ -101,8 +101,8 @@ impl Highlight {
 
 pub fn structure_team(id: &str) -> Option<Team> {
     id.split('_').find_map(|part| match part {
-        "T1" => Some(Team::Order),
-        "T2" => Some(Team::Chaos),
+        "T1" | "TOrder" => Some(Team::Order),
+        "T2" | "TChaos" => Some(Team::Chaos),
         _ => None,
     })
 }
