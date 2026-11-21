@@ -1,20 +1,17 @@
 use crossbeam_channel::{Receiver, unbounded};
 use greyscreen_core::settings::{Quality, Resolution, Settings};
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{Chrome, Env, Key, KeyEvent, Mods, Runtime};
+use rune::{Env, Key, KeyEvent, Mods, Runtime};
 
 use crate::ui::fake_player::{self, Call};
-use crate::ui::{Screen, Source, Ui, parse_clip_secs};
+use crate::ui::{Detail, Source, Ui, parse_clip_secs};
 use crate::view;
 
-mod home;
 mod keybinds;
 mod match_flow;
-mod nav_settings;
-mod recordings;
 mod review_flow;
+mod selection;
 mod settings_sheet;
-mod sidebar;
 mod storage_limit;
 mod update;
 
@@ -36,8 +33,9 @@ fn live_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
 }
 
 fn tap(rt: &mut Runtime<Ui>, key: &str) {
-    if rt.state.settings_open {
-        rt.update(|_, tx| tx.scroll_into_view(key));
+    if rt.state.settings_open && key != "nav-settings" {
+        let target = key.to_owned();
+        rt.update(move |_, tx| tx.scroll_into_view(target));
         for _ in 0..40 {
             rt.frame(1.0 / 60.0);
         }
@@ -46,20 +44,6 @@ fn tap(rt: &mut Runtime<Ui>, key: &str) {
     rt.pointer_down(x, y);
     rt.pointer_up(x, y);
     rt.frame(1.0 / 60.0);
-}
-
-#[test]
-fn nav_buttons_switch_the_screen() {
-    let mut rt = runtime();
-    assert_eq!(rt.state.screen, Screen::Home);
-    tap(&mut rt, "nav-recordings");
-    assert_eq!(rt.state.screen, Screen::Recordings);
-    tap(&mut rt, "nav-settings");
-    assert!(rt.state.settings_open);
-    rt.update(|ui, _| ui.close_settings());
-    rt.frame(1.0 / 60.0);
-    tap(&mut rt, "nav-home");
-    assert_eq!(rt.state.screen, Screen::Home);
 }
 
 #[test]
@@ -91,35 +75,19 @@ fn save_clip_button_sends_the_command_while_recording() {
 }
 
 #[test]
-fn opening_recordings_asks_the_engine_to_rescan() {
-    let (mut rt, rx) = live_runtime();
-    tap(&mut rt, "nav-recordings");
-    assert_eq!(rx.try_recv(), Ok(EngineCmd::RescanLibrary));
-}
-
-#[test]
-fn clicking_a_recording_row_opens_review_with_the_id() {
+fn clicking_a_game_row_opens_its_review_in_place() {
     let (mut rt, _rx) = live_runtime();
-    tap(&mut rt, "nav-recordings");
     let id = rt.state.recordings[1].meta.id.clone();
     tap(&mut rt, &id);
-    assert_eq!(rt.state.screen, Screen::Review);
+    assert_eq!(rt.state.detail(), Detail::Game);
     assert_eq!(
         rt.state.review.as_ref().map(|r| r.entry.meta.id.clone()),
-        Some(id)
+        Some(id.clone())
     );
-    tap(&mut rt, "review-back");
-    assert_eq!(rt.state.screen, Screen::Recordings);
-}
-
-#[test]
-fn the_folder_button_does_not_open_review() {
-    let (mut rt, _rx) = live_runtime();
-    tap(&mut rt, "nav-recordings");
-    let id = rt.state.recordings[0].meta.id.clone();
-    tap(&mut rt, &format!("show-{id}"));
-    assert_eq!(rt.state.screen, Screen::Recordings);
-    assert!(rt.state.review.is_none());
+    let other = rt.state.recordings[2].meta.id.clone();
+    tap(&mut rt, &other);
+    assert_eq!(rt.state.selected_id(), Some(other.as_str()));
+    assert!(rt.find(&id).is_some(), "the list stays while reviewing");
 }
 
 #[test]
@@ -246,9 +214,9 @@ fn tapping_a_clip_swaps_the_source_and_back_restores_the_game() {
 }
 
 #[test]
-fn leaving_the_review_screen_drops_the_player() {
-    let mut rt = review_runtime();
-    tap(&mut rt, "review-back");
+fn closing_the_game_drops_the_player() {
+    let mut rt = key_review_runtime();
+    press(&mut rt, Key::Escape);
     assert!(rt.state.review.is_none());
 }
 
@@ -314,26 +282,26 @@ fn f_toggles_theater_and_escape_leaves_it() {
     press(&mut rt, Key::Escape);
     assert!(!in_theater(&rt));
     assert!(!rt.state.window_full_screen);
-    assert_eq!(rt.state.screen, Screen::Review);
+    assert_eq!(rt.state.detail(), Detail::Game);
 }
 
 #[test]
-fn escape_outside_theater_goes_back_to_the_recordings() {
+fn escape_outside_theater_closes_the_game() {
     let mut rt = key_review_runtime();
     press(&mut rt, Key::Escape);
-    assert_eq!(rt.state.screen, Screen::Recordings);
+    assert_eq!(rt.state.detail(), Detail::Welcome);
     assert!(rt.state.review.is_none());
 }
 
 #[test]
 fn theater_shows_the_timeline_and_hides_the_navigation() {
     let mut rt = key_review_runtime();
-    assert!(rt.find("nav-home").is_some());
+    assert!(rt.find("nav-settings").is_some());
     press_char(&mut rt, "f");
     assert!(rt.find("timeline").is_some());
     assert!(rt.find("marker-9").is_some());
     assert!(rt.find("theater-exit").is_some());
-    assert!(rt.find("nav-home").is_none());
+    assert!(rt.find("nav-settings").is_none());
     assert!(rt.find("review-header").is_none());
     assert!(rt.find("event-5").is_none());
     assert!(rt.find("theater-top").is_some());
@@ -389,11 +357,11 @@ fn arrow_keys_seek_five_seconds() {
 }
 
 #[test]
-fn keys_do_nothing_outside_the_review_screen() {
+fn review_keys_do_nothing_without_a_game() {
     let mut rt = runtime();
     rt.on_key = Some(Ui::on_key);
     press_char(&mut rt, "f");
-    assert_eq!(rt.state.screen, Screen::Home);
+    assert_eq!(rt.state.detail(), Detail::Live);
     assert!(!in_theater(&rt));
 }
 
@@ -594,40 +562,24 @@ fn settle(rt: &mut Runtime<Ui>) {
 }
 
 #[test]
-fn the_logo_clears_the_window_buttons() {
+fn the_sidebar_is_300_points_wide_and_the_gear_opens_the_settings_sheet() {
     let mut rt = runtime();
-    let flush_left = nav_rect_of(&rt, "nav-brand")[0];
-    assert!(
-        flush_left < 40.0,
-        "without buttons the logo stays at the edge"
-    );
-    let inset = Chrome::DEFAULT.titlebar_inset();
-    assert!(inset > 0.0);
-    rt.set_titlebar_inset(inset);
-    settle(&mut rt);
-    let brand = nav_rect_of(&rt, "nav-brand");
-    assert!(
-        brand[0] >= inset + 8.0,
-        "logo starts at {}, the buttons end at {inset}",
-        brand[0]
-    );
-    let nav = nav_rect_of(&rt, "nav");
-    assert!(
-        brand[0] + brand[2] < nav[0] + nav[2],
-        "the logo fits inside the sidebar"
-    );
+    let nav = nav_rect_of(&rt, "sidebar");
+    assert!((nav[2] - 300.0).abs() < 24.0, "width {}", nav[2]);
+    assert!(rt.find("settings-sheet").is_none());
+    tap(&mut rt, "nav-settings");
+    assert!(rt.state.settings_open);
+    assert!(rt.find("settings-sheet").is_some());
+    press(&mut rt, Key::Escape);
+    assert!(!rt.state.settings_open);
 }
 
 #[test]
-fn the_logo_clears_the_window_buttons_on_every_screen() {
+fn the_settings_sheet_scrolls_while_the_games_list_stays() {
     let mut rt = runtime();
-    rt.set_titlebar_inset(Chrome::DEFAULT.titlebar_inset());
-    settle(&mut rt);
-    for key in ["nav-recordings", "nav-settings", "nav-home"] {
-        tap(&mut rt, key);
-        settle(&mut rt);
-        assert!(nav_rect_of(&rt, "nav-brand")[0] >= Chrome::DEFAULT.titlebar_inset());
-    }
+    tap(&mut rt, "nav-settings");
+    assert!(rt.find("settings-scroll").is_some());
+    assert!(rt.find("filter-champion").is_some());
 }
 
 fn visible_texts(rt: &Runtime<Ui>) -> Vec<String> {

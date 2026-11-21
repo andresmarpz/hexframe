@@ -9,6 +9,7 @@ use greyscreen_engine::{
     EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg, reveal,
 };
 use rune::{TextEdit, Tx};
+use rune_kit::PaneState;
 
 pub(crate) mod event_detail;
 mod format;
@@ -21,6 +22,7 @@ mod preview;
 pub(crate) mod recordings_filter;
 mod review;
 mod scenes;
+mod selection;
 mod settings_sheet;
 mod tone;
 mod update;
@@ -32,9 +34,10 @@ mod tests;
 
 pub(crate) use format::{format_clock, format_size, format_size_rate};
 pub(crate) use jump::seek_target;
-pub(crate) use recordings_filter::{RecordingsFilter, ResultFilter, modes_present};
+pub(crate) use recordings_filter::RecordingsFilter;
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use scenes::SCENES;
+pub(crate) use selection::{Detail, ListItem};
 pub(crate) use settings_sheet::SettingsSection;
 pub(crate) use tone::tone_color;
 pub(crate) use update::UpdateUi;
@@ -43,6 +46,10 @@ pub(crate) use update::UpdateUi;
 pub(crate) fn review_entry() -> RecordingEntry {
     preview::review_entry()
 }
+
+pub(crate) const SIDEBAR_WIDTH: f32 = 300.0;
+const SIDEBAR_MIN: f32 = 260.0;
+const SIDEBAR_MAX: f32 = 440.0;
 
 pub(crate) const MIN_CLIP_SECS: u32 = 1;
 pub(crate) const MAX_CLIP_SECS: u32 = 120;
@@ -54,14 +61,6 @@ const NOTICE_SECS: f64 = 4.0;
 const TICK: Duration = Duration::from_millis(250);
 const PLAYBACK_TICK: Duration = Duration::from_millis(33);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub(crate) enum Screen {
-    #[default]
-    Home,
-    Recordings,
-    Review,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Notice {
     pub level: NoticeLevel,
@@ -70,7 +69,8 @@ pub(crate) struct Notice {
 
 #[derive(Debug)]
 pub(crate) struct Ui {
-    pub screen: Screen,
+    pub sidebar: PaneState,
+    pub live_selected: bool,
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
     pub recordings: Vec<RecordingEntry>,
@@ -113,7 +113,8 @@ impl Ui {
 
     pub(crate) fn blank(settings: Settings) -> Ui {
         Ui {
-            screen: Screen::Home,
+            sidebar: PaneState::new(SIDEBAR_WIDTH).range(SIDEBAR_MIN, SIDEBAR_MAX),
+            live_selected: false,
             status: EngineStatus::Idle,
             feed: VecDeque::new(),
             recordings: Vec::new(),
@@ -188,17 +189,6 @@ impl Ui {
         }
     }
 
-    pub(crate) fn go(&mut self, screen: Screen) {
-        self.close_settings();
-        self.screen = screen;
-        if screen != Screen::Review {
-            self.review = None;
-        }
-        if screen == Screen::Recordings {
-            self.send(EngineCmd::RescanLibrary);
-        }
-    }
-
     pub(crate) fn open_review(&mut self, id: String) {
         if let Some(entry) = self.recordings.iter().find(|r| r.meta.id == id) {
             self.open_review_entry(entry.clone());
@@ -211,15 +201,10 @@ impl Ui {
         }
     }
 
-    pub(crate) fn open_clip(&mut self, id: String, index: usize) {
-        self.open_review(id);
-        self.play_clip(index);
-    }
-
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
         self.close_settings();
         self.review = Some(ReviewState::open(entry, self.player_factory));
-        self.screen = Screen::Review;
+        self.live_selected = false;
     }
 
     pub(crate) fn play_clip(&mut self, index: usize) {
@@ -272,7 +257,7 @@ impl Ui {
                 }
                 self.show_notice(NoticeLevel::Info, text, tx);
             }
-            UiMsg::Library(recordings) => self.recordings = recordings,
+            UiMsg::Library(recordings) => self.apply_library(recordings),
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
             UiMsg::Update(state) => self.apply_update(state),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
@@ -288,6 +273,7 @@ impl Ui {
                 self.last_game = None;
                 self.recording_since_clock = Some(tx.clock());
                 self.elapsed_secs = 0;
+                self.live_selected = self.review.is_none();
                 tx.wake_after(TICK);
             }
             EngineStatus::Recording { .. } => {}
@@ -301,6 +287,9 @@ impl Ui {
             self.stop_confirm_until = None;
         }
         self.status = status;
+        if !self.live_row_visible() {
+            self.live_selected = false;
+        }
         self.install_if_idle();
     }
 

@@ -1,10 +1,6 @@
 mod actions;
-mod clips;
 mod feed;
 mod last_game;
-mod recent_games;
-#[cfg(test)]
-mod tests;
 mod week;
 mod welcome;
 
@@ -16,21 +12,14 @@ use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
 use super::champion::champion_icon;
 use super::{card, title_style};
 use crate::ui::library_format::mode_label;
-use crate::ui::{Ui, format_clock};
+use crate::ui::{Detail, Ui, format_clock};
 
 const LEAGUE_HINT: &str =
     "If League runs in Fullscreen, switch it to Borderless or Windowed, then retry.";
 
-pub(super) fn shows_feed(s: &Ui) -> bool {
-    matches!(
-        s.status,
-        EngineStatus::Recording { .. } | EngineStatus::Finalizing
-    )
-}
-
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
     let page = col().key("home").w_full().gap(16.0).child(state_card(s, k));
-    if shows_feed(s) {
+    if s.detail() == Detail::Live {
         return page.h_full().min_h(0.0).child(feed::panel(s, k));
     }
     if s.recordings.is_empty() {
@@ -41,9 +30,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     if let Some(entry) = &s.last_game {
         page = page.child(last_game::panel(entry, k));
     }
-    page.child(recent_games::section(s, k, &now))
-        .child(week::section(s, k, &now))
-        .child(clips::section(s, k))
+    page.child(week::section(s, k, &now))
 }
 
 struct Headline {

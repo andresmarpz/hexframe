@@ -1,15 +1,15 @@
 pub(crate) mod champion;
+mod delete;
 mod home;
-mod recordings;
 mod review;
 mod settings;
 mod sidebar;
 
 use greyscreen_engine::NoticeLevel;
-use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
-use rune_kit::{Kit, Toast, ToastRegion};
+use rune::{Cx, El, ScrollSpec, TextStyle, col, el};
+use rune_kit::{Kit, SplitView, Toast, ToastRegion, Toolbar};
 
-use crate::ui::{Screen, Ui};
+use crate::ui::{Detail, Ui};
 
 const PAGE_MAX_WIDTH: f32 = 880.0;
 const PAGE_GUTTER: f32 = 24.0;
@@ -22,11 +22,16 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let theater = s.review.as_ref().filter(|r| r.theater);
     let body = match theater {
         Some(review) => review::theater(review),
-        None => window(s, &k, &mut layer, cx.titlebar_inset()),
+        None => window(s, &k, cx),
     };
-    settings::sheet(s, &k, &mut layer);
     if let Some(card) = review::hover_card(s, &k) {
         layer.push(card);
+    }
+    if theater.is_none() {
+        settings::sheet(s, &k, &mut layer);
+    }
+    if let Some(rec) = s.pending_delete_entry() {
+        delete::confirm_delete(rec, &k, &mut layer);
     }
     if let Some((notice, _)) = &s.notice {
         layer.push(toast(notice, &k));
@@ -34,21 +39,26 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     rune_kit::root(body, layer)
 }
 
-fn window(s: &Ui, k: &Kit, layer: &mut Vec<El>, titlebar_inset: f32) -> El {
-    let content = match s.screen {
-        Screen::Home if home::shows_feed(s) => fixed_content(home::page(s, k)),
-        Screen::Home => scrolling_content(home::page(s, k)),
-        Screen::Recordings => fixed_content(recordings::page(s, k, layer)),
-        Screen::Review => fixed_content(review::page(s, k)),
+fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
+    let (main, toolbar) = match (s.detail(), &s.review) {
+        (Detail::Game, Some(review)) => (review::page(review, k), review::toolbar(review, k)),
+        (Detail::Live, _) => (
+            fixed_content(home::page(s, k)),
+            Toolbar::new().title("Recording"),
+        ),
+        _ => (scrolling_content(home::page(s, k)), Toolbar::new()),
     };
-    row()
+    SplitView::new(main)
+        .sidebar(
+            &s.sidebar,
+            |ui: &mut Ui| &mut ui.sidebar,
+            sidebar::content(s, k),
+        )
+        .toolbar(toolbar)
+        .titlebar_inset(cx.titlebar_inset())
+        .reduced_motion(cx.is_reduced_motion())
+        .build(k)
         .key("window")
-        .w_full()
-        .h_full()
-        .fill(k.c.page)
-        .child(sidebar::panel(s, k, titlebar_inset))
-        .child(el().w(1.0).h_full().fill(k.c.border_muted).a11y_hidden())
-        .child(content)
 }
 
 fn content_column() -> El {
@@ -82,28 +92,6 @@ fn scrolling_content(page: El) -> El {
         })
         .scroll_edge_fade(SCROLL_FADE)
         .child(page_column().child(page))
-}
-
-fn page_header(k: &Kit, title: &str, subtitle: &str, action: Option<El>) -> El {
-    let mut header = row()
-        .key("page-header")
-        .w_full()
-        .center_y()
-        .justify_between()
-        .child({
-            let heading = col()
-                .gap(2.0)
-                .child(text(title).font(title_style(k)).color(k.c.text_base));
-            if subtitle.is_empty() {
-                heading
-            } else {
-                heading.child(text(subtitle).font(k.ty.body).color(k.c.text_muted))
-            }
-        });
-    if let Some(action) = action {
-        header = header.child(action);
-    }
-    header
 }
 
 fn card(k: &Kit) -> El {

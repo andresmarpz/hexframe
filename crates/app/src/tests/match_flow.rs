@@ -17,7 +17,7 @@ use rune::Runtime;
 
 use super::{runtime_with, tap};
 use crate::ui::fake_player;
-use crate::ui::{Screen, Ui};
+use crate::ui::{Detail, Ui};
 
 const WAIT: Duration = Duration::from_secs(30);
 
@@ -164,7 +164,7 @@ fn after_a_match_the_feed_is_empty_and_the_last_game_card_opens_in_review() {
     assert_eq!(last.meta.events.len(), 2);
 
     tap(&mut m.rt, "open-last-game");
-    assert_eq!(m.rt.state.screen, Screen::Review);
+    assert_eq!(m.rt.state.detail(), Detail::Game);
     assert_eq!(
         m.rt.state.review.as_ref().map(|r| r.entry.meta.id.clone()),
         Some(last.meta.id)

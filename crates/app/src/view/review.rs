@@ -13,16 +13,16 @@ use greyscreen_engine::reveal;
 use jiff::Zoned;
 use rune::{Color, El, PlayerState, TextStyle, Tx, col, el, row, text};
 use rune_kit::{
-    Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
-    glyphs,
+    Badge, BadgeVariant, ControlSize, IconButton, IconButtonVariant, Kit, Toolbar, glyphs,
 };
 
 use super::champion::champion_icon;
-use super::title_style;
+use super::delete::delete_key;
 use crate::ui::library_format::{kda, mode_label, total_time, when};
-use crate::ui::{ReviewState, Screen, Ui, format_clock};
+use crate::ui::{ReviewState, Ui, format_clock};
 
 const CHAMPION_ICON: f32 = 28.0;
+const PAGE_PADDING: f32 = 16.0;
 const NO_VIDEO: &str = "No video for this game";
 
 pub(super) use card::hover_card;
@@ -83,21 +83,13 @@ pub(super) fn clock_text(review: &ReviewState, k: &Kit, color: Color) -> El {
         .color(color)
 }
 
-pub(super) fn page(s: &Ui, k: &Kit) -> El {
-    match &s.review {
-        Some(review) => screen(review, k),
-        None => col().key("review").w_full().h_full(),
-    }
-}
-
-fn screen(review: &ReviewState, k: &Kit) -> El {
+pub(super) fn page(review: &ReviewState, k: &Kit) -> El {
     col()
         .key("review")
         .w_full()
         .h_full()
         .min_h(0.0)
-        .gap(16.0)
-        .child(header(review, k))
+        .padding(PAGE_PADDING)
         .child(
             row()
                 .w_full()
@@ -137,16 +129,9 @@ fn stats_line(review: &ReviewState) -> String {
     )
 }
 
-fn header(review: &ReviewState, k: &Kit) -> El {
+pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     let meta = &review.entry.meta;
     let champion = meta.game.info.me.champion.as_str();
-    let back = Button::new("Back")
-        .icon(&icons::ARROW_LEFT)
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Regular)
-        .on_press(|ui: &mut Ui| ui.go(Screen::Recordings))
-        .build(k)
-        .key("review-back");
     let video = review.entry.folder.join(&meta.video);
     let folder = IconButton::new(&glyphs::FOLDER_OPEN)
         .label("Open folder")
@@ -156,17 +141,25 @@ fn header(review: &ReviewState, k: &Kit) -> El {
         .on_press(move |_: &mut Ui| reveal(&video))
         .build(k)
         .key("review-folder");
+    let id = meta.id.clone();
+    let delete = IconButton::new(&icons::TRASH)
+        .label("Delete recording")
+        .help("Delete recording")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Regular)
+        .on_press(move |ui: &mut Ui| ui.ask_delete(id.clone()))
+        .build(k)
+        .key(delete_key(&meta.id));
     let mut line = row()
         .key("review-header")
-        .w_full()
-        .gap(12.0)
+        .gap(10.0)
         .center_y()
-        .child(back)
         .child(champion_icon(k, champion, CHAMPION_ICON))
         .child(
             text(champion.to_owned())
-                .font(title_style(k))
-                .color(k.c.text_base),
+                .font(k.ty.ui_medium)
+                .color(k.c.text_base)
+                .truncate(),
         )
         .child(
             Badge::new(mode_label(&meta.game.info.mode))
@@ -181,18 +174,21 @@ fn header(review: &ReviewState, k: &Kit) -> El {
         line = line.child(tone_pill(k, label, colors).key("review-result"));
     }
     let when = when(&meta.started_at, &Zoned::now());
-    line.child(
-        text(format!("{} {}", when.day, when.time))
-            .font(k.ty.body)
-            .color(k.c.text_muted),
-    )
-    .child(
-        text(stats_line(review))
-            .font(tabular(k.ty.body))
-            .color(k.c.text_muted),
-    )
-    .child(el().grow(1.0))
-    .child(folder)
+    let line = line
+        .child(
+            text(format!("{} {}", when.day, when.time))
+                .font(k.ty.body)
+                .color(k.c.text_muted),
+        )
+        .child(
+            text(stats_line(review))
+                .font(tabular(k.ty.body))
+                .color(k.c.text_muted),
+        );
+    Toolbar::new()
+        .leading(line)
+        .trailing(folder)
+        .trailing(delete)
 }
 
 fn player_column(review: &ReviewState, k: &Kit) -> El {
@@ -209,6 +205,7 @@ fn player_column(review: &ReviewState, k: &Kit) -> El {
 fn video(review: &ReviewState, k: &Kit) -> El {
     let frame = el()
         .key("review-video")
+        .focusable(true)
         .w_full()
         .grow(1.0)
         .min_h(0.0)

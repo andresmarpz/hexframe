@@ -185,48 +185,26 @@ fn unknown_results_stay_out_of_the_win_rate() {
 }
 
 #[test]
-fn recent_games_are_newest_first_and_capped() {
-    let mut recordings = Ui::preview().recordings;
-    recordings.reverse();
-    let shown = recent_games(&recordings, 5);
-    assert_eq!(shown.len(), 5);
-    let stamps: Vec<_> = shown
-        .iter()
-        .map(|r| r.meta.started_at.timestamp())
-        .collect();
-    assert!(stamps.windows(2).all(|pair| pair[0] >= pair[1]));
-    assert_eq!(shown[0].meta.id, Ui::preview().recordings[0].meta.id);
-}
-
-#[test]
-fn recent_clips_come_from_the_newest_game_first() {
-    let recordings = Ui::preview().recordings;
-    let clips = recent_clips(&recordings, 6);
-    assert_eq!(clips.len(), 6);
-    assert!(
-        clips
-            .iter()
-            .all(|c| c.entry.meta.id == recordings[0].meta.id)
-    );
-    let starts: Vec<f64> = clips.iter().map(|c| c.clip.start_secs).collect();
-    assert!(starts.windows(2).all(|pair| pair[0] >= pair[1]));
-}
-
-#[test]
-fn clips_run_over_the_games_that_have_them() {
-    let recordings = Ui::preview().recordings;
+fn day_headings_name_recent_days_then_dates() {
+    let now: Zoned = "2026-11-21T12:00:00[UTC]".parse().expect("now");
+    let at = |stamp: &str| -> Zoned { stamp.parse().expect("zoned") };
+    assert_eq!(day_heading(&at("2026-11-21T01:00:00[UTC]"), &now), "Today");
     assert_eq!(
-        recent_clips(&recordings, 100).len(),
-        6 + 3 + 9 + 5 + 4 + 2 + 1
+        day_heading(&at("2026-11-20T23:00:00[UTC]"), &now),
+        "Yesterday"
     );
-    assert!(recent_clips(&[], 6).is_empty());
-}
-
-#[test]
-fn game_time_is_recording_time_minus_the_loading_screen() {
-    let recordings = Ui::preview().recordings;
-    assert_eq!(game_secs_at(&recordings[0], 98.0), 90.0);
-    assert_eq!(game_secs_at(&recordings[0], 2.0), 0.0);
+    assert_eq!(
+        day_heading(&at("2026-11-19T10:00:00[UTC]"), &now),
+        "Thursday"
+    );
+    assert_eq!(
+        day_heading(&at("2026-11-02T10:00:00[UTC]"), &now),
+        "November 2"
+    );
+    assert_eq!(
+        day_heading(&at("2025-03-02T10:00:00[UTC]"), &now),
+        "March 2, 2025"
+    );
 }
 
 #[test]

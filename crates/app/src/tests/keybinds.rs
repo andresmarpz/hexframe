@@ -8,7 +8,7 @@ use rune::{Env, Key, KeyEvent, Modifier, Mods, Runtime};
 
 use super::{key_review_runtime, press_char, settle, tap, visible_texts};
 use crate::ui::fake_player::{self, Call};
-use crate::ui::{Screen, SettingsSection, Ui};
+use crate::ui::{Detail, SettingsSection, Ui};
 use crate::view;
 
 fn keybinds_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
@@ -153,11 +153,11 @@ fn a_combination_is_recorded_with_its_modifiers() {
 }
 
 #[test]
-fn arrow_and_function_keys_can_be_bound() {
+fn home_and_function_keys_can_be_bound() {
     let (mut rt, _rx) = keybinds_runtime();
     start_rebind(&mut rt, Action::Mute);
-    press_key(&mut rt, Key::Up);
-    assert_eq!(bindings(&rt, Action::Mute), vec![combo("Up")]);
+    press_key(&mut rt, Key::Home);
+    assert_eq!(bindings(&rt, Action::Mute), vec![combo("Home")]);
     start_rebind(&mut rt, Action::Mute);
     press_key(&mut rt, Key::Function(6));
     assert_eq!(bindings(&rt, Action::Mute), vec![combo("F6")]);
@@ -275,7 +275,7 @@ fn a_modifier_press_alone_keeps_waiting() {
 fn leaving_settings_cancels_the_capture() {
     let (mut rt, _rx) = keybinds_runtime();
     start_rebind(&mut rt, Action::Mute);
-    rt.update(|ui, _| ui.go(Screen::Recordings));
+    rt.update(|ui, _| ui.close_settings());
     assert!(rt.state.rebinding.is_none());
 }
 
@@ -399,6 +399,7 @@ fn rebinding_in_the_page_changes_what_the_review_keys_do() {
     start_rebind(&mut rt, Action::Mute);
     press_char(&mut rt, "n");
     rt.update(|ui, _| {
+        ui.close_settings();
         ui.player_factory = fake_player::factory;
         ui.open_review_entry(crate::ui::review_entry());
     });
@@ -466,25 +467,15 @@ fn j_and_l_seek_like_the_arrows_and_shift_arrows_jump_between_events() {
     fake_player::set_time(0.0);
 }
 
-#[test]
-fn a_command_key_press_goes_to_the_binding_with_the_primary_modifier() {
-    let (mut rt, _rx) = keybinds_runtime();
-    let primary = Mods {
-        cmd: true,
-        ..Mods::default()
-    };
-    press_with(&mut rt, Key::Command('1'), primary);
-    assert_eq!(rt.state.screen, Screen::Home);
-    press_with(&mut rt, Key::Command('2'), primary);
-    assert_eq!(rt.state.screen, Screen::Recordings);
-    press_with(&mut rt, Key::Command(','), primary);
-    assert!(rt.state.settings_open);
+fn closed_settings_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
+    let (mut rt, rx) = keybinds_runtime();
+    rt.update(|ui, _| ui.close_settings());
+    rt.frame(1.0 / 60.0);
+    (rt, rx)
 }
 
-#[test]
-fn the_platform_modifier_opens_the_pages_and_a_bare_key_does_not() {
-    let (mut rt, _rx) = keybinds_runtime();
-    let platform = if cfg!(target_os = "macos") {
+fn platform() -> Mods {
+    if cfg!(target_os = "macos") {
         Mods {
             cmd: true,
             logo: true,
@@ -492,35 +483,44 @@ fn the_platform_modifier_opens_the_pages_and_a_bare_key_does_not() {
         }
     } else {
         ctrl()
+    }
+}
+
+#[test]
+fn a_command_key_press_goes_to_the_binding_with_the_primary_modifier() {
+    let (mut rt, _rx) = closed_settings_runtime();
+    let primary = Mods {
+        cmd: true,
+        ..Mods::default()
     };
-    press_with(&mut rt, Key::Command('1'), platform);
-    assert_eq!(rt.state.screen, Screen::Home);
-    press_key(&mut rt, Key::Text("2".into()));
-    assert_eq!(rt.state.screen, Screen::Home);
-    press_with(&mut rt, Key::Command('2'), platform);
-    assert_eq!(rt.state.screen, Screen::Recordings);
+    press_with(&mut rt, Key::Command(','), primary);
+    assert!(rt.state.settings_open);
+}
+
+#[test]
+fn the_platform_modifier_opens_settings_and_a_bare_key_does_not() {
+    let (mut rt, _rx) = closed_settings_runtime();
+    press_key(&mut rt, Key::Text(",".into()));
+    assert!(!rt.state.settings_open);
+    press_with(&mut rt, Key::Command(','), platform());
+    assert!(rt.state.settings_open);
 }
 
 #[test]
 fn rebinding_a_general_action_moves_the_shortcut() {
     let (mut rt, _rx) = keybinds_runtime();
-    start_rebind(&mut rt, Action::GoRecordings);
+    start_rebind(&mut rt, Action::OpenSettings);
     press_with(&mut rt, Key::Command('r'), ctrl());
-    rt.update(|ui, _| ui.go(Screen::Home));
+    rt.update(|ui, _| ui.close_settings());
     press_with(&mut rt, Key::Command('r'), ctrl());
-    assert_eq!(rt.state.screen, Screen::Recordings);
-    rt.update(|ui, _| ui.go(Screen::Home));
-    let old = Key::Command('2');
-    let platform = Mods {
-        cmd: true,
-        ..Mods::default()
-    };
-    press_with(&mut rt, old, platform);
-    assert_eq!(rt.state.screen, Screen::Home);
+    assert!(rt.state.settings_open);
+    rt.update(|ui, _| ui.close_settings());
+    press_with(&mut rt, Key::Command(','), platform());
+    assert!(!rt.state.settings_open);
 }
 
 #[test]
-fn review_keys_do_nothing_off_the_review_screen() {
+fn review_keys_do_nothing_without_a_game() {
     let (mut rt, _rx) = keybinds_runtime();
     press_char(&mut rt, "f");
     press_char(&mut rt, "m");
@@ -529,12 +529,12 @@ fn review_keys_do_nothing_off_the_review_screen() {
 }
 
 #[test]
-fn the_fixed_escape_key_still_leaves_fullscreen_and_the_review() {
+fn the_fixed_escape_key_still_leaves_fullscreen_and_closes_the_game() {
     let mut rt = key_review_runtime();
     press_char(&mut rt, "f");
     assert!(rt.state.in_theater());
     press_key(&mut rt, Key::Escape);
     assert!(!rt.state.in_theater());
     press_key(&mut rt, Key::Escape);
-    assert_eq!(rt.state.screen, Screen::Recordings);
+    assert_eq!(rt.state.detail(), Detail::Welcome);
 }

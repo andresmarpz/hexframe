@@ -4,7 +4,7 @@ use rune::{KeyEvent, Tx};
 
 use super::jump::{next_target, previous_target};
 use super::key_event::combo_of;
-use super::{EventFilter, PanelTab, Screen, Source, Ui};
+use super::{Detail, EventFilter, PanelTab, Source, Ui};
 
 const STEP_SECS: f64 = 5.0;
 
@@ -25,22 +25,26 @@ impl Ui {
     fn run_action(&mut self, action: Action, tx: &mut Tx) -> bool {
         match action {
             Action::OpenSettings => self.toggle_settings(),
-            Action::GoHome => self.go(Screen::Home),
-            Action::GoRecordings => self.go(Screen::Recordings),
             _ if self.settings_open => return false,
+            Action::FocusSearch => tx.focus("filter-champion", true),
+            Action::ToggleSidebar => self.sidebar.toggle(),
+            Action::PreviousGame => self.step_selection(-1),
+            Action::NextGame => self.step_selection(1),
+            Action::FocusPlayer if self.detail() == Detail::Game => tx.focus("review-video", true),
+            Action::FocusPlayer => return false,
             _ => return self.run_review_action(action, tx),
         }
         true
     }
 
     fn run_review_action(&mut self, action: Action, tx: &mut Tx) -> bool {
-        if self.screen != Screen::Review || self.review.is_none() {
+        if self.detail() != Detail::Game {
             return false;
         }
         let theater = self.in_theater();
         match action {
             Action::ExitFullscreen if theater => self.set_theater(false, tx),
-            Action::ExitFullscreen => self.go(Screen::Recordings),
+            Action::ExitFullscreen => self.show_welcome(),
             Action::ToggleFullscreen => self.set_theater(!theater, tx),
             Action::PlayPause => self.review_toggle(),
             Action::SeekBack => self.review_step(-STEP_SECS),
@@ -52,9 +56,13 @@ impl Ui {
             Action::Mute => self.review_mute(),
             Action::SpeedDown => self.review_step_speed(-1),
             Action::SpeedUp => self.review_step_speed(1),
-            Action::SaveClip | Action::OpenSettings | Action::GoHome | Action::GoRecordings => {
-                return false;
-            }
+            Action::SaveClip
+            | Action::OpenSettings
+            | Action::PreviousGame
+            | Action::NextGame
+            | Action::FocusPlayer
+            | Action::ToggleSidebar
+            | Action::FocusSearch => return false,
         }
         if let Some(review) = &mut self.review {
             review.wake_controls(tx.clock());

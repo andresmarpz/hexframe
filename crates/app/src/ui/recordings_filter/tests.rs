@@ -37,64 +37,24 @@ fn champion_search_is_a_case_insensitive_substring() {
 }
 
 #[test]
-fn result_filter_keeps_victories_or_defeats_only() {
+fn search_also_matches_the_mode_and_the_result() {
     let all = library();
-    let mut filter = RecordingsFilter {
-        result: ResultFilter::Victory,
+    let search = |text: &str| RecordingsFilter {
+        champion: TextEdit::new(text),
         ..RecordingsFilter::default()
     };
-    let wins = filter.apply(&all);
-    assert_eq!(wins.len(), 4);
-    assert!(wins.iter().all(|r| r.meta.game.result == GameResult::Win));
-    filter.result = ResultFilter::Defeat;
-    let losses = filter.apply(&all);
-    assert_eq!(losses.len(), 3);
-    assert!(
-        losses
-            .iter()
-            .all(|r| r.meta.game.result == GameResult::Loss)
-    );
+    assert_eq!(champions(&search("aram").apply(&all)), ["Yasuo", "Ahri"]);
+    assert_eq!(search("victory").apply(&all).len(), 4);
+    assert_eq!(search("defeat").apply(&all).len(), 3);
 }
 
 #[test]
-fn mode_filter_matches_the_humanized_mode() {
-    let all = library();
-    let filter = RecordingsFilter {
-        mode: Some("ARAM".into()),
-        ..RecordingsFilter::default()
-    };
-    assert_eq!(champions(&filter.apply(&all)), ["Yasuo", "Ahri"]);
-}
-
-#[test]
-fn filters_combine() {
-    let all = library();
-    let filter = RecordingsFilter {
-        champion: TextEdit::new("ahri"),
-        result: ResultFilter::Victory,
-        mode: Some("Summoner's Rift".into()),
-        ..RecordingsFilter::default()
-    };
-    assert_eq!(filter.apply(&all).len(), 1);
-}
-
-#[test]
-fn modes_present_are_humanized_sorted_and_unique() {
-    assert_eq!(modes_present(&library()), ["ARAM", "Summoner's Rift"]);
-    assert!(modes_present(&[]).is_empty());
-}
-
-#[test]
-fn clearing_resets_every_filter() {
+fn clearing_resets_the_search() {
     let mut filter = RecordingsFilter {
         champion: TextEdit::new("ahri"),
-        result: ResultFilter::Defeat,
-        mode: Some("ARAM".into()),
-        mode_open: true,
         pending_delete: None,
     };
     assert!(filter.is_active());
     filter.clear();
     assert!(!filter.is_active());
-    assert!(!filter.mode_open);
 }

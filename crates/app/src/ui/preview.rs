@@ -20,6 +20,7 @@ pub(super) fn ui() -> Ui {
     ui.elapsed_secs = 12 * 60 + 34;
     ui.feed = feed().into();
     ui.recordings = recordings();
+    ui.live_selected = true;
     ui
 }
 
@@ -210,6 +211,36 @@ fn recordings() -> Vec<RecordingEntry> {
         row(190, "Viego", "CLASSIC", Unknown, 22.3, 1_190, 2),
         row(215, "Thresh", "CLASSIC", Loss, 31.5, 1_680, 1),
     ]
+}
+
+pub(super) fn demo_recordings() -> Vec<RecordingEntry> {
+    let fixture = review_entry();
+    recordings()
+        .into_iter()
+        .map(|mut rec| {
+            let last = rec.meta.events.last().map_or(1.0, |e| e.rec_secs) + 10.0;
+            let scale = fixture.meta.duration_secs / last;
+            for event in &mut rec.meta.events {
+                event.rec_secs *= scale;
+                event.highlights = match &event.kind {
+                    GameEvent::ChampionKill { killer, .. } if killer == "Summoner" => {
+                        vec!["MyKill".to_owned()]
+                    }
+                    GameEvent::ChampionKill { victim, .. } if victim == "Summoner" => {
+                        vec!["MyDeath".to_owned()]
+                    }
+                    _ => vec!["MyAssist".to_owned()],
+                };
+            }
+            if !rec.meta.clips.is_empty() {
+                rec.meta.clips = fixture.meta.clips.clone();
+            }
+            rec.folder = fixture.folder.clone();
+            rec.meta.video = fixture.meta.video.clone();
+            rec.meta.duration_secs = fixture.meta.duration_secs;
+            rec
+        })
+        .collect()
 }
 
 pub(super) fn review_entry() -> RecordingEntry {

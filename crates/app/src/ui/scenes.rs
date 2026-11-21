@@ -3,105 +3,121 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
 use rune::TextEdit;
 
-use super::{ResultFilter, Screen, SettingsSection, Ui, preview, update};
+use super::{SettingsSection, Ui, preview, update};
 
 type Scene = (&'static str, fn(&mut Ui));
 
+fn idle(ui: &mut Ui) {
+    ui.status = EngineStatus::Idle;
+    ui.feed.clear();
+}
+
+fn first_run(ui: &mut Ui) {
+    idle(ui);
+    ui.recordings.clear();
+}
+
+fn game(ui: &mut Ui) {
+    idle(ui);
+    ui.open_review_entry(preview::review_entry());
+}
+
+fn sheet(ui: &mut Ui, section: SettingsSection) {
+    game(ui);
+    ui.open_settings(section);
+}
+
+fn demo(ui: &mut Ui) {
+    idle(ui);
+    ui.recordings = preview::demo_recordings();
+}
+
 pub(crate) const SCENES: &[Scene] = &[
-    ("home", |ui| {
-        ui.status = EngineStatus::Idle;
-        ui.feed.clear();
-    }),
-    ("home-recording", |ui| ui.screen = Screen::Home),
-    ("home-first-run", |ui| {
-        ui.status = EngineStatus::Idle;
-        ui.feed.clear();
-        ui.recordings.clear();
-    }),
+    ("home", idle),
+    ("demo", demo),
+    ("home-first-run", first_run),
     ("idle-off", |ui| {
-        ui.status = EngineStatus::Idle;
+        idle(ui);
         ui.settings.auto_record = false;
-        ui.feed.clear();
     }),
     ("game-running-off", |ui| {
+        idle(ui);
         ui.status = EngineStatus::GameRunning;
         ui.settings.auto_record = false;
-        ui.feed.clear();
     }),
     ("last-game", |ui| {
-        ui.status = EngineStatus::Idle;
-        ui.feed.clear();
+        idle(ui);
         ui.last_game = ui.recordings.first().cloned();
     }),
     ("waiting", |ui| {
+        idle(ui);
         ui.status = EngineStatus::Waiting;
-        ui.feed.clear();
     }),
-    ("recording", |ui| ui.screen = Screen::Home),
-    ("finalizing", |ui| ui.status = EngineStatus::Finalizing),
+    ("recording", |ui| ui.select_live()),
+    ("recording-game", |ui| {
+        game(ui);
+        ui.status = Ui::preview().status;
+        ui.elapsed_secs = 12 * 60 + 34;
+    }),
+    ("finalizing", |ui| {
+        ui.status = EngineStatus::Finalizing;
+        ui.select_live();
+    }),
     ("error", |ui| {
+        idle(ui);
         ui.status = EngineStatus::Error("The game window could not be captured.".into());
-        ui.feed.clear();
     }),
-    ("recordings", |ui| ui.screen = Screen::Recordings),
-    ("recordings-empty", |ui| {
-        ui.screen = Screen::Recordings;
-        ui.recordings.clear();
-    }),
+    ("recordings", game),
+    ("recordings-empty", first_run),
     ("recordings-filtered", |ui| {
-        ui.screen = Screen::Recordings;
+        idle(ui);
         ui.filter.champion = TextEdit::new("ahri");
-        ui.filter.result = ResultFilter::Victory;
     }),
     ("recordings-no-match", |ui| {
-        ui.screen = Screen::Recordings;
+        idle(ui);
         ui.filter.champion = TextEdit::new("zzz");
     }),
     ("recordings-delete", |ui| {
-        ui.screen = Screen::Recordings;
-        ui.filter.pending_delete = ui.recordings.get(1).map(|rec| rec.meta.id.clone());
+        game(ui);
+        ui.filter.pending_delete = ui.review.as_ref().map(|r| r.entry.meta.id.clone());
     }),
-    ("settings", |ui| open_sheet(ui, SettingsSection::Recording)),
+    ("settings", |ui| sheet(ui, SettingsSection::Recording)),
     ("settings-resolution-open", |ui| {
-        open_sheet(ui, SettingsSection::Recording);
+        sheet(ui, SettingsSection::Recording);
         ui.resolution_open = true;
     }),
-    ("settings-clips", |ui| {
-        open_sheet(ui, SettingsSection::Clips)
-    }),
+    ("settings-clips", |ui| sheet(ui, SettingsSection::Clips)),
     ("settings-clips-off", |ui| {
         ui.settings.clips.enabled = false;
-        open_sheet(ui, SettingsSection::Clips);
+        sheet(ui, SettingsSection::Clips);
     }),
     ("settings-storage", |ui| {
         ui.settings.storage_limit_gb = Some(50);
-        open_sheet(ui, SettingsSection::Storage);
+        sheet(ui, SettingsSection::Storage);
     }),
     ("settings-search", |ui| {
-        open_sheet(ui, SettingsSection::Recording);
+        sheet(ui, SettingsSection::Recording);
         ui.settings_search = TextEdit::new("fps");
     }),
-    ("settings-about", |ui| {
-        open_sheet(ui, SettingsSection::About)
-    }),
+    ("settings-about", |ui| sheet(ui, SettingsSection::About)),
     ("settings-update", |ui| {
-        open_sheet(ui, SettingsSection::About);
+        sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::Ready(update::preview_info()));
     }),
     ("settings-update-game", |ui| {
-        open_sheet(ui, SettingsSection::About);
+        sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::Ready(update::preview_info()));
         ui.update.install_when_idle = true;
     }),
     ("settings-update-manual", |ui| {
-        open_sheet(ui, SettingsSection::About);
+        sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::AvailableManual(update::preview_info()));
     }),
     ("settings-keybinds", |ui| {
-        open_sheet(ui, SettingsSection::Keybinds)
+        sheet(ui, SettingsSection::Keybinds)
     }),
     ("settings-keybinds-capture", |ui| {
-        open_sheet(ui, SettingsSection::Keybinds);
+        sheet(ui, SettingsSection::Keybinds);
         ui.rebinding = Some(Action::PlayPause);
         ui.bind_hint = Some((
             Action::PlayPause,
@@ -109,25 +125,18 @@ pub(crate) const SCENES: &[Scene] = &[
         ));
     }),
     ("settings-keybinds-changed", |ui| {
-        open_sheet(ui, SettingsSection::Keybinds);
+        sheet(ui, SettingsSection::Keybinds);
         ui.settings.keybinds.insert("mute".into(), "N".into());
         ui.hotkey_errors = vec![(
             Action::SaveClip,
             "F9 is already used by another app. Choose a different key.".into(),
         )];
     }),
-    ("review", |ui| {
-        ui.open_review_entry(preview::review_entry());
-    }),
+    ("review", game),
     ("review-theater", |ui| {
-        ui.open_review_entry(preview::review_entry());
+        game(ui);
         if let Some(review) = &mut ui.review {
             review.theater = true;
         }
     }),
 ];
-
-fn open_sheet(ui: &mut Ui, section: SettingsSection) {
-    ui.screen = Screen::Recordings;
-    ui.open_settings(section);
-}

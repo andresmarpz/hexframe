@@ -17,7 +17,7 @@ use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::updater::UpdateConfig;
 use greyscreen_engine::{Engine, EngineConfig, league_factory_default};
-use rune::{App, AppSpec};
+use rune::{App, AppSpec, Chrome};
 
 use ui::Ui;
 
@@ -97,14 +97,20 @@ fn main() {
         tracing::warn!(%err, "cannot set app icon");
     }
     let spec = AppSpec {
-        min_size: Some((940.0, 520.0)),
+        min_size: Some((1000.0, 600.0)),
         scenes: ui::SCENES,
         poll: Some(Ui::poll),
         setup: Some(|_, waker| view::champion::set_waker(waker)),
         on_key: Some(Ui::on_key),
         ..AppSpec::new("Greyscreen", (1180.0, 680.0), Ui::preview, view::root)
     };
-    let mut app = App::new(spec).keep_running().release_gpu_when_closed();
+    let mut app = App::new(spec)
+        .chrome(Chrome {
+            traffic_lights: Some((16.0, 17.0)),
+            ..Chrome::DEFAULT
+        })
+        .keep_running()
+        .release_gpu_when_closed();
     if std::env::args().any(|arg| arg == HIDDEN_FLAG) {
         app = app.windowless();
     }

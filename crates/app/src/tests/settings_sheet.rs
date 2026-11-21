@@ -20,12 +20,12 @@ fn has_text(rt: &rune::Runtime<crate::ui::Ui>, wanted: &str) -> bool {
 }
 
 #[test]
-fn the_gear_opens_a_sheet_over_the_current_screen() {
+fn the_gear_opens_a_sheet_over_the_current_detail() {
     let rt = open_sheet();
     assert!(rt.state.settings_open);
-    assert_eq!(rt.state.screen, crate::ui::Screen::Home);
+    assert_eq!(rt.state.detail(), crate::ui::Detail::Live);
     assert!(rt.find("settings-sheet").is_some());
-    assert!(rt.find("nav-home").is_some());
+    assert!(rt.find("nav-settings").is_some());
 }
 
 #[test]
@@ -177,9 +177,9 @@ fn the_storage_meter_without_a_limit_says_so() {
 }
 
 #[test]
-fn navigating_to_a_screen_closes_the_sheet() {
+fn opening_a_game_closes_the_sheet() {
     let mut rt = open_sheet();
-    rt.update(|ui, _| ui.go(crate::ui::Screen::Recordings));
+    rt.update(|ui, _| ui.open_review_entry(crate::ui::review_entry()));
     settle(&mut rt);
     assert!(!rt.state.settings_open);
 }

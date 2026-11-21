@@ -92,10 +92,13 @@ actions! {
     SpeedUp => Spec::new("speed_up", "Faster", Group::Review, Scope::App, &["]"]),
     Mute => Spec::new("mute", "Mute", Group::Review, Scope::App, &["M"]),
     ToggleFullscreen => Spec::new("toggle_fullscreen", "Toggle fullscreen", Group::Review, Scope::App, &["F"]),
-    ExitFullscreen => Spec::new("exit_fullscreen", "Exit fullscreen or go back", Group::Review, Scope::App, &["Escape"]).fixed(),
+    ExitFullscreen => Spec::new("exit_fullscreen", "Exit fullscreen or close the game", Group::Review, Scope::App, &["Escape"]).fixed(),
     OpenSettings => Spec::new("open_settings", "Open settings", Group::General, Scope::App, &["Mod+,"]),
-    GoHome => Spec::new("go_home", "Go to Home", Group::General, Scope::App, &["Mod+1"]),
-    GoRecordings => Spec::new("go_recordings", "Go to Recordings", Group::General, Scope::App, &["Mod+2"]),
+    PreviousGame => Spec::new("previous_game", "Previous game", Group::General, Scope::App, &["Up"]),
+    NextGame => Spec::new("next_game", "Next game", Group::General, Scope::App, &["Down"]),
+    FocusPlayer => Spec::new("focus_player", "Focus the player", Group::General, Scope::App, &["Enter"]),
+    ToggleSidebar => Spec::new("toggle_sidebar", "Show or hide the games list", Group::General, Scope::App, &["Mod+Shift+B"]),
+    FocusSearch => Spec::new("focus_search", "Search games", Group::General, Scope::App, &["Mod+F"]),
 }
 
 impl Action {
