@@ -1,6 +1,10 @@
 use crate::game::{GameEvent, GameInfo, GameResult, Player, Team};
 use crate::settings::ClipSettings;
 
+mod display;
+
+pub use display::{LabelDisplay, Tone, describe_label, dominant_label};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Objective {
     Dragon(String),

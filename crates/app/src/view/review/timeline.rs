@@ -1,49 +1,20 @@
+use greyscreen_core::highlight::{Tone, describe_label, dominant_label};
 use greyscreen_core::library::EventEntry;
 use rune::{Color, Drag, El, Phase, el};
 use rune_kit::Kit;
 
 use super::card::hoverable;
-use crate::ui::{ReviewState, Source, Ui, seek_target};
+use crate::ui::{ReviewState, Source, Ui, seek_target, tone_color};
 
 const HEIGHT: f32 = 28.0;
 const TRACK_HEIGHT: f32 = 4.0;
 const MARKER_WIDTH: f32 = 8.0;
 const MARKER_HEIGHT: f32 = 18.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Category {
-    Mine,
-    Team,
-    Enemy,
-    Other,
-}
-
-pub(super) fn category(highlights: &[String]) -> Category {
-    highlights
-        .iter()
-        .map(|label| label_category(label))
-        .min_by_key(|c| *c as u8)
-        .unwrap_or(Category::Other)
-}
-
-fn label_category(label: &str) -> Category {
-    match label {
-        "MyKill" | "MyDeath" | "MyAssist" | "FirstBlood" | "Ace" => Category::Mine,
-        "Dragon" | "Herald" | "Baron" | "VoidGrub" | "Turret" | "Inhibitor" => Category::Team,
-        "EnemyKill" => Category::Other,
-        _ if label.starts_with("Multikill") => Category::Mine,
-        _ if label.starts_with("Enemy") => Category::Enemy,
-        _ => Category::Other,
-    }
-}
-
-pub(super) fn color(k: &Kit, category: Category) -> Color {
-    match category {
-        Category::Mine => k.c.bg_accent,
-        Category::Team => k.c.success.icon,
-        Category::Enemy => k.c.danger.icon,
-        Category::Other => k.c.icon_faint,
-    }
+pub(super) fn event_color(k: &Kit, highlights: &[String]) -> Color {
+    let tone = dominant_label(highlights.iter().map(String::as_str))
+        .map_or(Tone::Neutral, |label| describe_label(label).tone);
+    tone_color(k, tone)
 }
 
 pub(super) fn marker_x(rec_secs: f64, duration: f64, width: f32) -> f32 {
@@ -70,7 +41,7 @@ fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
         .size(MARKER_WIDTH, MARKER_HEIGHT)
         .absolute(x, (HEIGHT - MARKER_HEIGHT) / 2.0)
         .radius(2.0)
-        .fill(color(k, category(&event.highlights)))
+        .fill(event_color(k, &event.highlights))
         .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)));
     hoverable(marker, event.id, key)
 }

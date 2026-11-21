@@ -15,6 +15,7 @@ mod keys;
 pub(crate) mod library_format;
 mod preview;
 mod review;
+mod tone;
 
 #[cfg(test)]
 pub(crate) mod fake_player;
@@ -24,6 +25,7 @@ mod tests;
 pub(crate) use format::{format_clock, format_date, format_size, format_size_estimate};
 pub(crate) use jump::seek_target;
 pub(crate) use review::{PlayerFactory, ReviewState, Source};
+pub(crate) use tone::tone_color;
 
 #[cfg(test)]
 pub(crate) fn review_entry() -> RecordingEntry {

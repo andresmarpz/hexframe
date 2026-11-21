@@ -6,7 +6,7 @@ use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::card::hoverable;
 use super::tabular;
-use super::timeline::{category, color};
+use super::timeline::event_color;
 use crate::ui::{ReviewState, Source, Ui, format_clock, seek_target};
 use crate::view::{card, hairline};
 
@@ -54,7 +54,7 @@ fn event_row(event: &EventEntry, k: &Kit) -> El {
     let dot = el()
         .size(8.0, 8.0)
         .radius(4.0)
-        .fill(color(k, category(&event.highlights)));
+        .fill(event_color(k, &event.highlights));
     let key = format!("event-{}", event.id);
     let line = row()
         .key(key.clone())
