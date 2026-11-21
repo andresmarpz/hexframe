@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
+use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team, strip_tag};
 
 use crate::dto::{GameStats, PlayerEntry};
 
@@ -18,11 +18,6 @@ pub(crate) fn loose_bool(value: &Value) -> bool {
         Value::String(s) => s.eq_ignore_ascii_case("true"),
         _ => false,
     }
-}
-
-pub(crate) fn strip_tag(name: &str) -> &str {
-    name.rsplit_once('#')
-        .map_or(name, |(game_name, _)| game_name)
 }
 
 fn text(event: &Value, key: &str) -> String {

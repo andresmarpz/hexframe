@@ -1,4 +1,4 @@
-use crate::game::{GameEvent, GameInfo, GameResult, Player, Team};
+use crate::game::{GameEvent, GameInfo, GameResult, Player, Team, strip_tag};
 use crate::settings::ClipSettings;
 
 mod display;
@@ -105,11 +105,6 @@ pub fn structure_team(id: &str) -> Option<Team> {
         "T2" => Some(Team::Chaos),
         _ => None,
     })
-}
-
-fn strip_tag(name: &str) -> &str {
-    name.rsplit_once('#')
-        .map_or(name, |(game_name, _)| game_name)
 }
 
 fn names_match(player: &Player, name: &str) -> bool {

@@ -9,6 +9,11 @@ pub enum Team {
     Chaos,
 }
 
+pub fn strip_tag(name: &str) -> &str {
+    name.rsplit_once('#')
+        .map_or(name, |(game_name, _)| game_name)
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Player {
     pub name: String,
