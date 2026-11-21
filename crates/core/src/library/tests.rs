@@ -59,6 +59,7 @@ fn meta(id: &str, started_at: Zoned) -> RecordingMeta {
         },
         review: Default::default(),
         health: None,
+        recovered: false,
     }
 }
 
@@ -321,4 +322,25 @@ fn health_survives_a_write_and_read_of_the_sidecar() {
     let raw: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.path().join(META_FILE)).unwrap()).unwrap();
     assert_eq!(raw["health"]["frames_encoded"], 600);
+}
+
+#[test]
+fn a_recovered_flag_is_written_only_when_set_and_defaults_to_false() {
+    let mut recording = meta("a", zoned(20, 19));
+    assert!(
+        !serde_json::to_string(&recording)
+            .unwrap()
+            .contains("recovered")
+    );
+
+    recording.recovered = true;
+    let json = serde_json::to_string(&recording).unwrap();
+    assert!(json.contains("\"recovered\":true"));
+    let back: RecordingMeta = serde_json::from_str(&json).unwrap();
+    assert!(back.recovered);
+
+    let mut value: serde_json::Value = serde_json::to_value(meta("b", zoned(20, 19))).unwrap();
+    value.as_object_mut().unwrap().remove("recovered");
+    let old: RecordingMeta = serde_json::from_value(value).unwrap();
+    assert!(!old.recovered);
 }

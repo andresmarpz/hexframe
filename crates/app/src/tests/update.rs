@@ -250,6 +250,7 @@ fn the_card_walks_through_check_download_and_install_with_a_fake_source() {
         }),
         feedback: None,
         hotkeys: None,
+        free_space: None,
     });
     let ui = Ui::live(Settings::default(), engine.cmd.clone());
     let mut rt = super::runtime_sized(ui, (960.0, 2600.0));

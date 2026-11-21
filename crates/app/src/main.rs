@@ -79,6 +79,7 @@ fn main() {
             )),
             feedback: Some(FeedbackConfig::api(env!("CARGO_PKG_VERSION"))),
             hotkeys: None,
+            free_space: None,
         });
         if launch.install_failed() {
             handle.update(|ui: &mut Ui, tx| {

@@ -1,5 +1,7 @@
 use greyscreen_core::settings::Settings;
-use greyscreen_engine::{ClipEntry, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg};
+use greyscreen_engine::{
+    ClipEntry, EngineStatus, FeedItem, NoticeAction, NoticeLevel, RecordingEntry, UiMsg,
+};
 use rune::Tx;
 
 use super::review::jump::{next_target, previous_target};
@@ -139,6 +141,42 @@ fn a_notice_disappears_after_four_seconds() {
     assert!(ui.notice.is_some());
     assert!(ui.poll(4.0, &mut tx));
     assert!(ui.notice.is_none());
+}
+
+#[test]
+fn a_notice_with_an_action_stays_long_enough_to_press_it() {
+    let mut ui = ui();
+    let mut tx = Tx::default();
+    ui.apply(
+        UiMsg::NoticeWithAction {
+            level: NoticeLevel::Error,
+            text: "Not enough disk space to record (1.4 GB free).".into(),
+            action: NoticeAction::Link("https://example.com".into()),
+        },
+        &mut tx,
+    );
+    assert!(!ui.poll(4.0, &mut tx));
+    let (notice, _) = ui.notice.clone().expect("notice");
+    assert_eq!(
+        notice.action,
+        Some(NoticeAction::Link("https://example.com".into()))
+    );
+    assert!(ui.poll(12.0, &mut tx));
+    assert!(ui.notice.is_none());
+}
+
+#[test]
+fn a_plain_notice_has_no_action() {
+    let mut ui = ui();
+    let mut tx = Tx::default();
+    ui.apply(
+        UiMsg::Notice {
+            level: NoticeLevel::Info,
+            text: "Recovered 1 recording that was cut off.".into(),
+        },
+        &mut tx,
+    );
+    assert_eq!(ui.notice.expect("notice").0.action, None);
 }
 
 #[test]

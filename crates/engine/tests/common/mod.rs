@@ -1,17 +1,26 @@
 #![allow(dead_code, clippy::expect_used)]
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crossbeam_channel::{Receiver, Sender, unbounded};
-use greyscreen_core::game::{GameEvent, GameInfo, Player, Team};
-use greyscreen_core::media::MediaSource;
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
+use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
+use greyscreen_core::library::{self, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
+use greyscreen_core::media::{
+    AudioFormat, CaptureConfig, CaptureTarget, MediaEvent, MediaSource, Packet, Track, VideoFormat,
+};
 use greyscreen_core::settings::Settings;
 use greyscreen_core::time::Hns;
-use greyscreen_engine::{Engine, EngineConfig, EngineHandle, EngineStatus, LeagueFactory, UiMsg};
+use greyscreen_engine::{
+    Engine, EngineConfig, EngineHandle, EngineStatus, FakeMediaSource, FreeSpace, LeagueFactory,
+    RecordingEntry, UiMsg,
+};
 use greyscreen_league::LeagueMsg;
+use greyscreen_mp4::fragmented::FragmentedWriter;
+use jiff::Zoned;
 
 pub(crate) const WAIT: Duration = Duration::from_secs(20);
 
@@ -78,6 +87,16 @@ pub(crate) fn start_engine(
     league: LeagueFactory,
     tap: Option<Tap>,
 ) -> Harness {
+    start_engine_with_space(settings, media, league, tap, None)
+}
+
+pub(crate) fn start_engine_with_space(
+    settings: Settings,
+    media: Arc<dyn MediaSource>,
+    league: LeagueFactory,
+    tap: Option<Tap>,
+    free_space: Option<Arc<dyn FreeSpace>>,
+) -> Harness {
     let dir = settings.output_dir.clone();
     let settings_path = dir.with_extension("settings.json");
     let (tx, rx) = unbounded();
@@ -96,6 +115,7 @@ pub(crate) fn start_engine(
         updates: None,
         feedback: None,
         hotkeys: None,
+        free_space,
     });
     Harness {
         engine: Some(engine),
@@ -169,4 +189,90 @@ pub(crate) fn assert_playable_from_key_frame(path: &Path) {
     if let Some(first) = first {
         assert_eq!(first.trim(), "1", "first frame is not a key frame: {first}");
     }
+}
+
+pub(crate) struct Media {
+    pub video: VideoFormat,
+    pub audio: AudioFormat,
+    pub packets: Vec<Packet>,
+}
+
+pub(crate) fn capture_config() -> CaptureConfig {
+    Settings::default().capture_config(1080)
+}
+
+pub(crate) fn media(video_frames: usize) -> Media {
+    let (tx, rx) = bounded(4096);
+    let session = FakeMediaSource::fast()
+        .start(CaptureTarget::PrimaryMonitor, capture_config(), tx)
+        .expect("fake media");
+    let mut formats = None;
+    let mut packets = Vec::new();
+    let mut video_seen = 0;
+    while video_seen < video_frames {
+        match rx.recv().expect("media event") {
+            MediaEvent::Started { video, audio, .. } => formats = Some((video, audio)),
+            MediaEvent::Packet(packet) => {
+                video_seen += usize::from(packet.track == Track::Video);
+                packets.push(packet);
+            }
+            _ => {}
+        }
+    }
+    drop(rx);
+    session.stop();
+    let (video, audio) = formats.expect("started event");
+    Media {
+        video,
+        audio: audio.expect("audio format"),
+        packets,
+    }
+}
+
+pub(crate) fn leftover_part(output: &Path, name: &str, media: &Media, finish: bool) -> PathBuf {
+    let folder = output.join(name);
+    fs::create_dir_all(&folder).expect("folder");
+    let part = folder.join("game.mp4.part");
+    let mut writer =
+        FragmentedWriter::create(&part, &media.video, Some(&media.audio)).expect("writer");
+    for packet in &media.packets {
+        writer.push(packet).expect("push");
+    }
+    if finish {
+        writer.finish().expect("finish");
+    } else {
+        drop(writer);
+    }
+    let meta = RecordingMeta {
+        version: META_VERSION,
+        id: name.to_owned(),
+        started_at: Zoned::now(),
+        duration_secs: 0.0,
+        video: "game.mp4".to_owned(),
+        game: GameRecord {
+            info: info(),
+            result: GameResult::Unknown,
+        },
+        events: Vec::new(),
+        clips: Vec::new(),
+        encoder: "fake".to_owned(),
+        video_format: VideoInfo {
+            width: media.video.width,
+            height: media.video.height,
+            fps: media.video.fps,
+        },
+        review: Default::default(),
+        health: None,
+        recovered: false,
+    };
+    library::write_meta(&folder, &meta).expect("sidecar");
+    folder
+}
+
+pub(crate) fn library_message(harness: &Harness) -> Vec<RecordingEntry> {
+    wait_for(&harness.ui, |msg| match msg {
+        UiMsg::Library(entries) => Some(entries.clone()),
+        _ => None,
+    })
+    .expect("library message")
 }

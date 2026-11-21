@@ -54,6 +54,14 @@ fn notice(level: NoticeLevel) -> UiMsg {
     }
 }
 
+fn action_notice(level: NoticeLevel) -> UiMsg {
+    UiMsg::NoticeWithAction {
+        level,
+        text: "x".into(),
+        action: greyscreen_engine::NoticeAction::Link("https://example.com".into()),
+    }
+}
+
 fn feed(sfx: &mut Sfx, messages: &[UiMsg]) {
     let settings = Settings::default();
     for (i, msg) in messages.iter().enumerate() {
@@ -249,4 +257,18 @@ fn good_files_overlap_without_failing() {
     output.play(Cue::Failed, 0.5);
     assert_eq!(output.playing(), 3);
     assert!(output.reap().is_empty());
+}
+
+#[test]
+fn a_notice_with_an_action_sounds_by_its_level() {
+    let (mut sfx, played) = capture();
+    feed(
+        &mut sfx,
+        &[
+            action_notice(NoticeLevel::Info),
+            action_notice(NoticeLevel::Warn),
+            action_notice(NoticeLevel::Error),
+        ],
+    );
+    assert_eq!(cues(&played), [Cue::Failed]);
 }

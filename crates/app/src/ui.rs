@@ -4,7 +4,9 @@ use crossbeam_channel::Sender;
 use greyscreen_core::keybinds::Action;
 use greyscreen_core::settings::Settings;
 use greyscreen_core::update::UpdateInfo;
-use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem, NoticeLevel, RecordingEntry};
+use greyscreen_engine::{
+    EngineCmd, EngineStatus, FeedItem, NoticeAction, NoticeLevel, RecordingEntry,
+};
 use rune::{PointerPress, TextEdit};
 
 use crate::sfx::Sfx;
@@ -63,6 +65,7 @@ pub(crate) const STOP_CONFIRM_AFTER_SECS: u32 = 60;
 pub(crate) struct Notice {
     pub level: NoticeLevel,
     pub text: String,
+    pub action: Option<NoticeAction>,
 }
 
 #[derive(Debug)]

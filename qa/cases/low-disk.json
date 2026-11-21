@@ -1,0 +1,7 @@
+{
+  "about": "A start refused for lack of disk space says how much is free and offers Learn more.",
+  "scene": "notice-low-disk",
+  "steps": [
+    {"check": "refused", "has": ["notice", "text:Not enough disk space to record (1.4 GB free).", "label:Learn more"], "lacks": ["label:Show in folder"]}
+  ]
+}

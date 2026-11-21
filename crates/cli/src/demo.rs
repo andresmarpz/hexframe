@@ -178,6 +178,7 @@ fn write_game(media: &Media, spec: &Spec, started_at: Zoned, folder: &Path) -> R
         },
         review: Default::default(),
         health: None,
+        recovered: false,
     };
     library::write_meta(folder, &meta)?;
     Ok(())

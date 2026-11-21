@@ -56,6 +56,7 @@ fn entry(folder: &Path, clips: &[&str]) -> RecordingEntry {
             },
             review: Default::default(),
             health: None,
+            recovered: false,
         },
     }
 }

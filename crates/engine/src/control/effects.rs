@@ -70,6 +70,9 @@ impl Control {
 
     fn start_media(&mut self, target: CaptureTarget) {
         let cfg = self.settings.capture_config(NATIVE_HEIGHT_CEILING);
+        if !self.disk_allows_start(&cfg) {
+            return;
+        }
         let (tx, rx) = bounded(MEDIA_QUEUE);
         let started = folder::check_writable(&self.settings.output_dir)
             .and_then(|()| self.media.start(target, cfg, tx));
@@ -86,7 +89,7 @@ impl Control {
                     NoticeLevel::Error,
                     Problem::notice("Capture failed to start", &err),
                 );
-                self.feed(Input::MediaFailed(err));
+                send_internal(&self.internal_tx, Internal::StartFailed(err));
             }
         }
     }
@@ -212,6 +215,7 @@ impl Control {
         match msg {
             Internal::MediaStopped(generation) => self.on_media_stopped(generation),
             Internal::ClipDone(result) => self.on_clip_done(result),
+            Internal::StartFailed(reason) => self.feed(Input::MediaFailed(reason)),
             Internal::WriterDone(report) => {
                 if let Some(recording) = self.recording.as_mut() {
                     recording.report = Some(report);
@@ -287,6 +291,7 @@ impl Control {
             },
             review: Default::default(),
             health: None,
+            recovered: false,
         };
         let rate = started.audio.as_ref().map_or(48_000, |a| a.sample_rate);
         let mut recording = Recording {
@@ -430,7 +435,7 @@ fn folder_id(folder: &std::path::Path) -> String {
         .unwrap_or_default()
 }
 
-fn send_internal(tx: &crossbeam_channel::Sender<Internal>, msg: Internal) {
+pub(super) fn send_internal(tx: &crossbeam_channel::Sender<Internal>, msg: Internal) {
     if tx.send(msg).is_err() {
         tracing::debug!("engine stopped before an internal message was delivered");
     }

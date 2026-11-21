@@ -180,3 +180,35 @@ fn the_plan_fits_the_limit_and_the_last_step_was_needed() {
         }
     }
 }
+
+#[test]
+fn freeing_space_takes_the_oldest_videos_until_enough() {
+    let games = [
+        game("c", 3, 500, 10),
+        game("a", 1, 300, 10),
+        game("b", 2, 400, 10),
+    ];
+    assert_eq!(plan_free_space(&games, 250, None), vec![video("a")]);
+    assert_eq!(
+        plan_free_space(&games, 301, None),
+        vec![video("a"), video("b")]
+    );
+    assert_eq!(plan_free_space(&games, 1200, None).len(), 3);
+}
+
+#[test]
+fn freeing_space_never_deletes_whole_games_or_the_protected_one() {
+    let games = [game("a", 1, 300, 50), game("b", 2, 400, 50)];
+    assert_eq!(
+        plan_free_space(&games, u64::MAX, Some("a")),
+        vec![video("b")]
+    );
+}
+
+#[test]
+fn freeing_space_skips_games_without_a_video_and_needs_nothing_for_zero() {
+    let games = [game("a", 1, 0, 900), game("b", 2, 400, 0)];
+    assert_eq!(plan_free_space(&games, 100, None), vec![video("b")]);
+    assert_eq!(plan_free_space(&games, 0, None), vec![]);
+    assert_eq!(plan_free_space(&[], 100, None), vec![]);
+}

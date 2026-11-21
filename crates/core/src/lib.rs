@@ -2,6 +2,7 @@ pub mod api;
 pub mod categories;
 pub mod clips;
 pub mod crop;
+pub mod disk;
 pub mod feedback;
 pub mod game;
 pub mod health;

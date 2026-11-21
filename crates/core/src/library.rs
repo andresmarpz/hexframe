@@ -71,6 +71,12 @@ pub struct RecordingMeta {
     pub review: ReviewData,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<RecordingHealth>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub recovered: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 fn sanitize(text: &str, fallback: &str) -> String {

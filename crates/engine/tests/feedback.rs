@@ -87,6 +87,7 @@ fn rig(outcome: Outcome) -> Rig {
             home_dirs: vec!["/Users/ana".into()],
         }),
         hotkeys: None,
+        free_space: None,
     });
     Rig {
         transport,
@@ -203,6 +204,7 @@ fn a_build_without_feedback_says_so() {
         updates: None,
         feedback: None,
         hotkeys: None,
+        free_space: None,
     });
     engine
         .cmd

@@ -53,11 +53,12 @@ pub(crate) fn spawn_startup(
 ) {
     let parts = recovery::find_parts(&output_dir);
     spawn_worker("library-startup", move || {
-        for part in &parts {
-            recovery::recover_part(part);
-        }
+        let recovery = recovery::recover_parts(&parts, &active);
         storage::run(&output_dir, limit_bytes, &active, &sink);
         sink(UiMsg::Library(entries(&output_dir)));
+        if let Some(notice) = recovery.notice(&output_dir) {
+            sink(notice);
+        }
     });
 }
 

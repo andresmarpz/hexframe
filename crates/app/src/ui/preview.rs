@@ -221,6 +221,7 @@ fn entry(row: Row) -> RecordingEntry {
             },
             review: Default::default(),
             health: None,
+            recovered: false,
         },
     }
 }

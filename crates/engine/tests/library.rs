@@ -3,106 +3,17 @@
 mod common;
 
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crossbeam_channel::bounded;
-use greyscreen_core::game::{GameResult, Team};
-use greyscreen_core::library::{self, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
-use greyscreen_core::media::{
-    AudioFormat, CaptureConfig, CaptureTarget, MediaEvent, MediaSource, Packet, Track, VideoFormat,
-};
+use greyscreen_core::game::Team;
+use greyscreen_core::library;
 use greyscreen_core::settings::Settings;
-use greyscreen_engine::{EngineCmd, EngineStatus, FakeMediaSource, RecordingEntry, UiMsg};
-use greyscreen_mp4::fragmented::FragmentedWriter;
-use jiff::Zoned;
+use greyscreen_engine::{EngineCmd, EngineStatus, FakeMediaSource, UiMsg};
 
-use common::{assert_playable_from_key_frame, info, start_idle, temp_dir, wait_for};
-
-struct Media {
-    video: VideoFormat,
-    audio: AudioFormat,
-    packets: Vec<Packet>,
-}
-
-fn capture_config() -> CaptureConfig {
-    Settings::default().capture_config(1080)
-}
-
-fn media(video_frames: usize) -> Media {
-    let (tx, rx) = bounded(4096);
-    let session = FakeMediaSource::fast()
-        .start(CaptureTarget::PrimaryMonitor, capture_config(), tx)
-        .expect("fake media");
-    let mut formats = None;
-    let mut packets = Vec::new();
-    let mut video_seen = 0;
-    while video_seen < video_frames {
-        match rx.recv().expect("media event") {
-            MediaEvent::Started { video, audio, .. } => formats = Some((video, audio)),
-            MediaEvent::Packet(packet) => {
-                video_seen += usize::from(packet.track == Track::Video);
-                packets.push(packet);
-            }
-            _ => {}
-        }
-    }
-    drop(rx);
-    session.stop();
-    let (video, audio) = formats.expect("started event");
-    Media {
-        video,
-        audio: audio.expect("audio format"),
-        packets,
-    }
-}
-
-fn leftover_part(output: &Path, name: &str, media: &Media, finish: bool) -> PathBuf {
-    let folder = output.join(name);
-    fs::create_dir_all(&folder).expect("folder");
-    let part = folder.join("game.mp4.part");
-    let mut writer =
-        FragmentedWriter::create(&part, &media.video, Some(&media.audio)).expect("writer");
-    for packet in &media.packets {
-        writer.push(packet).expect("push");
-    }
-    if finish {
-        writer.finish().expect("finish");
-    } else {
-        drop(writer);
-    }
-    let meta = RecordingMeta {
-        version: META_VERSION,
-        id: name.to_owned(),
-        started_at: Zoned::now(),
-        duration_secs: 0.0,
-        video: "game.mp4".to_owned(),
-        game: GameRecord {
-            info: info(),
-            result: GameResult::Unknown,
-        },
-        events: Vec::new(),
-        clips: Vec::new(),
-        encoder: "fake".to_owned(),
-        video_format: VideoInfo {
-            width: media.video.width,
-            height: media.video.height,
-            fps: media.video.fps,
-        },
-        review: Default::default(),
-        health: None,
-    };
-    library::write_meta(&folder, &meta).expect("sidecar");
-    folder
-}
-
-fn library_message(harness: &common::Harness) -> Vec<RecordingEntry> {
-    wait_for(&harness.ui, |msg| match msg {
-        UiMsg::Library(entries) => Some(entries.clone()),
-        _ => None,
-    })
-    .expect("library message")
-}
+use common::{
+    assert_playable_from_key_frame, leftover_part, library_message, media, start_idle, temp_dir,
+    wait_for,
+};
 
 #[test]
 fn leftover_parts_are_recovered_or_renamed_before_the_first_scan() {

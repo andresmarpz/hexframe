@@ -1,4 +1,5 @@
 mod clips;
+mod disk;
 mod effects;
 mod folder;
 mod meta;
@@ -20,6 +21,7 @@ use greyscreen_league::LeagueMsg;
 use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
 use crate::delete;
+use crate::disk::FreeSpace;
 use crate::feedback::{self, FeedbackConfig};
 use crate::hotkey::{self, HotkeyBackend};
 use crate::library;
@@ -38,6 +40,7 @@ pub(crate) enum Internal {
     MediaStopped(u64),
     WriterDone(Report),
     ClipDone(ClipResult),
+    StartFailed(String),
 }
 
 pub(crate) struct Spec {
@@ -47,6 +50,7 @@ pub(crate) struct Spec {
     pub(crate) updates: Option<UpdateConfig>,
     pub(crate) feedback: Option<FeedbackConfig>,
     pub(crate) hotkeys: Option<Box<dyn HotkeyBackend>>,
+    pub(crate) free_space: Arc<dyn FreeSpace>,
     pub(crate) cmd: Sender<EngineCmd>,
 }
 
@@ -80,6 +84,9 @@ struct Control {
     hotkeys: Box<dyn HotkeyBackend>,
     applied_hotkeys: Vec<(Action, KeyCombo)>,
     active_folder: ActiveFolder,
+    free_space: Arc<dyn FreeSpace>,
+    disk_checked: Option<Instant>,
+    disk_refused: bool,
 }
 
 pub(crate) fn spawn(
@@ -124,6 +131,7 @@ impl Control {
             updates,
             feedback,
             hotkeys,
+            free_space,
             cmd,
         } = spec;
         let (internal_tx, internal_rx) = unbounded();
@@ -137,6 +145,9 @@ impl Control {
             hotkeys: hotkeys.unwrap_or_else(|| hotkey::platform(cmd, sink.clone())),
             applied_hotkeys: settings.keymap().global(),
             active_folder: ActiveFolder::default(),
+            free_space,
+            disk_checked: None,
+            disk_refused: false,
             test_stop_at: None,
             session: Session::new(settings.auto_record),
             settings,
@@ -206,7 +217,10 @@ impl Control {
         match cmd {
             EngineCmd::Shutdown => self.shutting_down = true,
             EngineCmd::StopRecording => self.feed(Input::UserStop),
-            EngineCmd::Retry => self.feed(Input::Retry),
+            EngineCmd::Retry => {
+                self.disk_refused = false;
+                self.feed(Input::Retry);
+            }
             EngineCmd::ApplySettings(settings) => self.apply_settings(settings),
             EngineCmd::StartTestRecording { secs } => self.start_test_recording(secs),
             EngineCmd::RescanLibrary => {
@@ -276,6 +290,7 @@ impl Control {
         self.feed(Input::Tick(now));
         self.stop_test_recording(now);
         self.run_due_clips(now);
+        self.check_disk_while_recording();
         if let Some(recording) = self.recording.as_mut()
             && recording.sidecar_due(now)
             && let Err(err) = recording.write_sidecar(now)
@@ -285,6 +300,7 @@ impl Control {
     }
 
     fn start_test_recording(&mut self, secs: u32) {
+        self.disk_refused = false;
         self.feed(Input::UserStart);
         if matches!(self.session.state(), SessionState::Starting { .. }) {
             self.test_stop_at = Some(mono_now() + secs_to_hns(f64::from(secs)));

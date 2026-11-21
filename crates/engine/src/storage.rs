@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use greyscreen_core::library::{self as core_library, RecordingMeta};
-use greyscreen_core::retention::{Deletion, GameUsage, plan};
+use greyscreen_core::retention::{Deletion, GameUsage, plan, plan_free_space};
 
 use crate::api::{NoticeLevel, UiMsg};
 use crate::control::Sink;
@@ -41,6 +41,17 @@ impl Cleanup {
             (0, _) => format!("Storage limit reached: deleted {games}."),
             _ => format!("Storage limit reached: deleted {videos} and {games}."),
         }
+    }
+}
+
+impl Cleanup {
+    pub(crate) fn low_disk_notice(&self) -> String {
+        let videos = if self.videos == 1 {
+            "1 old game video".to_owned()
+        } else {
+            format!("{} old game videos", self.videos)
+        };
+        format!("Low disk space: deleted {videos} to make room.")
     }
 }
 
@@ -96,31 +107,48 @@ fn delete_video(folder: &Path) -> io::Result<()> {
     }
 }
 
-pub(crate) fn enforce(output_dir: &Path, limit_bytes: u64, active: &ActiveFolder) -> Cleanup {
-    let metas = core_library::scan(output_dir);
-    let games: Vec<GameUsage> = metas
+fn usages(output_dir: &Path) -> Vec<GameUsage> {
+    core_library::scan(output_dir)
         .iter()
         .filter_map(|meta| usage(output_dir, meta))
-        .collect();
+        .collect()
+}
+
+fn apply(output_dir: &Path, deletion: &Deletion, active: &ActiveFolder, cleanup: &mut Cleanup) {
+    if active_id(active).as_deref() == Some(deletion.id()) {
+        return;
+    }
+    let Ok(folder) = recording_folder(output_dir, deletion.id()) else {
+        return;
+    };
+    match deletion {
+        Deletion::Video { id } => match delete_video(&folder) {
+            Ok(()) => cleanup.videos += 1,
+            Err(err) => tracing::warn!(%err, id, "cannot delete the game video"),
+        },
+        Deletion::Game { id } => match fs::remove_dir_all(&folder) {
+            Ok(()) => cleanup.games += 1,
+            Err(err) => tracing::warn!(%err, id, "cannot delete the game folder"),
+        },
+    }
+}
+
+pub(crate) fn enforce(output_dir: &Path, limit_bytes: u64, active: &ActiveFolder) -> Cleanup {
+    let games = usages(output_dir);
     let protected = active_id(active);
     let mut cleanup = Cleanup::default();
     for deletion in plan(&games, limit_bytes, protected.as_deref()) {
-        if active_id(active).as_deref() == Some(deletion.id()) {
-            continue;
-        }
-        let Ok(folder) = recording_folder(output_dir, deletion.id()) else {
-            continue;
-        };
-        match &deletion {
-            Deletion::Video { id } => match delete_video(&folder) {
-                Ok(()) => cleanup.videos += 1,
-                Err(err) => tracing::warn!(%err, id, "cannot delete the game video"),
-            },
-            Deletion::Game { id } => match fs::remove_dir_all(&folder) {
-                Ok(()) => cleanup.games += 1,
-                Err(err) => tracing::warn!(%err, id, "cannot delete the game folder"),
-            },
-        }
+        apply(output_dir, &deletion, active, &mut cleanup);
+    }
+    cleanup
+}
+
+pub(crate) fn free_up(output_dir: &Path, needed_bytes: u64, active: &ActiveFolder) -> Cleanup {
+    let games = usages(output_dir);
+    let protected = active_id(active);
+    let mut cleanup = Cleanup::default();
+    for deletion in plan_free_space(&games, needed_bytes, protected.as_deref()) {
+        apply(output_dir, &deletion, active, &mut cleanup);
     }
     cleanup
 }

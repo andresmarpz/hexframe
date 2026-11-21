@@ -67,6 +67,7 @@ fn meta(id: &str, day: u32, clips: &[&str]) -> RecordingMeta {
         },
         review: Default::default(),
         health: None,
+        recovered: false,
     }
 }
 
@@ -301,5 +302,81 @@ fn notices_read_naturally() {
     assert_eq!(
         text(2, 2),
         "Storage limit reached: deleted 2 old game videos and 2 whole games."
+    );
+}
+
+#[test]
+fn freeing_space_deletes_only_old_videos_until_enough() {
+    let out = output_dir("free-up");
+    let oldest = game(&out, "oldest", 1, 10_000, 1_000);
+    let middle = game(&out, "middle", 2, 10_000, 1_000);
+    let newest = game(&out, "newest", 3, 10_000, 1_000);
+
+    let cleanup = free_up(&out, 15_000, &none_active());
+
+    assert_eq!(
+        cleanup,
+        Cleanup {
+            videos: 2,
+            games: 0
+        }
+    );
+    for folder in [&oldest, &middle] {
+        assert!(!folder.join(VIDEO_FILE).exists());
+        assert!(folder.join(META_FILE).is_file());
+        assert!(folder.join("clips/a.mp4").is_file());
+    }
+    assert!(newest.join(VIDEO_FILE).is_file());
+}
+
+#[test]
+fn freeing_space_never_touches_the_game_being_recorded() {
+    let out = output_dir("free-up-active");
+    let running = game(&out, "running", 1, 10_000, 1_000);
+    let older = game(&out, "older", 2, 10_000, 1_000);
+
+    let cleanup = free_up(&out, u64::MAX, &active("running"));
+
+    assert_eq!(cleanup.videos, 1);
+    assert!(running.join(VIDEO_FILE).is_file());
+    assert!(!older.join(VIDEO_FILE).exists());
+}
+
+#[test]
+fn freeing_space_deletes_no_whole_game_even_when_it_cannot_reach_the_target() {
+    let out = output_dir("free-up-short");
+    let only = game(&out, "only", 1, 100, 1_000);
+
+    let cleanup = free_up(&out, u64::MAX, &none_active());
+
+    assert_eq!(
+        cleanup,
+        Cleanup {
+            videos: 1,
+            games: 0
+        }
+    );
+    assert!(only.join(META_FILE).is_file());
+    assert!(only.join("clips/a.mp4").is_file());
+}
+
+#[test]
+fn the_low_disk_notice_counts_the_videos() {
+    let one = Cleanup {
+        videos: 1,
+        games: 0,
+    };
+    let three = Cleanup {
+        videos: 3,
+        games: 0,
+    };
+
+    assert_eq!(
+        one.low_disk_notice(),
+        "Low disk space: deleted 1 old game video to make room."
+    );
+    assert_eq!(
+        three.low_disk_notice(),
+        "Low disk space: deleted 3 old game videos to make room."
     );
 }

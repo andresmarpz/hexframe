@@ -1,6 +1,8 @@
 use greyscreen_core::game::{GameInfo, GameResult, Player, Team};
 use greyscreen_core::library::{GameRecord, META_VERSION, RecordingMeta, VideoInfo};
 
+use std::sync::{Arc, Mutex};
+
 use super::*;
 
 fn boxed(fourcc: &[u8; 4], payload: &[u8]) -> Vec<u8> {
@@ -89,6 +91,7 @@ fn meta(duration_secs: f64, video: &str) -> RecordingMeta {
         },
         review: Default::default(),
         health: None,
+        recovered: false,
     }
 }
 
@@ -283,7 +286,7 @@ fn sidecar_after_recovery(meta: RecordingMeta) -> RecordingMeta {
     let bytes = file_of(&[ftyp(), small_mdat_header(40), moov(&mvhd_v0(1000, 90_500))]);
     let part = part_in(dir.path(), &bytes);
 
-    recover_part(&part);
+    recover_part(&part).expect("recovered");
 
     assert!(dir.path().join(VIDEO_FILE).is_file());
     library::read_meta(dir.path()).expect("sidecar")
@@ -318,7 +321,7 @@ fn recovery_without_a_sidecar_still_finishes_the_video() {
     let dir = tempfile::tempdir().expect("dir");
     let part = part_in(dir.path(), &file_of(&[ftyp(), small_mdat_header(8)]));
 
-    recover_part(&part);
+    assert!(recover_part(&part).is_err());
 
     assert!(dir.path().join(VIDEO_FILE).is_file());
     assert!(!dir.path().join("game.json").exists());
@@ -337,4 +340,178 @@ fn parts_are_found_one_folder_down() {
 
     assert_eq!(find_parts(dir.path()), vec![with.join(PART_FILE)]);
     assert!(find_parts(&dir.path().join("missing")).is_empty());
+}
+
+#[test]
+fn recovery_marks_the_sidecar_recovered_and_other_fields_stay() {
+    let recovered = sidecar_after_recovery(meta(0.0, ""));
+
+    assert!(recovered.recovered);
+    assert_eq!(recovered.id, "game");
+    assert_eq!(recovered.game.result, GameResult::Win);
+}
+
+fn library_with_parts(names: &[&str]) -> (tempfile::TempDir, Vec<PathBuf>) {
+    let root = tempfile::tempdir().expect("dir");
+    let bytes = file_of(&[ftyp(), small_mdat_header(40), moov(&mvhd_v0(1000, 4_000))]);
+    let mut parts = Vec::new();
+    for name in names {
+        let folder = root.path().join(name);
+        fs::create_dir_all(&folder).expect("folder");
+        let mut sidecar = meta(0.0, "");
+        sidecar.id = (*name).to_owned();
+        library::write_meta(&folder, &sidecar).expect("sidecar");
+        parts.push(part_in(&folder, &bytes));
+    }
+    (root, parts)
+}
+
+fn active_in(name: Option<&str>) -> ActiveFolder {
+    Arc::new(Mutex::new(name.map(str::to_owned)))
+}
+
+#[test]
+fn every_unfinished_recording_is_recovered_and_counted() {
+    let (root, parts) = library_with_parts(&["a", "b"]);
+
+    let outcome = recover_parts(&parts, &active_in(None));
+
+    assert_eq!(outcome.recovered, 2);
+    assert!(outcome.failed.is_empty());
+    for name in ["a", "b"] {
+        let folder = root.path().join(name);
+        assert!(folder.join(VIDEO_FILE).is_file());
+        assert!(!folder.join(PART_FILE).exists());
+        assert!(library::read_meta(&folder).expect("sidecar").recovered);
+    }
+}
+
+#[test]
+fn the_recording_that_is_being_written_is_left_alone() {
+    let (root, parts) = library_with_parts(&["running", "crashed"]);
+    let running_part = root.path().join("running").join(PART_FILE);
+    let before = fs::read(&running_part).expect("part");
+
+    let outcome = recover_parts(&parts, &active_in(Some("running")));
+
+    assert_eq!(outcome.recovered, 1);
+    assert!(outcome.failed.is_empty());
+    assert_eq!(fs::read(&running_part).expect("part"), before);
+    assert!(!root.path().join("running").join(VIDEO_FILE).exists());
+    assert!(
+        !library::read_meta(&root.path().join("running"))
+            .expect("sidecar")
+            .recovered
+    );
+    assert!(root.path().join("crashed").join(VIDEO_FILE).is_file());
+}
+
+#[test]
+fn recovering_twice_changes_nothing_the_second_time() {
+    let (root, parts) = library_with_parts(&["a"]);
+    recover_parts(&parts, &active_in(None));
+    let video = fs::read(root.path().join("a").join(VIDEO_FILE)).expect("video");
+    let sidecar = library::read_meta(&root.path().join("a")).expect("sidecar");
+
+    let again = recover_parts(&find_parts(root.path()), &active_in(None));
+
+    assert_eq!(again, Recovery::default());
+    assert_eq!(
+        fs::read(root.path().join("a").join(VIDEO_FILE)).expect("video"),
+        video
+    );
+    assert_eq!(
+        library::read_meta(&root.path().join("a")).expect("sidecar"),
+        sidecar
+    );
+}
+
+#[test]
+fn a_part_that_cannot_be_repaired_is_reported_and_kept() {
+    let root = tempfile::tempdir().expect("dir");
+    let folder = root.path().join("broken");
+    fs::create_dir_all(&folder).expect("folder");
+    library::write_meta(&folder, &meta(0.0, "game.mp4")).expect("sidecar");
+    let part = part_in(&folder, &ftyp());
+
+    let outcome = recover_parts(&[part], &active_in(None));
+
+    assert_eq!(outcome.recovered, 0);
+    assert_eq!(outcome.failed, vec![folder.clone()]);
+    assert!(!folder.join(VIDEO_FILE).exists());
+    assert!(folder.join("game.mp4.recovered-fmp4").is_file());
+    assert!(!library::read_meta(&folder).expect("sidecar").recovered);
+    assert!(find_parts(root.path()).is_empty());
+}
+
+#[test]
+fn a_repaired_video_without_details_is_reported_as_not_recovered() {
+    let (root, parts) = library_with_parts(&["a"]);
+    fs::remove_file(root.path().join("a").join(library::META_FILE)).expect("remove");
+
+    let outcome = recover_parts(&parts, &active_in(None));
+
+    assert_eq!(outcome.failed, vec![root.path().join("a")]);
+    assert!(root.path().join("a").join(VIDEO_FILE).is_file());
+}
+
+#[test]
+fn nothing_to_report_when_nothing_was_found() {
+    assert_eq!(Recovery::default().notice(Path::new("/lib")), None);
+}
+
+#[test]
+fn recovered_recordings_get_one_quiet_notice() {
+    let one = Recovery {
+        recovered: 1,
+        failed: Vec::new(),
+    };
+    let three = Recovery {
+        recovered: 3,
+        failed: Vec::new(),
+    };
+
+    assert_eq!(
+        one.notice(Path::new("/lib")),
+        Some(UiMsg::Notice {
+            level: NoticeLevel::Info,
+            text: "Recovered 1 recording that was cut off.".into()
+        })
+    );
+    assert_eq!(
+        three.notice(Path::new("/lib")),
+        Some(UiMsg::Notice {
+            level: NoticeLevel::Info,
+            text: "Recovered 3 recordings that were cut off.".into()
+        })
+    );
+}
+
+#[test]
+fn a_failure_names_the_recording_and_offers_its_folder() {
+    let one = Recovery {
+        recovered: 2,
+        failed: vec![PathBuf::from("/lib/2026-11-01_Ahri_CLASSIC")],
+    };
+    let two = Recovery {
+        recovered: 0,
+        failed: vec![PathBuf::from("/lib/a"), PathBuf::from("/lib/b")],
+    };
+
+    assert_eq!(
+        one.notice(Path::new("/lib")),
+        Some(UiMsg::NoticeWithAction {
+            level: NoticeLevel::Warn,
+            text: "Couldn't recover 2026-11-01_Ahri_CLASSIC".into(),
+            action: NoticeAction::Reveal(PathBuf::from("/lib/2026-11-01_Ahri_CLASSIC")),
+        })
+    );
+    assert_eq!(
+        two.notice(Path::new("/lib")),
+        Some(UiMsg::NoticeWithAction {
+            level: NoticeLevel::Warn,
+            text: "Couldn't recover 2 recordings".into(),
+            action: NoticeAction::Reveal(PathBuf::from("/lib")),
+        })
+    );
 }

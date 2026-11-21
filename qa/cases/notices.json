@@ -1,0 +1,9 @@
+{
+  "about": "The engine's recovery and low-disk notices: plain text, and the action button each one carries. Headless runs have no engine, so the scenes set the notice directly.",
+  "scene": "notice-recovered",
+  "steps": [
+    {"check": "recovered", "has": ["notice", "text:Recovered 1 recording that was cut off."], "lacks": ["label:Show in folder", "label:Learn more"]},
+    {"tap": "close"},
+    {"check": "dismissed", "lacks": ["notice"], "snap": false}
+  ]
+}

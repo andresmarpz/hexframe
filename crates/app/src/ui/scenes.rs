@@ -4,6 +4,7 @@ mod errors;
 mod feedback;
 mod games;
 mod home;
+mod notices;
 mod review;
 mod settings;
 mod update;
@@ -22,6 +23,7 @@ pub(crate) fn all() -> &'static [Scene] {
     ALL.get_or_init(|| {
         [
             home::SCENES,
+            notices::SCENES,
             games::SCENES,
             dock::SCENES,
             errors::SCENES,

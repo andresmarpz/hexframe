@@ -121,6 +121,10 @@ fn cue_for(msg: &UiMsg, was_recording: bool) -> Option<Cue> {
             level: NoticeLevel::Error,
             ..
         }
+        | UiMsg::NoticeWithAction {
+            level: NoticeLevel::Error,
+            ..
+        }
         | UiMsg::Feedback(FeedbackResult::Failed { .. }) => Some(Cue::Failed),
         _ => None,
     }

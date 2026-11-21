@@ -75,5 +75,33 @@ pub fn plan(games: &[GameUsage], limit_bytes: u64, protected: Option<&str>) -> V
     plan
 }
 
+pub fn plan_free_space(
+    games: &[GameUsage],
+    needed_bytes: u64,
+    protected: Option<&str>,
+) -> Vec<Deletion> {
+    let mut candidates: Vec<&GameUsage> = games
+        .iter()
+        .filter(|game| game.video_bytes > 0 && Some(game.id.as_str()) != protected)
+        .collect();
+    candidates.sort_by(|a, b| {
+        a.started_at
+            .cmp(&b.started_at)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    let mut freed = 0u64;
+    let mut plan = Vec::new();
+    for game in candidates {
+        if freed >= needed_bytes {
+            break;
+        }
+        freed += game.video_bytes;
+        plan.push(Deletion::Video {
+            id: game.id.clone(),
+        });
+    }
+    plan
+}
+
 #[cfg(test)]
 mod tests;

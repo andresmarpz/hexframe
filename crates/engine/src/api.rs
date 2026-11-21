@@ -14,6 +14,7 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_league::{GameLocator, LeagueMsg, LiveClient, Poller};
 
 use crate::control;
+use crate::disk::{FreeSpace, SystemFreeSpace};
 use crate::feedback::FeedbackConfig;
 use crate::hotkey::HotkeyBackend;
 use crate::updater::UpdateConfig;
@@ -48,6 +49,12 @@ pub enum NoticeLevel {
     Error,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoticeAction {
+    Reveal(PathBuf),
+    Link(String),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FeedItem {
     pub id: u32,
@@ -78,8 +85,18 @@ pub enum UiMsg {
     ClipSaved(ClipEntry),
     RecordingSaved(RecordingEntry),
     Library(Vec<RecordingEntry>),
-    Notice { level: NoticeLevel, text: String },
-    HotkeyStatus { errors: Vec<(Action, String)> },
+    Notice {
+        level: NoticeLevel,
+        text: String,
+    },
+    NoticeWithAction {
+        level: NoticeLevel,
+        text: String,
+        action: NoticeAction,
+    },
+    HotkeyStatus {
+        errors: Vec<(Action, String)>,
+    },
     Update(UpdateState),
     Feedback(FeedbackResult),
     Thumbnail(PathBuf),
@@ -116,6 +133,7 @@ pub struct EngineConfig {
     pub updates: Option<UpdateConfig>,
     pub feedback: Option<FeedbackConfig>,
     pub hotkeys: Option<Box<dyn HotkeyBackend>>,
+    pub free_space: Option<Arc<dyn FreeSpace>>,
 }
 
 impl std::fmt::Debug for EngineConfig {
@@ -145,6 +163,7 @@ impl Engine {
             updates: None,
             feedback: None,
             hotkeys: None,
+            free_space: None,
         })
     }
 
@@ -158,6 +177,7 @@ impl Engine {
             updates,
             feedback,
             hotkeys,
+            free_space,
         } = config;
         settings.validate();
         let (cmd, cmd_rx) = unbounded();
@@ -171,6 +191,7 @@ impl Engine {
                 updates,
                 feedback,
                 hotkeys,
+                free_space: free_space.unwrap_or_else(|| Arc::new(SystemFreeSpace)),
                 cmd: cmd.clone(),
             },
             guard,

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use greyscreen_engine::{EngineCmd, EngineStatus, NoticeLevel, UiMsg};
+use greyscreen_engine::{EngineCmd, EngineStatus, NoticeAction, NoticeLevel, UiMsg};
 use rune::Tx;
 
 use super::{FEED_CAP, Notice, STOP_CONFIRM_AFTER_SECS, Ui};
@@ -8,6 +8,7 @@ use crate::tray::TrayState;
 
 const STOP_CONFIRM_SECS: f64 = 3.0;
 const NOTICE_SECS: f64 = 4.0;
+const NOTICE_ACTION_SECS: f64 = 12.0;
 const TICK: Duration = Duration::from_millis(250);
 const PLAYBACK_TICK: Duration = Duration::from_millis(33);
 
@@ -75,6 +76,11 @@ impl Ui {
             UiMsg::Library(recordings) => self.apply_library(recordings),
             UiMsg::Thumbnail(path) => crate::view::thumb::invalidate(&path),
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
+            UiMsg::NoticeWithAction {
+                level,
+                text,
+                action,
+            } => self.show_notice_with(level, text, Some(action), tx),
             UiMsg::Update(state) => self.apply_update(state),
             UiMsg::Feedback(result) => self.apply_feedback(result),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
@@ -112,8 +118,30 @@ impl Ui {
     }
 
     pub(crate) fn show_notice(&mut self, level: NoticeLevel, text: String, tx: &mut Tx) {
-        let until = tx.clock() + NOTICE_SECS;
-        self.notice = Some((Notice { level, text }, until));
+        self.show_notice_with(level, text, None, tx);
+    }
+
+    pub(crate) fn show_notice_with(
+        &mut self,
+        level: NoticeLevel,
+        text: String,
+        action: Option<NoticeAction>,
+        tx: &mut Tx,
+    ) {
+        let secs = if action.is_some() {
+            NOTICE_ACTION_SECS
+        } else {
+            NOTICE_SECS
+        };
+        let until = tx.clock() + secs;
+        self.notice = Some((
+            Notice {
+                level,
+                text,
+                action,
+            },
+            until,
+        ));
         tx.wake_at(until);
     }
 

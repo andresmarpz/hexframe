@@ -3,6 +3,7 @@ mod clipjob;
 mod control;
 mod delete;
 mod diagnostics;
+mod disk;
 pub(crate) mod fake;
 pub(crate) mod feedback;
 mod hotkey;
@@ -17,9 +18,10 @@ mod writer;
 
 pub use api::{
     ClipEntry, Engine, EngineCmd, EngineConfig, EngineHandle, EngineStatus, FeedItem,
-    LeagueFactory, LeagueGuard, MANUAL_CLIP_LABEL, NoticeLevel, RecordingEntry, UiMsg, UiSink,
-    league_factory_default, reveal,
+    LeagueFactory, LeagueGuard, MANUAL_CLIP_LABEL, NoticeAction, NoticeLevel, RecordingEntry,
+    UiMsg, UiSink, league_factory_default, reveal,
 };
+pub use disk::{FreeSpace, LOW_DISK_URL};
 pub use fake::FakeMediaSource;
 pub use feedback::{FeedbackConfig, FeedbackTransport};
 pub use hotkey::HotkeyBackend;

@@ -6,6 +6,8 @@ use greyscreen_core::library;
 use greyscreen_mp4::reader::find_box;
 use greyscreen_mp4::recover::recover;
 
+use crate::api::{NoticeAction, NoticeLevel, UiMsg};
+use crate::storage::ActiveFolder;
 use crate::writer::{PART_FILE, VIDEO_FILE};
 
 const TIMESCALE_V0: usize = 12;
@@ -21,19 +23,79 @@ pub(crate) fn find_parts(output_dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-pub(crate) fn recover_part(part: &Path) {
-    let Some(folder) = part.parent() else {
-        return;
-    };
-    let finished = match finish(part) {
-        Ok(finished) => finished,
-        Err(err) => {
-            tracing::error!(part = %part.display(), %err, "cannot recover interrupted recording");
-            return;
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct Recovery {
+    pub(crate) recovered: usize,
+    pub(crate) failed: Vec<PathBuf>,
+}
+
+impl Recovery {
+    pub(crate) fn notice(&self, output_dir: &Path) -> Option<UiMsg> {
+        match self.failed.as_slice() {
+            [] if self.recovered == 0 => None,
+            [] => Some(UiMsg::Notice {
+                level: NoticeLevel::Info,
+                text: recovered_text(self.recovered),
+            }),
+            [folder] => Some(UiMsg::NoticeWithAction {
+                level: NoticeLevel::Warn,
+                text: format!("Couldn't recover {}", folder_name(folder)),
+                action: NoticeAction::Reveal(folder.clone()),
+            }),
+            many => Some(UiMsg::NoticeWithAction {
+                level: NoticeLevel::Warn,
+                text: format!("Couldn't recover {} recordings", many.len()),
+                action: NoticeAction::Reveal(output_dir.to_path_buf()),
+            }),
         }
-    };
+    }
+}
+
+fn recovered_text(count: usize) -> String {
+    if count == 1 {
+        "Recovered 1 recording that was cut off.".to_owned()
+    } else {
+        format!("Recovered {count} recordings that were cut off.")
+    }
+}
+
+fn folder_name(folder: &Path) -> String {
+    folder
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn is_active(folder: &Path, active: &ActiveFolder) -> bool {
+    let running = active.lock().map(|id| id.clone()).unwrap_or_default();
+    running.is_some_and(|id| id == folder_name(folder))
+}
+
+pub(crate) fn recover_parts(parts: &[PathBuf], active: &ActiveFolder) -> Recovery {
+    let mut outcome = Recovery::default();
+    for part in parts {
+        let Some(folder) = part.parent() else {
+            continue;
+        };
+        if is_active(folder, active) {
+            continue;
+        }
+        match recover_part(part) {
+            Ok(()) => outcome.recovered += 1,
+            Err(err) => {
+                tracing::error!(part = %part.display(), %err, "cannot recover interrupted recording");
+                outcome.failed.push(folder.to_path_buf());
+            }
+        }
+    }
+    outcome
+}
+
+pub(crate) fn recover_part(part: &Path) -> Result<(), String> {
+    let folder = part.parent().ok_or("no folder")?;
+    let finished = finish(part)?;
     tracing::info!(file = %finished.display(), "recovered interrupted recording");
-    update_sidecar(folder, &finished);
+    update_sidecar(folder, &finished)
 }
 
 fn finish(part: &Path) -> Result<PathBuf, String> {
@@ -47,27 +109,19 @@ fn read_header(file: &mut File, pos: u64) -> std::io::Result<[u8; 8]> {
     Ok(head)
 }
 
-fn update_sidecar(folder: &Path, video: &Path) {
-    let Ok(mut meta) = library::read_meta(folder) else {
-        return;
-    };
-    let mut changed = false;
+fn update_sidecar(folder: &Path, video: &Path) -> Result<(), String> {
+    let mut meta =
+        library::read_meta(folder).map_err(|err| format!("no recording details: {err}"))?;
     if meta.video.is_empty() {
         meta.video = VIDEO_FILE.to_owned();
-        changed = true;
     }
     if meta.duration_secs <= 0.0
         && let Some(duration) = movie_duration_secs(video)
     {
         meta.duration_secs = duration;
-        changed = true;
     }
-    if !changed {
-        return;
-    }
-    if let Err(err) = library::write_meta(folder, &meta) {
-        tracing::warn!(folder = %folder.display(), %err, "cannot update recovered sidecar");
-    }
+    meta.recovered = true;
+    library::write_meta(folder, &meta).map_err(|err| format!("cannot update details: {err}"))
 }
 
 fn movie_duration_secs(video: &Path) -> Option<f64> {
