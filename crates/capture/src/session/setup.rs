@@ -10,6 +10,7 @@ use super::Flags;
 use super::audio::AudioPipe;
 use super::emit::{Sink, StartInfo};
 use super::video::Video;
+use crate::client_area::ClientArea;
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::GpuDevice;
@@ -52,7 +53,9 @@ pub(crate) fn build(
     )
     .map_err(|e| format!("screen capture failed to start: {e}"))?;
     tracing::info!(step = "first frame", "capture setup");
-    let native = first_frame_size(&wgc, &flags)?;
+    let frame = first_frame_size(&wgc, &flags)?;
+    let mut client_area = ClientArea::for_target(target);
+    let native = client_area.crop(frame).size();
     let size = encode_size(native, cfg.max_height);
     tracing::info!(
         step = "video converter",
@@ -111,6 +114,7 @@ pub(crate) fn build(
     Ok(Video {
         wgc,
         converter,
+        client_area,
         encoder,
         audio,
         sink,

@@ -2,6 +2,7 @@
 
 pub mod aac;
 pub mod audio;
+mod client_area;
 pub mod clock;
 pub mod com;
 pub mod crash;

@@ -3,6 +3,7 @@ use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use greyscreen_core::crop::CropRect;
 use windows::Win32::Foundation::{E_POINTER, RECT};
 use windows::Win32::Graphics::Direct3D11::{
     D3D11_BIND_RENDER_TARGET, D3D11_BIND_VIDEO_ENCODER, D3D11_TEX2D_VPIV, D3D11_TEX2D_VPOV,
@@ -76,6 +77,7 @@ pub struct VideoConverter {
     out_size: (u32, u32),
     fps: u32,
     input_size: (u32, u32),
+    crop: CropRect,
     textures: Vec<ID3D11Texture2D>,
     output_views: Vec<ID3D11VideoProcessorOutputView>,
     input_views: HashMap<usize, ID3D11VideoProcessorInputView>,
@@ -100,6 +102,7 @@ impl VideoConverter {
             out_size,
             fps,
             input_size: DEFAULT_INPUT,
+            crop: CropRect::full(DEFAULT_INPUT),
             textures,
             output_views,
             input_views: HashMap::new(),
@@ -117,9 +120,19 @@ impl VideoConverter {
         self.releaser.release(slot);
     }
 
-    pub fn convert(&mut self, src: &ID3D11Texture2D, src_size: (u32, u32)) -> Result<Nv12Frame> {
+    pub fn convert(
+        &mut self,
+        src: &ID3D11Texture2D,
+        src_size: (u32, u32),
+        crop: CropRect,
+    ) -> Result<Nv12Frame> {
+        let crop = fit_crop(crop, src_size);
         if src_size != self.input_size {
+            self.crop = crop;
             self.rebuild_for_input(src_size)?;
+        } else if crop != self.crop {
+            self.crop = crop;
+            self.apply_rects();
         }
         let input_view = self.input_view(src)?;
         let slot = self.releaser.acquire().ok_or(VprocError::Busy)?;
@@ -221,8 +234,6 @@ impl VideoConverter {
                 },
             },
         };
-        let source = rect(0, 0, self.input_size.0, self.input_size.1);
-        let dest = letterbox(self.input_size, self.out_size);
         let target = rect(0, 0, self.out_size.0, self.out_size.1);
         // SAFETY: the processor is live and the colour and rects outlive the calls.
         unsafe {
@@ -245,6 +256,26 @@ impl VideoConverter {
                 0,
                 D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
             );
+            // The target is the whole output so the background colour fills the borders.
+            self.video_context.VideoProcessorSetOutputTargetRect(
+                &self.processor,
+                true,
+                Some(&target),
+            );
+        }
+        self.apply_rects();
+    }
+
+    fn apply_rects(&self) {
+        let source = rect(
+            self.crop.left,
+            self.crop.top,
+            self.crop.left + self.crop.width,
+            self.crop.top + self.crop.height,
+        );
+        let dest = letterbox(self.crop.size(), self.out_size);
+        // SAFETY: the processor is live and the rects outlive the calls.
+        unsafe {
             self.video_context.VideoProcessorSetStreamSourceRect(
                 &self.processor,
                 0,
@@ -257,14 +288,16 @@ impl VideoConverter {
                 true,
                 Some(&dest),
             );
-            // The target is the whole output so the background colour fills the borders.
-            self.video_context.VideoProcessorSetOutputTargetRect(
-                &self.processor,
-                true,
-                Some(&target),
-            );
         }
     }
+}
+
+fn fit_crop(crop: CropRect, frame: (u32, u32)) -> CropRect {
+    let fits = crop.width > 0
+        && crop.height > 0
+        && crop.left.saturating_add(crop.width) <= frame.0
+        && crop.top.saturating_add(crop.height) <= frame.1;
+    if fits { crop } else { CropRect::full(frame) }
 }
 
 fn rect(left: u32, top: u32, right: u32, bottom: u32) -> RECT {

@@ -190,6 +190,19 @@ let session = pool.CreateCaptureSession(&item)?;
 session.StartCapture()?;
 ```
 
+## Windowed mode cropping
+
+Not run on Windows yet (UNVERIFIED). The Mac only compile-checks it.
+
+- WGC on a windowed game captures the whole window, including the title bar and borders. Borderless and fullscreen have no chrome.
+- Each frame, `client_area` reads the window frame bounds (`DwmGetWindowAttribute` with `DWMWA_EXTENDED_FRAME_BOUNDS`), the client origin (`ClientToScreen(hwnd, 0,0)`) and the client size (`GetClientRect`). `core::crop::client_crop` turns them into a crop inside the frame.
+- Offset and size are scaled from screen pixels to frame pixels by frame `ContentSize` divided by the frame-bounds size, which covers DPI scaling.
+- The crop is the video processor source rect. The existing letterbox then fits the client area into the fixed output size.
+- A zero client size (minimized), an empty frame bounds, or a client rect outside the frame (more than 1 px) falls back to the full frame. Width and height round down to even.
+- The result is cached. It refreshes when the frame size changes and at most every 500 ms otherwise. A window move does not change the crop. A resize does. The crop is logged at start and on every change.
+- The output size at session start comes from the first frame's client area, then `encode_size`.
+- A mid-game resize keeps the output size fixed. The new client area is letterboxed into it, so the recording does not change resolution.
+
 ## Pitfalls
 
 - **Yellow border on Windows 10.** The system draws it around every captured item, and Microsoft's own page confirms it for each active session. `IsBorderRequired` is Win11-era and needs consent; Learn lists 20348. On Win10 expect the border. OBS users report the border can return when an exclusive-fullscreen game starts. Document it for users, do not fight it.

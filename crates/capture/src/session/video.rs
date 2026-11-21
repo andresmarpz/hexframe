@@ -7,6 +7,7 @@ use windows::core::HRESULT;
 use super::Flags;
 use super::audio::AudioPipe;
 use super::emit::Sink;
+use crate::client_area::ClientArea;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::GpuDevice;
 use crate::h264::{EncodedVideo, H264Encoder, H264Error};
@@ -27,6 +28,7 @@ enum Exit {
 pub(crate) struct Video {
     pub(super) wgc: WgcCapture,
     pub(super) converter: VideoConverter,
+    pub(super) client_area: ClientArea,
     pub(super) encoder: H264Encoder,
     pub(super) audio: Option<AudioPipe>,
     pub(super) sink: Sink,
@@ -106,7 +108,8 @@ impl Video {
             }
             Err(error) => return self.soft_frame("encoder poll", &error, lost_h264(&error)),
         }
-        let frame = match self.converter.convert(&texture, size) {
+        let crop = self.client_area.crop(size);
+        let frame = match self.converter.convert(&texture, size, crop) {
             Ok(frame) => frame,
             Err(VprocError::Busy) => {
                 self.stats.busy += 1;

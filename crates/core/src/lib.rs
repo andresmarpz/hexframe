@@ -1,4 +1,5 @@
 pub mod clips;
+pub mod crop;
 pub mod game;
 pub mod highlight;
 pub mod install;
