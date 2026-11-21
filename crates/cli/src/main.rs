@@ -1,3 +1,4 @@
+mod analyze;
 mod demo;
 mod doctor;
 mod fake_league;
@@ -22,6 +23,11 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     Doctor,
+    Analyze {
+        target: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
     Demo {
         #[command(subcommand)]
         action: demo::Action,
@@ -82,6 +88,7 @@ fn main() -> ExitCode {
         } => finish(run_fake_league(port, speed, script)),
         Command::Demo { action } => finish(demo::run(action)),
         Command::Doctor => doctor::run(),
+        Command::Analyze { target, json } => finish(analyze::run(&analyze::Args { target, json })),
         Command::Record {
             seconds,
             out,
