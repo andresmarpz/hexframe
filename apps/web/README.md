@@ -17,7 +17,7 @@ just web-build    # build into apps/web/dist
 
 ## GitHub data
 
-The build reads the repo's releases and star count from the GitHub API (`src/lib/github-build.ts`), so the static HTML already has the newest release that carries `greyscreen.exe`, with its version, date and size. If no release has it, the buttons link to the newest release page, then to `/releases`. The islands refresh the same data in the browser (sessionStorage, 10 minutes) and never replace good data with worse. The `just web-*` build recipes pass a token from `gh` for the `andresmarpz` account: unauthenticated builds hit the 60 requests per hour limit. `just release` redeploys the site, which refreshes the links.
+The build reads the repo's releases and star count from the GitHub API (`src/lib/github-build.ts`), so the static HTML already has the newest release that carries `greyscreen.exe`, with its version, date and size. If no release has it, the buttons link to the newest release page, then to `/releases`. The islands refresh the same data in the browser (sessionStorage, 10 minutes) and never replace good data with worse. The `just web-*` build recipes pass a token from `gh` for the `andresmarpz` account: unauthenticated builds hit the 60 requests per hour limit. Vercel's Git builds carry no token, so they can hit that limit and fall back to the releases link until the next deploy. `just release` redeploys the site with `just web-deploy` (a local, authenticated build), which refreshes the links; a release is not a commit, so Git cannot do it.
 
 ## Where things live
 
@@ -43,6 +43,15 @@ just web-screens
 ```
 
 Builds the app and renders the scenes with `greyscreen --snap`. The recipe sets `HOME=/Users/Shared`, so the Recordings page shows a neutral folder path and not the real user name. Check each PNG for private paths before committing.
+
+## Deploy
+
+Vercel project `greyscreen` (team `andresmarpzs-projects`) is connected to `andresmarpz/greyscreen` and publishes https://greyscreen-lake.vercel.app.
+
+- A push to `main` deploys to production. `apps/web/vercel.json` skips the build unless `apps/web/`, `brand/`, `package.json` or `bun.lock` changed in the last commit, so Rust-only pushes show as Canceled.
+- Project settings (in Vercel, not in git): root directory `apps/web`, "include source files outside the root directory" on (the site imports `brand/`), Node 24.x. Install, build and output commands live in `apps/web/vercel.json`.
+- `SITE_URL` is set for production only. Preview builds fall back to the production URL in `astro.config.mjs`.
+- `just web-deploy` is the manual path: a local build with a GitHub token, uploaded as a prebuilt production deployment, then a check of five URLs.
 
 ## Not in CI
 
