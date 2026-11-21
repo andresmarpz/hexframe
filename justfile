@@ -76,7 +76,9 @@ web-check:
 # Builds the site and publishes it to Vercel production at https://greyscreen-lake.vercel.app.
 web-deploy:
     export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && SITE_URL=https://greyscreen-lake.vercel.app bun run build
+    test -s apps/web/dist/index.html || { echo "web-deploy: apps/web/dist/index.html is missing, not deploying" >&2; exit 1; }
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy apps/web/dist --prod --yes
+    for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen-lake.vercel.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
 # Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
