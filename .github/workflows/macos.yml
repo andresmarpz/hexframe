@@ -24,8 +24,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: macos-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: macos-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
