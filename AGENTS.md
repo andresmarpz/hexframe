@@ -32,6 +32,7 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 - `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
 - `just web-build`: build the website into `apps/web/dist`.
 - `just web-check`: `astro check` and a website build.
+- `just web-deploy`: build the website and publish it to Vercel production (https://greyscreen-lake.vercel.app).
 - `just web-tokens`: regenerate the website's theme tokens from Rune's neutral kit.
 - `just web-screens`: render the app scenes into `apps/web/public/screens`.
 

@@ -53,6 +53,11 @@ web-build:
 web-check:
     cd apps/web && bun run check && bun run build
 
+# Builds the site and publishes it to Vercel production at https://greyscreen-lake.vercel.app.
+web-deploy:
+    cd apps/web && SITE_URL=https://greyscreen-lake.vercel.app bun run build
+    VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy apps/web/dist --prod --yes
+
 # Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
 # A tag with a dash (v0.2.0-preview.1) becomes a prerelease.
 release tag notes="": ci dist
