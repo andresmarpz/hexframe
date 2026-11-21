@@ -9,8 +9,8 @@ use crate::view;
 
 mod clips_screen;
 mod coach;
-mod delete_dialog;
 mod death_review;
+mod delete_dialog;
 mod dock;
 mod instant_pages;
 mod keybinds;

@@ -85,7 +85,11 @@ fn walk(rt: &mut Runtime<Ui>) {
     assert_eq!(animating(rt), Vec::<String>::new(), "opening a game");
     let second = nth_game(rt, 1);
     tap(rt, &second);
-    assert_eq!(animating(rt), Vec::<String>::new(), "moving to the next game");
+    assert_eq!(
+        animating(rt),
+        Vec::<String>::new(),
+        "moving to the next game"
+    );
     tap(rt, "nav-clips");
     assert_eq!(animating(rt), Vec::<String>::new(), "opening Clips");
     tap(rt, "nav-home");

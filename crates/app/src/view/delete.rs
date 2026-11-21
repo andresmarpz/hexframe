@@ -3,8 +3,8 @@ use jiff::Zoned;
 use rune::{El, col, row, text};
 use rune_kit::{Button, ButtonVariant, Dialog, Kit};
 
-use crate::ui::recordings_filter::BIN;
 use crate::ui::library_format::when;
+use crate::ui::recordings_filter::BIN;
 use crate::ui::{Ui, format_size};
 
 const WIDTH: f32 = 400.0;

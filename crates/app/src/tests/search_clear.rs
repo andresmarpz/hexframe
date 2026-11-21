@@ -4,9 +4,9 @@ use super::{runtime, settle, tap};
 use crate::ui::{Screen, Ui};
 
 fn clear_button_in(rt: &Runtime<Ui>, field: &str) -> bool {
-    rt.elements().into_iter().any(|e| {
-        e.key.as_deref() == Some("action") && e.path.split('/').any(|part| part == field)
-    })
+    rt.elements()
+        .into_iter()
+        .any(|e| e.key.as_deref() == Some("action") && e.path.split('/').any(|part| part == field))
 }
 
 #[test]
