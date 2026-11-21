@@ -271,3 +271,39 @@ fn a_game_with_no_video_and_no_clips_says_so() {
             .any(|t| t == "No video for this game")
     );
 }
+
+fn right_edge(rt: &Runtime<Ui>, key: &str) -> f32 {
+    let r = super::nav_rect_of(rt, key);
+    r[0] + r[2]
+}
+
+#[test]
+fn the_review_toolbar_never_runs_the_title_under_the_buttons() {
+    let mut rt = review_runtime();
+    rt.update(|ui, _| ui.settings.sidebar_collapsed = true);
+    for width in [1000.0, 1100.0, 1280.0, 1600.0] {
+        rt.set_viewport((width, 600.0), 1.0);
+        super::settle(&mut rt);
+        let trailing = super::nav_rect_of(&rt, "trailing");
+        for key in [
+            "review-header",
+            "review-stats",
+            "review-when",
+            "review-result",
+        ] {
+            assert!(
+                right_edge(&rt, key) <= trailing[0] + 0.5,
+                "{key} at {width}: {} over {}",
+                right_edge(&rt, key),
+                trailing[0]
+            );
+        }
+        for key in ["review-deaths", "review-folder"] {
+            let r = super::nav_rect_of(&rt, key);
+            assert!(
+                r[0] >= trailing[0] - 0.5 && r[2] >= 24.0,
+                "{key} at {width}"
+            );
+        }
+    }
+}

@@ -25,7 +25,7 @@ mod update;
 mod update_banner;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
-    runtime_sized(ui, (1180.0, 680.0))
+    runtime_sized(ui, (1280.0, 720.0))
 }
 
 fn runtime_sized(ui: Ui, size: (f32, f32)) -> Runtime<Ui> {

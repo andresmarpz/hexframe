@@ -86,3 +86,16 @@ fn the_rail_navigates_and_opens_recent_games() {
     tap(&mut rt, "nav-status");
     assert_eq!(rt.state.screen, Screen::Home);
 }
+
+#[test]
+fn a_narrow_window_folds_the_nav_to_the_rail_without_changing_the_setting() {
+    let (mut rt, _rx) = live_runtime();
+    rt.set_viewport((1000.0, 600.0), 1.0);
+    settle(&mut rt);
+    assert!((nav_width(&rt) - 56.0).abs() < 1.0, "{}", nav_width(&rt));
+    assert!(!rt.state.settings.sidebar_collapsed);
+    rt.set_viewport((1400.0, 800.0), 1.0);
+    settle(&mut rt);
+    assert!((nav_width(&rt) - 220.0).abs() < 1.0, "{}", nav_width(&rt));
+    assert!(!rt.state.settings.sidebar_collapsed);
+}

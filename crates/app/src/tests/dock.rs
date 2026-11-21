@@ -10,7 +10,7 @@ fn docked() -> Runtime<Ui> {
     let mut ui = Ui::preview();
     ui.settings.nav_style = NavStyle::Dock;
     ui.status = EngineStatus::Idle;
-    let mut rt = runtime_with(ui);
+    let mut rt = runtime_sized(ui, (1180.0, 680.0));
     settle(&mut rt);
     rt
 }

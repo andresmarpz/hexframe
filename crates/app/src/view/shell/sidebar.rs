@@ -17,16 +17,22 @@ const LIGHTS_HEIGHT: f32 = 40.0;
 const PAD: f32 = 12.0;
 const TRAFFIC_LIGHT_GAP: f32 = 12.0;
 
-pub(in crate::view) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
-    if s.settings.sidebar_collapsed {
+pub(in crate::view) const FOLD_BELOW: f32 = 1200.0;
+
+pub(in crate::view) fn is_folded(s: &Ui, window_width: Option<f32>) -> bool {
+    s.settings.sidebar_collapsed || window_width.is_some_and(|w| w < FOLD_BELOW)
+}
+
+pub(in crate::view) fn panel(s: &Ui, k: &Kit, folded: bool, titlebar_inset: f32) -> El {
+    if folded {
         collapsed::panel(s, k, titlebar_inset)
     } else {
         expanded(s, k, titlebar_inset)
     }
 }
 
-pub(in crate::view) fn lights_overhang(s: &Ui, titlebar_inset: f32) -> f32 {
-    if s.settings.sidebar_collapsed {
+pub(in crate::view) fn lights_overhang(folded: bool, titlebar_inset: f32) -> f32 {
+    if folded {
         (titlebar_inset + TRAFFIC_LIGHT_GAP - collapsed::WIDTH).max(0.0)
     } else {
         0.0

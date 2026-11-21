@@ -52,18 +52,21 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     match s.settings.nav_style {
-        NavStyle::Sidebar => row()
-            .key("window")
-            .w_full()
-            .h_full()
-            .fill(k.c.bg_deep)
-            .child(shell::sidebar::panel(s, k, cx.titlebar_inset()))
-            .child(col().grow(1.0).min_w(0.0).h_full().child(screen(
-                s,
-                k,
-                cx,
-                shell::sidebar::lights_overhang(s, cx.titlebar_inset()),
-            ))),
+        NavStyle::Sidebar => {
+            let folded = shell::sidebar::is_folded(s, cx.layout_with("window", |r| r[2]));
+            row()
+                .key("window")
+                .w_full()
+                .h_full()
+                .fill(k.c.bg_deep)
+                .child(shell::sidebar::panel(s, k, folded, cx.titlebar_inset()))
+                .child(col().grow(1.0).min_w(0.0).h_full().child(screen(
+                    s,
+                    k,
+                    cx,
+                    shell::sidebar::lights_overhang(folded, cx.titlebar_inset()),
+                )))
+        }
         NavStyle::Dock => col()
             .key("window")
             .w_full()

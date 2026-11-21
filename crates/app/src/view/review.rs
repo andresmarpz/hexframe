@@ -25,6 +25,7 @@ use crate::ui::library_format::{kda, mode_label, total_time, when};
 use crate::ui::{ReviewState, Ui, format_clock};
 
 const CHAMPION_ICON: f32 = 28.0;
+const CHAMPION_MIN_WIDTH: f32 = 56.0;
 const PAGE_PADDING: f32 = 16.0;
 const NO_VIDEO: &str = "No video for this game";
 
@@ -166,6 +167,7 @@ pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
         .key(delete_key(&meta.id));
     let mut line = row()
         .key("review-header")
+        .shrink()
         .gap(10.0)
         .center_y()
         .child(champion_icon(k, champion, CHAMPION_ICON))
@@ -173,7 +175,8 @@ pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
             text(champion.to_owned())
                 .font(k.ty.ui_medium)
                 .color(k.c.text_base)
-                .truncate(),
+                .truncate()
+                .min_w(CHAMPION_MIN_WIDTH),
         )
         .child(
             Badge::new(mode_label(&meta.game.info.mode))
@@ -191,13 +194,17 @@ pub(super) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     let line = line
         .child(
             text(format!("{} {}", when.day, when.time))
+                .key("review-when")
                 .font(k.ty.body)
-                .color(k.c.text_muted),
+                .color(k.c.text_muted)
+                .truncate(),
         )
         .child(
             text(stats_line(review))
+                .key("review-stats")
                 .font(tabular(k.ty.body))
-                .color(k.c.text_muted),
+                .color(k.c.text_muted)
+                .truncate(),
         );
     Toolbar::new()
         .leading(line)
