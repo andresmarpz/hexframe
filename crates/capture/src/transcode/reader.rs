@@ -28,6 +28,7 @@ pub(super) struct AudioInfo {
 
 #[derive(Debug, Clone, Copy)]
 struct Picture {
+    coded_width: usize,
     crop: (usize, usize, usize, usize),
 }
 
@@ -215,7 +216,7 @@ impl Source {
                 buffer
                     .Lock(&mut base, None, Some(&mut len))
                     .map_err(|e| failed("frame buffer", &e))?;
-                pitch = 0;
+                pitch = self.picture.coded_width as i32;
             }
             let outcome = self.scale_locked(
                 base,
@@ -246,8 +247,7 @@ impl Source {
         height: usize,
         out: &mut Vec<u8>,
     ) -> bool {
-        let (x, y, w, h) = self.picture.crop;
-        let pitch = if pitch == 0 { x + w } else { pitch };
+        let (_, y, _, h) = self.picture.crop;
         let rows = match len * 2 / (3 * pitch.max(1)) {
             0 => y + h,
             rows => rows.max(y + h),
@@ -322,7 +322,10 @@ fn picture(media: &IMFMediaType) -> Result<Picture, TranscodeError> {
             }
             _ => (0, 0, width & !1, height & !1),
         };
-        Ok(Picture { crop })
+        Ok(Picture {
+            coded_width: width,
+            crop,
+        })
     }
 }
 
