@@ -28,6 +28,7 @@ impl Ui {
             _ if self.settings_open => return false,
             Action::GoHome => self.go(Screen::Home),
             Action::GoGames => self.go(Screen::Games),
+            Action::GoClips => self.go(Screen::Clips),
             Action::FocusSearch => {
                 self.go(Screen::Games);
                 tx.focus("filter-champion", true);
@@ -78,6 +79,7 @@ impl Ui {
             | Action::OpenSettings
             | Action::GoHome
             | Action::GoGames
+            | Action::GoClips
             | Action::PreviousGame
             | Action::NextGame
             | Action::FocusPlayer

@@ -7,6 +7,7 @@ use crate::ui::fake_player::{self, Call};
 use crate::ui::{Detail, Source, Ui, parse_clip_secs};
 use crate::view;
 
+mod clips_screen;
 mod coach;
 mod death_review;
 mod keybinds;

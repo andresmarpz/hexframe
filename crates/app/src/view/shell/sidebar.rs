@@ -4,7 +4,7 @@ use rune::tok::type_;
 use rune::{El, Icon, col, el, row, text};
 use rune_kit::{Kit, SidebarRow};
 
-use self::icons::{GAMES, GEAR, HOME, LOGO};
+use self::icons::{CLIPS, GAMES, GEAR, HOME, LOGO};
 use crate::ui::{Screen, Ui};
 
 pub(in crate::view) const WIDTH: f32 = 220.0;
@@ -39,6 +39,15 @@ pub(in crate::view) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
             s.screen == Screen::Games,
             count(s.recordings.len()),
             |ui| ui.go(Screen::Games),
+        ))
+        .child(item(
+            k,
+            "Clips",
+            &CLIPS,
+            "nav-clips",
+            s.screen == Screen::Clips,
+            count(s.clip_count()),
+            |ui| ui.go(Screen::Clips),
         ));
     col()
         .key("nav")

@@ -48,6 +48,14 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.go(Screen::Home);
     }),
     ("games-pick", idle),
+    ("clips", |ui| {
+        idle(ui);
+        ui.go(Screen::Clips);
+    }),
+    ("clips-empty", |ui| {
+        first_run(ui);
+        ui.go(Screen::Clips);
+    }),
     ("idle-off", |ui| {
         home(ui);
         ui.settings.auto_record = false;

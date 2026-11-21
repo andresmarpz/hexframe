@@ -21,6 +21,15 @@ pub(super) static GAMES: Icon = Icon {
     ),
 };
 
+pub(super) static CLIPS: Icon = Icon {
+    name: "greyscreen-clips",
+    view: 16.0,
+    body: concat!(
+        r#"<rect x="1.75" y="3" width="12.5" height="10" rx="2.25" fill="none" stroke="currentColor" stroke-width="1.5"/>"#,
+        r#"<path d="M6.8 5.9v4.2l3.4-2.1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>"#
+    ),
+};
+
 pub(super) static GEAR: Icon = Icon {
     name: "greyscreen-gear",
     view: 16.0,

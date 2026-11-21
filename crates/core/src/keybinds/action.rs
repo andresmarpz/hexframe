@@ -100,6 +100,7 @@ actions! {
     OpenSettings => Spec::new("open_settings", "Open settings", Group::General, Scope::App, &["Mod+,"]),
     GoHome => Spec::new("go_home", "Go to Home", Group::General, Scope::App, &["Mod+1"]),
     GoGames => Spec::new("go_recordings", "Go to Games", Group::General, Scope::App, &["Mod+2"]),
+    GoClips => Spec::new("go_clips", "Go to Clips", Group::General, Scope::App, &["Mod+3"]),
     PreviousGame => Spec::new("previous_game", "Previous game", Group::General, Scope::App, &["Up"]),
     NextGame => Spec::new("next_game", "Next game", Group::General, Scope::App, &["Down"]),
     FocusPlayer => Spec::new("focus_player", "Focus the player", Group::General, Scope::App, &["Enter"]),

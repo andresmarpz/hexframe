@@ -8,6 +8,7 @@ use super::{Screen, Ui};
 pub(crate) enum Detail {
     Welcome,
     Pick,
+    Clips,
     Live,
     Game,
 }
@@ -34,6 +35,7 @@ impl Ui {
             Screen::Games if self.live_selected && self.live_row_visible() => Detail::Live,
             Screen::Games if self.review.is_some() => Detail::Game,
             Screen::Games => Detail::Pick,
+            Screen::Clips => Detail::Clips,
         }
     }
 
@@ -110,7 +112,7 @@ impl Ui {
                     Some(self.recordings[i].meta.id.as_str()) == self.selected_id()
                 })
             }),
-            Detail::Welcome | Detail::Pick => None,
+            Detail::Welcome | Detail::Pick | Detail::Clips => None,
         };
         let next = match current {
             Some(at) => at.saturating_add_signed(delta).min(last),

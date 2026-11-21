@@ -5,6 +5,7 @@ pub(crate) enum Screen {
     #[default]
     Home,
     Games,
+    Clips,
 }
 
 impl Ui {
@@ -16,6 +17,10 @@ impl Ui {
             self.pause_review();
         }
         self.screen = screen;
+    }
+
+    pub(crate) fn clip_count(&self) -> usize {
+        self.recordings.iter().map(|rec| rec.meta.clips.len()).sum()
     }
 
     fn pause_review(&self) {

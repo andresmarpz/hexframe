@@ -1,4 +1,5 @@
 pub(crate) mod champion;
+mod clips;
 mod delete;
 mod games;
 mod home;
@@ -48,6 +49,7 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     let screen = match s.screen {
         Screen::Home => home_screen(s, k),
         Screen::Games => games_screen(s, k, cx),
+        Screen::Clips => clips_screen(s, k),
     };
     row()
         .key("window")
@@ -67,6 +69,12 @@ fn home_screen(s: &Ui, k: &Kit) -> El {
         _ => (scrolling_content(home::page(s, k)), Toolbar::new()),
     };
     Page::new(main).toolbar(toolbar).build(k)
+}
+
+fn clips_screen(s: &Ui, k: &Kit) -> El {
+    Page::new(scrolling_content(clips::page(s, k)))
+        .title("Clips")
+        .build(k)
 }
 
 fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
