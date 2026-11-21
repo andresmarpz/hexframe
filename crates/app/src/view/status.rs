@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
+use greyscreen_core::game::GameResult;
 use greyscreen_core::highlight::Highlight;
-use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem};
+use greyscreen_engine::{EngineCmd, EngineStatus, FeedItem, RecordingEntry};
 use rune::{Color, El, GrowthSpec, ScrollSpec, col, el, row, text};
-use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit};
+use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit, Switch};
 
 use super::{card, hairline, title_style};
 use crate::ui::{TEST_RECORDING_SECS, Ui, format_clock};
@@ -19,7 +20,10 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
         .min_h(0.0)
         .gap(16.0)
         .child(state_card(s, k))
-        .child(feed_card(s, k))
+        .child(match &s.last_game {
+            Some(entry) => last_game_card(entry, k),
+            None => feed_card(s, k),
+        })
 }
 
 struct Headline {
@@ -32,10 +36,24 @@ struct Headline {
 
 fn headline(s: &Ui, k: &Kit) -> Headline {
     let (pill, title, detail, clock, danger) = match &s.status {
-        EngineStatus::Idle => (
+        EngineStatus::Idle if s.settings.auto_record => (
             pill(k, "Idle", k.c.text_faint, k.c.layer_02, k.c.text_muted),
-            "Waiting for League".to_owned(),
+            "Waiting for a game".to_owned(),
             "Greyscreen starts recording when a game starts.".to_owned(),
+            None,
+            false,
+        ),
+        EngineStatus::Idle => (
+            pill(k, "Off", k.c.text_faint, k.c.layer_02, k.c.text_muted),
+            "Recording off".to_owned(),
+            "Games won't be recorded until you turn this on.".to_owned(),
+            None,
+            false,
+        ),
+        EngineStatus::GameRunning => (
+            pill(k, "Off", k.c.text_faint, k.c.layer_02, k.c.text_muted),
+            "Game in progress, not recording".to_owned(),
+            "Turn on Record games to start recording this game.".to_owned(),
             None,
             false,
         ),
@@ -101,7 +119,7 @@ fn pill_recording(k: &Kit) -> El {
 
 fn buttons(s: &Ui, k: &Kit) -> El {
     let recording = matches!(s.status, EngineStatus::Recording { .. });
-    let idle = matches!(s.status, EngineStatus::Idle);
+    let idle = matches!(s.status, EngineStatus::Idle | EngineStatus::GameRunning);
     let mut buttons = row().gap(10.0).center_y();
     if recording {
         buttons = buttons
@@ -162,9 +180,9 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         )
         .child(el().h(2.0))
         .child(buttons(s, k));
-    let mut body = row().w_full().justify_between().center_y().child(left);
+    let mut right = col().items_end().gap(14.0).child(record_switch(s, k));
     if let Some(clock) = h.clock {
-        body = body.child(
+        right = right.child(
             col()
                 .items_end()
                 .gap(2.0)
@@ -181,11 +199,93 @@ fn state_card(s: &Ui, k: &Kit) -> El {
                 .child(text("elapsed").font(k.ty.small).color(k.c.text_muted)),
         );
     }
+    let body = row()
+        .w_full()
+        .justify_between()
+        .items_start()
+        .child(left)
+        .child(right);
     let mut card = card(k).key("state-card").padding(20.0);
     if h.danger {
         card = card.border(1.0, k.c.danger.icon);
     }
     card.child(body)
+}
+
+fn record_switch(s: &Ui, k: &Kit) -> El {
+    row()
+        .gap(10.0)
+        .center_y()
+        .child(
+            text("Record games")
+                .font(k.ty.body_medium)
+                .color(k.c.text_base),
+        )
+        .child(
+            Switch::new(s.settings.auto_record)
+                .label("Record games".to_owned())
+                .hide_label()
+                .on_toggle(|ui: &mut Ui| ui.change(|s| s.auto_record = !s.auto_record))
+                .build(k)
+                .key("record-games"),
+        )
+}
+
+fn last_game_card(entry: &RecordingEntry, k: &Kit) -> El {
+    let game = &entry.meta.game;
+    let result = match game.result {
+        GameResult::Win => Badge::new("WIN").variant(BadgeVariant::Accent).build(k),
+        GameResult::Loss => Badge::new("LOSS").variant(BadgeVariant::Subtle).build(k),
+        GameResult::Unknown => Badge::new("UNKNOWN")
+            .variant(BadgeVariant::Neutral)
+            .build(k),
+    };
+    let events = entry.meta.events.len();
+    let detail = format!(
+        "{} - {} - {} {}",
+        game.info.mode,
+        format_clock(entry.meta.duration_secs as u32),
+        events,
+        if events == 1 { "event" } else { "events" },
+    );
+    let open = Button::new("Open")
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Large)
+        .on_press(|ui: &mut Ui| ui.open_last_game())
+        .build(k)
+        .key("open-last-game");
+    let summary = row()
+        .w_full()
+        .px(16.0)
+        .py(14.0)
+        .gap(12.0)
+        .center_y()
+        .child(
+            col()
+                .grow(1.0)
+                .min_w(0.0)
+                .gap(2.0)
+                .child(
+                    text(game.info.me.champion.clone())
+                        .font(k.ty.body_medium)
+                        .color(k.c.text_base)
+                        .truncate(),
+                )
+                .child(text(detail).font(k.ty.small).color(k.c.text_muted)),
+        )
+        .child(result)
+        .child(open);
+    card(k)
+        .key("last-game-card")
+        .child(
+            row().w_full().h(44.0).px(16.0).center_y().child(
+                text("Last game")
+                    .font(k.ty.body_medium)
+                    .color(k.c.text_base),
+            ),
+        )
+        .child(hairline(k))
+        .child(summary)
 }
 
 fn pill(k: &Kit, label: &str, dot: Color, fill: Color, ink: Color) -> El {

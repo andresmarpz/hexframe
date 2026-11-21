@@ -23,6 +23,9 @@ png.workspace = true
 [target.'cfg(windows)'.dependencies]
 greyscreen-capture.workspace = true
 
+[dev-dependencies]
+greyscreen-league.workspace = true
+
 [build-dependencies]
 winresource.workspace = true
 

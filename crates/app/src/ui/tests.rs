@@ -62,6 +62,30 @@ fn leaving_recording_stops_the_clock_and_keeps_the_feed() {
 }
 
 #[test]
+fn returning_to_idle_clears_the_feed() {
+    for idle in [EngineStatus::Idle, EngineStatus::GameRunning] {
+        let mut ui = ui();
+        let mut tx = Tx::default();
+        ui.apply(UiMsg::Status(recording()), &mut tx);
+        ui.apply(UiMsg::Feed(feed_item(1)), &mut tx);
+        ui.apply(UiMsg::Status(idle), &mut tx);
+        assert!(ui.feed.is_empty());
+    }
+}
+
+#[test]
+fn a_saved_recording_becomes_the_last_game_until_the_next_one_starts() {
+    let mut ui = ui();
+    let mut tx = Tx::default();
+    ui.apply(UiMsg::RecordingSaved(entry(0)), &mut tx);
+    assert_eq!(ui.last_game, Some(entry(0)));
+    ui.apply(UiMsg::Status(EngineStatus::Waiting), &mut tx);
+    assert!(ui.last_game.is_some());
+    ui.apply(UiMsg::Status(recording()), &mut tx);
+    assert!(ui.last_game.is_none());
+}
+
+#[test]
 fn the_feed_keeps_only_the_newest_items() {
     let mut ui = ui();
     let mut tx = Tx::default();

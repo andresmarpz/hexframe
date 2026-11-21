@@ -35,6 +35,21 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.status = EngineStatus::Idle;
         ui.feed.clear();
     }),
+    ("idle-off", |ui| {
+        ui.status = EngineStatus::Idle;
+        ui.settings.auto_record = false;
+        ui.feed.clear();
+    }),
+    ("game-running-off", |ui| {
+        ui.status = EngineStatus::GameRunning;
+        ui.settings.auto_record = false;
+        ui.feed.clear();
+    }),
+    ("last-game", |ui| {
+        ui.status = EngineStatus::Idle;
+        ui.feed.clear();
+        ui.last_game = ui.recordings.first().cloned();
+    }),
     ("waiting", |ui| {
         ui.status = EngineStatus::Waiting;
         ui.feed.clear();
@@ -91,6 +106,7 @@ pub(crate) struct Ui {
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
     pub recordings: Vec<RecordingEntry>,
+    pub last_game: Option<RecordingEntry>,
     pub settings: Settings,
     pub notice: Option<(Notice, f64)>,
     pub cmd: Option<Sender<EngineCmd>>,
@@ -122,6 +138,7 @@ impl Ui {
             status: EngineStatus::Idle,
             feed: VecDeque::new(),
             recordings: Vec::new(),
+            last_game: None,
             notice: None,
             cmd: None,
             recording_since_clock: None,
@@ -174,6 +191,12 @@ impl Ui {
         }
     }
 
+    pub(crate) fn open_last_game(&mut self) {
+        if let Some(entry) = self.last_game.clone() {
+            self.open_review_entry(entry);
+        }
+    }
+
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
         self.review = Some(ReviewState::open(entry, self.player_factory));
         self.screen = Screen::Review;
@@ -218,6 +241,7 @@ impl Ui {
             }
             UiMsg::RecordingSaved(entry) => {
                 let text = format!("Recording saved: {}", entry.meta.game.info.me.champion);
+                self.last_game = Some(entry.clone());
                 match self
                     .recordings
                     .iter_mut()
@@ -238,11 +262,16 @@ impl Ui {
         match &status {
             EngineStatus::Recording { .. } if !was_recording => {
                 self.feed.clear();
+                self.last_game = None;
                 self.recording_since_clock = Some(tx.clock());
                 self.elapsed_secs = 0;
                 tx.wake_after(TICK);
             }
             EngineStatus::Recording { .. } => {}
+            EngineStatus::Idle | EngineStatus::GameRunning => {
+                self.recording_since_clock = None;
+                self.feed.clear();
+            }
             _ => self.recording_since_clock = None,
         }
         self.status = status;

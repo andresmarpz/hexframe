@@ -7,6 +7,8 @@ use crate::ui::fake_player::{self, Call};
 use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
+mod match_flow;
+
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
     let mut rt = Runtime::new(ui, view::root, (960.0, 640.0), Env::new(true, 1.0));
     rt.frame(0.0);

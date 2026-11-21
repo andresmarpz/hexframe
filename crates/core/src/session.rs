@@ -37,6 +37,7 @@ pub enum Effect {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Status {
     Idle,
+    GameRunning,
     Waiting,
     Recording { since: Hns, game: Option<GameInfo> },
     Finalizing,
@@ -81,12 +82,21 @@ pub struct StartRetry {
     at: Hns,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct LiveGame {
+    hwnd: isize,
+    pid: u32,
+    info: Option<GameInfo>,
+    ended: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct Session {
     state: SessionState,
     now: Hns,
     last_pid: Option<u32>,
     auto_record: bool,
+    live: Option<LiveGame>,
 }
 
 impl Session {
@@ -96,6 +106,7 @@ impl Session {
             now: 0,
             last_pid: None,
             auto_record,
+            live: None,
         }
     }
 
@@ -104,21 +115,110 @@ impl Session {
     }
 
     pub fn step(&mut self, input: Input) -> Vec<Effect> {
-        match input {
-            Input::Tick(now) => self.now = now,
-            Input::SettingsChanged { auto_record } => {
-                self.auto_record = auto_record;
-                return Vec::new();
-            }
+        match &input {
+            Input::Tick(now) => self.now = *now,
+            Input::SettingsChanged { auto_record } => return self.set_auto_record(*auto_record),
             _ => {}
         }
+        self.track_live(&input);
+        let finalized = matches!(input, Input::Finalized);
         let state = std::mem::replace(&mut self.state, SessionState::Idle);
-        let (next, effects) = self.transition(state, input);
+        let (next, mut effects) = self.transition(state, input);
         if let SessionState::Armed { pid, .. } = &next {
             self.last_pid = Some(*pid);
         }
         self.state = next;
+        if finalized && let Some(resumed) = self.resume() {
+            effects.extend(resumed);
+        }
         effects
+    }
+
+    fn track_live(&mut self, input: &Input) {
+        match input {
+            Input::WindowFound { hwnd, pid } => {
+                self.live = Some(LiveGame {
+                    hwnd: *hwnd,
+                    pid: *pid,
+                    info: None,
+                    ended: false,
+                });
+            }
+            Input::Ready(info) => {
+                if let Some(live) = &mut self.live {
+                    live.info = Some(info.clone());
+                }
+            }
+            Input::Ended(_) => {
+                if let Some(live) = &mut self.live {
+                    live.ended = true;
+                }
+            }
+            Input::Gone | Input::Skipped(_) => self.live = None,
+            _ => {}
+        }
+    }
+
+    fn game_running(&self) -> bool {
+        self.live.as_ref().is_some_and(|live| !live.ended)
+    }
+
+    fn idle_status(&self) -> Status {
+        if !self.auto_record && self.game_running() {
+            Status::GameRunning
+        } else {
+            Status::Idle
+        }
+    }
+
+    fn set_auto_record(&mut self, auto_record: bool) -> Vec<Effect> {
+        if self.auto_record == auto_record {
+            return Vec::new();
+        }
+        self.auto_record = auto_record;
+        if auto_record {
+            return self.resume().unwrap_or_default();
+        }
+        let state = std::mem::replace(&mut self.state, SessionState::Idle);
+        let (next, effects) = self.stop_for_switch(state);
+        self.state = next;
+        effects
+    }
+
+    fn stop_for_switch(&self, state: SessionState) -> (SessionState, Vec<Effect>) {
+        use SessionState::*;
+        match state {
+            Armed { .. } => (Idle, vec![Effect::Status(self.idle_status())]),
+            Starting {
+                target: CaptureTarget::GameWindow { .. },
+                ..
+            } => (
+                Idle,
+                vec![Effect::StopMedia, Effect::Status(self.idle_status())],
+            ),
+            Recording { manual: false, .. } => finalize(GameResult::Unknown, true, false),
+            Tail { result, .. } => finalize(result, true, false),
+            other => (other, Vec::new()),
+        }
+    }
+
+    fn resume(&mut self) -> Option<Vec<Effect>> {
+        if !self.auto_record || !matches!(self.state, SessionState::Idle) {
+            return None;
+        }
+        let live = self.live.as_ref().filter(|live| !live.ended)?;
+        let (hwnd, pid) = (live.hwnd, live.pid);
+        self.last_pid = Some(pid);
+        let Some(info) = live.info.clone() else {
+            self.state = armed(hwnd, pid);
+            return Some(vec![Effect::Status(Status::Waiting)]);
+        };
+        let target = CaptureTarget::GameWindow { hwnd, pid };
+        self.state = self.starting(target, Some(info), 0);
+        Some(vec![
+            Effect::StartMedia(target),
+            Effect::Status(Status::Waiting),
+        ])
     }
 
     fn transition(&self, state: SessionState, input: Input) -> (SessionState, Vec<Effect>) {
@@ -131,6 +231,10 @@ impl Session {
                 if self.auto_record && self.last_pid.is_some_and(|last| last != pid) =>
             {
                 (armed(hwnd, pid), vec![Effect::Status(Status::Waiting)])
+            }
+            (Idle, Input::WindowFound { .. }) => (Idle, vec![Effect::Status(Status::GameRunning)]),
+            (Idle, Input::Ended(_)) if !self.auto_record => {
+                (Idle, vec![Effect::Status(self.idle_status())])
             }
             (Idle, Input::UserStart) => {
                 let target = CaptureTarget::PrimaryMonitor;
@@ -160,7 +264,7 @@ impl Session {
                     vec![Effect::StartMedia(target)],
                 )
             }
-            (Armed { .. }, Input::Gone) => (Idle, vec![Effect::Status(Status::Idle)]),
+            (Armed { .. }, Input::Gone) => (Idle, vec![Effect::Status(self.idle_status())]),
             (Starting { target, game, .. }, Input::MediaStarted { t0 }) => {
                 let status = Status::Recording {
                     since: t0,
@@ -222,7 +326,10 @@ impl Session {
                     ..
                 },
                 Input::Gone,
-            ) => (Idle, vec![Effect::StopMedia, Effect::Status(Status::Idle)]),
+            ) => (
+                Idle,
+                vec![Effect::StopMedia, Effect::Status(self.idle_status())],
+            ),
             (
                 Starting {
                     target: CaptureTarget::GameWindow { .. },
@@ -231,7 +338,7 @@ impl Session {
                 Input::Skipped(_),
             ) => (
                 Cooldown,
-                vec![Effect::StopMedia, Effect::Status(Status::Idle)],
+                vec![Effect::StopMedia, Effect::Status(self.idle_status())],
             ),
             (Recording { manual: false, .. }, Input::Ended(result)) => (
                 Tail {
@@ -271,11 +378,11 @@ impl Session {
             }
             (Finalizing { manual, gone }, Input::Finalized) => {
                 let next = if manual || gone { Idle } else { Cooldown };
-                (next, vec![Effect::Status(Status::Idle)])
+                (next, vec![Effect::Status(self.idle_status())])
             }
             (Cooldown, Input::Gone) => (Idle, Vec::new()),
             (Idle | Armed { .. } | Cooldown, Input::Skipped(_)) => {
-                (Cooldown, vec![Effect::Status(Status::Idle)])
+                (Cooldown, vec![Effect::Status(self.idle_status())])
             }
             (state, _) => (state, Vec::new()),
         }

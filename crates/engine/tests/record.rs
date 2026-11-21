@@ -163,6 +163,7 @@ fn status_names(msgs: &[UiMsg]) -> Vec<&'static str> {
     msgs.iter()
         .filter_map(|msg| match msg {
             UiMsg::Status(EngineStatus::Idle) => Some("Idle"),
+            UiMsg::Status(EngineStatus::GameRunning) => Some("GameRunning"),
             UiMsg::Status(EngineStatus::Waiting) => Some("Waiting"),
             UiMsg::Status(EngineStatus::Recording { .. }) => Some("Recording"),
             UiMsg::Status(EngineStatus::Finalizing) => Some("Finalizing"),

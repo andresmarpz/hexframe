@@ -398,8 +398,9 @@ fn user_stop_in_game_recording_goes_to_cooldown_after_finalize() {
 #[test]
 fn auto_record_off_ignores_window_found_until_turned_on() {
     let mut s = Session::new(false);
-    assert!(s.step(found()).is_empty());
+    assert_eq!(s.step(found()), vec![Effect::Status(Status::GameRunning)]);
     assert_eq!(*s.state(), SessionState::Idle);
+    s.step(Input::Gone);
     s.step(Input::SettingsChanged { auto_record: true });
     assert!(!s.step(found()).is_empty());
     assert_eq!(
@@ -410,4 +411,148 @@ fn auto_record_off_ignores_window_found_until_turned_on() {
             retry: None
         }
     );
+}
+
+fn off() -> Input {
+    Input::SettingsChanged { auto_record: false }
+}
+
+fn on() -> Input {
+    Input::SettingsChanged { auto_record: true }
+}
+
+fn finalize_effects(result: GameResult) -> Vec<Effect> {
+    vec![
+        Effect::StopMedia,
+        Effect::Finalize { result },
+        Effect::Status(Status::Finalizing),
+    ]
+}
+
+#[test]
+fn turning_off_while_recording_finalizes_like_a_game_end() {
+    let mut s = recording_session(0);
+    assert_eq!(s.step(off()), finalize_effects(GameResult::Unknown));
+    assert_eq!(
+        s.step(Input::Finalized),
+        vec![Effect::Status(Status::GameRunning)]
+    );
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn turning_off_during_tail_keeps_the_known_result() {
+    let mut s = recording_session(0);
+    s.step(Input::Ended(GameResult::Win));
+    assert_eq!(s.step(off()), finalize_effects(GameResult::Win));
+    assert_eq!(s.step(Input::Finalized), vec![Effect::Status(Status::Idle)]);
+}
+
+#[test]
+fn turning_on_again_in_the_same_game_starts_a_new_recording() {
+    let mut s = recording_session(0);
+    s.step(off());
+    s.step(Input::Finalized);
+    assert_eq!(
+        s.step(on()),
+        vec![Effect::StartMedia(WINDOW), Effect::Status(Status::Waiting)]
+    );
+    assert!(matches!(s.state(), SessionState::Starting { .. }));
+}
+
+#[test]
+fn turning_on_while_finalizing_starts_once_the_file_is_closed() {
+    let mut s = recording_session(0);
+    s.step(off());
+    assert!(s.step(on()).is_empty());
+    assert_eq!(
+        s.step(Input::Finalized),
+        vec![
+            Effect::Status(Status::Idle),
+            Effect::StartMedia(WINDOW),
+            Effect::Status(Status::Waiting)
+        ]
+    );
+}
+
+#[test]
+fn turning_on_mid_game_starts_recording_right_away() {
+    let mut s = Session::new(false);
+    s.step(found());
+    s.step(Input::Ready(info()));
+    assert_eq!(
+        s.step(on()),
+        vec![Effect::StartMedia(WINDOW), Effect::Status(Status::Waiting)]
+    );
+    assert_eq!(
+        s.step(Input::MediaStarted { t0: 5 }),
+        vec![recording_status(5)]
+    );
+}
+
+#[test]
+fn turning_on_before_the_game_loads_arms_and_waits() {
+    let mut s = Session::new(false);
+    s.step(found());
+    assert_eq!(s.step(on()), vec![Effect::Status(Status::Waiting)]);
+    assert_eq!(
+        s.step(Input::Ready(info())),
+        vec![Effect::StartMedia(WINDOW)]
+    );
+}
+
+#[test]
+fn turning_off_while_armed_or_starting_cancels() {
+    let mut s = Session::new(true);
+    s.step(found());
+    assert_eq!(s.step(off()), vec![Effect::Status(Status::GameRunning)]);
+    assert_eq!(*s.state(), SessionState::Idle);
+
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Ready(info()));
+    assert_eq!(
+        s.step(off()),
+        vec![Effect::StopMedia, Effect::Status(Status::GameRunning)]
+    );
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn turning_on_after_the_game_ended_does_not_record() {
+    let mut s = Session::new(false);
+    s.step(found());
+    s.step(Input::Ready(info()));
+    assert_eq!(
+        s.step(Input::Ended(GameResult::Win)),
+        vec![Effect::Status(Status::Idle)]
+    );
+    assert!(s.step(on()).is_empty());
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn turning_on_with_no_game_running_does_nothing() {
+    let mut s = Session::new(false);
+    assert!(s.step(on()).is_empty());
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn switch_in_the_same_position_changes_nothing() {
+    let mut s = recording_session(0);
+    assert!(s.step(on()).is_empty());
+    assert!(matches!(s.state(), SessionState::Recording { .. }));
+}
+
+#[test]
+fn turning_off_during_a_manual_recording_keeps_it() {
+    let mut s = Session::new(true);
+    s.step(Input::UserStart);
+    s.step(Input::MediaStarted { t0: 0 });
+    assert!(s.step(off()).is_empty());
+    assert!(matches!(
+        s.state(),
+        SessionState::Recording { manual: true, .. }
+    ));
 }
