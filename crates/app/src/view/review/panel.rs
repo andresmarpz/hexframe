@@ -14,6 +14,7 @@ use crate::ui::{EventFilter, PanelTab, ReviewState, Source, Ui, format_clock, se
 use crate::view::{card, hairline, thumb};
 
 pub(super) const PANEL_WIDTH: f32 = 280.0;
+const STACKED_HEIGHT: f32 = 360.0;
 const ROW_HEIGHT: f32 = 34.0;
 const CLIP_ROW_HEIGHT: f32 = 52.0;
 const CLIP_THUMB_WIDTH: f32 = 64.0;
@@ -392,16 +393,18 @@ fn clip_banner(review: &ReviewState, k: &Kit) -> Option<El> {
     )
 }
 
-pub(super) fn panel(review: &ReviewState, k: &Kit) -> El {
+pub(super) fn panel(review: &ReviewState, k: &Kit, stacked: bool) -> El {
     let body = match review.tab {
         PanelTab::Events => events_body(review, k),
         PanelTab::Clips => clips_list(review, k),
     };
-    let mut panel = card(k)
-        .key("review-panel")
-        .w(PANEL_WIDTH)
-        .h_full()
-        .min_h(0.0)
+    let sized = card(k).key("review-panel");
+    let sized = if stacked {
+        sized.w_full().h(STACKED_HEIGHT)
+    } else {
+        sized.w(PANEL_WIDTH).h_full().min_h(0.0)
+    };
+    let mut panel = sized
         .child(tabs(review, k))
         .child(hairline(k));
     if let Some(banner) = clip_banner(review, k) {

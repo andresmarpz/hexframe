@@ -5,6 +5,24 @@ use super::{clock_text, controls, icons, play_button, timeline};
 use crate::ui::{ReviewState, Ui};
 
 const SKIP_SECS: f64 = 5.0;
+const SHOW_SKIP_FROM: f32 = 440.0;
+const SHOW_SPEED_FROM: f32 = 360.0;
+const SHOW_CLOCK_FROM: f32 = 260.0;
+
+struct Visible {
+    skip: bool,
+    speed: bool,
+    clock: bool,
+}
+
+fn visible(width: Option<f32>) -> Visible {
+    let at_least = |min: f32| width.is_none_or(|w| w >= min);
+    Visible {
+        skip: at_least(SHOW_SKIP_FROM),
+        speed: at_least(SHOW_SPEED_FROM),
+        clock: at_least(SHOW_CLOCK_FROM),
+    }
+}
 
 fn skip_button(forward: bool, k: &Kit) -> El {
     let (icon, name, key, shortcut) = if forward {
@@ -46,7 +64,7 @@ fn screen_button(theater: bool, k: &Kit) -> El {
         .key(key)
 }
 
-pub(super) fn transport(review: &ReviewState, k: &Kit, theater: bool) -> El {
+pub(super) fn transport(review: &ReviewState, k: &Kit, theater: bool, width: Option<f32>) -> El {
     let variant = if theater {
         IconButtonVariant::Ghost
     } else {
@@ -57,16 +75,25 @@ pub(super) fn transport(review: &ReviewState, k: &Kit, theater: bool) -> El {
     } else {
         k.c.text_muted
     };
-    let buttons = row()
+    let show = visible(width);
+    let mut buttons = row()
         .w_full()
         .gap(8.0)
         .center_y()
-        .child(play_button(review, k, variant))
-        .child(skip_button(false, k))
-        .child(skip_button(true, k))
-        .child(clock_text(review, k, clock))
-        .child(el().grow(1.0))
-        .child(controls::speed_menu(review, k, &mut Vec::new()))
+        .child(play_button(review, k, variant));
+    if show.skip {
+        buttons = buttons
+            .child(skip_button(false, k))
+            .child(skip_button(true, k));
+    }
+    if show.clock {
+        buttons = buttons.child(clock_text(review, k, clock));
+    }
+    buttons = buttons.child(el().grow(1.0));
+    if show.speed {
+        buttons = buttons.child(controls::speed_menu(review, k, &mut Vec::new()));
+    }
+    let buttons = buttons
         .child(controls::volume_control(review, k, &mut Vec::new()))
         .child(screen_button(theater, k));
     col()

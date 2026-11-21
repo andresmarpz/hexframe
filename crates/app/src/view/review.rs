@@ -14,7 +14,7 @@ mod tests;
 use greyscreen_core::game::GameResult;
 use greyscreen_engine::reveal;
 use jiff::Zoned;
-use rune::{Color, El, PlayerState, TextStyle, Tx, col, el, row, text};
+use rune::{Color, El, PlayerState, ScrollSpec, TextStyle, Tx, col, el, row, text};
 use rune_kit::{
     Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
     Toolbar, glyphs,
@@ -28,6 +28,9 @@ use crate::ui::{ReviewState, Ui, format_clock};
 const CHAMPION_ICON: f32 = 28.0;
 const CHAMPION_MIN_WIDTH: f32 = 56.0;
 const PAGE_PADDING: f32 = 16.0;
+const STACK_BELOW: f32 = 800.0;
+const VIDEO_ASPECT: f32 = 16.0 / 9.0;
+const COLUMN_GAP: f32 = 16.0;
 const NO_VIDEO: &str = "No video for this game";
 
 pub(super) use card::hover_card;
@@ -89,33 +92,52 @@ pub(super) fn clock_text(review: &ReviewState, k: &Kit, color: Color) -> El {
         .color(color)
 }
 
-pub(super) fn page(s: &Ui, k: &Kit) -> El {
+pub(super) fn page(s: &Ui, k: &Kit, width: Option<f32>) -> El {
     let Some(review) = &s.review else {
         return col().key("review").w_full().h_full();
     };
     match &review.death {
         Some(state) if state.summary => death_summary::screen(review, state, k),
         Some(state) => deaths::screen(review, state, &s.death_note, k),
-        None => screen(review, k),
+        None => screen(review, k, width),
     }
 }
 
-fn screen(review: &ReviewState, k: &Kit) -> El {
+pub(super) fn is_stacked(width: Option<f32>) -> bool {
+    width.is_some_and(|w| w < STACK_BELOW)
+}
+
+fn screen(review: &ReviewState, k: &Kit, width: Option<f32>) -> El {
+    let stacked = is_stacked(width);
+    let inner = width.map(|w| w - 2.0 * PAGE_PADDING);
+    let body = if stacked {
+        col()
+            .w_full()
+            .grow(1.0)
+            .min_h(0.0)
+            .gap(COLUMN_GAP)
+            .scroll(ScrollSpec {
+                stick_bottom: false,
+            })
+            .child(player_column(review, k, true, inner))
+            .child(panel::panel(review, k, true))
+    } else {
+        let player = inner.map(|w| w - COLUMN_GAP - panel::PANEL_WIDTH);
+        row()
+            .w_full()
+            .grow(1.0)
+            .min_h(0.0)
+            .gap(COLUMN_GAP)
+            .child(player_column(review, k, false, player))
+            .child(panel::panel(review, k, false))
+    };
     col()
         .key("review")
         .w_full()
         .h_full()
         .min_h(0.0)
         .padding(PAGE_PADDING)
-        .child(
-            row()
-                .w_full()
-                .grow(1.0)
-                .min_h(0.0)
-                .gap(16.0)
-                .child(player_column(review, k))
-                .child(panel::panel(review, k)),
-        )
+        .child(body)
 }
 
 pub(super) fn result_label(result: GameResult) -> Option<&'static str> {
@@ -229,26 +251,31 @@ fn deaths_button(review: &ReviewState, k: &Kit) -> El {
         .key("review-deaths")
 }
 
-fn player_column(review: &ReviewState, k: &Kit) -> El {
-    col()
-        .key("review-player")
-        .grow(1.0)
-        .min_w(0.0)
-        .min_h(0.0)
-        .gap(8.0)
-        .child(video(review, k))
-        .child(transport::transport(review, k, false))
+fn player_column(review: &ReviewState, k: &Kit, stacked: bool, width: Option<f32>) -> El {
+    let column = col().key("review-player").min_w(0.0).gap(8.0);
+    let column = if stacked {
+        column.w_full()
+    } else {
+        column.grow(1.0).min_h(0.0)
+    };
+    column
+        .child(video(review, k, stacked))
+        .child(transport::transport(review, k, false, width))
 }
 
-fn video(review: &ReviewState, k: &Kit) -> El {
+fn video(review: &ReviewState, k: &Kit, stacked: bool) -> El {
     let frame = el()
         .key("review-video")
         .focusable(true)
         .w_full()
-        .grow(1.0)
         .min_h(0.0)
         .radius(8.0)
         .fill(Color::BLACK);
+    let frame = if stacked {
+        frame.aspect_ratio(VIDEO_ASPECT)
+    } else {
+        frame.grow(1.0)
+    };
     video_frame(review, k, frame)
 }
 

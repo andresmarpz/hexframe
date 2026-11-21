@@ -58,6 +58,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 }
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
+    let review_width = cx.layout_with("review", |r| r[2]);
     match s.settings.nav_style {
         NavStyle::Sidebar => {
             let folded = shell::sidebar::is_folded(s, cx.layout_with("window", |r| r[2]));
@@ -71,6 +72,7 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
                     s,
                     k,
                     shell::sidebar::lights_overhang(folded, cx.titlebar_inset()),
+                    review_width,
                 )))
         }
         NavStyle::Dock => col()
@@ -83,7 +85,7 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
                     .w_full()
                     .grow(1.0)
                     .min_h(0.0)
-                    .child(screen(s, k, cx.titlebar_inset())),
+                    .child(screen(s, k, cx.titlebar_inset(), review_width)),
             )
             .children(shell::dock::hover_zone(s))
             .child(shell::dock::layer(s, k)),
@@ -94,10 +96,10 @@ fn settled(el: El) -> El {
     el.transition(Transition::none()).instant_changes()
 }
 
-fn screen(s: &Ui, k: &Kit, inset: f32) -> El {
+fn screen(s: &Ui, k: &Kit, inset: f32, review_width: Option<f32>) -> El {
     let (key, built) = match s.screen {
         Screen::Home => ("screen-home", home_screen(s, k, inset)),
-        Screen::Games => ("screen-games", games_screen(s, k, inset)),
+        Screen::Games => ("screen-games", games_screen(s, k, inset, review_width)),
         Screen::Clips => ("screen-clips", clips_screen(s, k, inset)),
     };
     settled(col().key(key).w_full().h_full().child(built))
@@ -124,9 +126,9 @@ fn clips_screen(s: &Ui, k: &Kit, inset: f32) -> El {
         .build(k)
 }
 
-fn games_screen(s: &Ui, k: &Kit, inset: f32) -> El {
+fn games_screen(s: &Ui, k: &Kit, inset: f32, review_width: Option<f32>) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
-        (Detail::Game, Some(review)) => (review_page(s, k), review::toolbar(review, k)),
+        (Detail::Game, Some(review)) => (review_page(s, k, review_width), review::toolbar(review, k)),
         (Detail::Live, _) => (
             fixed_content(s, home::page(s, k)),
             Toolbar::new().title("Recording"),
@@ -146,8 +148,8 @@ fn games_screen(s: &Ui, k: &Kit, inset: f32) -> El {
         .build(k)
 }
 
-fn review_page(s: &Ui, k: &Kit) -> El {
-    let page = review::page(s, k);
+fn review_page(s: &Ui, k: &Kit, width: Option<f32>) -> El {
+    let page = review::page(s, k, width);
     if s.settings.nav_style == NavStyle::Sidebar {
         return page;
     }

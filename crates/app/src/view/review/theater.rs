@@ -125,7 +125,7 @@ fn bottom_bar(review: &ReviewState, k: &Kit) -> El {
         .pt(BAR_PAD_TOP)
         .pb(BAR_PAD_BOTTOM)
         .linear_gradient(PI, scrim())
-        .child(transport::transport(review, k, true))
+        .child(transport::transport(review, k, true, None))
 }
 
 fn drawer(review: &ReviewState, k: &Kit) -> El {
