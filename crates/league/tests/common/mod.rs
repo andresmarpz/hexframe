@@ -31,6 +31,10 @@ impl Script {
         self.frozen = Some(self.game_time());
     }
 
+    pub fn freeze_at(&mut self, secs: f64) {
+        self.frozen = Some(secs);
+    }
+
     pub fn unfreeze(&mut self) {
         if let Some(frozen) = self.frozen.take() {
             self.game_time_base = frozen - self.started.elapsed().as_secs_f64();

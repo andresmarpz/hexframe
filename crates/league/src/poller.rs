@@ -11,6 +11,8 @@ use crate::client::{ClientError, LiveClient};
 use crate::locator::GameLocator;
 use crate::parse::{event_id, event_secs, to_game_event, to_game_info};
 
+pub type Clock = Box<dyn FnMut() -> Hns + Send>;
+
 pub(crate) const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_REFUSED_POLLS: u32 = 3;
 const MAX_IDENTIFY_ATTEMPTS: u32 = 5;
@@ -43,11 +45,22 @@ impl Poller {
         out: Sender<LeagueMsg>,
         interval: Duration,
     ) -> PollerHandle {
+        Self::spawn_with_clock(client, locator, out, interval, Box::new(mono_now))
+    }
+
+    pub fn spawn_with_clock(
+        client: LiveClient,
+        locator: Box<dyn GameLocator>,
+        out: Sender<LeagueMsg>,
+        interval: Duration,
+        clock: Clock,
+    ) -> PollerHandle {
         let (stop, stop_rx) = crossbeam_channel::bounded(0);
         let worker = Worker {
             client,
             locator,
             out,
+            clock,
             state: State::Idle,
         };
         let thread = std::thread::Builder::new()
@@ -99,6 +112,7 @@ struct Worker {
     client: LiveClient,
     locator: Box<dyn GameLocator>,
     out: Sender<LeagueMsg>,
+    clock: Clock,
     state: State,
 }
 
@@ -175,7 +189,7 @@ impl Worker {
             return Ok(());
         };
         self.state = State::Recording(Recording {
-            ready_at: mono_now(),
+            ready_at: (self.clock)(),
             seen: HashSet::new(),
             offset: None,
             last_at: Hns::MIN,
@@ -200,9 +214,9 @@ impl Worker {
             return self.send(LeagueMsg::Gone);
         }
         let events = self.client.eventdata();
-        let before_stats = mono_now();
+        let before_stats = (self.clock)();
         let stats = self.client.gamestats();
-        let after_stats = mono_now();
+        let after_stats = (self.clock)();
 
         if matches!(events, Err(ClientError::Refused)) {
             rec.refused += 1;

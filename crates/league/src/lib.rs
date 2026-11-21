@@ -11,5 +11,5 @@ pub use client::{ClientError, LiveClient};
 pub use ddragon::{ChampionIcons, ChampionIndex, DdragonError, SyncReport};
 pub use feedback::{FeedbackClient, FeedbackError};
 pub use locator::{AlwaysPresent, GameLocator};
-pub use poller::{LeagueMsg, Poller, PollerHandle};
+pub use poller::{Clock, LeagueMsg, Poller, PollerHandle};
 pub use updates::{GithubReleases, UpdateError};
