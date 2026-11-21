@@ -87,6 +87,7 @@ pub struct CaptureConfig {
     pub gop_frames: u32,         // == fps
     pub audio: bool,
     pub audio_bitrate: u32,      // 192_000
+    pub cursor: bool,
 }
 pub enum MediaEvent {
     Started { t0: Hns, video: VideoFormat, audio: Option<AudioFormat>, encoder: String },
@@ -198,6 +199,7 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `resolution` | `Resolution { Native, P1440, P1080, P720 }` | `P1080` |
 | `fps` | `u32` (30 or 60) | `60` |
 | `audio` | `bool` | `true` |
+| `capture_cursor` | `bool` | `true` |
 | `clips.enabled` | `bool` | `true` |
 | `clips.pre_secs` / `clips.post_secs` | `u32` | `15` / `5` |
 | `clips.kills`, `deaths`, `multikills`, `objectives`, `aces` | `bool` | `true` |

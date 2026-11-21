@@ -45,6 +45,7 @@ fn save_then_load_round_trips() {
         quality: Quality::Max,
         resolution: Resolution::P720,
         fps: 30,
+        capture_cursor: false,
         output_dir: dir.join("videos"),
         clips: ClipSettings {
             assists: true,
@@ -176,4 +177,26 @@ fn audio_flag_is_passed_through() {
         ..Settings::default()
     };
     assert!(!s.capture_config(1080).audio);
+}
+
+#[test]
+fn cursor_is_on_by_default_and_reaches_the_capture_config() {
+    let s = Settings::default();
+    assert!(s.capture_cursor);
+    assert!(s.capture_config(1080).cursor);
+    let off = Settings {
+        capture_cursor: false,
+        ..Settings::default()
+    };
+    assert!(!off.capture_config(1080).cursor);
+}
+
+#[test]
+fn old_settings_file_without_cursor_loads_with_cursor_on() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    fs::write(&path, r#"{"fps": 30, "audio": false}"#).unwrap();
+    let s = Settings::load(&path);
+    assert_eq!(s.fps, 30);
+    assert!(s.capture_cursor);
 }

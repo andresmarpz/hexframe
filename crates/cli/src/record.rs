@@ -24,6 +24,7 @@ pub(crate) struct Args {
     pub(crate) fps: u32,
     pub(crate) height: u32,
     pub(crate) audio: bool,
+    pub(crate) cursor: bool,
 }
 
 #[derive(Debug, Default)]
@@ -65,6 +66,7 @@ fn record(args: &Args) -> Result<ExitCode> {
     cfg.fps = args.fps;
     cfg.max_height = Some(args.height);
     cfg.audio = args.audio;
+    cfg.cursor = args.cursor;
     run_with(source.as_ref(), target, cfg, args)
 }
 

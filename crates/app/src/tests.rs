@@ -109,6 +109,19 @@ fn toggling_a_switch_applies_the_setting_through_the_engine() {
 }
 
 #[test]
+fn cursor_switch_flips_the_setting_and_applies_it() {
+    let (mut rt, rx) = live_runtime();
+    tap(&mut rt, "nav-settings");
+    let before = rt.state.settings.capture_cursor;
+    tap(&mut rt, "capture-cursor-switch");
+    assert_eq!(rt.state.settings.capture_cursor, !before);
+    let Ok(EngineCmd::ApplySettings(sent)) = rx.try_recv() else {
+        panic!("no ApplySettings sent");
+    };
+    assert_eq!(sent.capture_cursor, !before);
+}
+
+#[test]
 fn full_game_switch_changes_the_setting() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");

@@ -138,6 +138,7 @@ impl H264Encoder {
             gop_frames: 120,
             audio: false,
             audio_bitrate: 0,
+            cursor: false,
             bitrate_pixels: 0,
         };
         match Self::new(gpu, PROBE_SIZE.0, PROBE_SIZE.1, PROBE_FPS, &cfg) {

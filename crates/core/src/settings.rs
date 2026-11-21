@@ -93,6 +93,7 @@ pub struct Settings {
     pub resolution: Resolution,
     pub fps: u32,
     pub audio: bool,
+    pub capture_cursor: bool,
     pub clips: ClipSettings,
 }
 
@@ -106,6 +107,7 @@ impl Default for Settings {
             resolution: Resolution::default(),
             fps: 60,
             audio: true,
+            capture_cursor: true,
             clips: ClipSettings::default(),
         }
     }
@@ -169,6 +171,7 @@ impl Settings {
             gop_frames: self.fps,
             audio: self.audio,
             audio_bitrate: AUDIO_BITRATE,
+            cursor: self.capture_cursor,
             bitrate_pixels: pixels.round() as u64,
         }
     }

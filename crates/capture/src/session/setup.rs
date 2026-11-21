@@ -17,7 +17,7 @@ use crate::h264::H264Encoder;
 use crate::pacer::{Pacer, Stats};
 use crate::vproc::VideoConverter;
 use crate::watchdog::Watchdog;
-use crate::wgc::WgcCapture;
+use crate::wgc::{WgcCapture, WgcOptions};
 
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(2);
 const FIRST_FRAME_POLL: Duration = Duration::from_millis(10);
@@ -41,8 +41,16 @@ pub(crate) fn build(
     .map_err(|e| format!("no usable GPU: {e}"))?;
     let qpc = QpcMap::now();
     tracing::info!(step = "graphics capture", adapter = %gpu.adapter_name, "capture setup");
-    let wgc = WgcCapture::start(&gpu, target, qpc, cfg.fps)
-        .map_err(|e| format!("screen capture failed to start: {e}"))?;
+    let wgc = WgcCapture::start(
+        &gpu,
+        target,
+        qpc,
+        WgcOptions {
+            fps: cfg.fps,
+            cursor: cfg.cursor,
+        },
+    )
+    .map_err(|e| format!("screen capture failed to start: {e}"))?;
     tracing::info!(step = "first frame", "capture setup");
     let native = first_frame_size(&wgc, &flags)?;
     let size = encode_size(native, cfg.max_height);

@@ -61,6 +61,12 @@ struct Shared {
     frames: AtomicU64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct WgcOptions {
+    pub fps: u32,
+    pub cursor: bool,
+}
+
 pub struct WgcCapture {
     shared: Arc<Shared>,
     item: Option<GraphicsCaptureItem>,
@@ -79,7 +85,12 @@ impl std::fmt::Debug for WgcCapture {
 }
 
 impl WgcCapture {
-    pub fn start(gpu: &GpuDevice, target: &CaptureTarget, qpc: QpcMap, fps: u32) -> Result<Self> {
+    pub fn start(
+        gpu: &GpuDevice,
+        target: &CaptureTarget,
+        qpc: QpcMap,
+        options: WgcOptions,
+    ) -> Result<Self> {
         if !GraphicsCaptureSession::IsSupported()? {
             return Err(WgcError::Unsupported);
         }
@@ -122,7 +133,7 @@ impl WgcCapture {
             closed_token: None,
         };
         tracing::info!(step = "session", "graphics capture");
-        capture.attach(fps)?;
+        capture.attach(options)?;
         tracing::info!(
             width = item_size.Width,
             height = item_size.Height,
@@ -131,7 +142,7 @@ impl WgcCapture {
         Ok(capture)
     }
 
-    fn attach(&mut self, fps: u32) -> windows::core::Result<()> {
+    fn attach(&mut self, options: WgcOptions) -> windows::core::Result<()> {
         let (Some(item), Some(pool)) = (self.item.clone(), self.pool.clone()) else {
             return Err(windows::core::Error::from(E_POINTER));
         };
@@ -159,7 +170,7 @@ impl WgcCapture {
         }))?);
         let session = pool.CreateCaptureSession(&item)?;
         self.session = Some(session.clone());
-        configure_session(&session, fps);
+        configure_session(&session, options);
         tracing::info!(step = "start", "graphics capture");
         session.StartCapture()
     }
@@ -364,9 +375,11 @@ fn create_item(target: &CaptureTarget) -> windows::core::Result<GraphicsCaptureI
     }
 }
 
-fn configure_session(session: &GraphicsCaptureSession, fps: u32) {
-    if let Err(error) = session.SetIsCursorCaptureEnabled(false) {
-        tracing::warn!(%error, "disable cursor capture failed");
+fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) {
+    let WgcOptions { fps, cursor } = options;
+    tracing::info!(cursor, "graphics capture cursor");
+    if let Err(error) = session.SetIsCursorCaptureEnabled(cursor) {
+        tracing::warn!(%error, cursor, "set cursor capture failed");
     }
     tracing::info!(step = "borderless access", "graphics capture");
     request_borderless();

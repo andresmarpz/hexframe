@@ -60,6 +60,7 @@ pub struct CaptureConfig {
     pub gop_frames: u32,
     pub audio: bool,
     pub audio_bitrate: u32,
+    pub cursor: bool,
     pub bitrate_pixels: u64,
 }
 

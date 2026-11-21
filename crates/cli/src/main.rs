@@ -31,6 +31,8 @@ enum Command {
         height: u32,
         #[arg(long)]
         no_audio: bool,
+        #[arg(long)]
+        cursor: bool,
     },
     FakeLeague {
         #[arg(long, default_value_t = 2999)]
@@ -61,6 +63,7 @@ fn main() -> ExitCode {
             fps,
             height,
             no_audio,
+            cursor,
         } => record::run(&record::Args {
             seconds,
             out,
@@ -68,6 +71,7 @@ fn main() -> ExitCode {
             fps,
             height,
             audio: !no_audio,
+            cursor,
         }),
         Command::Recover { path } => finish(recover::run(&path)),
     }

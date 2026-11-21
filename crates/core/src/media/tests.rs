@@ -288,6 +288,7 @@ fn bitrate_scales_down_to_a_smaller_encode_size() {
         gop_frames: 60,
         audio: true,
         audio_bitrate: 192_000,
+        cursor: false,
         bitrate_pixels: 3840 * 2160,
     };
     let scaled = cfg.for_encode_size(1920, 1080);

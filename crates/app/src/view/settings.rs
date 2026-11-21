@@ -209,6 +209,14 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 settings.audio,
                 |ui| ui.change(|s| s.audio = !s.audio),
             ),
+            toggle_row(
+                k,
+                "capture-cursor",
+                "Show cursor",
+                Some("Include the mouse cursor, as the game draws it."),
+                settings.capture_cursor,
+                |ui| ui.change(|s| s.capture_cursor = !s.capture_cursor),
+            ),
         ],
     )
 }
