@@ -34,3 +34,23 @@ fn the_settings_search_shows_clear_only_with_text() {
     settle(&mut rt);
     assert!(clear_button_in(&rt, "settings-search"));
 }
+
+#[test]
+fn the_games_search_clear_button_empties_the_search() {
+    let mut rt = runtime();
+    rt.update(|ui, _| ui.go(Screen::Games));
+    rt.update(|ui, _| ui.filter.champion = TextEdit::new("ah"));
+    settle(&mut rt);
+    tap(&mut rt, "filter-champion/action");
+    assert_eq!(rt.state.filter.champion.text, "");
+}
+
+#[test]
+fn the_settings_search_clear_button_empties_the_search() {
+    let mut rt = runtime();
+    tap(&mut rt, "nav-settings");
+    rt.update(|ui, _| ui.settings_search = TextEdit::new("qual"));
+    settle(&mut rt);
+    tap(&mut rt, "settings-search/action");
+    assert_eq!(rt.state.settings_search.text, "");
+}

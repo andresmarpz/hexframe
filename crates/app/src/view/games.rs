@@ -75,7 +75,7 @@ fn search(s: &Ui, k: &Kit) -> El {
         .label("Search games")
         .placeholder("Search games")
         .leading_icon(&glyphs::SEARCH);
-    clear_when_filled(input, &s.filter.champion.text)
+    clear_when_filled(input, &s.filter.champion.text, |ui| &mut ui.filter.champion)
         .width(None)
         .on_edit(|ui: &mut Ui| &mut ui.filter.champion)
         .on_key(search_key)

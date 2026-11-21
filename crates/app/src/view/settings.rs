@@ -72,7 +72,7 @@ fn search_bar(s: &Ui, k: &Kit) -> El {
         .label("Search settings")
         .placeholder("Search settings…")
         .leading_icon(&glyphs::SEARCH);
-    let input = clear_when_filled(input, &s.settings_search.text)
+    let input = clear_when_filled(input, &s.settings_search.text, |ui| &mut ui.settings_search)
         .width(Some(SHEET_WIDTH - 32.0))
         .on_edit(|ui: &mut Ui| &mut ui.settings_search)
         .on_key(|ui: &mut Ui, ev: &KeyEvent, _: &mut Tx| ui.clear_settings_search_on_escape(ev))
