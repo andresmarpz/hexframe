@@ -277,6 +277,7 @@ impl Ui {
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),
             UiMsg::Update(state) => self.apply_update(state),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
+            UiMsg::Thumbnail(_) => {}
         }
     }
 

@@ -38,9 +38,9 @@ crates/
   league/   greyscreen-league   Live Client Data API client and poller. The Windows game-window locator sits behind cfg(windows).
   capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session.
   engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library. Fake media source for the Mac.
-  thumbs/   greyscreen-thumbs   One MP4 frame to a JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`.
+  thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. Used by the engine's background thumbnail worker.
   app/      greyscreen          The Rune UI binary.
-  cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`.
+  cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`.
 ```
 
 Dependency direction: `core` ← `mp4` ← `capture`; `core` ← `league`; (`core`, `mp4`, `league`, `capture` on Windows) ← `engine` ← (`app`, `cli`).
@@ -181,8 +181,10 @@ UI commands ──EngineCmd────┘          └─> UiMsg sink -> AppHan
   2026-11-20_19-55-01_Ahri_CLASSIC/
     game.mp4            (game.mp4.part while recording)
     game.json           library sidecar, the source of truth for the UI
+    thumb.jpg           game thumbnail, made in the background
     clips/
       12-34_MyKill.mp4
+      12-34_MyKill.jpg  clip thumbnail
 %APPDATA%\Greyscreen\settings.json                macOS ~/Library/Application Support/Greyscreen/settings.json
 %LOCALAPPDATA%\Greyscreen\logs\greyscreen.log.YYYY-MM-DD
 ```

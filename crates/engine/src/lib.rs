@@ -9,6 +9,7 @@ mod recovery;
 mod ring;
 mod settings_save;
 mod storage;
+mod thumbs;
 pub mod updater;
 mod writer;
 

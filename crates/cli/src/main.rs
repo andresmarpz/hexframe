@@ -3,6 +3,7 @@ mod doctor;
 mod fake_league;
 mod record;
 mod recover;
+mod thumb;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -62,6 +63,13 @@ enum Command {
     Recover {
         path: PathBuf,
     },
+    Thumb {
+        video: PathBuf,
+        #[arg(long, default_value_t = 1.0)]
+        at: f64,
+        #[arg(long, default_value = "thumb.jpg")]
+        out: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -102,6 +110,7 @@ fn main() -> ExitCode {
             peak_mbps: peak,
         }),
         Command::Recover { path } => finish(recover::run(&path)),
+        Command::Thumb { video, at, out } => finish(thumb::run(&video, at, &out)),
     }
 }
 

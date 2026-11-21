@@ -219,3 +219,27 @@ fn write_review_fails_without_a_sidecar() {
     assert!(write_review(dir.path(), &ReviewData::default()).is_err());
     assert!(!dir.path().join(META_FILE).exists());
 }
+
+#[test]
+fn clip_thumbnails_sit_next_to_their_clip() {
+    let clip = &meta("a", zoned(20, 19)).clips[0];
+    assert_eq!(thumb::clip_thumb_file(clip), "clips/01-52_Kill.jpg");
+}
+
+#[test]
+fn clip_thumbnail_time_lands_near_the_moment_and_inside_the_clip() {
+    let mut clip = meta("a", zoned(20, 19)).clips.remove(0);
+    assert!((thumb::clip_thumb_secs(&clip) - 14.0).abs() < 1e-9);
+    clip.end_secs = clip.start_secs + 0.5;
+    assert_eq!(thumb::clip_thumb_secs(&clip), 0.0);
+}
+
+#[test]
+fn game_thumbnail_uses_the_first_clip_then_falls_back_to_the_game() {
+    let mut m = meta("a", zoned(20, 19));
+    assert!((thumb::game_thumb_secs(&m) - 111.5).abs() < 1e-9);
+    m.clips.clear();
+    assert!((thumb::game_thumb_secs(&m) - 720.2).abs() < 1e-9);
+    m.duration_secs = 0.5;
+    assert_eq!(thumb::game_thumb_secs(&m), 0.0);
+}

@@ -159,6 +159,8 @@ fn highlights_become_merged_clips_before_recording_saved() {
     }
     let files = std::fs::read_dir(entry.folder.join("clips"))
         .expect("clips dir")
+        .flatten()
+        .filter(|file| file.path().extension().is_some_and(|ext| ext == "mp4"))
         .count();
     assert_eq!(files, 2);
 }

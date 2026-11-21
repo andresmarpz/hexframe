@@ -76,6 +76,7 @@ pub enum UiMsg {
     Notice { level: NoticeLevel, text: String },
     HotkeyStatus { errors: Vec<(Action, String)> },
     Update(UpdateState),
+    Thumbnail(PathBuf),
 }
 
 pub type UiSink = Box<dyn Fn(UiMsg) + Send + Sync>;
@@ -165,7 +166,7 @@ impl Engine {
             guard,
             league_rx,
             cmd_rx,
-            Arc::from(sink),
+            crate::thumbs::wrap(Arc::from(sink)),
         );
         EngineHandle { cmd, thread }
     }

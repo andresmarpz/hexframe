@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::game::{GameEvent, GameInfo, GameResult};
 use crate::review::ReviewData;
 
+pub mod thumb;
+
 pub const META_FILE: &str = "game.json";
 pub const META_VERSION: u32 = 1;
 
