@@ -30,6 +30,11 @@ thread_local! {
     static TIME: Cell<f64> = const { Cell::new(0.0) };
     static PLAYING: Cell<bool> = const { Cell::new(false) };
     static DURATION: Cell<f64> = const { Cell::new(10.0) };
+    static OPEN: Cell<usize> = const { Cell::new(0) };
+}
+
+pub(crate) fn open_players() -> usize {
+    OPEN.get()
 }
 
 pub(crate) fn set_playing(playing: bool) {
@@ -61,7 +66,14 @@ pub(crate) struct FakePlayer;
 
 pub(crate) fn factory(path: &Path) -> Box<dyn ReviewPlayer> {
     record(Call::Open(path.to_owned()));
+    OPEN.set(OPEN.get() + 1);
     Box::new(FakePlayer)
+}
+
+impl Drop for FakePlayer {
+    fn drop(&mut self) {
+        OPEN.set(OPEN.get().saturating_sub(1));
+    }
 }
 
 impl ReviewPlayer for FakePlayer {

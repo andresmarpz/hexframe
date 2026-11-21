@@ -98,3 +98,20 @@ fn the_toolbar_trash_button_opens_the_same_dialog() {
     tap(&mut rt, "delete-confirm");
     assert_eq!(deletes(&rx), vec![id]);
 }
+
+#[test]
+fn deleting_the_open_game_closes_its_player_first() {
+    let (mut rt, rx) = browsing();
+    rt.update(|ui, _| ui.player_factory = crate::ui::fake_player::factory);
+    let id = first_game(&rt);
+    tap(&mut rt, &id);
+    settle(&mut rt);
+    assert!(rt.state.review.is_some());
+    assert_eq!(crate::ui::fake_player::open_players(), 1);
+    tap(&mut rt, &format!("delete-{id}"));
+    settle(&mut rt);
+    tap(&mut rt, "delete-confirm");
+    assert!(rt.state.review.is_none());
+    assert_eq!(crate::ui::fake_player::open_players(), 0);
+    assert_eq!(deletes(&rx), vec![id]);
+}

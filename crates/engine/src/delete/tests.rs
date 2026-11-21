@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fs;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -153,4 +154,50 @@ fn a_refused_delete_reports_an_error_and_keeps_the_library() {
         }
     ));
     assert!(output.join("2025-01-01_Ahri").is_dir());
+}
+
+fn refuse_while_open(handle_open: &AtomicBool, bin: &Path) -> impl Fn(&Path) -> io::Result<()> {
+    move |path: &Path| {
+        if handle_open.load(Ordering::SeqCst) {
+            Err(io::Error::new(io::ErrorKind::ResourceBusy, "in use"))
+        } else {
+            move_into(path, bin)
+        }
+    }
+}
+
+#[test]
+fn a_delete_waits_for_a_handle_that_closes_soon() {
+    let output = temp_dir("busy-soon");
+    let bin = temp_dir("busy-soon-bin");
+    let folder = recording(&output, "2025-01-01_Ahri");
+    let handle_open = Arc::new(AtomicBool::new(true));
+    let closer = handle_open.clone();
+    let closing = thread::spawn(move || {
+        thread::sleep(IN_USE_DELAY * 3);
+        closer.store(false, Ordering::SeqCst);
+    });
+    let mover = refuse_while_open(&handle_open, &bin);
+    delete_recording(&output, "2025-01-01_Ahri", None, &mover).expect("delete");
+    closing.join().expect("closer");
+    assert!(!folder.exists());
+}
+
+#[test]
+fn a_handle_that_stays_open_reports_the_file_is_in_use() {
+    let output = temp_dir("busy-stays");
+    let bin = temp_dir("busy-stays-bin");
+    let folder = recording(&output, "2025-01-01_Ahri");
+    let handle_open = AtomicBool::new(true);
+    let seen: Arc<Mutex<Vec<UiMsg>>> = Arc::default();
+    let log = seen.clone();
+    let sink: Sink = Arc::new(move |msg| log.lock().expect("lock").push(msg));
+    let mover = refuse_while_open(&handle_open, &bin);
+    run(&output, "2025-01-01_Ahri", None, &mover, &sink);
+    let seen = seen.lock().expect("lock");
+    assert!(matches!(
+        &seen[0],
+        UiMsg::Notice { level: NoticeLevel::Error, text } if text == "Couldn't delete: the file is in use"
+    ));
+    assert!(folder.join("game.mp4").is_file());
 }

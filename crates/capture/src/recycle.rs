@@ -8,6 +8,8 @@ use windows::Win32::UI::Shell::{
 };
 use windows::core::PCWSTR;
 
+const IN_USE_CODES: [i32; 3] = [0x20, 0x21, 0x78];
+
 pub fn move_to_recycle_bin(path: &Path) -> io::Result<()> {
     let mut from: Vec<u16> = path
         .as_os_str()
@@ -31,6 +33,12 @@ pub fn move_to_recycle_bin(path: &Path) -> io::Result<()> {
     // SAFETY: `from` is double-null terminated and outlives the call, and `operation` is initialised.
     let code = unsafe { SHFileOperationW(&mut operation) };
     if code != 0 {
+        if IN_USE_CODES.contains(&code) {
+            return Err(io::Error::new(
+                io::ErrorKind::ResourceBusy,
+                format!("the file is in use (code {code:#x})"),
+            ));
+        }
         return Err(io::Error::other(format!(
             "the Recycle Bin refused the folder (code {code:#x})"
         )));

@@ -10,14 +10,14 @@ use greyscreen_core::install::{
     install_plan, is_inside, run_command, start_plan, uninstall_values, wait_until,
     without_update_flag,
 };
-use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+use windows::Win32::Foundation::{E_OUTOFMEMORY, ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
 use windows::Win32::Storage::EnhancedStorage::PKEY_AppUserModel_ID;
 use windows::Win32::System::Com::StructuredStorage::{
     PROPVARIANT, PROPVARIANT_0, PROPVARIANT_0_0, PROPVARIANT_0_0_0,
 };
 use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
-    CoUninitialize, IPersistFile,
+    CoTaskMemAlloc, CoUninitialize, IPersistFile,
 };
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE, REG_DWORD, REG_OPTION_NON_VOLATILE, REG_SZ,
@@ -114,6 +114,9 @@ pub fn install(mut progress: impl FnMut(Progress)) -> Result<(), InstallError> {
             return Err(InstallError::StillRunning);
         }
         tracing::info!("the installed exe is unlocked");
+        wait_until(QUIT_WAIT, QUIT_POLL, || {
+            !crate::instance::is_running(APP_ID)
+        });
     }
     progress(Progress::Copying);
     let size = if plan == InstallPlan::RelaunchInstalled {
@@ -124,8 +127,15 @@ pub fn install(mut progress: impl FnMut(Progress)) -> Result<(), InstallError> {
             source,
         })?
     };
-    write_uninstall_entry(&target, &dir, size)?;
-    create_shortcut(&target, &dir)?;
+    tracing::info!(size, "copied the exe");
+    match write_uninstall_entry(&target, &dir, size) {
+        Ok(()) => tracing::info!("wrote the uninstall entry"),
+        Err(error) => tracing::warn!(%error, "cannot write the uninstall entry"),
+    }
+    match create_shortcut(&target, &dir) {
+        Ok(()) => tracing::info!("wrote the Start menu shortcut"),
+        Err(error) => tracing::warn!(%error, "cannot write the Start menu shortcut"),
+    }
     tracing::info!("installed");
     Ok(())
 }
@@ -361,24 +371,36 @@ fn write_shortcut(exe: &Path, dir: &Path, lnk: &Path) -> windows::core::Result<(
         link.SetWorkingDirectory(&HSTRING::from(dir.as_os_str()))?;
         link.SetDescription(&HSTRING::from("Greyscreen"))?;
         link.SetIconLocation(&exe, 0)?;
-        let id = HSTRING::from(APP_ID);
-        let value = PROPVARIANT {
-            Anonymous: PROPVARIANT_0 {
-                Anonymous: std::mem::ManuallyDrop::new(PROPVARIANT_0_0 {
-                    vt: VT_LPWSTR,
-                    wReserved1: 0,
-                    wReserved2: 0,
-                    wReserved3: 0,
-                    Anonymous: PROPVARIANT_0_0_0 {
-                        pwszVal: PWSTR(id.as_ptr() as *mut u16),
-                    },
-                }),
-            },
-        };
+        let value = string_property(APP_ID)?;
         let store: IPropertyStore = link.cast()?;
         store.SetValue(&PKEY_AppUserModel_ID, &value)?;
         store.Commit()?;
         let file: IPersistFile = link.cast()?;
         file.Save(&HSTRING::from(lnk.as_os_str()), true)
     }
+}
+
+fn string_property(text: &str) -> windows::core::Result<PROPVARIANT> {
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let bytes = wide.len() * std::mem::size_of::<u16>();
+    // SAFETY: the buffer comes from CoTaskMemAlloc because PROPVARIANT's drop frees it with CoTaskMemFree.
+    let buffer = unsafe { CoTaskMemAlloc(bytes) }.cast::<u16>();
+    if buffer.is_null() {
+        return Err(E_OUTOFMEMORY.into());
+    }
+    // SAFETY: the buffer holds `wide.len()` u16 values and does not overlap the vector.
+    unsafe { std::ptr::copy_nonoverlapping(wide.as_ptr(), buffer, wide.len()) };
+    Ok(PROPVARIANT {
+        Anonymous: PROPVARIANT_0 {
+            Anonymous: std::mem::ManuallyDrop::new(PROPVARIANT_0_0 {
+                vt: VT_LPWSTR,
+                wReserved1: 0,
+                wReserved2: 0,
+                wReserved3: 0,
+                Anonymous: PROPVARIANT_0_0_0 {
+                    pwszVal: PWSTR(buffer),
+                },
+            }),
+        },
+    })
 }

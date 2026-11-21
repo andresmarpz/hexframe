@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 use std::thread;
+use std::time::Duration;
 
 use greyscreen_core::library::META_FILE;
 use thiserror::Error;
@@ -16,9 +17,18 @@ pub(crate) enum DeleteError {
     NotARecording,
     #[error("the recording is still being written")]
     InProgress,
-    #[error("cannot move the recording: {0}")]
+    #[error("the file is in use")]
+    InUse,
+    #[error("{0}")]
     Move(#[source] io::Error),
 }
+
+const IN_USE_ATTEMPTS: u32 = 10;
+const IN_USE_DELAY: Duration = if cfg!(test) {
+    Duration::from_millis(5)
+} else {
+    Duration::from_millis(250)
+};
 
 pub(crate) type Mover<'a> = &'a dyn Fn(&Path) -> io::Result<()>;
 
@@ -54,7 +64,19 @@ pub(crate) fn delete_recording(
         return Err(DeleteError::InProgress);
     }
     let folder = recording_folder(output_dir, id)?;
-    mover(&folder).map_err(DeleteError::Move)
+    for attempt in 1..=IN_USE_ATTEMPTS {
+        match mover(&folder) {
+            Ok(()) => return Ok(()),
+            Err(err) if err.kind() == io::ErrorKind::ResourceBusy => {
+                tracing::info!(attempt, id, "the recording is in use, trying again");
+                if attempt < IN_USE_ATTEMPTS {
+                    thread::sleep(IN_USE_DELAY);
+                }
+            }
+            Err(err) => return Err(DeleteError::Move(err)),
+        }
+    }
+    Err(DeleteError::InUse)
 }
 
 fn run(output_dir: &Path, id: &str, active: Option<&str>, mover: Mover, sink: &Sink) {
@@ -67,7 +89,7 @@ fn run(output_dir: &Path, id: &str, active: Option<&str>, mover: Mover, sink: &S
             tracing::warn!(%err, id, "cannot delete the recording");
             sink(UiMsg::Notice {
                 level: NoticeLevel::Error,
-                text: format!("Could not delete the recording: {err}"),
+                text: format!("Couldn't delete: {err}"),
             });
         }
     }
