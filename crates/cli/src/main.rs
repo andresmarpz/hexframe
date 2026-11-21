@@ -1,3 +1,4 @@
+mod demo;
 mod doctor;
 mod fake_league;
 mod record;
@@ -20,6 +21,10 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     Doctor,
+    Demo {
+        #[command(subcommand)]
+        action: demo::Action,
+    },
     Record {
         #[arg(long)]
         seconds: f64,
@@ -67,6 +72,7 @@ fn main() -> ExitCode {
             speed,
             script,
         } => finish(run_fake_league(port, speed, script)),
+        Command::Demo { action } => finish(demo::run(action)),
         Command::Doctor => doctor::run(),
         Command::Record {
             seconds,
