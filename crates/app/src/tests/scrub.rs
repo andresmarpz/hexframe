@@ -219,3 +219,27 @@ fn a_seek_that_never_lands_writes_one_stall_report() {
     assert_eq!(s.review().watch.reports, 1);
     assert!(s.review().is_playing());
 }
+
+#[test]
+fn playback_that_runs_fast_writes_one_report() {
+    let mut s = session(windows_like());
+    for _ in 0..90 {
+        sim::advance(2.0 * TICK);
+        s.tick();
+    }
+    let watch = &s.review().watch;
+    let report = watch.last_fast_report.clone().expect("a fast report");
+    assert!(report.contains("playback ran fast"), "{report}");
+    assert_eq!(watch.fast_reports, 1, "{report}");
+    s.run(1.5);
+    assert_eq!(s.review().watch.fast_reports, 1);
+}
+
+#[test]
+fn a_jump_or_a_normal_run_writes_no_fast_report() {
+    let mut s = session(windows_like());
+    s.run(2.0);
+    sim::advance(1.2);
+    s.run(2.0);
+    assert_eq!(s.review().watch.fast_reports, 0);
+}

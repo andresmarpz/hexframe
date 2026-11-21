@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::path::Path;
 use std::time::Instant;
@@ -11,9 +11,16 @@ use super::ReviewPlayer;
 const KEEP: usize = 200;
 /// Playback that stands still this long, or a seek this slow, is a stall.
 const STALL: f64 = 1.0;
+/// Playback is measured over this much of the frame clock.
+const PACE_WINDOW: f64 = 0.5;
+/// Playback faster than the rate times this, over a window, is a fast run.
+const PACE_LIMIT: f64 = 1.5;
+/// A step of the time this big in one frame is a jump (a seek, a loop), not a fast run.
+const JUMP: f64 = 0.25;
 
 thread_local! {
     static TRACE: RefCell<VecDeque<(Instant, String)>> = const { RefCell::new(VecDeque::new()) };
+    static RATE: Cell<f32> = const { Cell::new(1.0) };
 }
 
 fn note(what: String) {
@@ -44,6 +51,7 @@ pub(crate) struct Traced(Box<dyn ReviewPlayer>);
 
 pub(crate) fn traced(path: &Path, player: Box<dyn ReviewPlayer>) -> Box<dyn ReviewPlayer> {
     note(format!("open {}", path.display()));
+    RATE.set(1.0);
     Box::new(Traced(player))
 }
 
@@ -97,6 +105,7 @@ impl ReviewPlayer for Traced {
 
     fn set_rate(&self, rate: f32) {
         self.call(format_args!("rate {rate}"));
+        RATE.set(rate);
         self.0.set_rate(rate);
     }
 
@@ -128,6 +137,13 @@ pub(crate) struct Watch {
     stalled: Option<f64>,
     pub last_report: Option<String>,
     pub reports: usize,
+    /// The frame clock and the time where the current measure of the pace began, and the last
+    /// time seen.
+    pace: Option<(f64, f64, f64)>,
+    /// A fast run was reported and the pace has not been normal since.
+    running_fast: bool,
+    pub last_fast_report: Option<String>,
+    pub fast_reports: usize,
 }
 
 impl Watch {
@@ -159,6 +175,7 @@ impl Watch {
             _ if moving => Some((time, clock)),
             _ => None,
         };
+        self.measure_pace(clock, time, moving, file);
         let stall = match (self.seeking, self.standing) {
             (Some((since, to)), _) if clock - since > STALL => {
                 Some(("a seek waits for its picture", to, since))
@@ -191,5 +208,38 @@ impl Watch {
             }
             _ => {}
         }
+    }
+}
+
+impl Watch {
+    fn measure_pace(&mut self, clock: f64, time: f64, moving: bool, file: &Path) {
+        let Some((began, from, last)) = self.pace.filter(|_| moving) else {
+            self.pace = moving.then_some((clock, time, time));
+            return;
+        };
+        if !(0.0..=JUMP).contains(&(time - last)) {
+            self.pace = Some((clock, time, time));
+            return;
+        }
+        self.pace = Some((began, from, time));
+        let span = clock - began;
+        if span < PACE_WINDOW {
+            return;
+        }
+        let rate = f64::from(RATE.get());
+        let advanced = time - from;
+        let fast = advanced > rate * span * PACE_LIMIT;
+        if fast && !self.running_fast {
+            let report = format!(
+                "playback ran fast: {advanced:.2} s of clip in {span:.2} s at rate {rate} in {}\nrecent player calls and changes:\n{}",
+                file.display(),
+                recent()
+            );
+            tracing::warn!("{report}");
+            self.last_fast_report = Some(report);
+            self.fast_reports += 1;
+        }
+        self.running_fast = fast;
+        self.pace = Some((clock, time, time));
     }
 }
