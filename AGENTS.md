@@ -10,8 +10,8 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 2. Read `AGENTS.md`, `docs/architecture.md`, the ticket and the research sections it names. A change that makes a doc untrue fixes the doc in the same commit.
 3. Change only the files the ticket lists. If something outside them must change, make the smallest change and say so in your final report.
 4. Do not take design decisions. If the ticket is ambiguous or wrong, pick the option closest to `docs/architecture.md`, and list it under "Deviations" in your report.
-5. `just ci` must pass: fmt, clippy on the host, clippy for Windows through cargo-xwin, and the tests.
-6. Commit with the message `<crate>: <what changed>` (for example `mp4: add fragmented writer`). Then `git fetch origin && git rebase origin/main && just ci && git push origin HEAD:main`. On a push race, repeat the rebase.
+5. `just check` must pass: fmt, clippy on the host and the tests. Run `just ci` (adds typos and Windows clippy through cargo-xwin) only when you touch Windows-only code (`capture`, `thumbs`, `cfg(windows)`) or before a release. Real Windows builds and tests are run by the orchestrator on the Windows PC.
+6. Commit with the message `<crate>: <what changed>` (for example `mp4: add fragmented writer`). Then `git fetch origin && git rebase origin/main && just check && git push origin HEAD:main`. On a push race, repeat the rebase.
 7. Final report, under 15 lines: commit sha, what was built, the tests added, deviations, and anything left unverified.
 
 ## Rules for code
@@ -22,7 +22,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `unsafe` only in `capture`, `thumbs` and the Windows locator, and each block carries a `// SAFETY:` line (clippy `undocumented_unsafe_blocks`).
 - No `unwrap`/`expect` outside tests, except on a mutex lock.
 - Libraries return `thiserror` errors. Binaries use `anyhow`.
-- `just ci` passes before every push. It runs fmt, clippy on macOS and on Windows through cargo-xwin, and the tests.
+- `just check` passes before every push.
 
 ## Keybinds
 
@@ -32,7 +32,8 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 
 ## Commands
 
-- `just ci`: fmt check, host clippy, typos, Windows clippy through cargo-xwin, tests.
+- `just check`: the everyday gate: fmt check, host clippy, tests.
+- `just ci`: the full gate, `just check` plus typos and Windows clippy through cargo-xwin. `just release` runs it.
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows.
 - `just release <tag>`: runs `just ci`, builds and publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe` and `README.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. GitHub Actions has no minutes to spare, so releases never go through CI. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.

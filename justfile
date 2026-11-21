@@ -13,6 +13,8 @@ fmt:
 lint:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets --locked -- -D warnings
+
+spell:
     typos
 
 check-win:
@@ -31,7 +33,11 @@ dist: build-win
     cp target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt dist/
     cp dist/greyscreen.exe dist/GreyscreenSetup.exe
 
-ci: lint check-win test
+# Everyday gate: fmt check, host clippy and the tests. Run before every push.
+check: lint test
+
+# Full gate for releases and Windows-only code: check, typos and Windows clippy.
+ci: check spell check-win
 
 # Builds an ad-hoc signed Greyscreen.app for UI testing on this Mac and installs it in ~/Applications. Never published.
 mac-app:
