@@ -10,11 +10,20 @@ use rune::{TextEdit, Tx};
 
 mod format;
 mod preview;
+mod review;
 
+#[cfg(test)]
+pub(crate) mod fake_player;
 #[cfg(test)]
 mod tests;
 
 pub(crate) use format::{format_clock, format_date, format_size};
+pub(crate) use review::{PlayerFactory, ReviewState, Source};
+
+#[cfg(test)]
+pub(crate) fn review_entry() -> RecordingEntry {
+    preview::review_entry()
+}
 
 type Scene = (&'static str, fn(&mut Ui));
 
@@ -40,8 +49,7 @@ pub(crate) const SCENES: &[Scene] = &[
     }),
     ("settings", |ui| ui.screen = Screen::Settings),
     ("review", |ui| {
-        ui.review = ui.recordings.first().map(|r| r.meta.id.clone());
-        ui.screen = Screen::Review;
+        ui.open_review_entry(preview::review_entry());
     }),
 ];
 
@@ -51,6 +59,7 @@ pub(crate) const FEED_CAP: usize = 500;
 pub(crate) const TEST_RECORDING_SECS: u32 = 10;
 const NOTICE_SECS: f64 = 4.0;
 const TICK: Duration = Duration::from_millis(250);
+const PLAYBACK_TICK: Duration = Duration::from_millis(33);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Screen {
@@ -78,7 +87,8 @@ pub(crate) struct Ui {
     pub cmd: Option<Sender<EngineCmd>>,
     pub recording_since_clock: Option<f64>,
     pub elapsed_secs: u32,
-    pub review: Option<String>,
+    pub review: Option<ReviewState>,
+    pub player_factory: PlayerFactory,
     pub resolution_open: bool,
     pub pre_secs: TextEdit,
     pub post_secs: TextEdit,
@@ -106,6 +116,7 @@ impl Ui {
             recording_since_clock: None,
             elapsed_secs: 0,
             review: None,
+            player_factory: review::rune_player,
             resolution_open: false,
             pre_secs: TextEdit::new(settings.clips.pre_secs.to_string()),
             post_secs: TextEdit::new(settings.clips.post_secs.to_string()),
@@ -123,14 +134,43 @@ impl Ui {
 
     pub(crate) fn go(&mut self, screen: Screen) {
         self.screen = screen;
+        if screen != Screen::Review {
+            self.review = None;
+        }
         if screen == Screen::Recordings {
             self.send(EngineCmd::RescanLibrary);
         }
     }
 
     pub(crate) fn open_review(&mut self, id: String) {
-        self.review = Some(id);
+        if let Some(entry) = self.recordings.iter().find(|r| r.meta.id == id) {
+            self.open_review_entry(entry.clone());
+        }
+    }
+
+    pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
+        self.review = Some(ReviewState::open(entry, self.player_factory));
         self.screen = Screen::Review;
+    }
+
+    pub(crate) fn play_clip(&mut self, index: usize) {
+        let make = self.player_factory;
+        if let Some(review) = &mut self.review {
+            review.play_clip(index, make);
+        }
+    }
+
+    pub(crate) fn play_game(&mut self) {
+        let make = self.player_factory;
+        if let Some(review) = &mut self.review {
+            review.play_game(make);
+        }
+    }
+
+    pub(crate) fn review_seek(&mut self, secs: f64) {
+        if let Some(review) = &mut self.review {
+            review.seek(secs);
+        }
     }
 
     pub(crate) fn reveal_output_dir(&self) {
@@ -203,6 +243,12 @@ impl Ui {
                 changed = true;
             }
             tx.wake_after(TICK);
+        }
+        if let Some(review) = &mut self.review {
+            changed |= review.changed_since_shown();
+            if review.needs_ticks() {
+                tx.wake_after(PLAYBACK_TICK);
+            }
         }
         changed
     }

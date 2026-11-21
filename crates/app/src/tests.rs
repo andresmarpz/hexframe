@@ -3,7 +3,8 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Env, Runtime};
 
-use crate::ui::{Screen, Ui, parse_clip_secs};
+use crate::ui::fake_player::{self, Call};
+use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
@@ -86,7 +87,10 @@ fn review_button_opens_the_review_screen_with_the_id() {
     let id = rt.state.recordings[0].meta.id.clone();
     tap(&mut rt, &format!("review-{id}"));
     assert_eq!(rt.state.screen, Screen::Review);
-    assert_eq!(rt.state.review, Some(id));
+    assert_eq!(
+        rt.state.review.as_ref().map(|r| r.entry.meta.id.clone()),
+        Some(id)
+    );
     tap(&mut rt, "review-back");
     assert_eq!(rt.state.screen, Screen::Recordings);
 }
@@ -132,4 +136,76 @@ fn clip_seconds_outside_the_range_are_ignored() {
     assert_eq!(parse_clip_secs("0"), None);
     assert_eq!(parse_clip_secs("121"), None);
     assert_eq!(parse_clip_secs("abc"), None);
+}
+
+fn review_runtime() -> Runtime<Ui> {
+    let mut ui = Ui::preview();
+    ui.player_factory = fake_player::factory;
+    let mut rt = runtime_with(ui);
+    rt.update(|ui, _| ui.open_review_entry(crate::ui::review_entry()));
+    rt.frame(1.0 / 60.0);
+    rt.frame(2.0 / 60.0);
+    fake_player::clear_calls();
+    rt
+}
+
+fn assert_seeks_to(secs: f64) {
+    match fake_player::calls().as_slice() {
+        [Call::Seek(at)] => assert!((at - secs).abs() < 1e-9, "sought {at}"),
+        other => panic!("unexpected calls {other:?}"),
+    }
+}
+
+#[test]
+fn tapping_a_marker_seeks_three_seconds_before_the_event() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "marker-9");
+    assert_seeks_to(5.2);
+}
+
+#[test]
+fn pressing_the_track_seeks_to_that_share_of_the_video() {
+    let mut rt = review_runtime();
+    let (x, y) = rt.find("timeline").expect("timeline");
+    rt.pointer_down(x, y);
+    rt.pointer_up(x, y);
+    rt.frame(1.0 / 60.0);
+    assert_seeks_to(5.0);
+}
+
+#[test]
+fn tapping_an_event_row_seeks_like_its_marker() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "event-5");
+    assert_seeks_to(1.6);
+}
+
+#[test]
+fn tapping_the_play_button_plays_a_paused_player() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "review-play");
+    assert_eq!(fake_player::calls(), vec![Call::Play]);
+}
+
+#[test]
+fn tapping_a_clip_swaps_the_source_and_back_restores_the_game() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "clip-1");
+    assert_eq!(
+        rt.state.review.as_ref().map(|r| r.source),
+        Some(Source::Clip(1))
+    );
+    assert!(matches!(fake_player::calls()[0], Call::Open(_)));
+    tap(&mut rt, "review-game");
+    assert_eq!(
+        rt.state.review.as_ref().map(|r| r.source),
+        Some(Source::Game)
+    );
+}
+
+#[test]
+fn leaving_the_review_screen_drops_the_player() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "review-back");
+    assert!(rt.state.review.is_none());
 }

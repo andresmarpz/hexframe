@@ -183,3 +183,98 @@ fn recordings() -> Vec<RecordingEntry> {
         row((15, 20, 48), "Thresh", "CLASSIC", Loss, 31.5, 1_680, 1),
     ]
 }
+
+pub(super) fn review_entry() -> RecordingEntry {
+    let mut entry = recordings().remove(0);
+    entry.folder = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+    entry.meta.video = "review.mp4".into();
+    entry.meta.duration_secs = 10.0;
+    let who = || String::from("Summoner");
+    let kill = |killer: &str, victim: &str| GameEvent::ChampionKill {
+        killer: killer.into(),
+        victim: victim.into(),
+        assisters: Vec::new(),
+    };
+    let rows: Vec<(f64, GameEvent, &[&str])> = vec![
+        (0.3, GameEvent::MinionsSpawning, &[]),
+        (
+            1.2,
+            GameEvent::FirstBlood { recipient: who() },
+            &["FirstBlood"],
+        ),
+        (2.4, kill("Summoner", "Zed"), &["MyKill"]),
+        (
+            3.4,
+            GameEvent::TurretKilled {
+                turret: "Turret_T2_C_05".into(),
+                killer: who(),
+                assisters: Vec::new(),
+            },
+            &["Turret"],
+        ),
+        (4.6, kill("Lee Sin", "Summoner"), &["MyDeath"]),
+        (
+            5.5,
+            GameEvent::DragonKill {
+                dragon_type: "Fire".into(),
+                stolen: false,
+                killer: "Jinx".into(),
+                assisters: Vec::new(),
+            },
+            &["EnemyDragon"],
+        ),
+        (6.4, kill("Jinx", "Lux"), &["AllyKill"]),
+        (
+            7.3,
+            GameEvent::Multikill {
+                killer: who(),
+                streak: 2,
+            },
+            &["Multikill2"],
+        ),
+        (
+            8.2,
+            GameEvent::BaronKill {
+                stolen: false,
+                killer: who(),
+                assisters: Vec::new(),
+            },
+            &["Baron"],
+        ),
+        (
+            9.1,
+            GameEvent::InhibKilled {
+                inhib: "Barracks_T1_C1".into(),
+                killer: "Lee Sin".into(),
+                assisters: Vec::new(),
+            },
+            &["EnemyInhibitor"],
+        ),
+    ];
+    entry.meta.events = rows
+        .into_iter()
+        .zip(1u32..)
+        .map(|((rec_secs, kind, highlights), id)| EventEntry {
+            id,
+            game_secs: rec_secs - 8.0,
+            rec_secs,
+            kind,
+            highlights: highlights.iter().map(|h| (*h).to_owned()).collect(),
+        })
+        .collect();
+    entry.meta.clips = vec![
+        ClipEntry {
+            file: "review.mp4".into(),
+            start_secs: 0.0,
+            end_secs: 10.0,
+            label: "FirstBlood".into(),
+        },
+        ClipEntry {
+            file: "review.mp4".into(),
+            start_secs: 1.0,
+            end_secs: 6.0,
+            label: "MyKill".into(),
+        },
+    ];
+    entry
+}

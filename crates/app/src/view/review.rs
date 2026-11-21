@@ -1,41 +1,144 @@
-use rune::{El, col, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
+mod panel;
+mod timeline;
 
-use super::page_header;
-use crate::ui::{Screen, Ui};
+#[cfg(test)]
+mod tests;
+
+use greyscreen_core::game::GameResult;
+use rune::{Color, El, PlayerState, col, el, row, text};
+use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit};
+
+use super::title_style;
+use crate::ui::{ReviewState, Screen, Ui, format_clock, format_date};
+
+const VIDEO_RATIO: f32 = 16.0 / 9.0;
+const NO_VIDEO: &str = "No video for this game";
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
-    let subtitle = s
-        .recordings
-        .iter()
-        .find(|r| Some(&r.meta.id) == s.review.as_ref())
-        .map(|r| {
-            format!(
-                "{} - {}",
-                r.meta.game.info.me.champion,
-                crate::ui::format_date(&r.meta.started_at)
-            )
-        })
-        .unwrap_or_default();
-    let back = Button::new("Back")
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
-        .on_press(|ui: &mut Ui| ui.go(Screen::Recordings))
-        .build(k)
-        .key("review-back");
+    match &s.review {
+        Some(review) => screen(review, k),
+        None => col().key("review").w_full().h_full(),
+    }
+}
+
+fn screen(review: &ReviewState, k: &Kit) -> El {
     col()
         .key("review")
         .w_full()
         .h_full()
         .min_h(0.0)
         .gap(16.0)
-        .child(page_header(k, "Review", &subtitle, Some(back)))
+        .child(header(review, k))
         .child(
-            col().w_full().grow(1.0).center().child(
-                text("Review comes next")
-                    .key("review-placeholder")
-                    .font(k.ty.body)
-                    .color(k.c.text_muted),
-            ),
+            row()
+                .w_full()
+                .grow(1.0)
+                .min_h(0.0)
+                .gap(16.0)
+                .child(player_column(review, k))
+                .child(panel::panel(review, k)),
         )
+}
+
+fn header(review: &ReviewState, k: &Kit) -> El {
+    let meta = &review.entry.meta;
+    let back = Button::new("Back")
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Large)
+        .on_press(|ui: &mut Ui| ui.go(Screen::Recordings))
+        .build(k)
+        .key("review-back");
+    let result = match meta.game.result {
+        GameResult::Win => Some(Badge::new("WIN").variant(BadgeVariant::Accent)),
+        GameResult::Loss => Some(Badge::new("LOSS").variant(BadgeVariant::Subtle)),
+        GameResult::Unknown => None,
+    };
+    let mut line = row()
+        .key("review-header")
+        .w_full()
+        .gap(12.0)
+        .center_y()
+        .child(back)
+        .child(
+            text(meta.game.info.me.champion.clone())
+                .font(title_style(k))
+                .color(k.c.text_base),
+        )
+        .child(
+            Badge::new(meta.game.info.mode.clone())
+                .variant(BadgeVariant::Neutral)
+                .build(k),
+        );
+    if let Some(result) = result {
+        line = line.child(result.build(k));
+    }
+    line.child(
+        text(format_date(&meta.started_at))
+            .font(k.ty.body)
+            .color(k.c.text_muted),
+    )
+}
+
+fn player_column(review: &ReviewState, k: &Kit) -> El {
+    col()
+        .key("review-player")
+        .grow(1.0)
+        .min_w(0.0)
+        .gap(12.0)
+        .child(video(review, k))
+        .child(controls(review, k))
+}
+
+fn video(review: &ReviewState, k: &Kit) -> El {
+    let frame = el()
+        .key("review-video")
+        .w_full()
+        .aspect_ratio(VIDEO_RATIO)
+        .radius(8.0)
+        .fill(Color::BLACK);
+    let message = |label: String| {
+        frame
+            .clone()
+            .center()
+            .child(text(label).font(k.ty.body).color(k.c.text_muted))
+    };
+    match &review.player {
+        None => message(NO_VIDEO.into()),
+        Some(player) => match player.state() {
+            PlayerState::Failed(err) => message(err),
+            _ => player.show(frame),
+        },
+    }
+}
+
+fn controls(review: &ReviewState, k: &Kit) -> El {
+    let label = if review.is_playing() { "Pause" } else { "Play" };
+    let play = Button::new(label)
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Regular)
+        .on_press(|ui: &mut Ui| {
+            if let Some(review) = &ui.review {
+                review.toggle();
+            }
+        })
+        .build(k)
+        .key("review-play");
+    let clock = format!(
+        "{} / {}",
+        format_clock(review.time() as u32),
+        format_clock(review.duration() as u32)
+    );
+    row()
+        .key("review-controls")
+        .w_full()
+        .gap(12.0)
+        .center_y()
+        .child(play)
+        .child(
+            text(clock)
+                .key("review-clock")
+                .font(k.ty.body)
+                .color(k.c.text_muted),
+        )
+        .child(timeline::timeline(review, k))
 }
