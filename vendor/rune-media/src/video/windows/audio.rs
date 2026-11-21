@@ -1,14 +1,17 @@
 //! Sound for a clip: a WASAPI shared-mode stream on the default output device, fed by the
-//! decoder and timed by the player's clock. The stream follows the clock rather than leading
-//! it: each time the device asks for more, it writes the samples for the moment they'll be
-//! heard, padding with silence or skipping ahead when the clock moved (a start, a seek, a stall,
-//! the device's own drift), so picture and sound stay together without either waiting.
+//! decoder (audio clips) or by a reader of its own (`ahead`, video), and timed by the player's
+//! clock. Each time the device asks for more, it writes the samples for the moment they'll be
+//! heard, from the device's own position, padding with silence or skipping ahead when the clock
+//! jumped (a start, a seek, a stall). While it plays on, the sound is the master: where the
+//! device clock drifts from the player's, the player's clock moves to the sound, so the
+//! pictures follow what is heard and the sound never skips.
 
+use super::ahead::{self, Read};
 use super::machine::Anchor;
 use super::mf::Sound;
 use rune_core::time::Instant;
 use std::collections::VecDeque;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
 use windows::Win32::Media::Audio::*;
@@ -18,10 +21,17 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 
 /// The device's buffer: long enough to ride out a busy decoder, short enough to react.
 const BUFFER: Duration = Duration::from_millis(100);
-/// Sound decoded ahead of what's heard; the decoder waits beyond it.
+/// Sound decoded ahead of what's heard; the reader waits beyond it.
 const AHEAD: f64 = 1.0;
-/// How far written sound may drift from the clock before it jumps back in line.
+/// How far written sound may be from the clock before it jumps back in line: a start, a seek, a
+/// stall, a clock the UI set again.
 const SLOP: f64 = 0.04;
+/// How far the sound may run from the clock, on average, before the clock moves to the sound.
+const NUDGE: f64 = 0.008;
+/// Each write's weight in that average.
+const SMOOTH: f64 = 0.1;
+/// The device's position is trusted only this far past the estimate from its buffer.
+const POSITION_SLACK: f64 = 0.5;
 
 /// The playback clock the UI sets and the sound follows: none while paused, stalled or ended.
 #[derive(Default)]
@@ -37,6 +47,14 @@ impl Clock {
     }
     pub(super) fn get(&self) -> Option<Anchor> {
         *self.anchor.lock().unwrap()
+    }
+    /// Moves the clock `by` seconds to where the sound plays, unless it was set again since
+    /// `anchor` was read.
+    fn nudge(&self, anchor: Anchor, by: f64) {
+        let mut current = self.anchor.lock().unwrap();
+        if *current == Some(anchor) {
+            *current = Some(Anchor { pos: anchor.pos + by, ..anchor });
+        }
     }
     /// Sleeps until the clock runs at 1x (or patience passes) while it doesn't: sound plays
     /// only at normal speed.
@@ -54,27 +72,78 @@ struct Chunk {
 }
 
 #[derive(Default)]
-struct Feed {
+pub(super) struct Feed {
     chunks: VecDeque<Chunk>,
     /// Interleaved samples buffered.
     samples: usize,
     gain: f32,
-    stop: bool,
+    pub stop: bool,
     /// Media time of the next sample the device gets, once it's writing in line with the clock.
     cursor: Option<f64>,
+    /// For the reader: an unwrapped time to read from next.
+    pub seek: Option<f64>,
+    pub looping: bool,
 }
 
-/// A clip's sound output; dropping it stops the stream.
+impl Feed {
+    /// Forgets queued sound.
+    pub(super) fn clear(&mut self) {
+        self.chunks.clear();
+        self.samples = 0;
+        self.cursor = None;
+    }
+}
+
+/// The sound between whoever decodes it and the device; `room` wakes the reader when the device
+/// took some, or something changed.
+#[derive(Default)]
+pub(super) struct Queue {
+    feed: Mutex<Feed>,
+    room: Condvar,
+}
+
+impl Queue {
+    pub(super) fn lock(&self) -> MutexGuard<'_, Feed> {
+        self.feed.lock().unwrap()
+    }
+    pub(super) fn wait<'a>(&self, feed: MutexGuard<'a, Feed>, patience: Duration) -> MutexGuard<'a, Feed> {
+        self.room.wait_timeout(feed, patience).unwrap().0
+    }
+    /// Enough is queued; whoever decodes may wait.
+    pub(super) fn full(&self, feed: &Feed, sound: Sound) -> bool {
+        feed.samples as f64 >= AHEAD * f64::from(sound.rate) * f64::from(sound.channels)
+    }
+}
+
+/// Queues a decoded float sample at `pts` seconds; sound before `skip_before` (a seek's
+/// pre-roll) is dropped.
+pub(super) fn push_sample(queue: &Queue, sound: Sound, sample: &IMFSample, pts: f64, skip_before: f64) {
+    let Some(samples) = samples(sample) else { return };
+    let channels = usize::from(sound.channels);
+    let end = pts + (samples.len() / channels) as f64 / f64::from(sound.rate);
+    if end <= skip_before {
+        return;
+    }
+    let mut feed = queue.lock();
+    feed.samples += samples.len();
+    feed.chunks.push_back(Chunk { pts, samples });
+}
+
+/// A clip's sound output; dropping it stops the stream and its reader.
 pub(super) struct Output {
-    feed: Arc<Mutex<Feed>>,
+    queue: Arc<Queue>,
     clock: Arc<Clock>,
     sound: Sound,
+    /// A reader of its own feeds it (`read`); else the decoder pushes.
+    reads: bool,
 }
 
 impl Output {
-    pub(super) fn open(sound: Sound, clock: Arc<Clock>) -> Result<Self, String> {
-        let feed = Arc::new(Mutex::new(Feed { gain: 1.0, ..Feed::default() }));
-        let (thread_feed, thread_clock) = (feed.clone(), clock.clone());
+    /// Opens the stream; with `read`, a reader of its own reads the sound ahead.
+    pub(super) fn open(sound: Sound, clock: Arc<Clock>, read: Option<Read>) -> Result<Self, String> {
+        let queue = Arc::new(Queue::default());
+        queue.lock().gain = 1.0;
+        let (thread_queue, thread_clock) = (queue.clone(), clock.clone());
         let (ready, started) = std::sync::mpsc::sync_channel(1);
         std::thread::Builder::new()
             .name("rune-video-sound".into())
@@ -84,7 +153,7 @@ impl Output {
                 match Stream::new(sound) {
                     Ok(stream) => {
                         let _ = ready.send(Ok(()));
-                        stream.run(&thread_feed, &thread_clock, sound);
+                        stream.run(&thread_queue, &thread_clock, sound);
                     }
                     Err(e) => {
                         let _ = ready.send(Err(e));
@@ -97,40 +166,40 @@ impl Output {
             })
             .map_err(|e| e.to_string())?;
         started.recv().map_err(|_| "the sound thread stopped".to_string())??;
-        Ok(Self { feed, clock, sound })
-    }
-
-    /// Queues a decoded float sample at `pts` seconds; sound before `skip_before` (a seek's
-    /// pre-roll) is dropped.
-    pub(super) fn push(&self, sample: &IMFSample, pts: f64, skip_before: f64, _generation: u32) {
-        let Some(samples) = samples(sample) else { return };
-        let channels = usize::from(self.sound.channels);
-        let rate = f64::from(self.sound.rate);
-        let end = pts + (samples.len() / channels) as f64 / rate;
-        if end <= skip_before {
-            return;
+        let output = Self { queue, clock, sound, reads: read.is_some() };
+        if let Some(read) = read {
+            ahead::start(read, output.queue.clone(), sound)?;
         }
-        let mut feed = self.feed.lock().unwrap();
-        feed.samples += samples.len();
-        feed.chunks.push_back(Chunk { pts, samples });
+        Ok(output)
     }
 
-    /// Forgets queued sound (a seek).
-    pub(super) fn flush(&self) {
-        let mut feed = self.feed.lock().unwrap();
-        feed.chunks.clear();
-        feed.samples = 0;
-        feed.cursor = None;
+    /// Queues a decoded float sample at `pts` seconds, from the decoder.
+    pub(super) fn push(&self, sample: &IMFSample, pts: f64, skip_before: f64, _generation: u32) {
+        push_sample(&self.queue, self.sound, sample, pts, skip_before);
+    }
+
+    /// Forgets queued sound; a reader reads again from `to` (unwrapped seconds).
+    pub(super) fn seek(&self, to: f64) {
+        let mut feed = self.queue.lock();
+        feed.clear();
+        if self.reads {
+            feed.seek = Some(to);
+        }
+        drop(feed);
+        self.queue.room.notify_all();
     }
 
     pub(super) fn set_gain(&self, gain: f32) {
-        self.feed.lock().unwrap().gain = gain.clamp(0.0, 1.0);
+        self.queue.lock().gain = gain.clamp(0.0, 1.0);
     }
 
-    /// Enough is queued; the decoder may wait.
+    pub(super) fn set_looping(&self, looping: bool) {
+        self.queue.lock().looping = looping;
+    }
+
+    /// Enough is queued from the decoder; it may wait. A reader of its own keeps it full.
     pub(super) fn full(&self) -> bool {
-        let per_second = f64::from(self.sound.rate) * f64::from(self.sound.channels);
-        self.feed.lock().unwrap().samples as f64 >= AHEAD * per_second
+        !self.reads && self.queue.full(&self.queue.lock(), self.sound)
     }
 
     /// Nothing plays: paused, stalled or ended.
@@ -144,8 +213,9 @@ impl Output {
 
 impl Drop for Output {
     fn drop(&mut self) {
-        self.feed.lock().unwrap().stop = true;
+        self.queue.lock().stop = true;
         self.clock.changed.notify_all();
+        self.queue.room.notify_all();
     }
 }
 
@@ -168,6 +238,8 @@ struct Stream {
     event: HANDLE,
     frames: u32,
     latency: Duration,
+    /// The device's position counter and its ticks per second, when it has one.
+    position: Option<(IAudioClock, u64)>,
 }
 
 impl Stream {
@@ -194,14 +266,36 @@ impl Stream {
             let render: IAudioRenderClient = client.GetService().map_err(|e| e.message())?;
             let frames = client.GetBufferSize().map_err(|e| e.message())?;
             let latency = Duration::from_nanos(client.GetStreamLatency().unwrap_or(0).max(0) as u64 * 100);
-            Ok(Self { client, render, event, frames, latency })
+            let position = client.GetService::<IAudioClock>().ok().and_then(|c| c.GetFrequency().ok().filter(|f| *f > 0).map(|f| (c, f)));
+            Ok(Self { client, render, event, frames, latency, position })
         }
     }
 
-    fn run(&self, feed: &Mutex<Feed>, clock: &Clock, sound: Sound) {
+    /// When the next sample written will be heard. Running, from the device's position: what
+    /// was written and not yet played is still to come. Else from the buffer and the stream's
+    /// latency.
+    fn heard(&self, now: Instant, written: u64, padding: u32, rate: f64, running: bool) -> Instant {
+        let buffered = self.latency.as_secs_f64() + f64::from(padding) / rate;
+        let from_buffer = now + Duration::from_secs_f64(buffered);
+        let Some((clock, frequency)) = self.position.as_ref().filter(|_| running) else { return from_buffer };
+        let (mut position, mut counter) = (0u64, 0u64);
+        // SAFETY: reads into locals from this stream's clock.
+        if unsafe { clock.GetPosition(&mut position, Some(&mut counter)) }.is_err() {
+            return from_buffer;
+        }
+        let played = position as f64 / *frequency as f64;
+        let age = performance_seconds() - counter as f64 / 1e7;
+        let wait = written as f64 / rate - played - age;
+        if (0.0..=buffered + POSITION_SLACK).contains(&wait) { now + Duration::from_secs_f64(wait) } else { from_buffer }
+    }
+
+    fn run(&self, queue: &Queue, clock: &Clock, sound: Sound) {
         let channels = usize::from(sound.channels);
         let rate = f64::from(sound.rate);
         let mut started = false;
+        // Frames written since the stream started, and how far the sound runs from the clock.
+        let mut written = 0u64;
+        let mut drift = 0.0;
         loop {
             if !started {
                 // Stopped: sleep until the clock runs, not on the device's period.
@@ -209,7 +303,7 @@ impl Stream {
             }
             // SAFETY: a wait on this stream's own event.
             let woke = started && unsafe { WaitForSingleObject(self.event, 20) } == WAIT_OBJECT_0;
-            if feed.lock().unwrap().stop {
+            if queue.lock().stop {
                 break;
             }
             let anchor = clock.get().filter(|a| (a.rate - 1.0).abs() < 1e-6);
@@ -221,15 +315,17 @@ impl Stream {
                         let _ = self.client.Reset();
                     }
                     started = false;
-                    feed.lock().unwrap().cursor = None;
+                    written = 0;
+                    queue.lock().cursor = None;
                 }
+                drift = 0.0;
                 continue;
             };
             if started && !woke {
                 continue;
             }
             // SAFETY: buffer calls on this stream; the device buffer holds `free` frames.
-            unsafe {
+            let off = unsafe {
                 let padding = self.client.GetCurrentPadding().unwrap_or(self.frames);
                 let free = self.frames.saturating_sub(padding);
                 if free == 0 {
@@ -237,12 +333,25 @@ impl Stream {
                 }
                 let Ok(data) = self.render.GetBuffer(free) else { continue };
                 let out = std::slice::from_raw_parts_mut(data.cast::<f32>(), free as usize * channels);
-                let heard = Instant::now() + self.latency + Duration::from_secs_f64(f64::from(padding) / rate);
-                fill(&mut feed.lock().unwrap(), out, channels, rate, anchor.position(heard));
+                let heard = self.heard(Instant::now(), written, padding, rate, started);
+                let off = fill(&mut queue.lock(), out, channels, rate, anchor.position(heard));
                 let _ = self.render.ReleaseBuffer(free, 0);
+                written += u64::from(free);
                 if !started {
                     started = self.client.Start().is_ok();
                 }
+                off
+            };
+            queue.room.notify_all();
+            match off {
+                Some(off) => {
+                    drift += (off - drift) * SMOOTH;
+                    if drift.abs() > NUDGE {
+                        clock.nudge(anchor, drift);
+                        drift = 0.0;
+                    }
+                }
+                None => drift = 0.0,
             }
         }
         // SAFETY: stops this stream and closes its event.
@@ -253,11 +362,24 @@ impl Stream {
     }
 }
 
-/// Writes `out` with the sound from media time `want` on, in line with the clock.
-fn fill(feed: &mut Feed, out: &mut [f32], channels: usize, rate: f64, want: f64) {
-    let mut cursor = match feed.cursor {
-        Some(c) if (c - want).abs() < SLOP => c,
-        _ => want,
+/// The performance counter now, in seconds: the clock the device's position is stamped with.
+fn performance_seconds() -> f64 {
+    let (mut count, mut frequency) = (0i64, 0i64);
+    // SAFETY: plain reads of the performance counter into locals.
+    unsafe {
+        windows_sys::Win32::System::Performance::QueryPerformanceCounter(&mut count);
+        windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency);
+    }
+    count as f64 / frequency.max(1) as f64
+}
+
+/// Writes `out` with the sound from media time `want` on. Within `SLOP` of the last write's
+/// end, it goes on from there and returns how far that runs from `want`; further off, it jumps
+/// to `want` and returns None.
+fn fill(feed: &mut Feed, out: &mut [f32], channels: usize, rate: f64, want: f64) -> Option<f64> {
+    let (mut cursor, off) = match feed.cursor {
+        Some(c) if (c - want).abs() < SLOP => (c, Some(c - want)),
+        _ => (want, None),
     };
     let frames = out.len() / channels;
     let mut written = 0;
@@ -293,4 +415,8 @@ fn fill(feed: &mut Feed, out: &mut [f32], channels: usize, rate: f64, want: f64)
         cursor += n as f64 / rate;
     }
     feed.cursor = Some(cursor);
+    off
 }
+
+#[cfg(test)]
+mod tests;

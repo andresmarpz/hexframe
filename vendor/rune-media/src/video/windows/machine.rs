@@ -76,6 +76,8 @@ pub(super) enum Event {
     Resumed { target: Instant, at: f64, lead: f64 },
     /// The decoder let go of the clip.
     Released { at: f64 },
+    /// The sound moved the running clock to where it plays.
+    Synced { clock: Anchor },
 }
 
 #[derive(Debug, PartialEq)]
@@ -181,6 +183,10 @@ pub(super) fn step(phase: &mut Phase, event: Event) -> Effects<Effect> {
         // Nothing to show past a seek: a playing clip ends there, a paused one holds there.
         (P::Buffering { play, .. }, Event::Ended { at }) => {
             *phase = if play { P::Ended { at } } else { P::Paused { at } };
+            Effects::none()
+        }
+        (P::Playing { clock }, Event::Synced { clock: heard }) if heard.rate == clock.rate => {
+            *phase = P::Playing { clock: heard };
             Effects::none()
         }
         (P::Playing { clock }, Event::Resumed { target, at, lead }) => {

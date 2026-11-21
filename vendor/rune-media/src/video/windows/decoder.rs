@@ -6,6 +6,7 @@
 //! The queue is the decoder's only clock: it decodes while there's room, so a clip nobody
 //! draws fills it and sleeps, costing nothing until a frame takes a picture again.
 
+use super::ahead::Read;
 use super::audio::{self, Output};
 use super::gpu::{self, Ring};
 use super::layer::Layer;
@@ -249,6 +250,7 @@ fn run(pipe: &Pipe, job: Job) {
 }
 
 struct Decoder {
+    kind: Kind,
     reader: IMFSourceReader,
     facts: Facts,
     ring: Option<Ring>,
@@ -305,16 +307,18 @@ impl Decoder {
         let facts = Facts { meta, picture, sound: opened.sound, hardware, gpu: ring.is_some() };
         let opened_us = us(t0);
         let steps = format!("Media Foundation at {t_mf}, D3D11 at {t_device}, source at {t_source}, reader at {t_reader}, ring at {opened_us}");
-        let mut d = Self { reader: opened.reader, facts, ring, output: None, video: opened.video, audio: opened.audio, video_open: picture.is_some(), audio_open: false, opened_us, steps, layer: None, awaiting_gpu };
-        d.select_sound(job.sound.is_some() || job.kind == Kind::Audio, &job.clock);
+        let mut d = Self { kind: job.kind, reader: opened.reader, facts, ring, output: None, video: opened.video, audio: opened.audio, video_open: picture.is_some(), audio_open: false, opened_us, steps, layer: None, awaiting_gpu };
+        d.select_sound(job.sound.is_some() || job.kind == Kind::Audio, job, job.start);
         Ok(d)
     }
 
-    /// Turns the audio stream on (opening the output) or off (so it isn't decoded at all).
-    fn select_sound(&mut self, on: bool, clock: &Arc<audio::Clock>) {
+    /// Turns the sound on (opening the output, which reads a video's sound from `at` on with a
+    /// reader of its own) or off. Only an audio clip's sound comes from this reader.
+    fn select_sound(&mut self, on: bool, job: &Job, at: f64) {
         let Some(sound) = self.facts.sound else { return };
         if on && self.output.is_none() {
-            match Output::open(sound, clock.clone()) {
+            let read = (self.kind == Kind::Video).then(|| Read { source: job.source.clone(), at, duration: self.facts.meta.duration });
+            match Output::open(sound, job.clock.clone(), read) {
                 Ok(output) => self.output = Some(output),
                 Err(e) => eprintln!("rune: no sound for the clip: {e}"),
             }
@@ -324,9 +328,14 @@ impl Decoder {
         }
         if let Some(index) = self.audio {
             // SAFETY: stream selection on this thread's reader.
-            let _ = unsafe { self.reader.SetStreamSelection(index, self.output.is_some()) };
+            let _ = unsafe { self.reader.SetStreamSelection(index, self.reads_sound()) };
         }
-        self.audio_open = self.output.is_some();
+        self.audio_open = self.reads_sound();
+    }
+
+    /// This reader decodes the sound: an audio clip's, while it plays any.
+    fn reads_sound(&self) -> bool {
+        self.kind == Kind::Audio && self.output.is_some()
     }
 
     fn decode(&mut self, pipe: &Pipe, job: &Job) -> Result<(), String> {
@@ -363,17 +372,20 @@ impl Decoder {
                         mf::seek(&self.reader, to)?;
                         self.reopen_streams();
                         if let Some(o) = &self.output {
-                            o.flush();
+                            o.seek(to);
                         }
                     }
                     if self.output.is_some() != s.sound.is_some() {
                         let on = s.sound.is_some();
+                        // Sound turned on mid-clip starts where the clip is.
+                        let at = job.clock.get().map(|clock| clock.position(Instant::now())).or(s.frames.front().map(|f| f.pts)).unwrap_or(epoch + skip_before);
                         drop(s);
-                        self.select_sound(on, &job.clock);
+                        self.select_sound(on, job, at);
                         s = pipe.lock();
                     }
                     if let (Some(o), Some(gain)) = (&self.output, s.sound) {
                         o.set_gain(gain);
+                        o.set_looping(s.looping);
                     }
                     self.follow_layer(&mut s);
                     // Rune's GPU came after the clip opened on the CPU: it opens again on the GPU,
@@ -512,7 +524,7 @@ impl Decoder {
     /// After a seek or a loop, every selected stream reads again.
     fn reopen_streams(&mut self) {
         self.video_open = self.facts.picture.is_some();
-        self.audio_open = self.output.is_some();
+        self.audio_open = self.reads_sound();
     }
 
 
@@ -567,25 +579,25 @@ impl Decoder {
         Some(clock)
     }
 
-    /// Presents the picture `blit_on_layer` scaled at its time on `clock`; false leaves it to the
-    /// window. The wait ends early for a seek, a stop or the window taking the pictures back.
+    /// Presents the picture `blit_on_layer` scaled at its time on the clock; false leaves it to
+    /// the window. The wait ends early for a seek, a stop or the window taking the pictures back,
+    /// and follows the clock where the sound moves it.
     fn present_when_due(&mut self, pipe: &Pipe, job: &Job, clock: Anchor, pts: f64, generation: u32) -> bool {
         let Some(layer) = &self.layer else { return false };
-        let at = clock.when(pts).checked_sub(LAYER_LEAD).unwrap_or_else(|| clock.when(pts));
         let mut s = pipe.lock();
         loop {
             if s.stop || s.seek.is_some() || s.layer.is_none() {
                 return false;
             }
+            // Paused, or the rate changed, while it waited: the window decides again.
+            let Some(now_clock) = job.clock.get().filter(|c| c.rate == clock.rate) else { return false };
+            let due = now_clock.when(pts);
+            let at = due.checked_sub(LAYER_LEAD).unwrap_or(due);
             let now = Instant::now();
             if now >= at {
                 break;
             }
             s = pipe.wake.wait_timeout(s, at - now).unwrap().0;
-        }
-        // Paused, or the rate changed, while it waited: the window decides again.
-        if job.clock.get() != Some(clock) {
-            return false;
         }
         drop(s);
         if let Err(e) = layer.present() {

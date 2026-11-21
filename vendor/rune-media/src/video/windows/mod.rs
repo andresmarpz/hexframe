@@ -12,6 +12,7 @@
 //!
 //! Nothing here runs until a clip opens: Media Foundation, D3D11 and the audio stack load then.
 
+mod ahead;
 mod audio;
 mod decoder;
 mod gpu;
@@ -338,6 +339,11 @@ impl Native {
             self.event(shared, c, Event::Failed);
             return;
         }
+        if let (Phase::Playing { clock }, Some(heard)) = (self.phase, self.clock.get())
+            && heard != clock
+        {
+            self.event(shared, c, Event::Synced { clock: heard });
+        }
         let lead = vsync::period().as_secs_f64() / 2.0;
         if let Some(to) = c.seek.take() {
             // A parked clip opens again to show the seek's picture.
@@ -365,8 +371,9 @@ impl Native {
             self.rate = c.rate;
             self.event(shared, c, Event::Rate { target, rate: f64::from(c.rate) });
         }
+        // Until the clip opens, whether it has sound is unknown: the decoder keeps its ask.
         let sound = self.sounding(c).then_some(c.volume);
-        if let Some(pipe) = &self.pipe {
+        if let Some(pipe) = self.pipe.as_ref().filter(|_| self.facts.is_some()) {
             let mut inbox = pipe.lock();
             if inbox.looping != c.looping || inbox.sound != sound {
                 inbox.looping = c.looping;
