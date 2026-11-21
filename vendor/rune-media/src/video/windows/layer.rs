@@ -11,8 +11,9 @@
 use super::gpu::Device;
 use super::mf::{self, Picture};
 use crate::native_surface::{Format, Matrix, Orient};
+use std::collections::VecDeque;
 use std::mem::ManuallyDrop;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::{CloseHandle, HANDLE, RECT};
 use windows::Win32::Graphics::Direct3D11::*;
 use windows::Win32::Graphics::Dxgi::Common::*;
@@ -23,6 +24,15 @@ type CreateSurfaceHandle = unsafe extern "system" fn(u32, *const core::ffi::c_vo
 
 /// `COMPOSITIONOBJECT_READ | COMPOSITIONOBJECT_WRITE`.
 const ALL_ACCESS: u32 = 0x3;
+
+/// How many closed layers' surface handles a new layer stays clear of.
+const REMEMBER: usize = 16;
+
+/// The surface handle values of the layers that closed last. The window keys its visual on the
+/// value, and Windows gives a new handle the value of the one closed last: a layer made again
+/// with that value would present where nothing shows, while the window kept the closed layer's
+/// last picture on screen.
+static CLOSED: Mutex<VecDeque<usize>> = Mutex::new(VecDeque::new());
 
 pub(super) struct Layer {
     swap: IDXGISwapChain3,
@@ -49,6 +59,11 @@ impl Drop for Layer {
         unsafe {
             let _ = CloseHandle(self.handle);
         }
+        let mut closed = CLOSED.lock().unwrap();
+        closed.push_back(self.handle());
+        if closed.len() > REMEMBER {
+            closed.pop_front();
+        }
     }
 }
 
@@ -64,8 +79,8 @@ impl Layer {
         // owned by this layer. The swap chain is made on the decoders' live device.
         unsafe {
             let create: CreateSurfaceHandle = mf::symbol(dcomp, c"DCompositionCreateSurfaceHandle").ok_or("no DCompositionCreateSurfaceHandle")?;
-            let mut handle = HANDLE::default();
-            create(ALL_ACCESS, std::ptr::null(), &mut handle).ok().map_err(|e| format!("composition surface: {}", e.message()))?;
+            let handle = fresh_handle(create)?;
+            tracing::info!("video layer made at {}x{}, surface handle {:#x}", size.0, size.1, handle.0 as usize);
             let swap = match swap_chain(&device, handle, buffer) {
                 Ok(swap) => swap,
                 Err(e) => {
@@ -175,6 +190,34 @@ impl Layer {
             Ok((enumerator, processor, output.ok_or("video output")?))
         }
     }
+}
+
+/// A composition surface handle whose value no recently closed layer had: one that has such a
+/// value stays open while the next is made, so the next can't take it.
+unsafe fn fresh_handle(create: CreateSurfaceHandle) -> Result<HANDLE, String> {
+    let closed = CLOSED.lock().unwrap();
+    let mut held = Vec::new();
+    let made = loop {
+        let mut handle = HANDLE::default();
+        // SAFETY: the documented entry point; the handle it writes is the caller's to close.
+        if let Err(e) = unsafe { create(ALL_ACCESS, std::ptr::null(), &mut handle) }.ok() {
+            break Err(format!("composition surface: {}", e.message()));
+        }
+        if !closed.contains(&(handle.0 as usize)) || held.len() >= REMEMBER {
+            break Ok(handle);
+        }
+        held.push(handle);
+    };
+    if !held.is_empty() {
+        tracing::info!("video layer: {} new surface handles had a closed layer's value; took the next", held.len());
+    }
+    for handle in held {
+        // SAFETY: handles made above that nothing else holds.
+        unsafe {
+            let _ = CloseHandle(handle);
+        }
+    }
+    made
 }
 
 /// `DXGI_SWAP_CHAIN_FLAG_YUV_VIDEO | DXGI_SWAP_CHAIN_FLAG_FULLSCREEN_VIDEO`, as Chromium's.
