@@ -20,5 +20,6 @@ pub mod video_log;
 pub mod vproc;
 mod watchdog;
 pub mod wgc;
+pub mod window;
 
 pub use session::WindowsMediaSource;
