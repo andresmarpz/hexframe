@@ -84,6 +84,7 @@ impl Ui {
             UiMsg::Update(state) => self.apply_update(state),
             UiMsg::Feedback(result) => self.apply_feedback(result),
             UiMsg::HotkeyStatus { errors } => self.hotkey_errors = errors,
+            UiMsg::Encoder(check) => self.encoder = Some(check),
         }
     }
 

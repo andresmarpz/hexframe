@@ -32,6 +32,10 @@ pub fn sounds_dir() -> PathBuf {
     cache_dir().join("sounds")
 }
 
+pub fn encoder_check_file() -> PathBuf {
+    cache_dir().join("encoder-check.json")
+}
+
 pub(crate) fn default_output_dir() -> PathBuf {
     match dirs::video_dir() {
         Some(videos) => videos.join(APP_DIR),

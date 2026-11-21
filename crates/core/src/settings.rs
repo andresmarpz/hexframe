@@ -25,6 +25,7 @@ const QUALITY_MODE_SIZE_FACTOR: f64 = 0.6;
 const MAX_CLIP_SECS: u32 = 120;
 const BYTES_PER_GB: u64 = 1_000_000_000;
 pub const MAX_SOUND_VOLUME: u32 = 100;
+pub const NATIVE_HEIGHT_CEILING: u32 = 2160;
 pub const DEFAULT_SOUND_VOLUME: u32 = 60;
 pub const STORAGE_LIMITS_GB: [u32; 4] = [50, 100, 250, 500];
 

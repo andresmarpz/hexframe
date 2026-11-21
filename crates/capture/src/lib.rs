@@ -1,6 +1,7 @@
 #![cfg(windows)]
 
 pub mod aac;
+pub mod adapters;
 pub mod audio;
 mod client_area;
 pub mod clock;
@@ -17,6 +18,7 @@ mod pacer;
 pub mod probe;
 mod procstats;
 pub mod recycle;
+pub mod selftest;
 mod session;
 pub mod video_log;
 pub mod vproc;

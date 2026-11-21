@@ -55,7 +55,7 @@ Download `GreyscreenSetup.exe` from the [latest release](https://github.com/andr
 **Requirements:**
 
 - Windows 10 2004 or newer (Windows 11 recommended).
-- A GPU with a hardware H.264 encoder (any NVIDIA, AMD, or Intel GPU from the last several years).
+- A GPU with a hardware H.264 encoder (any NVIDIA, AMD, or Intel GPU from the last several years). Without one, Greyscreen records with Windows' software encoder at up to 1080p 30 fps, which uses more CPU.
 
 Set League of Legends to **Borderless** or **Windowed** mode, because exclusive fullscreen cannot be captured. On Windows 10 a thin yellow border may appear around the game while recording, which is a Windows limitation.
 

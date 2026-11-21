@@ -2,6 +2,7 @@ mod audio;
 mod emit;
 mod facts;
 mod matching;
+mod pick;
 mod setup;
 mod video;
 
@@ -13,9 +14,10 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+use greyscreen_core::encoder::Attempt;
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource};
 
-const SETUP_TIMEOUT: Duration = Duration::from_secs(5);
+const SETUP_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Default)]
@@ -64,6 +66,14 @@ impl MediaSource for WindowsMediaSource {
             Ok(Err(message)) => Err(message),
             Err(_) => Err("capture setup timed out".into()),
         }
+    }
+
+    fn encoder_fingerprint(&self) -> Option<String> {
+        Some(crate::selftest::fingerprint())
+    }
+
+    fn check_encoders(&self, cfg: &CaptureConfig, every: bool) -> Vec<Attempt> {
+        crate::selftest::check(cfg, every)
     }
 }
 

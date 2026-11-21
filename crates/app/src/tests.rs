@@ -13,6 +13,7 @@ mod coach;
 mod death_review;
 mod delete_dialog;
 mod dock;
+mod encoder;
 mod feedback;
 mod first_run;
 mod instant_pages;

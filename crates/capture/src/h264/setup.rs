@@ -22,12 +22,12 @@ use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::{GUID, Interface};
 
-use super::{H264Error, Result};
+use super::{H264Error, Mode, Result};
 use crate::d3d::GpuDevice;
 use crate::probe::string_attribute;
 
 const MAX_LISTED_TYPES: u32 = 64;
-const QUALITY_VS_SPEED: u32 = 100;
+const HARDWARE_QUALITY_VS_SPEED: u32 = 100;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Spec {
@@ -42,11 +42,9 @@ pub(super) struct Spec {
 
 #[derive(Debug)]
 pub(super) struct Opened {
-    pub(super) activate: IMFActivate,
+    pub(super) mode: Mode,
     pub(super) transform: IMFTransform,
-    pub(super) events: IMFMediaEventGenerator,
     pub(super) codec: ICodecAPI,
-    pub(super) manager: IMFDXGIDeviceManager,
     pub(super) input_id: u32,
     pub(super) output_id: u32,
     pub(super) name: String,
@@ -85,11 +83,13 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
             Ok(configured) => {
                 tracing::info!(encoder = %name, "hardware H.264 encoder configured");
                 return Ok(Opened {
-                    activate,
+                    mode: Mode::Async {
+                        events: configured.events,
+                        activate,
+                        _manager: manager,
+                    },
                     transform: configured.transform,
-                    events: configured.events,
                     codec: configured.codec,
-                    manager,
                     input_id: configured.input_id,
                     output_id: configured.output_id,
                     name: format!("{name} ({})", configured.mode.label()),
@@ -244,7 +244,7 @@ fn configure(
     }
     let (input_id, output_id) = stream_ids(&transform)?;
     let codec: ICodecAPI = transform.cast()?;
-    let mode = apply_codec_properties(&codec, spec)?;
+    let mode = apply_codec_properties(&codec, spec, HARDWARE_QUALITY_VS_SPEED)?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
     // SAFETY: the type is live and not modified after this point.
     unsafe {
@@ -280,7 +280,7 @@ fn configure(
     })
 }
 
-fn stream_ids(transform: &IMFTransform) -> Result<(u32, u32)> {
+pub(super) fn stream_ids(transform: &IMFTransform) -> Result<(u32, u32)> {
     let mut inputs = [0u32; 1];
     let mut outputs = [0u32; 1];
     // SAFETY: both slices are live and hold one id each.
@@ -295,7 +295,7 @@ fn pack_u32_pair(high: u32, low: u32) -> u64 {
     (u64::from(high) << 32) | u64::from(low)
 }
 
-fn video_type(spec: &Spec, subtype: &GUID) -> Result<IMFMediaType> {
+pub(super) fn video_type(spec: &Spec, subtype: &GUID) -> Result<IMFMediaType> {
     // SAFETY: MFCreateMediaType has no pointer arguments.
     let media_type = unsafe { MFCreateMediaType()? };
     // SAFETY: the type is live and owned by this call; the GUIDs outlive each call.
@@ -314,7 +314,7 @@ fn video_type(spec: &Spec, subtype: &GUID) -> Result<IMFMediaType> {
     Ok(media_type)
 }
 
-fn read_sequence_header(transform: &IMFTransform, output_id: u32) -> Vec<u8> {
+pub(super) fn read_sequence_header(transform: &IMFTransform, output_id: u32) -> Vec<u8> {
     // SAFETY: the transform is live.
     let Ok(current) = (unsafe { transform.GetOutputCurrentType(output_id) }) else {
         return Vec::new();
@@ -354,7 +354,7 @@ fn log_bind_flags(transform: &IMFTransform, input_id: u32) {
     }
 }
 
-fn start_streaming(transform: &IMFTransform) -> Result<()> {
+pub(super) fn start_streaming(transform: &IMFTransform) -> Result<()> {
     for message in [
         MFT_MESSAGE_COMMAND_FLUSH,
         MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
@@ -366,7 +366,7 @@ fn start_streaming(transform: &IMFTransform) -> Result<()> {
     Ok(())
 }
 
-fn base_properties(spec: &Spec) -> Vec<Property> {
+fn base_properties(spec: &Spec, quality_vs_speed: u32) -> Vec<Property> {
     vec![
         Property {
             name: "AVEncMPVGOPSize",
@@ -395,15 +395,19 @@ fn base_properties(spec: &Spec) -> Vec<Property> {
         Property {
             name: "AVEncCommonQualityVsSpeed",
             id: CODECAPI_AVEncCommonQualityVsSpeed,
-            value: VARIANT::from(QUALITY_VS_SPEED),
+            value: VARIANT::from(quality_vs_speed),
             required: false,
         },
     ]
 }
 
-fn apply_codec_properties(codec: &ICodecAPI, spec: &Spec) -> Result<RateMode> {
+pub(super) fn apply_codec_properties(
+    codec: &ICodecAPI,
+    spec: &Spec,
+    quality_vs_speed: u32,
+) -> Result<RateMode> {
     let mode = rate::apply(codec, spec)?;
-    for property in base_properties(spec) {
+    for property in base_properties(spec, quality_vs_speed) {
         apply_property(codec, &property)?;
     }
     Ok(mode)

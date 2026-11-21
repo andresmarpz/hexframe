@@ -16,13 +16,19 @@ mod tests;
 
 use greyscreen_core::install::HIDDEN_FLAG;
 use greyscreen_core::paths;
+use greyscreen_core::settings::NATIVE_HEIGHT_CEILING;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::updater::UpdateConfig;
-use greyscreen_engine::{Engine, EngineConfig, EngineStatus, FeedbackConfig, league_factory_default};
+use greyscreen_engine::{
+    EncoderCheckSpec, Engine, EngineConfig, EngineStatus, FeedbackConfig, league_factory_default,
+    spawn_encoder_check,
+};
 use rune::{App, AppSpec, Chrome};
 
 use sfx::Sfx;
 use ui::Ui;
+
+const ENCODER_CHECK_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
 fn main() {
     let headless = rune::is_headless();
@@ -67,9 +73,10 @@ fn main() {
         let handle = app.handle();
         launch.serve_second_launch(&handle);
         let sink_handle = handle.clone();
+        let media = platform::media_source();
         let engine = Engine::start_with(EngineConfig {
             settings: settings.clone(),
-            media: platform::media_source(),
+            media: media.clone(),
             league: league_factory_default(),
             sink: Box::new(move |msg| sink_handle.update(move |ui: &mut Ui, tx| ui.apply(msg, tx))),
             settings_path: Some(paths::settings_file()),
@@ -90,6 +97,17 @@ fn main() {
                 );
             });
         }
+        let check_handle = handle.clone();
+        spawn_encoder_check(
+            EncoderCheckSpec {
+                media,
+                cfg: settings.capture_config(NATIVE_HEIGHT_CEILING),
+                cache: paths::encoder_check_file(),
+                version: env!("CARGO_PKG_VERSION").to_owned(),
+                delay: ENCODER_CHECK_DELAY,
+            },
+            Box::new(move |msg| check_handle.update(move |ui: &mut Ui, tx| ui.apply(msg, tx))),
+        );
         champion_icons::start_prefetch(handle.clone());
         let cmd = engine.cmd.clone();
         let tray = tray::start(

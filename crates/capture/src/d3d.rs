@@ -1,4 +1,5 @@
 use greyscreen_core::health::driver_version_text;
+use greyscreen_core::media::CaptureTarget;
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
 use windows::Win32::Foundation::{HMODULE, HWND, LUID};
 use windows::Win32::Graphics::Direct3D::{
@@ -24,21 +25,32 @@ pub struct GpuDevice {
     pub context: ID3D11DeviceContext,
     pub adapter_luid: LUID,
     pub adapter_name: String,
+    pub vendor_id: u32,
     pub driver_version: String,
 }
 
 impl GpuDevice {
-    pub fn for_window(hwnd: isize) -> windows::core::Result<Self> {
-        let hwnd = HWND(hwnd as *mut core::ffi::c_void);
-        // SAFETY: MonitorFromWindow accepts any handle value and falls back to the nearest monitor.
-        let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
-        Self::for_monitor(monitor)
+    pub fn for_target(target: &CaptureTarget) -> windows::core::Result<Self> {
+        Self::for_monitor(target_monitor(target))
     }
 
     pub fn for_primary_monitor() -> windows::core::Result<Self> {
-        // SAFETY: a null window handle with DEFAULTTOPRIMARY returns the primary monitor.
-        let monitor = unsafe { MonitorFromWindow(HWND::default(), MONITOR_DEFAULTTOPRIMARY) };
-        Self::for_monitor(monitor)
+        Self::for_target(&CaptureTarget::PrimaryMonitor)
+    }
+
+    pub fn for_luid(luid: u64) -> windows::core::Result<Self> {
+        // SAFETY: CreateDXGIFactory1 has no pointer arguments.
+        let factory: IDXGIFactory1 = unsafe { CreateDXGIFactory1()? };
+        let mut index = 0;
+        // SAFETY: enumeration only reads from live COM objects and writes return values.
+        while let Ok(adapter) = unsafe { factory.EnumAdapters1(index) } {
+            // SAFETY: GetDesc1 only writes to the returned value.
+            if unsafe { adapter.GetDesc1() }.is_ok_and(|desc| luid_u64(desc.AdapterLuid) == luid) {
+                return Self::create(&adapter);
+            }
+            index += 1;
+        }
+        Err(DXGI_ERROR_NOT_FOUND.into())
     }
 
     pub fn winrt_device(&self) -> windows::core::Result<IDirect3DDevice> {
@@ -96,12 +108,34 @@ impl GpuDevice {
             context,
             adapter_luid: desc.AdapterLuid,
             adapter_name,
+            vendor_id: desc.VendorId,
             driver_version,
         })
     }
 }
 
-fn adapter_for_monitor(factory: &IDXGIFactory1, monitor: HMONITOR) -> Option<IDXGIAdapter1> {
+pub(crate) fn target_monitor(target: &CaptureTarget) -> HMONITOR {
+    match *target {
+        CaptureTarget::GameWindow { hwnd, .. } => {
+            let hwnd = HWND(hwnd as *mut core::ffi::c_void);
+            // SAFETY: MonitorFromWindow accepts any handle value and falls back to the nearest monitor.
+            unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) }
+        }
+        // SAFETY: a null window handle with DEFAULTTOPRIMARY returns the primary monitor.
+        CaptureTarget::PrimaryMonitor => unsafe {
+            MonitorFromWindow(HWND::default(), MONITOR_DEFAULTTOPRIMARY)
+        },
+    }
+}
+
+pub(crate) fn luid_u64(luid: LUID) -> u64 {
+    (u64::from(luid.HighPart as u32) << 32) | u64::from(luid.LowPart)
+}
+
+pub(crate) fn adapter_for_monitor(
+    factory: &IDXGIFactory1,
+    monitor: HMONITOR,
+) -> Option<IDXGIAdapter1> {
     let mut adapter_index = 0;
     // SAFETY: enumeration calls only read from live COM objects and write return values.
     while let Ok(adapter) = unsafe { factory.EnumAdapters1(adapter_index) } {

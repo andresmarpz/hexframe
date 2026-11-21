@@ -1,8 +1,9 @@
-use greyscreen_core::problem::NO_FRAMES;
-use greyscreen_engine::{EngineStatus, RecordingEntry};
+use greyscreen_core::encoder::{CheckOutcome, SOFTWARE_LABEL, SOFTWARE_NOTICE};
+use greyscreen_core::problem::{NO_FRAMES, Problem};
+use greyscreen_engine::{EngineStatus, NoticeAction, NoticeLevel, RecordingEntry};
 
-use super::{Scene, death, first_run, game, home};
-use crate::ui::{Screen, TestRun, Ui, preview};
+use super::{Scene, death, encoder, first_run, game, home};
+use crate::ui::{Notice, Screen, TestRun, Ui, preview};
 
 fn test_recording() -> RecordingEntry {
     let mut entry = preview::demo_recordings().remove(0);
@@ -75,6 +76,22 @@ pub(super) const SCENES: &[Scene] = &[
     ("error", |ui| {
         home(ui);
         ui.status = EngineStatus::Error("The game window could not be captured.".into());
+    }),
+    ("home-no-encoder", |ui| {
+        home(ui);
+        ui.last_game = ui.recordings.first().cloned();
+        ui.encoder = encoder(CheckOutcome::Failed, "");
+    }),
+    ("software-encoder-notice", |ui| {
+        home(ui);
+        ui.last_game = ui.recordings.first().cloned();
+        ui.encoder = encoder(CheckOutcome::Software, SOFTWARE_LABEL);
+        let notice = Notice {
+            level: NoticeLevel::Warn,
+            text: SOFTWARE_NOTICE.to_owned(),
+            action: Some(NoticeAction::Link(Problem::NoEncoder.help_url())),
+        };
+        ui.notice = Some((notice, f64::MAX));
     }),
     ("coach-demo", |ui| {
         home(ui);

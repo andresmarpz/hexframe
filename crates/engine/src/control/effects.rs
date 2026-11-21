@@ -3,6 +3,7 @@ use std::thread;
 
 use crossbeam_channel::{bounded, never};
 use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
+use greyscreen_core::encoder;
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
 use greyscreen_core::health::HealthTracker;
 use greyscreen_core::highlight::classify;
@@ -10,6 +11,7 @@ use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMe
 use greyscreen_core::media::{CaptureTarget, MediaEvent};
 use greyscreen_core::problem::Problem;
 use greyscreen_core::session::{Effect, Input, SessionState, Status};
+use greyscreen_core::settings::NATIVE_HEIGHT_CEILING;
 use greyscreen_core::time::{Hns, hns_to_secs, mono_now, secs_to_hns};
 use jiff::Zoned;
 
@@ -23,10 +25,10 @@ use crate::ring::ClipRing;
 use crate::storage;
 use crate::writer::{GameWriter, VIDEO_FILE};
 
-const NATIVE_HEIGHT_CEILING: u32 = 2160;
 const MEDIA_QUEUE: usize = 1024;
 const RING_MARGIN_SECS: u32 = 5;
 const DISK_TOO_SLOW: &str = "Disk too slow: the full game recording stopped";
+const ENCODER_STOPPED: &str = "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point.";
 
 pub(super) fn ring_keep() -> Hns {
     let plan = MAX_PLAN + DUE_DELAY;
@@ -199,7 +201,12 @@ impl Control {
                     if let Some(recording) = self.recording.as_mut() {
                         recording.health.on_failure();
                     }
-                    self.notice(NoticeLevel::Error, Problem::notice("Capture failed", &text));
+                    let notice = if encoder::is_encoder_failure(&text) {
+                        ENCODER_STOPPED.to_owned()
+                    } else {
+                        Problem::notice("Capture failed", &text)
+                    };
+                    self.notice(NoticeLevel::Error, notice);
                 } else {
                     tracing::info!(%text, "capture ended after the game window closed");
                 }

@@ -11,6 +11,7 @@ pub(super) enum Row {
     Quality,
     Resolution,
     FrameRate,
+    Encoder,
     Audio,
     Cursor,
     NavStyle,
@@ -43,6 +44,9 @@ impl Row {
             Self::Quality => "quality balanced high max size disk bitrate estimate mb",
             Self::Resolution => "resolution 1080p 1440p native scale size",
             Self::FrameRate => "frame rate fps 30 60 smooth",
+            Self::Encoder => {
+                "encoder video hardware software gpu cpu nvidia nvenc amd amf intel quick sync"
+            }
             Self::Audio => "audio sound game audio microphone discord",
             Self::Cursor => "cursor mouse pointer",
             Self::NavStyle => "navigation style layout sidebar dock menu tabs",
@@ -102,6 +106,7 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
             Row::Quality,
             Row::Resolution,
             Row::FrameRate,
+            Row::Encoder,
             Row::Audio,
             Row::Cursor,
             Row::NavStyle,

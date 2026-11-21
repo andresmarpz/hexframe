@@ -3,6 +3,7 @@ pub mod categories;
 pub mod clips;
 pub mod crop;
 pub mod disk;
+pub mod encoder;
 pub mod feedback;
 pub mod game;
 pub mod health;

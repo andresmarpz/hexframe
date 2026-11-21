@@ -9,7 +9,7 @@ use windows::Win32::Media::MediaFoundation::{
     MFT_OUTPUT_STREAM_PROVIDES_SAMPLES,
 };
 
-use super::{EncodedVideo, H264Encoder, H264Error, Result};
+use super::{EncodedVideo, H264Encoder, H264Error, Mode, Result};
 
 const START_CODE: [u8; 4] = [0, 0, 0, 1];
 const MIN_OUTPUT_BUFFER: u32 = 1 << 20;
@@ -18,9 +18,13 @@ const MAX_OUTPUT_TYPES: u32 = 64;
 
 impl H264Encoder {
     pub(super) fn pump_events(&mut self) -> Result<()> {
+        let Mode::Async { events, .. } = &self.mode else {
+            return Ok(());
+        };
+        let events = events.clone();
         loop {
             // SAFETY: the event generator is live; NO_WAIT makes the call non-blocking.
-            let event = match unsafe { self.events.GetEvent(MF_EVENT_FLAG_NO_WAIT) } {
+            let event = match unsafe { events.GetEvent(MF_EVENT_FLAG_NO_WAIT) } {
                 Ok(event) => event,
                 Err(error) if error.code() == MF_E_NO_EVENTS_AVAILABLE => return Ok(()),
                 Err(error) => return Err(error.into()),
@@ -34,7 +38,7 @@ impl H264Encoder {
                 k if k == MEError.0 => {
                     // SAFETY: the event is live.
                     let status = unsafe { event.GetStatus()? };
-                    return Err(windows::core::Error::from(status).into());
+                    return Err(H264Error::Stopped(windows::core::Error::from(status)));
                 }
                 _ => {}
             }

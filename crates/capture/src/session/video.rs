@@ -1,6 +1,7 @@
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
+use greyscreen_core::encoder;
 use greyscreen_core::time::mono_now;
 use windows::Win32::Graphics::Dxgi::{DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET};
 use windows::core::HRESULT;
@@ -93,7 +94,9 @@ impl Video {
             .watchdog
             .stalled(mono_now(), self.sink.encoded(), submitting)
         {
-            return Err(Exit::Failed("encoder stopped producing frames".into()));
+            return Err(Exit::Failed(encoder::stopped_reason(
+                "no frames came out for too long",
+            )));
         }
         if let Some(audio) = &self.audio {
             self.stats.c.audio_packets += audio.drain(&mut self.sink);
@@ -134,7 +137,7 @@ impl Video {
                 self.stats.c.dropped += 1;
                 return Ok(true);
             }
-            Err(error) => return self.soft_frame("encoder poll", &error, lost_h264(&error)),
+            Err(error) => return self.encoder_error("encoder poll", &error).map(|()| true),
         }
         let crop = self.client_area.crop(size);
         let frame = match self.converter.convert(&texture, size, crop) {
@@ -153,7 +156,7 @@ impl Video {
         let (pts, dur) = (self.pacer.pts(), self.pacer.frame_hns());
         if let Err(error) = self.encoder.submit(&frame, pts, dur) {
             self.converter.release(frame.slot);
-            return self.soft_frame("encoder submit", &error, lost_h264(&error));
+            return self.encoder_error("encoder submit", &error).map(|()| true);
         }
         self.sink.submitted(self.pacer.tick(), pts);
         if seq == self.last_seq {
@@ -191,10 +194,17 @@ impl Video {
     fn drain_video(&mut self) -> Result<(), Exit> {
         if let Err(error) = self.encoder.drain_output(&mut self.scratch) {
             self.sink.video(&mut self.scratch);
-            return self.soft("encoder drain", &error, lost_h264(&error));
+            return self.encoder_error("encoder drain", &error);
         }
         self.sink.video(&mut self.scratch);
         Ok(())
+    }
+
+    fn encoder_error(&mut self, what: &str, error: &H264Error) -> Result<(), Exit> {
+        if let H264Error::Stopped(code) = error {
+            return Err(Exit::Failed(encoder::stopped_reason(&code.to_string())));
+        }
+        self.soft(what, error, lost_h264(error))
     }
 
     fn soft(&mut self, what: &str, error: &dyn std::fmt::Display, lost: bool) -> Result<(), Exit> {
@@ -208,7 +218,12 @@ impl Video {
         self.stats.c.soft_errors += 1;
         self.soft_errors += 1;
         if self.soft_errors >= MAX_SOFT_ERRORS {
-            return Err(Exit::Failed(format!("{what} keeps failing: {error}")));
+            let reason = format!("{what} keeps failing: {error}");
+            return Err(Exit::Failed(if what.starts_with("encoder") {
+                encoder::stopped_reason(&reason)
+            } else {
+                reason
+            }));
         }
         Ok(())
     }

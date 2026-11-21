@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crossbeam_channel::Sender;
+use greyscreen_core::encoder::EncoderCheck;
 use greyscreen_core::keybinds::Action;
 use greyscreen_core::settings::Settings;
 use greyscreen_core::update::UpdateInfo;
@@ -109,6 +110,7 @@ pub(crate) struct Ui {
     pub feedback: FeedbackUi,
     pub first_test: TestRun,
     pub tray: Option<crate::tray::Link>,
+    pub encoder: Option<EncoderCheck>,
 }
 
 impl Ui {
@@ -162,6 +164,7 @@ impl Ui {
             feedback: FeedbackUi::default(),
             first_test: TestRun::default(),
             tray: None,
+            encoder: None,
             settings,
         }
     }

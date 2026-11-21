@@ -305,6 +305,7 @@ fn sidecar_and_clip_times_subtract_the_media_offset() {
 struct FailsAfter {
     inner: FakeMediaSource,
     delay: Duration,
+    reason: &'static str,
 }
 
 impl MediaSource for FailsAfter {
@@ -315,12 +316,10 @@ impl MediaSource for FailsAfter {
         out: Sender<MediaEvent>,
     ) -> Result<Box<dyn MediaSession>, String> {
         let failed = out.clone();
-        let delay = self.delay;
+        let (delay, reason) = (self.delay, self.reason);
         thread::spawn(move || {
             thread::sleep(delay);
-            failed
-                .send(MediaEvent::Failed("window closed".to_owned()))
-                .ok();
+            failed.send(MediaEvent::Failed(reason.to_owned())).ok();
         });
         self.inner.start(target, cfg, out)
     }
@@ -345,6 +344,7 @@ fn capture_failure_in_the_tail_is_not_an_error_notice() {
         Arc::new(FailsAfter {
             inner: FakeMediaSource::new(),
             delay: Duration::from_secs(1),
+            reason: "window closed",
         }),
         Vec::new(),
         LeagueMsg::Ended(GameResult::Win),
@@ -362,6 +362,7 @@ fn capture_failure_while_recording_is_an_error_notice() {
         Arc::new(FailsAfter {
             inner: FakeMediaSource::new(),
             delay: Duration::from_secs(1),
+            reason: "window closed",
         }),
         Vec::new(),
         LeagueMsg::Skipped("never".to_owned()),
@@ -375,4 +376,29 @@ fn capture_failure_while_recording_is_an_error_notice() {
         "{:?}",
         error_notices(&msgs)
     );
+}
+
+#[test]
+fn an_encoder_failure_while_recording_saves_the_game_so_far() {
+    let harness = game_with(
+        clip_settings("fail-encoder", true),
+        Arc::new(FailsAfter {
+            inner: FakeMediaSource::new(),
+            delay: Duration::from_secs(1),
+            reason: "the video encoder stopped: 0x887a0005",
+        }),
+        Vec::new(),
+        LeagueMsg::Skipped("never".to_owned()),
+        Duration::ZERO,
+    );
+    let msgs = collect_until_saved(&harness.ui);
+    assert_eq!(
+        error_notices(&msgs),
+        vec![
+            "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point."
+        ]
+    );
+    let meta = saved_meta(&msgs);
+    assert!(meta.duration_secs > 0.5, "{}", meta.duration_secs);
+    assert!(!meta.video.is_empty());
 }

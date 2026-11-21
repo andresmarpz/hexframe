@@ -105,6 +105,14 @@ pub trait MediaSource: Send + Sync {
         cfg: CaptureConfig,
         out: Sender<MediaEvent>,
     ) -> Result<Box<dyn MediaSession>, String>;
+
+    fn encoder_fingerprint(&self) -> Option<String> {
+        None
+    }
+
+    fn check_encoders(&self, _cfg: &CaptureConfig, _every: bool) -> Vec<crate::encoder::Attempt> {
+        Vec::new()
+    }
 }
 
 pub trait MediaSession: Send {

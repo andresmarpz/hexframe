@@ -4,6 +4,7 @@ mod control;
 mod delete;
 mod diagnostics;
 mod disk;
+mod encoder_check;
 pub(crate) mod fake;
 pub(crate) mod feedback;
 mod hotkey;
@@ -22,6 +23,7 @@ pub use api::{
     UiMsg, UiSink, league_factory_default, reveal,
 };
 pub use disk::{FreeSpace, LOW_DISK_URL};
+pub use encoder_check::{EncoderCheckSpec, run_encoder_check, spawn_encoder_check};
 pub use fake::FakeMediaSource;
 pub use feedback::{FeedbackConfig, FeedbackTransport};
 pub use hotkey::HotkeyBackend;

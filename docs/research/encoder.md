@@ -8,7 +8,7 @@ Research date: 2026-11-20. Verified items cite a source in the list at the end. 
 2. Do the BGRA to NV12 conversion ourselves on the GPU with `ID3D11VideoProcessor` (BT.709 limited range). The documented input types of the Microsoft H.264 MFT are NV12, I420, IYUV, YUY2 and YV12 only. No source I found says vendor hardware MFTs accept BGRA, so assume they do not.
 3. Settings: High profile, PeakConstrainedVBR (20 Mbps mean and 30 Mbps peak at 1080p60, 30 and 45 Mbps at 1440p60), GOP 120 frames (2 s), 0 B-frames, low-latency mode on, CABAC on. These come from the properties Microsoft requires of every certified hardware encoder, so they are safe on NVIDIA, AMD and Intel.
 4. Risk: Chromium's authors state that current MFTs write an UNSPECIFIED colour space into the stream. We must write the BT.709 colour tag ourselves (MP4 `colr` box, or an SPS VUI patch). Also no verified AMD-specific MFT bug was found, so AMD needs real hardware testing.
-5. No software fallback. If `MFTEnumEx(HARDWARE)` finds nothing, fail with a clear error. Put everything behind an `Encoder` trait so a direct NVENC (and later AMF) backend slots in. HEVC and AV1 are v2 and fit the same trait.
+5. No software fallback in v1. (Superseded for the public beta: Windows' software MFT is now the last fallback, capped at 1080p 30 fps; see `docs/architecture.md`, Encoder selection.) If `MFTEnumEx(HARDWARE)` finds nothing, fail with a clear error. Put everything behind an `Encoder` trait so a direct NVENC (and later AMF) backend slots in. HEVC and AV1 are v2 and fit the same trait.
 
 ## Comparison
 
@@ -232,7 +232,7 @@ What others use (verified): OBS Advanced Recording guide: Constant QP/CQP/ICQ wi
 11. **Hybrid GPUs:** the MFT must be on the same adapter as the D3D device. Use the LUID filter in step 4; otherwise a cross-adapter copy hits system memory.
 12. **COM and MF:** MTA, `MFSTARTUP_FULL`, one dedicated encoder thread. Release every COM object before `MFShutdown`. A leaked `IMFSample` that holds a pool texture will deadlock the pool.
 13. **Texture reuse:** the MFT reads the NV12 texture asynchronously. Never overwrite a texture before its sample has been released.
-14. **Software MFT fallback: do not.** The inbox "H.264 Video Encoder" (`Mfh264enc.dll`) takes only system-memory NV12/I420/IYUV/YUY2/YV12, so using it means a CPU readback of every frame. This breaks the stated rule and would eat CPU while a game runs. Return `EncoderError::NoHardwareEncoder` and show the user a message. Revisit only if testers have machines without a hardware encoder.
+14. **Software MFT fallback: do not.** (Superseded for the public beta: it is the last fallback, capped at 1080p 30 fps with the speed preset; see `docs/architecture.md`, Encoder selection.) The inbox "H.264 Video Encoder" (`Mfh264enc.dll`) takes only system-memory NV12/I420/IYUV/YUY2/YV12, so using it means a CPU readback of every frame. This breaks the stated rule and would eat CPU while a game runs. Return `EncoderError::NoHardwareEncoder` and show the user a message. Revisit only if testers have machines without a hardware encoder.
 15. **Detection:** hardware encoder exists if `MFTEnum2/MFTEnumEx(HARDWARE | SORTANDFILTER)` returns at least one activate object AND the MFT has `MF_SA_D3D11_AWARE` AND `SET_D3D_MANAGER` succeeds AND `SetInputType(NV12)` succeeds. Check all four at startup and cache the result.
 16. **`MFSetAttributeSize` is missing in windows-rs.** Pack manually.
 

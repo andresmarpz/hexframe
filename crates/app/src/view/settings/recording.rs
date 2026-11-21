@@ -1,3 +1,4 @@
+use greyscreen_core::encoder::CheckOutcome;
 use greyscreen_core::settings::{NavStyle, Quality, Resolution, resolution_options};
 use greyscreen_engine::EngineStatus;
 use rune::{Drag, El, Phase, row, text};
@@ -25,6 +26,10 @@ const SOUND_VOLUME_WIDTH: f32 = 200.0;
 const PERCENT_WIDTH: f32 = 32.0;
 const RESOLUTION_WIDTH: f32 = 180.0;
 const DIAGNOSTICS_NOTE: &str = "Saves a per-second log next to each recording, for finding stutter. Applies to your next game.";
+const ENCODER_NOTE: &str = "Greyscreen tests it when it starts.";
+const SOFTWARE_NOTE: &str =
+    "No hardware encoder works on this PC, so recordings are capped at 1080p 30 fps.";
+const FAILED_NOTE: &str = "See Home for what to try.";
 const NEXT_GAME: &str =
     "Recording now. Quality, resolution and frame rate changes apply to your next game.";
 
@@ -90,6 +95,7 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
             Some("60 is smoother, 30 uses less disk space."),
             fps(s, k),
         ),
+        Row::Encoder => encoder(s, k),
         Row::Audio => toggle_row(
             k,
             "audio",
@@ -139,6 +145,25 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
             sound_volume(s, k),
         ),
     }
+}
+
+fn encoder(s: &Ui, k: &Kit) -> El {
+    let (line, note) = match &s.encoder {
+        Some(check) => (
+            check.settings_line(),
+            match check.outcome {
+                CheckOutcome::Hardware => ENCODER_NOTE,
+                CheckOutcome::Software => SOFTWARE_NOTE,
+                CheckOutcome::Failed => FAILED_NOTE,
+            },
+        ),
+        None => (String::new(), ENCODER_NOTE),
+    };
+    let value = text(line)
+        .key("encoder")
+        .font(k.ty.body)
+        .color(k.c.text_muted);
+    setting_row(k, "encoder-row", "Encoder", Some(note), value)
 }
 
 fn sound_volume(s: &Ui, k: &Kit) -> El {

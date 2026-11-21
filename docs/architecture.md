@@ -16,7 +16,7 @@ This is the contract every ticket builds against. Each decision cites the resear
 | Video capture | Windows.Graphics.Capture on the game window (`RiotWindowClass`), hand-written on `windows` 0.62 | Desktop Duplication, hooks, `windows-capture` crate | `capture.md`: per-window, GPU textures, safe with Vanguard |
 | Colour and scale | `ID3D11VideoProcessor`, BGRA to NV12, BT.709 limited, letterbox to a fixed encode size | Compute shader | `capture.md`, `encoder.md` |
 | Frame pacing | Constant frame rate. A pacer re-encodes the latest frame on each tick | Variable frame rate | `encoder.md` Timestamps |
-| Encoder | Hardware H.264 MFT driven directly (async events), High profile, PeakConstrainedVBR, no B-frames, GOP = 1 s | Sink writer, FFmpeg, NVENC/AMF SDKs (later) | `encoder.md`: packets for the clip ring, no DLLs |
+| Encoder | Hardware H.264 MFT driven directly (async events), High profile, PeakConstrainedVBR, no B-frames, GOP = 1 s. Fallback: Windows' software H.264 MFT (sync, GPU readback), capped at 1080p 30 fps. See Encoder selection | Sink writer, FFmpeg, NVENC/AMF SDKs (later) | `encoder.md`: packets for the clip ring, no DLLs |
 | Audio | WASAPI process loopback on the game PID (`wasapi` 0.27), 48 kHz stereo float, gapless timeline with silence fill | System loopback (kept only for the test recording) | `audio.md` |
 | Audio encoder | `CLSID_AACMFTEncoder` driven directly (sync MFT), PCM16 in, AAC-LC 192 kbps out | Sink writer insertion | `audio.md`, `container.md` |
 | Container | Own pure-Rust MP4 writer: fragmented MP4 while recording, "hybrid" finalize at stop (OBS design), regular MP4 for clips | MF sink, `shiguredo_mp4`, `mp4` crate, MKV | `container.md`: crash safe, one encoder feeds file and clips, testable on the Mac |
@@ -33,10 +33,10 @@ This is the contract every ticket builds against. Each decision cites the resear
 
 ```
 crates/
-  core/     greyscreen-core     Pure logic. Settings, keybinds, events, event categories, classification, clips, session machine, library schema, death review, storage retention, disk thresholds, update rules, feedback report, install rules, plain-language setup problems (`problem`), shared media types. No threads, no OS calls except settings and library file I/O.
+  core/     greyscreen-core     Pure logic. Settings, keybinds, events, event categories, classification, clips, session machine, library schema, death review, storage retention, disk thresholds, update rules, feedback report, install rules, plain-language setup problems (`problem`), encoder selection, shared media types. No threads, no OS calls except settings and library file I/O.
   mp4/      greyscreen-mp4      Pure-Rust MP4: H.264 and AAC helpers, fragmented writer, finalize, clip writer, recovery, read-only inspect (sample tables of a finished or unfinished file).
   league/   greyscreen-league   Live Client Data API client and poller, champion icon download, GitHub release client for updates, feedback HTTP client. The Windows game-window locator sits behind cfg(windows).
-  capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session, global hotkeys, installer, single-instance event, crash filter.
+  capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFTs (hardware and software) and the encoder check, WASAPI, AAC MFT, capture session, global hotkeys, installer, single-instance event, crash filter.
   engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library, makes thumbnails, recovers crashed recordings, enforces the storage limit and the low disk guard, deletes games, updates, sends feedback. Fake media source for the Mac.
   thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
   app/      greyscreen          The Rune UI binary. It also holds the setup window.
@@ -103,6 +103,8 @@ pub enum MediaEvent {
 pub trait MediaSource: Send + Sync {
     fn start(&self, target: CaptureTarget, cfg: CaptureConfig, out: crossbeam_channel::Sender<MediaEvent>)
         -> Result<Box<dyn MediaSession>, String>;
+    fn encoder_fingerprint(&self) -> Option<String> { None }                    // GPU names and driver versions
+    fn check_encoders(&self, cfg: &CaptureConfig, every: bool) -> Vec<encoder::Attempt> { Vec::new() }
 }
 pub trait MediaSession: Send {
     fn request_keyframe(&self);
@@ -183,7 +185,7 @@ UI commands ──EngineCmd────┘          └─> UiMsg sink -> AppHan
 Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `engine-updates`, `engine-feedback`, and on Windows a global hotkey listener. The library scan, delete, storage cleanup and settings save run on short worker threads.
 
 - `EngineCmd`: `ApplySettings(Settings)`, `StartTestRecording { secs: u32 }`, `StopRecording`, `Retry`, `RescanLibrary`, `DeleteRecording { id }`, `SaveClipNow`, `GlobalAction(Action)`, `CheckForUpdates`, `InstallUpdate`, `SendFeedback(FeedbackDraft)`, `Shutdown`.
-- `UiMsg`: `Status(EngineStatus)`, `Feed(FeedItem)`, `ClipSaved(ClipEntry)`, `RecordingSaved(RecordingEntry)`, `Library(Vec<RecordingEntry>)`, `Notice { level, text }`, `NoticeWithAction { level, text, action }` (`NoticeAction::Reveal(path)` shows Show in folder, `Link(url)` shows Learn more; the toast stays 12 s instead of 4), `HotkeyStatus { errors }`, `Update(UpdateState)`, `Feedback(FeedbackResult)`, `Thumbnail(PathBuf)`.
+- `UiMsg`: `Status(EngineStatus)`, `Feed(FeedItem)`, `ClipSaved(ClipEntry)`, `RecordingSaved(RecordingEntry)`, `Library(Vec<RecordingEntry>)`, `Notice { level, text }`, `NoticeWithAction { level, text, action }` (`NoticeAction::Reveal(path)` shows Show in folder, `Link(url)` shows Learn more; the toast stays 12 s instead of 4), `HotkeyStatus { errors }`, `Update(UpdateState)`, `Feedback(FeedbackResult)`, `Thumbnail(PathBuf)`, `Encoder(EncoderCheck)`.
 - `EngineStatus` (`core::session::Status`): `Idle`, `GameRunning` (a game is on and auto record is off), `Waiting`, `Recording { since: Hns, game: Option<GameInfo> }`, `Finalizing`, `Error(String)`.
 - Deleting a game moves its folder to the Recycle Bin (Trash on macOS).
 - Recovery at start: before anything records, the engine lists the `game.mp4.part` files one folder below the recordings folder. A background worker repairs each one with `greyscreen_mp4::recover` (a finished file is only renamed), then updates `game.json`: `video` and `duration_secs` when they were empty, and `recovered: true`. Then it posts the library (thumbnails follow from the normal thumbnail worker) and one notice: "Recovered N recording(s) that were cut off." The folder of the running recording (`ActiveFolder`) is skipped. Nothing is deleted. If the repair fails, the crate renames the part to `game.mp4.recovered-fmp4` and the engine keeps every file and posts "Couldn't recover <folder name>" with Show in folder (the recordings folder when several failed). A repaired video whose `game.json` is missing or unreadable counts as a failure too, because the library cannot list it. A second start finds no `.part`, so it does nothing and says nothing.
@@ -252,7 +254,7 @@ An old `save_clip_hotkey` key is read once and moved into `keybinds`. It is neve
 
 Bitrate: the mean bitrate at 1080p60 is 8, 12 or 20 Mbps for Balanced, High or Max. It scales with pixel count to the power 0.75 and with fps/60 to the power 0.8. Peak is 2.0 times the mean. `CaptureConfig::for_encode_size` rescales with the same 0.75 exponent when the real encode size is smaller than `bitrate_pixels`.
 
-Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Balanced, High or Max. With `Some(q)` the encoder uses Quality rate control with `AVEncCommonQuality = q`, and mean and peak only cap through `MaxBitRate` and the buffer size. If the encoder rejects or misreads either value, it falls back to peak-constrained VBR at the mean and peak, and logs one warning. `MediaEvent::Started.encoder` ends with the mode, for example `(quality 70)` or `(vbr 18.5 Mbps)`. `Settings::estimated_mb_per_minute` returns 0.6 times the mean bitrate plus audio, for the size line in the Recording settings (Native counts as the height of the tallest connected display). The 0.6 factor is a placeholder until real recordings give numbers.
+Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Balanced, High or Max. With `Some(q)` the encoder uses Quality rate control with `AVEncCommonQuality = q`, and mean and peak only cap through `MaxBitRate` and the buffer size. If the encoder rejects or misreads either value, it falls back to peak-constrained VBR at the mean and peak, and logs one warning. `MediaEvent::Started.encoder` is the encoder label, the MFT name and the mode, for example `NVIDIA NVENC (hardware) · NVIDIA H.264 Encoder MFT (vendor VEN_10DE) (quality 70)` or `Windows software encoder · Microsoft H.264 Encoder MFT (vbr 18.5 Mbps)`. `Settings::estimated_mb_per_minute` returns 0.6 times the mean bitrate plus audio, for the size line in the Recording settings (Native counts as the height of the tallest connected display). The 0.6 factor is a placeholder until real recordings give numbers.
 
 `greyscreen-cli record` takes `--preset`, `--rc quality|vbr`, `--quality N`, `--bitrate MBPS`, `--peak MBPS`, `--fps`, `--height H`, `--no-audio` and `--cursor` to override the config for A/B tests.
 
@@ -300,12 +302,23 @@ The website's FAQ page (`https://greyscreen-lake.vercel.app/faq`) needs one sect
 | `window-not-found` | The League window closed or was not found while capture started | Make sure League is running, then retry |
 | `folder-not-writable` | The recordings folder is missing, read-only or cannot be created | Choose another folder in Settings > Storage |
 | `low-disk` | The drive has no space left | Free some space or choose another folder |
-| `no-encoder` | No hardware H.264 encoder or GPU was usable | Update the graphics driver and restart Greyscreen |
+| `no-encoder` | No hardware or software H.264 encoder or GPU was usable (capture start, or the encoder check at start) | Update the graphics driver and restart Greyscreen |
 | `windows-version` | Windows Graphics Capture is not supported | Update to Windows 10 version 1903 or newer |
 | `run-as-admin` | Windows refused access to the window (access denied) | Run Greyscreen as administrator if League does; check Settings > Privacy & security > Screen capture |
 | `help` | Any other capture failure | The Get help section: send feedback, GitHub Issues, logs |
 
 On Windows 10 builds that cannot hide the capture border, a start warning says Windows draws a yellow border around the captured window and that it is not in the video. It has no anchor.
+
+## Encoder selection (`core::encoder`, `capture::selftest`)
+
+- Plan (`encoder::plan`, pure): hardware MFTs first, one per GPU, then Windows' software H.264 MFT (`CLSID_MSH264EncoderMFT`), then fail. GPUs come in this order: on a hybrid laptop (the GPU that owns the game's display is Windows' minimum-power GPU and another GPU is its high-performance one) the high-performance GPU first, because games run there; then the display's GPU; then the others in DXGI order. Microsoft adapters (Basic Render Driver, remote sessions) get no hardware try. The software encoder runs on the display's GPU, or the first adapter when no GPU owns it.
+- Capture builds the whole pipeline (device, WGC, video converter, encoder) on the plan's GPU. When every encoder on a GPU fails, it stops that WGC capture and starts over on the next GPU. Setup fails with all the encoder reasons, or with the first setup error (for example no frames from the window) when no encoder was tried.
+- The software encoder is synchronous. Each converted NV12 frame is copied to a staging texture, mapped and copied into a system-memory sample (about 90 MB/s at 1080p 30). Settings that keep CPU use down: `encoder::software_config` caps the encode at 1080p and 30 fps (GOP = fps), `AVEncCommonQualityVsSpeed` 0 and `AVEncNumWorkerThreads` at half the cores, 2 to 4. Rate control and the other properties are the hardware ones.
+- Labels (`encoder::label`): `NVIDIA NVENC (hardware)`, `AMD AMF (hardware)`, `Intel Quick Sync (hardware)`, `Qualcomm (hardware)`, else `<adapter name> (hardware)`, and `Windows software encoder`. The label starts `MediaEvent::Started.encoder`, so the log, the recording health and `diagnostics.jsonl` name the encoder.
+- Check at start: the app calls `greyscreen_engine::spawn_encoder_check` once the engine runs. After 2 s, a background thread computes the key (app version, `encoder_fingerprint`: every adapter's name, vendor and driver version, and the user's fps, height and quality). When `<cache>/encoder-check.json` holds an `EncoderCheck` with that key and an outcome other than `failed`, it is used as is. Otherwise `check_encoders(cfg, every: false)` runs the plan on the primary display's size: each candidate converts a synthetic BGRA frame and encodes 10 frames (no screen capture), and the first that returns a key frame wins. The result (`outcome`: `hardware`, `software` or `failed`, `encoder` label, `detail` with every failure, `noticed`) is saved and sent as `UiMsg::Encoder`. A software outcome also sends one Warn `NoticeWithAction` ("Your graphics card's video encoder didn't work, ...", Learn more links to `/faq#no-encoder`) and saves `noticed: true`, so it shows once per key.
+- UI: Settings, Recording has a read-only Encoder row (`encoder-row`) once a check came back: `NVIDIA NVENC (hardware)`, `Windows software encoder — uses more CPU` or `None works`. A failed check shows a danger card on Home (`encoder-error`): what to try (update the graphics driver, restart), Read the FAQ (`Problem::NoEncoder.help_url()`, `/faq#no-encoder`) and Send feedback.
+- Mid-recording failure: an `MEError` event from the MFT, an encoder step that fails 120 ticks in a row, or no packets for too long ends the session with `MediaEvent::Failed("the video encoder stopped: ...")`; a removed device ends it with `graphics device ...`. Capture drops the dead encoder without draining it. The engine finalizes the game up to that point as for any capture failure and shows the Error notice "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point." (`encoder::is_encoder_failure`).
+- `greyscreen-cli doctor` runs `check_encoders(cfg, every: true)` with the user's settings: every candidate in plan order, one line each, then the chosen encoder. It exits non-zero when none works.
 
 ## Recording health and diagnostics
 
@@ -329,7 +342,7 @@ The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and e
 | `frames_encoded`, `frames_dropped`, `frames_repeated` | encoded, missing (dts holes), and ticks that re-encoded an unchanged frame |
 | `dropped_pct`, `repeated_pct` | of `frames_expected` and of `frames_encoded` |
 | `longest_video_gap_ms` | the longest time between two video packets (16.7 ms at 60 fps is normal) |
-| `encoder` | the hardware MFT name and rate-control mode |
+| `encoder` | the encoder label, MFT name and rate-control mode (`MediaEvent::Started.encoder`) |
 | `encode_ms` (`avg`, `p95`, `max`) | the encode latency above, left out when capture sent no timing |
 | `audio` (`packets`, `gaps`, `longest_gap_ms`, `discontinuities`, `idle_silence_ms`, `start_offset_ms`, `drift_ms`) | `gaps` counts audio dts holes plus filled gaps; `drift_ms` is audio minus video track length; `start_offset_ms` is the first kept audio packet against the first video frame; left out without an audio track |
 | `file_bytes`, `avg_bitrate_kbps` | the finalized file size and its average bitrate (video and audio) |

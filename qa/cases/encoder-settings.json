@@ -1,0 +1,7 @@
+{
+  "about": "Settings, Recording names the encoder the start-up check chose; the software fallback says it uses more CPU.",
+  "scene": "settings-encoder-software",
+  "steps": [
+    {"check": "software", "has": ["encoder-row"], "text": ["Windows software encoder — uses more CPU"]}
+  ]
+}

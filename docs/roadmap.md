@@ -4,7 +4,7 @@ Status on 2026-11-21. `docs/architecture.md` describes how the app works today. 
 
 ## Done
 
-- Capture and encode on Windows: WGC, video processor, hardware H.264, process loopback audio, AAC, pacer, capture session.
+- Capture and encode on Windows: WGC, video processor, hardware H.264 with a software fallback and a start-up encoder check, process loopback audio, AAC, pacer, capture session.
 - Pure-Rust MP4: fragmented writer, finalize, clip writer, crash recovery.
 - Live Client poller, event classification, session state machine with start retries.
 - Engine: game writer, clip ring and planner, clip jobs, library scan, thumbnails, storage limit, delete to the Recycle Bin, global hotkeys, updater, feedback.

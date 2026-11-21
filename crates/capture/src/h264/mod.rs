@@ -1,6 +1,8 @@
 mod pump;
 mod rate;
+mod readback;
 mod setup;
+mod software;
 #[cfg(test)]
 mod tests;
 
@@ -8,24 +10,25 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
+use greyscreen_core::encoder::{EncoderKind, label};
 use greyscreen_core::media::CaptureConfig;
 use windows::Win32::Graphics::Direct3D11::ID3D11Texture2D;
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncVideoForceKeyFrame, ICodecAPI, IMFActivate, IMFDXGIDeviceManager, IMFMediaBuffer,
-    IMFMediaEventGenerator, IMFSample, IMFShutdown, IMFTransform, MFCreateDXGISurfaceBuffer,
-    MFCreateSample, MFT_MESSAGE_COMMAND_DRAIN, MFT_MESSAGE_COMMAND_FLUSH,
-    MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_END_STREAMING,
+    IMFMediaEventGenerator, IMFSample, IMFShutdown, IMFTransform, MF_E_NOTACCEPTING,
+    MFCreateDXGISurfaceBuffer, MFCreateSample, MFT_MESSAGE_COMMAND_DRAIN,
+    MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_END_STREAMING,
 };
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::Interface;
 
 use crate::d3d::GpuDevice;
 use crate::vproc::{Nv12Frame, SlotReleaser};
+use readback::Readback;
 
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(3);
 const DRAIN_POLL: Duration = Duration::from_millis(2);
-const PROBE_SIZE: (u32, u32) = (1920, 1080);
-const PROBE_FPS: u32 = 60;
+const MAX_SYNC_OUTPUTS: u32 = 256;
 
 #[derive(Debug, thiserror::Error)]
 pub enum H264Error {
@@ -42,6 +45,8 @@ pub enum H264Error {
     NotAccepting,
     #[error("encoder produced a bitstream that is neither Annex B nor length-prefixed")]
     Bitstream,
+    #[error("the encoder reported an error: {0}")]
+    Stopped(windows::core::Error),
     #[error("media foundation call failed: {0}")]
     Windows(#[from] windows::core::Error),
 }
@@ -56,13 +61,24 @@ pub struct EncodedVideo {
 }
 
 #[derive(Debug)]
+enum Mode {
+    Async {
+        events: IMFMediaEventGenerator,
+        activate: IMFActivate,
+        _manager: IMFDXGIDeviceManager,
+    },
+    Sync {
+        readback: Readback,
+    },
+}
+
+#[derive(Debug)]
 pub struct H264Encoder {
     scratch: Option<IMFSample>,
-    events: IMFMediaEventGenerator,
+    mode: Mode,
     codec: ICodecAPI,
     transform: IMFTransform,
-    activate: IMFActivate,
-    _manager: IMFDXGIDeviceManager,
+    kind: EncoderKind,
     name: String,
     sequence_header: Vec<u8>,
     input_id: u32,
@@ -81,6 +97,7 @@ pub struct H264Encoder {
 impl H264Encoder {
     pub fn new(
         gpu: &GpuDevice,
+        kind: EncoderKind,
         width: u32,
         height: u32,
         fps: u32,
@@ -105,15 +122,22 @@ impl H264Encoder {
             quality: cfg.quality,
             gop_frames: cfg.gop_frames,
         };
-        let opened = setup::open(gpu, &spec)?;
+        let opened = match kind {
+            EncoderKind::Hardware => setup::open(gpu, &spec)?,
+            EncoderKind::Software => software::open(gpu, &spec)?,
+        };
+        let name = format!(
+            "{} · {}",
+            label(kind, gpu.vendor_id, &gpu.adapter_name),
+            opened.name
+        );
         let mut encoder = Self {
             scratch: None,
-            events: opened.events,
+            mode: opened.mode,
             codec: opened.codec,
             transform: opened.transform,
-            activate: opened.activate,
-            _manager: opened.manager,
-            name: opened.name,
+            kind,
+            name,
             sequence_header: opened.sequence_header,
             input_id: opened.input_id,
             output_id: opened.output_id,
@@ -131,31 +155,8 @@ impl H264Encoder {
         Ok(encoder)
     }
 
-    pub fn probe(gpu: &GpuDevice) -> Result<String> {
-        let cfg = CaptureConfig {
-            fps: PROBE_FPS,
-            max_height: None,
-            video_bitrate: 20_000_000,
-            video_peak: 30_000_000,
-            quality: None,
-            gop_frames: 120,
-            audio: false,
-            audio_bitrate: 0,
-            cursor: false,
-            bitrate_pixels: 0,
-            diagnostics: false,
-        };
-        match Self::new(gpu, PROBE_SIZE.0, PROBE_SIZE.1, PROBE_FPS, &cfg) {
-            Ok(encoder) => {
-                let name = encoder.encoder_name();
-                tracing::info!(encoder = %name, "hardware H.264 encoder probe succeeded");
-                Ok(name)
-            }
-            Err(error) => {
-                tracing::warn!(%error, "hardware H.264 encoder probe failed");
-                Err(error)
-            }
-        }
+    pub fn kind(&self) -> EncoderKind {
+        self.kind
     }
 
     pub fn with_releaser(mut self, releaser: SlotReleaser) -> Self {
@@ -172,11 +173,26 @@ impl H264Encoder {
     }
 
     pub fn need_input(&mut self) -> Result<bool> {
+        if matches!(self.mode, Mode::Sync { .. }) {
+            return Ok(true);
+        }
         self.pump_events()?;
         Ok(self.pending_need_input > 0)
     }
 
     pub fn submit(&mut self, frame: &Nv12Frame, pts_hns: i64, dur_hns: i64) -> Result<()> {
+        if let Mode::Sync { readback } = &self.mode {
+            let sample = readback.sample(&frame.texture, pts_hns, dur_hns)?;
+            // SAFETY: the transform is live and the sample outlives the call.
+            match unsafe { self.transform.ProcessInput(self.input_id, &sample, 0) } {
+                Err(error) if error.code() == MF_E_NOTACCEPTING => {
+                    return Err(H264Error::NotAccepting);
+                }
+                result => result?,
+            }
+            self.releaser.release(frame.slot);
+            return Ok(());
+        }
         self.pump_events()?;
         if self.pending_need_input == 0 {
             return Err(H264Error::NotAccepting);
@@ -200,6 +216,15 @@ impl H264Encoder {
     }
 
     pub fn drain_output(&mut self, out: &mut Vec<EncodedVideo>) -> Result<()> {
+        if matches!(self.mode, Mode::Sync { .. }) {
+            for _ in 0..MAX_SYNC_OUTPUTS {
+                match self.process_output()? {
+                    Some(packet) => out.push(packet),
+                    None => break,
+                }
+            }
+            return Ok(());
+        }
         self.pump_events()?;
         while self.pending_have_output > 0 {
             self.pending_have_output -= 1;
@@ -221,6 +246,9 @@ impl H264Encoder {
         unsafe {
             self.transform
                 .ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0)?;
+        }
+        if matches!(self.mode, Mode::Sync { .. }) {
+            return self.drain_output(out);
         }
         let deadline = Instant::now() + DRAIN_TIMEOUT;
         loop {
@@ -280,6 +308,9 @@ impl H264Encoder {
             }
         }
         self.release_inflight();
+        let Mode::Async { activate, .. } = &self.mode else {
+            return;
+        };
         if let Ok(shutdown) = self.transform.cast::<IMFShutdown>() {
             // SAFETY: the interface is live; Shutdown ends the event queue.
             if let Err(error) = unsafe { shutdown.Shutdown() } {
@@ -287,7 +318,7 @@ impl H264Encoder {
             }
         }
         // SAFETY: the activate object created this transform and is still live.
-        if let Err(error) = unsafe { self.activate.ShutdownObject() } {
+        if let Err(error) = unsafe { activate.ShutdownObject() } {
             tracing::debug!(%error, "encoder activate shutdown failed");
         }
     }

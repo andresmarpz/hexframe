@@ -1,5 +1,6 @@
 mod actions;
 mod clips;
+mod encoder;
 mod feed;
 mod first_run;
 mod last_game;
@@ -16,7 +17,12 @@ use crate::ui::library::format::mode_label;
 use crate::ui::{Detail, Ui, format_clock};
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
-    let page = col().key("home").w_full().gap(16.0).child(state_card(s, k));
+    let page = col()
+        .key("home")
+        .w_full()
+        .gap(16.0)
+        .children(encoder::error_card(s, k))
+        .child(state_card(s, k));
     if s.detail() == Detail::Live {
         return page.h_full().min_h(0.0).child(feed::panel(s, k));
     }

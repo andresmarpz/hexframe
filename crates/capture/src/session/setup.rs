@@ -1,9 +1,5 @@
-use std::sync::atomic::Ordering;
-use std::time::{Duration, Instant};
-
 use crossbeam_channel::Sender;
-use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, encode_size};
-use greyscreen_core::problem::NO_FRAMES;
+use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent};
 use greyscreen_core::time::mono_now;
 use greyscreen_mp4::avc::{NAL_PPS, NAL_SPS, nal_type, split_annexb};
 
@@ -11,20 +7,14 @@ use super::Flags;
 use super::audio::AudioPipe;
 use super::emit::{Sink, StartInfo};
 use super::facts;
+use super::pick::{self, Stage};
 use super::video::Video;
-use crate::client_area::ClientArea;
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
-use crate::d3d::GpuDevice;
-use crate::h264::H264Encoder;
 use crate::pacer::{Pacer, Stats};
 use crate::procstats::ProcessSampler;
-use crate::vproc::VideoConverter;
 use crate::watchdog::Watchdog;
-use crate::wgc::{WgcCapture, WgcOptions};
 
-const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(2);
-const FIRST_FRAME_POLL: Duration = Duration::from_millis(10);
 const BORDER_SHOWN: &str = "Windows shows a yellow border around the captured window while Greyscreen records. It is not in the video.";
 
 pub(crate) fn build(
@@ -38,50 +28,21 @@ pub(crate) fn build(
     tracing::info!(step = "media foundation", "capture setup");
     let mf = MfGuard::start().map_err(|e| format!("Media Foundation start failed: {e}"))?;
     tracing::info!(step = "gpu", "capture setup");
-    let gpu = match *target {
-        CaptureTarget::GameWindow { hwnd, .. } => GpuDevice::for_window(hwnd),
-        CaptureTarget::PrimaryMonitor => GpuDevice::for_primary_monitor(),
-    }
-    .map_err(|e| format!("no usable GPU: {e}"))?;
     let qpc = QpcMap::now();
-    tracing::info!(step = "graphics capture", adapter = %gpu.adapter_name, "capture setup");
-    let wgc = WgcCapture::start(
-        &gpu,
-        target,
-        qpc,
-        WgcOptions {
-            fps: cfg.fps,
-            cursor: cfg.cursor,
-        },
-    )
-    .map_err(|e| format!("screen capture failed to start: {e}"))?;
-    tracing::info!(step = "first frame", "capture setup");
-    let frame = first_frame_size(&wgc, &flags)?;
-    let mut client_area = ClientArea::for_target(target);
-    let crop = client_area.crop(frame);
+    let Stage {
+        gpu,
+        wgc,
+        frame,
+        client_area,
+        crop,
+        size,
+        converter,
+        encoder,
+        cfg,
+        video_cfg,
+    } = pick::first_working(target, cfg, qpc, &flags)?;
     log_capture_path(frame, client_area.client_size());
-    let native = crop.size();
-    let size = encode_size(native, cfg.max_height);
-    tracing::info!(
-        step = "video converter",
-        width = size.0,
-        height = size.1,
-        "capture setup"
-    );
-    let converter = VideoConverter::new(&gpu, size.0, size.1, cfg.fps)
-        .map_err(|e| format!("video converter failed: {e}"))?;
-    let video_cfg = cfg.for_encode_size(size.0, size.1);
-    tracing::info!(
-        width = size.0,
-        height = size.1,
-        bitrate = video_cfg.video_bitrate,
-        peak = video_cfg.video_peak,
-        "encode size"
-    );
-    tracing::info!(step = "encoder", "capture setup");
-    let encoder = H264Encoder::new(&gpu, size.0, size.1, cfg.fps, &video_cfg)
-        .map_err(|e| format!("video encoder failed: {e}"))?
-        .with_releaser(converter.releaser());
+    tracing::info!(encoder = %encoder.encoder_name(), "video encoder chosen");
     let mut warnings = Vec::new();
     if !wgc.border_hidden() {
         warnings.push(BORDER_SHOWN.to_owned());
@@ -168,25 +129,6 @@ fn log_capture_path(frame: (u32, u32), client: Option<(u32, u32)>) {
             "capture size matches the window client size"
         ),
         None => {}
-    }
-}
-
-fn first_frame_size(wgc: &WgcCapture, flags: &Flags) -> Result<(u32, u32), String> {
-    let deadline = Instant::now() + FIRST_FRAME_TIMEOUT;
-    loop {
-        if let Some((_, size, _)) = wgc.latest() {
-            return Ok(size);
-        }
-        if wgc.is_closed() {
-            return Err("the captured window closed during startup".into());
-        }
-        if flags.stop.load(Ordering::Acquire) {
-            return Err("capture stopped during startup".into());
-        }
-        if Instant::now() >= deadline {
-            return Err(NO_FRAMES.into());
-        }
-        std::thread::sleep(FIRST_FRAME_POLL);
     }
 }
 

@@ -225,7 +225,13 @@ fn keybind_groups(s: &Ui, k: &Kit, layer: &mut Vec<El>, rows: &[Row]) -> Vec<El>
 }
 
 fn search_content(s: &Ui, k: &Kit, layer: &mut Vec<El>, query: &str) -> El {
-    let found = catalog::search(query);
+    let found: Vec<(SettingsSection, Vec<Row>)> = catalog::search(query)
+        .into_iter()
+        .filter_map(|(section, rows)| {
+            let rows: Vec<Row> = rows.into_iter().filter(|r| shown(s, *r)).collect();
+            (!rows.is_empty()).then_some((section, rows))
+        })
+        .collect();
     if found.is_empty() {
         return col()
             .key("settings-no-results")
@@ -278,6 +284,7 @@ fn group(
     rows: &[Row],
 ) -> El {
     let clips_off = section == SettingsSection::Clips && !s.settings.clips.enabled;
+    let rows: Vec<Row> = rows.iter().copied().filter(|r| shown(s, *r)).collect();
     let mut body = card(k).key(key);
     let last = rows.len().saturating_sub(1);
     for (i, row) in rows.iter().enumerate() {
@@ -295,6 +302,10 @@ fn group(
     body
 }
 
+fn shown(s: &Ui, row: Row) -> bool {
+    row != Row::Encoder || s.encoder.is_some()
+}
+
 fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
     match row {
         Row::RecordGames
@@ -302,6 +313,7 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         | Row::Quality
         | Row::Resolution
         | Row::FrameRate
+        | Row::Encoder
         | Row::Audio
         | Row::Cursor
         | Row::NavStyle

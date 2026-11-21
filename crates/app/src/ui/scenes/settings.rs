@@ -1,7 +1,9 @@
 use greyscreen_core::keybinds::Action;
 use rune::TextEdit;
 
-use super::{Scene, sheet};
+use greyscreen_core::encoder::{CheckOutcome, SOFTWARE_LABEL};
+
+use super::{Scene, encoder, sheet};
 use crate::ui::SettingsSection;
 
 pub(super) const SCENES: &[Scene] = &[
@@ -9,6 +11,14 @@ pub(super) const SCENES: &[Scene] = &[
     ("settings-resolution-open", |ui| {
         sheet(ui, SettingsSection::Recording);
         ui.resolution_open = true;
+    }),
+    ("settings-encoder", |ui| {
+        ui.encoder = encoder(CheckOutcome::Hardware, "NVIDIA NVENC (hardware)");
+        sheet(ui, SettingsSection::Recording);
+    }),
+    ("settings-encoder-software", |ui| {
+        ui.encoder = encoder(CheckOutcome::Software, SOFTWARE_LABEL);
+        sheet(ui, SettingsSection::Recording);
     }),
     ("settings-clips", |ui| sheet(ui, SettingsSection::Clips)),
     ("settings-clips-off", |ui| {

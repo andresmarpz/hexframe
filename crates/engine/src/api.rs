@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crossbeam_channel::{Sender, unbounded};
+use greyscreen_core::encoder::EncoderCheck;
 use greyscreen_core::feedback::{FeedbackDraft, FeedbackResult};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::keybinds::Action;
@@ -100,6 +101,7 @@ pub enum UiMsg {
     Update(UpdateState),
     Feedback(FeedbackResult),
     Thumbnail(PathBuf),
+    Encoder(EncoderCheck),
 }
 
 pub type UiSink = Box<dyn Fn(UiMsg) + Send + Sync>;

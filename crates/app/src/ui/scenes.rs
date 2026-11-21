@@ -11,6 +11,7 @@ mod update;
 
 use std::sync::OnceLock;
 
+use greyscreen_core::encoder::{CheckOutcome, EncoderCheck};
 use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::EngineStatus;
 
@@ -59,6 +60,16 @@ fn game(ui: &mut Ui) {
 fn sheet(ui: &mut Ui, section: SettingsSection) {
     game(ui);
     ui.open_settings(section);
+}
+
+fn encoder(outcome: CheckOutcome, name: &str) -> Option<EncoderCheck> {
+    Some(EncoderCheck {
+        key: String::new(),
+        outcome,
+        encoder: name.to_owned(),
+        detail: String::new(),
+        noticed: true,
+    })
 }
 
 fn docked(ui: &mut Ui) {
