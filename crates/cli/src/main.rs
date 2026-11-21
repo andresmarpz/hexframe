@@ -98,6 +98,7 @@ pub(crate) fn init_windows() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
+        .with_ansi(false)
         .with_env_filter(filter)
         .init();
     if let Err(err) = greyscreen_capture::probe::init_process() {
