@@ -1,0 +1,249 @@
+{
+ "loading_secs": 5.0,
+ "tail_secs": 10.0,
+ "duration_secs": 360.0,
+ "active_player": "Me#EUW",
+ "game_mode": "CLASSIC",
+ "players": [
+  {
+   "summonerName": "Me",
+   "riotId": "Me#EUW",
+   "riotIdGameName": "Me",
+   "riotIdTagLine": "EUW",
+   "championName": "Ahri",
+   "rawChampionName": "game_character_displayname_Ahri",
+   "isBot": false,
+   "team": "ORDER"
+  },
+  {
+   "summonerName": "Kaya",
+   "riotId": "Kaya#EUW",
+   "riotIdGameName": "Kaya",
+   "riotIdTagLine": "EUW",
+   "championName": "Lee Sin",
+   "rawChampionName": "game_character_displayname_LeeSin",
+   "isBot": false,
+   "team": "ORDER"
+  },
+  {
+   "summonerName": "Orin",
+   "riotId": "Orin#EUW",
+   "riotIdGameName": "Orin",
+   "riotIdTagLine": "EUW",
+   "championName": "Jinx",
+   "rawChampionName": "game_character_displayname_Jinx",
+   "isBot": false,
+   "team": "ORDER"
+  },
+  {
+   "summonerName": "Tess",
+   "riotId": "Tess#EUW",
+   "riotIdGameName": "Tess",
+   "riotIdTagLine": "EUW",
+   "championName": "Thresh",
+   "rawChampionName": "game_character_displayname_Thresh",
+   "isBot": false,
+   "team": "ORDER"
+  },
+  {
+   "summonerName": "Bram",
+   "riotId": "Bram#EUW",
+   "riotIdGameName": "Bram",
+   "riotIdTagLine": "EUW",
+   "championName": "Ornn",
+   "rawChampionName": "game_character_displayname_Ornn",
+   "isBot": false,
+   "team": "ORDER"
+  },
+  {
+   "summonerName": "Vex",
+   "riotId": "Vex#EUW",
+   "riotIdGameName": "Vex",
+   "riotIdTagLine": "EUW",
+   "championName": "Zed",
+   "rawChampionName": "game_character_displayname_Zed",
+   "isBot": false,
+   "team": "CHAOS"
+  },
+  {
+   "summonerName": "Lior",
+   "riotId": "Lior#EUW",
+   "riotIdGameName": "Lior",
+   "riotIdTagLine": "EUW",
+   "championName": "Ashe",
+   "rawChampionName": "game_character_displayname_Ashe",
+   "isBot": false,
+   "team": "CHAOS"
+  },
+  {
+   "summonerName": "Nova",
+   "riotId": "Nova#EUW",
+   "riotIdGameName": "Nova",
+   "riotIdTagLine": "EUW",
+   "championName": "Leona",
+   "rawChampionName": "game_character_displayname_Leona",
+   "isBot": false,
+   "team": "CHAOS"
+  },
+  {
+   "summonerName": "Dax",
+   "riotId": "Dax#EUW",
+   "riotIdGameName": "Dax",
+   "riotIdTagLine": "EUW",
+   "championName": "Viego",
+   "rawChampionName": "game_character_displayname_Viego",
+   "isBot": false,
+   "team": "CHAOS"
+  },
+  {
+   "summonerName": "Pike",
+   "riotId": "Pike#EUW",
+   "riotIdGameName": "Pike",
+   "riotIdTagLine": "EUW",
+   "championName": "Darius",
+   "rawChampionName": "game_character_displayname_Darius",
+   "isBot": false,
+   "team": "CHAOS"
+  }
+ ],
+ "events": [
+  {
+   "EventName": "GameStart",
+   "EventTime": 0.03
+  },
+  {
+   "EventName": "MinionsSpawning",
+   "EventTime": 65.0
+  },
+  {
+   "EventName": "FirstBlood",
+   "EventTime": 95.0,
+   "Recipient": "Me"
+  },
+  {
+   "EventName": "ChampionKill",
+   "EventTime": 95.0,
+   "KillerName": "Me",
+   "VictimName": "Vex",
+   "Assisters": [
+    "Kaya"
+   ]
+  },
+  {
+   "EventName": "ChampionKill",
+   "EventTime": 100.0,
+   "KillerName": "Me",
+   "VictimName": "Lior",
+   "Assisters": []
+  },
+  {
+   "EventName": "Multikill",
+   "EventTime": 100.0,
+   "KillerName": "Me",
+   "KillStreak": 2
+  },
+  {
+   "EventName": "ChampionKill",
+   "EventTime": 130.0,
+   "KillerName": "Vex",
+   "VictimName": "Me",
+   "Assisters": [
+    "Nova"
+   ]
+  },
+  {
+   "EventName": "ChampionKill",
+   "EventTime": 150.0,
+   "KillerName": "Kaya",
+   "VictimName": "Nova",
+   "Assisters": [
+    "Me"
+   ]
+  },
+  {
+   "EventName": "HordeKill",
+   "EventTime": 170.0,
+   "KillerName": "Kaya",
+   "Assisters": [
+    "Orin"
+   ]
+  },
+  {
+   "EventName": "DragonKill",
+   "EventTime": 185.0,
+   "DragonType": "Earth",
+   "Stolen": "False",
+   "KillerName": "Orin",
+   "Assisters": [
+    "Kaya"
+   ]
+  },
+  {
+   "EventName": "HeraldKill",
+   "EventTime": 200.0,
+   "Stolen": "False",
+   "KillerName": "Kaya",
+   "Assisters": []
+  },
+  {
+   "EventName": "FirstBrick",
+   "EventTime": 215.0,
+   "KillerName": "Kaya"
+  },
+  {
+   "EventName": "TurretKilled",
+   "EventTime": 215.0,
+   "TurretKilled": "Turret_T2_L_03_A",
+   "KillerName": "Kaya",
+   "Assisters": [
+    "Tess"
+   ]
+  },
+  {
+   "EventName": "ChampionKill",
+   "EventTime": 220.0,
+   "KillerName": "Dax",
+   "VictimName": "Me",
+   "Assisters": [
+    "Pike"
+   ]
+  },
+  {
+   "EventName": "ChampionKill",
+   "EventTime": 240.0,
+   "KillerName": "Orin",
+   "VictimName": "Pike",
+   "Assisters": [
+    "Me",
+    "Tess"
+   ]
+  },
+  {
+   "EventName": "InhibKilled",
+   "EventTime": 255.0,
+   "InhibKilled": "Barracks_T2_R1",
+   "KillerName": "Orin",
+   "Assisters": []
+  },
+  {
+   "EventName": "BaronKill",
+   "EventTime": 290.0,
+   "Stolen": "False",
+   "KillerName": "Bram",
+   "Assisters": [
+    "Kaya"
+   ]
+  },
+  {
+   "EventName": "Ace",
+   "EventTime": 320.0,
+   "Acer": "Kaya",
+   "AcingTeam": "ORDER"
+  },
+  {
+   "EventName": "GameEnd",
+   "EventTime": 360.0,
+   "Result": "Win"
+  }
+ ]
+}
