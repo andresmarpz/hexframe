@@ -5,10 +5,10 @@ import Icon from "../components/Icon.astro";
 import Base from "../layouts/Base.astro";
 import {
   closing,
-  faq,
   features,
   githubUrl,
   hero,
+  homeQuestions,
   howItWorks,
   review,
   safe,
@@ -114,23 +114,17 @@ const downloads = await getDownloads();
             ))
           }
         </ul>
+        <p class="safe-more"><a href="/faq/#vanguard">{safe.more}</a></p>
       </div>
     </div>
   </section>
 
-  <section class="section" id="faq" aria-labelledby="faq-title">
+  <section class="section" id="questions" aria-labelledby="questions-title">
     <div class="container narrow">
-      <h2 id="faq-title">{faq.title}</h2>
-      <div class="faq">
-        {
-          faq.items.map((item) => (
-            <details>
-              <summary>{item.q}</summary>
-              <p>{item.a}</p>
-            </details>
-          ))
-        }
-      </div>
+      <h2 id="questions-title">{homeQuestions.title}</h2>
+      <ul class="question-links">
+        {homeQuestions.items.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+      </ul>
     </div>
   </section>
 

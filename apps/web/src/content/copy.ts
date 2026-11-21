@@ -1,7 +1,9 @@
-// TODO(copy): strings outside the written copy: faq.title, download section titles and buttons, notFound buttons, review image alts
+// TODO(copy): strings outside the written copy: download section titles and buttons, notFound buttons, review image alts
 export const repo = "andresmarpz/greyscreen";
 export const githubUrl = `https://github.com/${repo}`;
 export const releasesUrl = `${githubUrl}/releases`;
+export const issuesUrl = `${githubUrl}/issues`;
+export const discordUrl = "";
 
 export const site = {
   name: "Greyscreen",
@@ -19,7 +21,15 @@ export const site = {
 export const nav = [
   { label: "Features", href: "/#features" },
   { label: "Download", href: "/download/" },
+  { label: "FAQ", href: "/faq/" },
   { label: "Changelog", href: "/changelog/" },
+];
+
+export const footerLinks = [
+  { label: "Privacy", href: "/privacy/" },
+  { label: "Get help", href: "/faq/#help" },
+  { label: "GitHub Issues", href: issuesUrl },
+  ...(discordUrl ? [{ label: "Discord", href: discordUrl }] : []),
 ];
 
 export const hero = {
@@ -34,6 +44,7 @@ export const hero = {
 export const trust = [
   "Free",
   "Open source",
+  "Public beta",
   "Windows 10 and 11 (64-bit)",
   "Local MP4s, no account",
 ];
@@ -69,7 +80,7 @@ export const features: { icon: IconName; title: string; body: string }[] = [
   {
     icon: "local",
     title: "Local files, no account",
-    body: "Recordings stay on your PC as normal MP4s with a small JSON file beside them. No account, no uploads, no telemetry. Installs from one .exe without admin rights.",
+    body: "Recordings stay on your PC as normal MP4s with a small JSON file beside them. No account and no uploads. Nothing is sent unless you press Send feedback. Installs from one .exe without admin rights.",
   },
 ];
 
@@ -118,20 +129,32 @@ export const review = {
 };
 
 export const safe = {
-  title: "Safe by design",
+  title: "Stays out of the game",
   points: [
     {
       title: "Official Riot local API",
-      body: "Events come from Riot's official Live Client Data API served by League on your PC, and video uses Windows' standard capture of the game window.",
+      body: "Events come from Riot's Live Client Data API, which League serves on your own PC. Video uses Windows' standard capture of the game window.",
     },
     {
       title: "No memory reading or injection",
-      body: "Greyscreen does not read game memory, inject into the game, or modify game files.",
+      body: "Greyscreen does not read game memory, inject into the game, or change game files.",
     },
     {
       title: "Local files only",
-      body: "Every recording stays on your PC as an MP4 with a small JSON file next to it. No account, no uploads, and no telemetry.",
+      body: "Recordings stay on your PC as an MP4 with a small JSON file next to it. No account, no uploads. Nothing is sent unless you press Send feedback.",
     },
+  ],
+  more: "More in the FAQ",
+};
+
+export const homeQuestions = {
+  title: "Questions",
+  items: [
+    { label: "Is it safe with Vanguard? Will I get banned?", href: "/faq/#vanguard" },
+    { label: "Does it cost FPS?", href: "/faq/#fps" },
+    { label: "Where are my recordings, and how much space do they use?", href: "/faq/#storage" },
+    { label: "Why isn't it recording?", href: "/faq/#fullscreen" },
+    { label: "What does it send?", href: "/privacy/" },
   ],
 };
 
@@ -140,73 +163,33 @@ export const closing = {
   button: "Download for Windows",
 };
 
-export const faq = {
-  title: "Questions",
-  items: [
-    {
-      q: "Is Greyscreen allowed? Will I get banned?",
-      a: "Greyscreen only uses Riot's official local Live Client Data API and standard Windows screen capture, like other well-known recorders. It does not read game memory, inject into the game, or modify game files. Riot's terms and enforcement are always Riot's call.",
-    },
-    {
-      q: "Will recording hurt my FPS?",
-      a: "Greyscreen uses your GPU's hardware H.264 encoder, so video encoding runs on the graphics card instead of your CPU. You can also choose Balanced, High, or Max quality and 30 or 60 fps in Settings.",
-    },
-    {
-      q: "Which GPUs are supported?",
-      a: "Greyscreen runs on 64-bit Windows 10 and 11 with a GPU that supports hardware H.264 encoding. It has been tested on NVIDIA so far; AMD and Intel use the same Windows encoder path.",
-    },
-    {
-      q: "How much disk space do recordings use?",
-      a: "Size depends on your display resolution, frame rate (30 or 60 fps), and quality preset (Balanced, High, or Max). At 1080p60 High, recordings use about 55 MB per minute. Settings shows an estimated size for your configuration.",
-    },
-    {
-      q: "Where are my recordings saved?",
-      a: "Files stay on your PC as normal MP4 videos with a small JSON file next to each one. Nothing is uploaded and no account is required. You can manage recordings and delete them to the Recycle Bin from the library.",
-    },
-    {
-      q: "Does it record Discord or my microphone?",
-      a: "No. Greyscreen records only League's own audio. Discord and your microphone are not recorded.",
-    },
-    {
-      q: "Can I show or hide my mouse cursor?",
-      a: "Yes. Showing the mouse cursor in recordings is optional, so you can turn it on to analyze your mouse movement or hide it.",
-    },
-    {
-      q: "How do I uninstall Greyscreen?",
-      a: "Greyscreen installs to your user folder with a Start Menu entry and an uninstaller, with no admin rights required. Run the uninstaller to remove it.",
-    },
-    {
-      q: "Why does Windows SmartScreen show a warning?",
-      a: 'The download is not code-signed yet, so Windows SmartScreen may warn before running it. Click "More info" and then "Run anyway", or inspect the source code on GitHub.',
-    },
-    {
-      q: "Is Greyscreen free and open source?",
-      a: "Yes. Greyscreen is free and open source on GitHub, with no account, no uploads, and no telemetry.",
-    },
-  ],
-};
-
 export const download = {
   title: "Download Greyscreen",
   intro:
-    "One small .exe for Windows. Free, open source, and installs to your user folder without admin rights.",
+    "One small .exe for Windows. Free, open source, and installs to your user folder without admin rights. Greyscreen is in public beta, so expect rough edges.",
   button: "Download for Windows",
   requirementsTitle: "Requirements",
   requirements: [
-    "Windows 10 or Windows 11 (64-bit)",
-    "GPU with hardware H.264 encoding (tested on NVIDIA; AMD and Intel use the same Windows encoder path)",
-    "League of Legends on the same PC",
+    "Windows 10 (version 2004 or newer) or Windows 11, 64-bit",
+    "A GPU with hardware H.264 encoding. Most NVIDIA, AMD and Intel GPUs from the last several years have one. Tested mostly on NVIDIA so far.",
+    "League of Legends set to Borderless or Windowed. Windows cannot capture exclusive Fullscreen.",
   ],
-  smartScreenTitle: "Windows SmartScreen",
-  smartScreen:
-    'The download is not code-signed yet, so Windows SmartScreen may show a warning. Click "More info" and then "Run anyway" to continue.',
+  smartScreenTitle: "Windows may warn you",
+  smartScreenSteps: [
+    'Windows may show "Windows protected your PC". The .exe is not code-signed yet, so Windows does not know it.',
+    'Click "More info", then "Run anyway".',
+    "To check what you run, read the source on GitHub.",
+  ],
+  smartScreenAppControl:
+    'On Windows 11 with Smart App Control turned on, Windows can block the file with no "Run anyway" button. Turn Smart App Control off in Windows Security, or wait for a signed release.',
   firstRunTitle: "First run",
   firstRun: [
-    "Run the downloaded .exe to install Greyscreen in your user folder with a Start Menu entry and an uninstaller.",
-    'Open Settings to pick your quality preset (Balanced, High, or Max), frame rate (30 or 60 fps), cursor option, and whether Greyscreen starts with Windows.',
-    'Leave Greyscreen in the tray with "Record games" turned on, then start a match.',
+    "Run the downloaded .exe. It installs Greyscreen in your user folder with a Start Menu entry and an uninstaller.",
+    "In Settings, pick your quality, frame rate, cursor option, and whether Greyscreen starts with Windows.",
+    'Set League to Borderless, leave Greyscreen in the tray with "Record games" on, then start a match.',
   ],
   firstRunAlt: "The Greyscreen settings sheet.",
+  helpLine: "Something wrong? See the FAQ",
   cliTitle: "Command-line tool",
   cliBody:
     "Use greyscreen-cli.exe to check your encoder (greyscreen-cli doctor) or run a 10-second test recording (greyscreen-cli record --seconds 10).",

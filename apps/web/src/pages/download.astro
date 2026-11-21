@@ -1,6 +1,7 @@
 ---
 import Frame from "../components/Frame.astro";
 import DownloadButton from "../components/DownloadButton";
+import SmartScreenNotice from "../components/SmartScreenNotice.astro";
 import ReleaseInfo from "../components/ReleaseInfo";
 import Base from "../layouts/Base.astro";
 import { withCode } from "../lib/inline-code";
@@ -8,7 +9,6 @@ import { download, releasesUrl, site } from "../content/copy";
 import { getDownloads } from "../lib/github-build";
 
 const downloads = await getDownloads();
-
 ---
 
 <Base title={`${download.title} — ${site.name}`} description={download.intro}>
@@ -35,10 +35,7 @@ const downloads = await getDownloads();
         </ul>
       </div>
 
-      <div class="card notice">
-        <h2 class="h3">{download.smartScreenTitle}</h2>
-        <p>{download.smartScreen}</p>
-      </div>
+      <SmartScreenNotice />
 
       <div class="card">
         <h2 class="h3">{download.firstRunTitle}</h2>
@@ -58,6 +55,8 @@ const downloads = await getDownloads();
           </DownloadButton>
         </p>
       </div>
+
+      <p class="fine"><a href="/faq/">{download.helpLine}</a></p>
     </div>
   </section>
 </Base>

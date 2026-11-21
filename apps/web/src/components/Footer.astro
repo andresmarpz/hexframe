@@ -1,6 +1,6 @@
 ---
 import Logo from "./Logo.astro";
-import { githubUrl, nav, releasesUrl, site } from "../content/copy";
+import { footerLinks, githubUrl, nav, releasesUrl, site } from "../content/copy";
 ---
 
 <footer class="site-footer">
@@ -16,6 +16,7 @@ import { githubUrl, nav, releasesUrl, site } from "../content/copy";
         {nav.map((item) => <a href={item.href}>{item.label}</a>)}
         <a href={githubUrl}>GitHub</a>
         <a href={releasesUrl}>Releases</a>
+        {footerLinks.map((item) => <a href={item.href}>{item.label}</a>)}
       </nav>
     </div>
     <p class="riot-notice">{site.riotNotice}</p>

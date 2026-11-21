@@ -1,0 +1,12 @@
+---
+import { download } from "../content/copy";
+---
+
+<!-- Remove this whole box (and the smartScreen strings in content/copy.ts) once the exe is code-signed. -->
+<div class="card notice" id="smartscreen">
+  <h2 class="h3">{download.smartScreenTitle}</h2>
+  <ol class="list numbered">
+    {download.smartScreenSteps.map((step) => <li>{step}</li>)}
+  </ol>
+  <p>{download.smartScreenAppControl}</p>
+</div>

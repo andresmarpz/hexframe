@@ -1,6 +1,6 @@
 # Greyscreen website
 
-Static marketing site: Astro, React islands for the GitHub star count and the download links, plain CSS.
+Static site (home, download, FAQ, privacy, changelog): Astro, React islands for the GitHub star count and the download links, plain CSS.
 
 ## Run
 
@@ -21,12 +21,24 @@ The build reads the repo's releases and star count from the GitHub API (`src/lib
 
 ## Where things live
 
-- `src/content/copy.ts`: all page copy. Strings marked `TODO(copy)` are not in the written copy yet.
+- `src/content/copy.ts`: home and download copy, nav and footer links. Strings marked `TODO(copy)` are not in the written copy yet. `discordUrl` is empty: the Discord links in the footer and the FAQ stay hidden until you set it.
+- `src/content/faq.ts` and `src/content/privacy.ts`: the `/faq` and `/privacy` pages. Keep `privacy.ts` true to the code: update checks, Data Dragon icons, Send feedback payload.
+- `src/components/SmartScreenNotice.astro`: the "Windows may warn you" box on the download page. Delete it, its use in `download.astro` and the `smartScreen*` strings in `copy.ts` once the exe is code-signed.
 - `src/assets/brand/logo-mark.svg` and `public/favicon.svg`: logo and favicon. Replace the files to rebrand.
 - `src/styles/rune-tokens.css`: the app's colours, type sizes and radii. Generated, do not edit.
 - `src/styles/global.css`: site styles on top of those tokens.
 - `src/content/changelog/<version>.md`: one file per release (`version`, `date`, `title`, then bullets).
 - `public/screens/*.png`: app screenshots.
+
+## Help anchors
+
+The app's "Learn more" links open `https://greyscreen-lake.vercel.app/faq#<anchor>`. Each anchor is the `id` of an item in `src/content/faq.ts`. Do not rename them:
+
+`vanguard`, `fps`, `storage`, `low-disk`, `death-review`, `fullscreen`, `window-not-found`, `run-as-admin`, `folder-not-writable`, `no-encoder`, `updates`, `uninstall`, `privacy`, `free`, `help`.
+
+## Analytics
+
+`@vercel/analytics` (cookie-less page views) is in `Base.astro`. Turn Web Analytics on once in the Vercel project (Analytics tab) or it records nothing.
 
 ## Refresh the theme tokens
 
