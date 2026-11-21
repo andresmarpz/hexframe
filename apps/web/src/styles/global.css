@@ -203,9 +203,8 @@ time,
   text-decoration: none;
 }
 
-.logo-mark {
+.logo {
   display: inline-flex;
-  color: var(--accent);
 }
 
 .nav {

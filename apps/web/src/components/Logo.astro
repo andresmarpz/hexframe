@@ -1,12 +1,17 @@
 ---
-import mark from "../assets/brand/logo-mark.svg?raw";
+import lockup from "../../../../brand/logo-horizontal.svg?raw";
 
 interface Props {
-  size?: number;
+  height?: number;
 }
 
-const { size = 24 } = Astro.props;
-const sized = mark.replace("<svg ", `<svg width="${size}" height="${size}" aria-hidden="true" focusable="false" `);
+const { height = 24 } = Astro.props;
+const width = Math.round((height * 548) / 112);
+const themed = lockup
+  .replace(/<title>.*?<\/title>\s*/, "")
+  .replaceAll('fill="#4392F7"', 'fill="var(--accent)"')
+  .replaceAll('fill="#EFF0F2"', 'fill="currentColor"')
+  .replace("<svg ", `<svg width="${width}" height="${height}" aria-hidden="true" focusable="false" `);
 ---
 
-<span class="logo-mark" set:html={sized} />
+<span class="logo" set:html={themed} />

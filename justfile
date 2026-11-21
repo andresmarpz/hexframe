@@ -60,7 +60,7 @@ web-screens:
     cargo build -q --locked -p greyscreen
     mkdir -p apps/web/public/screens "/Users/Shared/Library/Application Support/Greyscreen"
     ln -sfn "$HOME/Library/Application Support/Greyscreen/cache" "/Users/Shared/Library/Application Support/Greyscreen/cache"
-    for scene in recording last-game recordings review review-theater settings; do HOME=/Users/Shared target/debug/greyscreen --snap apps/web/public/screens/$scene.png --scene $scene --scale 2 --theme dark || echo "skipped $scene"; done
+    for scene in recording last-game recordings settings; do HOME=/Users/Shared target/debug/greyscreen --snap apps/web/public/screens/$scene.png --scene $scene --scale 2 --theme dark || echo "skipped $scene"; done
     rm "/Users/Shared/Library/Application Support/Greyscreen/cache"
     rmdir "/Users/Shared/Library/Application Support/Greyscreen" "/Users/Shared/Library/Application Support" /Users/Shared/Library
 

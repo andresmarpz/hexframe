@@ -116,8 +116,6 @@ export const review = {
       body: "Adjust playback speed to inspect close fights.",
     },
   ],
-  reviewAlt: "The Greyscreen review screen with the match video and its event timeline.",
-  theaterAlt: "The Greyscreen review screen in fullscreen theater mode.",
   recordingsAlt: "The Greyscreen Recordings screen listing recorded games by champion.",
 };
 

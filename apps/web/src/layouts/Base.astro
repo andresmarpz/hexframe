@@ -23,7 +23,8 @@ const {
 } = Astro.props;
 const path = Astro.url.pathname;
 const canonical = new URL(path, Astro.site);
-const image = new URL("/screens/recording.png", Astro.site);
+const ogImageAlt = "Greyscreen: automatic League of Legends game recorder and review timeline.";
+const image = new URL("/og.png", Astro.site);
 ---
 
 <!doctype html>
@@ -39,13 +40,23 @@ const image = new URL("/screens/recording.png", Astro.site);
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={site.name} />
     <meta property="og:title" content={ogTitle} />
     <meta property="og:description" content={ogDescription} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={image} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={ogTitle} />
+    <meta name="twitter:description" content={ogDescription} />
+    <meta name="twitter:image" content={image} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
