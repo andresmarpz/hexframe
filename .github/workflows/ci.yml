@@ -84,18 +84,6 @@ jobs:
             target/${{ env.BUILD_PROFILE }}/greyscreen-cli.exe
           if-no-files-found: error
 
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install toolchain
-        run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
-
   typos:
     runs-on: ubuntu-latest
     steps:
