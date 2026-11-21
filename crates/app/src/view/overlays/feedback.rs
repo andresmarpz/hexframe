@@ -8,6 +8,7 @@ use rune_kit::{
 use crate::ui::{FEEDBACK_MESSAGE_KEY, FeedbackPhase, FeedbackUi, Ui};
 
 const DIALOG_WIDTH: f32 = 480.0;
+const COPY_WIDTH: f32 = 112.0;
 const DIALOG_CHROME: f32 = 190.0;
 const MIN_FIELDS_HEIGHT: f32 = 120.0;
 const MESSAGE_ROWS: usize = 5;
@@ -200,7 +201,8 @@ fn footer(f: &FeedbackUi, k: &Kit) -> El {
                 .control_size(ControlSize::Large)
                 .on_press_tx(|ui: &mut Ui, tx: &mut Tx| ui.copy_feedback_report(tx))
                 .build(k)
-                .key("feedback-copy"),
+                .key("feedback-copy")
+                .w(COPY_WIDTH),
         );
     }
     buttons = buttons

@@ -686,3 +686,18 @@ fn the_quality_note_follows_the_injected_display() {
 
     assert!(visible_texts(&rt).iter().any(|t| t.contains("(1440p)")));
 }
+
+#[test]
+fn the_stop_button_keeps_its_width_while_asking_to_confirm() {
+    let (mut rt, _rx) = live_runtime();
+    rt.update(|ui, _| {
+        ui.status = Ui::preview().status;
+        ui.elapsed_secs = 600;
+    });
+    rt.frame(1.0 / 60.0);
+    let before = nav_rect_of(&rt, "stop-recording")[2];
+    tap(&mut rt, "stop-recording");
+    settle(&mut rt);
+    assert!(rt.state.stop_confirm_until.is_some());
+    assert_eq!(nav_rect_of(&rt, "stop-recording")[2], before);
+}

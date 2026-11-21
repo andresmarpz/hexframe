@@ -12,7 +12,7 @@ use greyscreen_engine::{
 use greyscreen_league::{LeagueMsg, UpdateError};
 use rune::Runtime;
 
-use super::{settle, tap, visible_texts};
+use super::{nav_rect_of, settle, tap, visible_texts};
 use crate::ui::Ui;
 
 fn info(tag: &str) -> UpdateInfo {
@@ -53,7 +53,7 @@ fn has_text(rt: &Runtime<Ui>, wanted: &str) -> bool {
 #[test]
 fn the_about_card_offers_a_check() {
     let (rt, _rx) = settings_runtime();
-    assert!(has_text(&rt, "Check for updates"));
+    assert!(has_text(&rt, "Check"));
     assert!(rt.find("check-updates-button").is_some());
     assert!(rt.find("install-update").is_none());
 }
@@ -266,4 +266,53 @@ fn the_card_walks_through_check_download_and_install_with_a_fake_source() {
     assert_eq!(launched[0].file_name().unwrap(), "greyscreen-v0.2.0.exe");
     drop(engine);
     std::fs::remove_dir_all(dir).ok();
+}
+
+fn width_in(rt: &mut Runtime<Ui>, state: UpdateState, key: &str) -> f32 {
+    show(rt, state);
+    nav_rect_of(rt, key)[2]
+}
+
+#[test]
+fn the_check_button_keeps_its_width_in_every_state() {
+    let (mut rt, _rx) = settings_runtime();
+    let key = "check-updates-button";
+    let idle = width_in(&mut rt, UpdateState::Unknown, key);
+    let states = [
+        UpdateState::Checking,
+        UpdateState::UpToDate,
+        UpdateState::Available(info("v0.2.0")),
+        UpdateState::Downloading(info("v0.2.0")),
+        UpdateState::Failed("Couldn't check for updates. Try again later.".into()),
+    ];
+    for state in states {
+        let name = format!("{state:?}");
+        assert_eq!(width_in(&mut rt, state, key), idle, "{name}");
+    }
+}
+
+#[test]
+fn checking_shows_a_spinner_beside_the_same_label() {
+    let (mut rt, _rx) = settings_runtime();
+    assert!(rt.find("check-updates-spinner").is_none());
+    show(&mut rt, UpdateState::Checking);
+    assert!(rt.find("check-updates-spinner").is_some());
+    assert!(has_text(&rt, "Check"));
+    show(&mut rt, UpdateState::UpToDate);
+    assert!(rt.find("check-updates-spinner").is_none());
+}
+
+#[test]
+fn the_install_button_keeps_its_width_in_every_state() {
+    let (mut rt, _rx) = settings_runtime();
+    let key = "install-update";
+    let ready = width_in(&mut rt, UpdateState::Ready(info("v0.2.0")), key);
+    rt.update(|ui, _| ui.update.install_when_idle = true);
+    settle(&mut rt);
+    assert_eq!(nav_rect_of(&rt, key)[2], ready);
+    rt.update(|ui, _| ui.update.install_when_idle = false);
+    assert_eq!(
+        width_in(&mut rt, UpdateState::Installing(info("v0.2.0")), key),
+        ready
+    );
 }

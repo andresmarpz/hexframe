@@ -1,6 +1,6 @@
 use rune::{Key, KeyEvent, Mods};
 
-use super::{runtime, settle, tap, visible_texts};
+use super::{nav_rect_of, runtime, runtime_sized, settle, tap, visible_texts};
 use crate::ui::SettingsSection;
 
 fn open_sheet() -> rune::Runtime<crate::ui::Ui> {
@@ -231,7 +231,7 @@ fn the_resolution_menu_stays_inside_the_sheet_in_a_short_window() {
 #[test]
 fn the_sheet_keeps_its_full_height_in_a_tall_window() {
     let rt = open_sheet();
-    assert_eq!(bounds(&rt, "settings-sheet")[3], 484.0);
+    assert_eq!(bounds(&rt, "settings-sheet")[3], 532.0);
 }
 
 fn press_escape(rt: &mut rune::Runtime<crate::ui::Ui>) {
@@ -322,4 +322,54 @@ fn the_navigation_style_choice_reaches_the_engine() {
         panic!("no ApplySettings sent");
     };
     assert_eq!(sent.nav_style, NavStyle::Dock);
+}
+
+fn sheet_rects(window: (f32, f32)) -> ([f32; 4], [f32; 4]) {
+    let mut rt = runtime_sized(crate::ui::Ui::preview(), window);
+    tap(&mut rt, "nav-settings");
+    settle(&mut rt);
+    (
+        nav_rect_of(&rt, "settings-dialog"),
+        nav_rect_of(&rt, "settings-sheet"),
+    )
+}
+
+#[test]
+fn the_sheet_grows_with_the_window_in_steps() {
+    let cases = [
+        ((1000.0, 600.0), 760.0, 484.0),
+        ((1280.0, 760.0), 880.0, 532.0),
+        ((1600.0, 900.0), 1040.0, 652.0),
+        ((1920.0, 1080.0), 1040.0, 652.0),
+        ((2560.0, 1440.0), 1200.0, 760.0),
+        ((1920.0, 640.0), 760.0, 484.0),
+        ((1920.0, 500.0), 760.0, 392.0),
+        ((1000.0, 400.0), 760.0, 292.0),
+    ];
+    for (window, width, body) in cases {
+        let (dialog, sheet) = sheet_rects(window);
+        assert_eq!(dialog[2], width, "dialog width at {window:?}");
+        assert_eq!(sheet[3], body, "body height at {window:?}");
+        assert!(dialog[0] >= 16.0, "left margin at {window:?}");
+        assert!(
+            dialog[0] + dialog[2] <= window.0 - 16.0,
+            "right margin at {window:?}"
+        );
+        assert!(dialog[1] >= 16.0, "top margin at {window:?}");
+        assert!(
+            dialog[1] + dialog[3] <= window.1 - 16.0,
+            "bottom margin at {window:?}"
+        );
+    }
+}
+
+#[test]
+fn the_wide_sheet_gives_the_nav_and_the_search_the_extra_room() {
+    let (dialog, _) = sheet_rects((1920.0, 1080.0));
+    let mut rt = runtime_sized(crate::ui::Ui::preview(), (1920.0, 1080.0));
+    tap(&mut rt, "nav-settings");
+    settle(&mut rt);
+    assert_eq!(nav_rect_of(&rt, "settings-nav")[2], 224.0);
+    let search = nav_rect_of(&rt, "settings-search");
+    assert!(search[2] > dialog[2] - 64.0, "search spans the sheet");
 }

@@ -21,6 +21,10 @@ pub(super) const SCENES: &[Scene] = &[
         ui.apply_update(UpdateState::Ready(preview::update_info()));
         ui.update.install_when_idle = true;
     }),
+    ("settings-update-checking", |ui| {
+        sheet(ui, SettingsSection::About);
+        ui.apply_update(UpdateState::Checking);
+    }),
     ("settings-update-manual", |ui| {
         sheet(ui, SettingsSection::About);
         ui.apply_update(UpdateState::AvailableManual(preview::update_info()));

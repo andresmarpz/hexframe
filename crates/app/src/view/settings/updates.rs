@@ -1,9 +1,15 @@
 use greyscreen_core::update::{UpdateInfo, UpdateState};
-use rune::El;
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
+use rune::{El, row, text};
+use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Spinner};
 
 use super::{setting_row, toggle_row};
 use crate::ui::Ui;
+
+const CHECK_WIDTH: f32 = 92.0;
+const INSTALL_WIDTH: f32 = 156.0;
+const OPEN_RELEASE_WIDTH: f32 = 120.0;
+const SPINNER_SIZE: f32 = 14.0;
+const SPINNER_GAP: f32 = 6.0;
 
 pub(super) fn auto_row(s: &Ui, k: &Kit) -> El {
     toggle_row(
@@ -28,7 +34,7 @@ pub(super) fn update_row(s: &Ui, k: &Kit) -> El {
 }
 
 enum Action {
-    Check { enabled: bool, label: &'static str },
+    Check { enabled: bool, busy: bool },
     Install { enabled: bool },
     OpenRelease(String),
 }
@@ -36,20 +42,15 @@ enum Action {
 impl Action {
     fn build(self, k: &Kit) -> El {
         match self {
-            Action::Check { enabled, label } => Button::new(label)
-                .variant(ButtonVariant::Neutral)
-                .control_size(ControlSize::Large)
-                .disabled(!enabled)
-                .on_press(Ui::check_for_updates)
-                .build(k)
-                .key("check-updates-button"),
+            Action::Check { enabled, busy } => check_button(k, enabled, busy),
             Action::Install { enabled } => Button::new("Install and restart")
                 .variant(ButtonVariant::Contrast)
                 .control_size(ControlSize::Large)
                 .disabled(!enabled)
                 .on_press(Ui::install_update)
                 .build(k)
-                .key("install-update"),
+                .key("install-update")
+                .w(INSTALL_WIDTH),
             Action::OpenRelease(url) => Button::new("Open GitHub")
                 .variant(ButtonVariant::Neutral)
                 .control_size(ControlSize::Large)
@@ -59,39 +60,68 @@ impl Action {
                     }
                 })
                 .build(k)
-                .key("open-release"),
+                .key("open-release")
+                .w(OPEN_RELEASE_WIDTH),
         }
     }
 }
 
-fn check(enabled: bool, label: &'static str) -> Action {
-    Action::Check { enabled, label }
+fn check_button(k: &Kit, enabled: bool, busy: bool) -> El {
+    let button = Button::new("Check")
+        .variant(ButtonVariant::Neutral)
+        .control_size(ControlSize::Large)
+        .disabled(!enabled);
+    let button = if busy {
+        let spinner = Spinner::new()
+            .size(SPINNER_SIZE)
+            .build(k)
+            .key("check-updates-spinner");
+        button.label_with(move |font, ink| {
+            row()
+                .gap(SPINNER_GAP)
+                .center_y()
+                .child(spinner)
+                .child(text("Check").font(font).color(ink))
+        })
+    } else {
+        button
+    };
+    button
+        .on_press(Ui::check_for_updates)
+        .build(k)
+        .key("check-updates-button")
+        .w(CHECK_WIDTH)
+}
+
+fn check(enabled: bool) -> Action {
+    Action::Check {
+        enabled,
+        busy: false,
+    }
+}
+
+fn working() -> Action {
+    Action::Check {
+        enabled: false,
+        busy: true,
+    }
 }
 
 fn describe(s: &Ui) -> (String, Action) {
     let available = |info: &UpdateInfo| format!("Update to v{} available", info.version());
     match &s.update.state {
-        UpdateState::Unknown => (
-            "See if a newer version is out.".into(),
-            check(true, "Check for updates"),
-        ),
-        UpdateState::Checking => ("Checking…".into(), check(false, "Checking…")),
-        UpdateState::UpToDate => (
-            "Greyscreen is up to date.".into(),
-            check(true, "Check for updates"),
-        ),
+        UpdateState::Unknown => ("See if a newer version is out.".into(), check(true)),
+        UpdateState::Checking => ("Checking…".into(), working()),
+        UpdateState::UpToDate => ("Greyscreen is up to date.".into(), check(true)),
         UpdateState::AvailableManual(info) => (
             format!("{} — download from GitHub", available(info)),
             Action::OpenRelease(info.notes_url.clone()),
         ),
         UpdateState::Available(info) => (
             format!("{}. It downloads after this game.", available(info)),
-            check(false, "Check for updates"),
+            check(false),
         ),
-        UpdateState::Downloading(info) => (
-            format!("Downloading v{}…", info.version()),
-            check(false, "Downloading…"),
-        ),
+        UpdateState::Downloading(info) => (format!("Downloading v{}…", info.version()), working()),
         UpdateState::Ready(_) if s.update.install_when_idle => (
             "Greyscreen will update after this game".into(),
             Action::Install { enabled: false },
@@ -104,6 +134,6 @@ fn describe(s: &Ui) -> (String, Action) {
             "Restarting to finish the update…".into(),
             Action::Install { enabled: false },
         ),
-        UpdateState::Failed(text) => (text.clone(), check(true, "Check for updates")),
+        UpdateState::Failed(text) => (text.clone(), check(true)),
     }
 }

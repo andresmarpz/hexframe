@@ -16,15 +16,73 @@ use super::{card, hairline};
 use crate::ui::{SettingsSection, Ui};
 use catalog::Row;
 
-const SHEET_WIDTH: f32 = 760.0;
-const BODY_HEIGHT: f32 = 484.0;
 const MIN_BODY_HEIGHT: f32 = 160.0;
 const DIALOG_CHROME: f32 = 108.0;
-const NAV_WIDTH: f32 = 188.0;
 const SCROLL_FADE: f32 = 20.0;
 const SUBTITLE: &str = "Changes are saved automatically.";
 
-pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<f32>) {
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Tier {
+    min_window_width: f32,
+    min_window_height: f32,
+    width: f32,
+    body_height: f32,
+    nav_width: f32,
+}
+
+const TIERS: [Tier; 4] = [
+    Tier {
+        min_window_width: 0.0,
+        min_window_height: 0.0,
+        width: 760.0,
+        body_height: 484.0,
+        nav_width: 188.0,
+    },
+    Tier {
+        min_window_width: 1200.0,
+        min_window_height: 700.0,
+        width: 880.0,
+        body_height: 532.0,
+        nav_width: 204.0,
+    },
+    Tier {
+        min_window_width: 1600.0,
+        min_window_height: 800.0,
+        width: 1040.0,
+        body_height: 652.0,
+        nav_width: 224.0,
+    },
+    Tier {
+        min_window_width: 2200.0,
+        min_window_height: 1100.0,
+        width: 1200.0,
+        body_height: 760.0,
+        nav_width: 240.0,
+    },
+];
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SheetSize {
+    width: f32,
+    body_height: f32,
+    nav_width: f32,
+}
+
+fn sheet_size(window: Option<(f32, f32)>) -> SheetSize {
+    let (window_width, window_height) = window.unwrap_or((0.0, f32::MAX));
+    let tier = TIERS
+        .iter()
+        .rev()
+        .find(|t| window_width >= t.min_window_width && window_height >= t.min_window_height)
+        .unwrap_or(&TIERS[0]);
+    SheetSize {
+        width: tier.width,
+        body_height: (window_height - DIALOG_CHROME).clamp(MIN_BODY_HEIGHT, tier.body_height),
+        nav_width: tier.nav_width,
+    }
+}
+
+pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window: Option<(f32, f32)>) {
     if !s.settings_open {
         return;
     }
@@ -35,10 +93,11 @@ pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<
     } else {
         search_content(s, k, &mut popups, &query)
     };
+    let size = sheet_size(window);
     let body = col()
         .key("settings-sheet")
         .w_full()
-        .h(body_height(window_height))
+        .h(size.body_height)
         .child(search_bar(s, k))
         .child(hairline(k))
         .child(
@@ -46,13 +105,13 @@ pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<
                 .w_full()
                 .grow(1.0)
                 .min_h(0.0)
-                .child(nav(s, k, query.is_empty()))
+                .child(nav(s, k, query.is_empty(), size.nav_width))
                 .child(el().w(1.0).h_full().fill(k.c.border_muted).a11y_hidden())
                 .child(scroller(content)),
         );
     Dialog::new("settings", "Settings")
         .description(SUBTITLE)
-        .width(SHEET_WIDTH)
+        .width(size.width)
         .fit()
         .open(true)
         .on_close(|ui: &mut Ui| ui.close_settings())
@@ -61,19 +120,13 @@ pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<
     layer.extend(popups);
 }
 
-fn body_height(window_height: Option<f32>) -> f32 {
-    window_height.map_or(BODY_HEIGHT, |h| {
-        (h - DIALOG_CHROME).clamp(MIN_BODY_HEIGHT, BODY_HEIGHT)
-    })
-}
-
 fn search_bar(s: &Ui, k: &Kit) -> El {
     let input = TextInput::new(&s.settings_search)
         .label("Search settings")
         .placeholder("Search settings…")
         .leading_icon(&glyphs::SEARCH);
     let input = clear_when_filled(input, &s.settings_search.text, |ui| &mut ui.settings_search)
-        .width(Some(SHEET_WIDTH - 32.0))
+        .width(None)
         .on_edit(|ui: &mut Ui| &mut ui.settings_search)
         .on_key(|ui: &mut Ui, ev: &KeyEvent, _: &mut Tx| ui.clear_settings_search_on_escape(ev))
         .build(k)
@@ -81,10 +134,10 @@ fn search_bar(s: &Ui, k: &Kit) -> El {
     row().w_full().px(16.0).pb(12.0).child(input)
 }
 
-fn nav(s: &Ui, k: &Kit, active: bool) -> El {
+fn nav(s: &Ui, k: &Kit, active: bool, width: f32) -> El {
     let mut list = col()
         .key("settings-nav")
-        .w(NAV_WIDTH)
+        .w(width)
         .h_full()
         .padding(8.0)
         .gap(2.0);

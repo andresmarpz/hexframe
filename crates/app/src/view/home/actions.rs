@@ -6,6 +6,8 @@ use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::{TEST_RECORDING_SECS, Ui};
 
+const STOP_WIDTH: f32 = 168.0;
+
 pub(super) fn bar(s: &Ui, k: &Kit) -> El {
     match &s.status {
         EngineStatus::Recording { .. } => recording(s, k),
@@ -116,5 +118,6 @@ fn stop_button(confirming: bool, k: &Kit) -> El {
         .on_press_tx(|ui: &mut Ui, tx| ui.request_stop(tx))
         .build(k)
         .key("stop-recording")
+        .w(STOP_WIDTH)
         .hover_group()
 }

@@ -32,7 +32,12 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     }
     review::controls_layer(s, &k, &mut layer);
     if theater.is_none() {
-        settings::sheet(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));
+        settings::sheet(
+            s,
+            &k,
+            &mut layer,
+            cx.layout_with("window", |r| (r[2], r[3])),
+        );
     }
     if theater.is_none() {
         overlays::feedback_dialog(s, &k, &mut layer, cx.layout_with("window", |r| r[3]));

@@ -14,7 +14,7 @@ use greyscreen_engine::{
 use greyscreen_league::{FeedbackError, LeagueMsg};
 use rune::{Key, KeyEvent, Mods, Runtime, TextEdit};
 
-use super::{live_runtime, settle, tap, visible_texts};
+use super::{live_runtime, nav_rect_of, settle, tap, visible_texts};
 use crate::ui::{FeedbackPhase, Ui};
 
 fn has_text(rt: &Runtime<Ui>, wanted: &str) -> bool {
@@ -375,4 +375,26 @@ fn the_dialog_walks_through_failure_and_success_with_a_fake_transport() {
     );
     assert_eq!(seen[0].1.client_id, seen[1].1.client_id);
     assert_eq!(seen[0].1.message, "It crashed");
+}
+
+#[test]
+fn the_copy_button_keeps_its_width_after_copying() {
+    let (mut rt, _rx) = live_runtime();
+    let clipboard = rune::clipboard::memory();
+    rt.use_clipboard(&clipboard);
+    open(&mut rt);
+    write(&mut rt, "It crashed");
+    tap(&mut rt, "feedback-send");
+    rt.update(|ui, _| {
+        ui.apply_feedback(FeedbackResult::Failed {
+            error: "Couldn't reach Greyscreen.".into(),
+            report: "{}".into(),
+        });
+    });
+    settle(&mut rt);
+    let before = nav_rect_of(&rt, "feedback-copy")[2];
+    tap(&mut rt, "feedback-copy");
+    settle(&mut rt);
+    assert!(has_text(&rt, "Copied"));
+    assert_eq!(nav_rect_of(&rt, "feedback-copy")[2], before);
 }
