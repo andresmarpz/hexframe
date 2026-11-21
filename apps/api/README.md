@@ -33,9 +33,9 @@ JSON body, with the header `x-greyscreen-version`:
 
 ### `POST /v1/crash` (experimental)
 
-Not part of the desktop contract yet. It can change without notice.
+Not part of the desktop contract yet: the app does not call it. It can change without notice.
 
-`multipart/form-data` with two parts: `minidump` (a file, at most 20 MB) and `json` (a JSON object with a `app_version` string, at most 64 KB). The whole body is capped at 25 MB.
+`multipart/form-data` with two parts: `minidump` (a file, at most 20 MB) and `json` (a JSON object, at most 64 KB). `app_version` comes from the JSON, or from the `x-greyscreen-version` header when the JSON has none. The whole body is capped at 25 MB.
 
 - `202 {"id"}`: stored in R2 as `crashes/<version>/<yyyy>/<mm>/<dd>/<id>/minidump.dmp` and `meta.json`, and indexed in the D1 table `crash_reports`.
 - `400`, `413`, `429`: same error shape. The limit is 10 uploads per hour per IP address.
@@ -49,7 +49,7 @@ No Cloudflare account is needed. Alchemy runs the Worker in workerd and emulates
 ```sh
 bun install
 just api-dev          # or: cd apps/api && bun run dev
-curl http://localhost:1337/health
+curl <local url that Alchemy prints>/health
 ```
 
 `local.env` holds placeholder Cloudflare credentials. Alchemy asks for credentials even when everything is local, and no call leaves the machine. Local state lives in `.alchemy/`.
@@ -75,7 +75,7 @@ bun run deploy --stage prod        # shows a plan, asks to approve, then creates
 
 Alchemy applies the SQL files in `migrations/` on every deploy. It keeps its own state in an R2 bucket in your account. Use `--stage dev` for a separate cloud copy. Stages never share resources.
 
-The deploy prints `url: https://<name>.<account>.workers.dev`. Set the desktop app's API base setting (`GREYSCREEN_API_URL`) to that URL with no trailing slash. A custom domain can come later.
+The deploy prints `url: https://<name>.<account>.workers.dev`. The desktop app talks to `https://api.greyscreen.app` unless the `GREYSCREEN_API_URL` environment variable names another base, for example this URL.
 
 ## Layout
 

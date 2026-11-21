@@ -1,11 +1,13 @@
 # Greyscreen
 
-League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has the tickets, `docs/research/` has the API details.
+League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done and what is next, `docs/research/` has the API details.
+
+Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback clients), `capture` (Windows only), `engine` (threads and I/O), `thumbs` (OS thumbnails), `app` (the Rune UI and the setup window) and `cli`. `docs/architecture.md` has the dependency direction.
 
 ## Worker protocol
 
 1. Work in the worktree you were given. Run `git fetch origin && git rebase origin/main` before starting.
-2. Read `AGENTS.md`, `docs/architecture.md`, the ticket and the research sections it names.
+2. Read `AGENTS.md`, `docs/architecture.md`, the ticket and the research sections it names. A change that makes a doc untrue fixes the doc in the same commit.
 3. Change only the files the ticket lists. If something outside them must change, make the smallest change and say so in your final report.
 4. Do not take design decisions. If the ticket is ambiguous or wrong, pick the option closest to `docs/architecture.md`, and list it under "Deviations" in your report.
 5. `just ci` must pass: fmt, clippy on the host, clippy for Windows through cargo-xwin, and the tests.
@@ -32,10 +34,11 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 
 - `just ci`: fmt check, host clippy, typos, Windows clippy through cargo-xwin, tests.
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows.
-- `just release <tag>`: runs `just ci`, builds and publishes a GitHub release from the Mac, then redeploys the website. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. GitHub Actions has no minutes to spare, so releases never go through CI. A tag with a dash is a prerelease.
+- `just release <tag>`: runs `just ci`, builds and publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe` and `README.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. GitHub Actions has no minutes to spare, so releases never go through CI. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.
-- `just dist`: build both exes and copy them with `README.txt` into `dist/` as separate files.
+- `just dist`: build both exes and copy them with `README.txt` into `dist/` as separate files, plus a `GreyscreenSetup.exe` copy of `greyscreen.exe`.
 - `just mac-app`: build an ad-hoc signed `dist/mac/Greyscreen.app` (fake capture media, for UI testing only) and install it to `~/Applications/Greyscreen.app`.
+- `just brand`: regenerate the icons and web images from the SVGs in `brand/`.
 - `just fmt`: format the workspace.
 - `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
 - `just web-build`: build the website into `apps/web/dist`.

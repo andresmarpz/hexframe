@@ -24,7 +24,7 @@ This is the contract every ticket builds against. Each decision cites the resear
 | Game detection | 1 Hz `FindWindowW("RiotWindowClass")` gives HWND and PID, then the Live Client API gates the start | Process scan only, WMI, LCU | `capture.md`, `events.md` |
 | Events | Live Client Data API, 1 Hz poll of `/eventdata` then `/gamestats`, de-dup by `EventID`, fresh time offset each poll | LCU (v2), `allgamedata` | `events.md` sections 6, 10 |
 | TLS to 127.0.0.1:2999 | `ureq` 3 with rustls (ring) and `disable_verification`, connect only to the literal `127.0.0.1` | Root pinning first (the root is X.509 v1 with SHA-1; rustls rejects SHA-1) | `events.md` section 5. Loopback and read-only, so verification adds nothing |
-| UI | Rune pinned to dev rev `7a707454fbfb8d3fd200723c65778fb7b98fd31e`, `rune-kit` without default features | | `ui-rune.md` |
+| UI | Rune pinned to dev rev `eb9f1104` (see `AGENTS.md` for why), `rune-kit` without default features and used stock | | `ui-rune.md` |
 | Backend to UI | `AppHandle::update` with a `UiMsg` enum and a pure `Ui::apply` | Channel plus poll | `ui-rune.md` section 2 |
 | Errors and logs | `thiserror` in libraries, `anyhow` in binaries, `tracing` to a daily file in the logs folder | | `tooling.md` |
 | Time and dates | `jiff` for wall-clock dates and local-time folder names | `chrono` | Modern, handles the Windows time zone |
@@ -33,17 +33,17 @@ This is the contract every ticket builds against. Each decision cites the resear
 
 ```
 crates/
-  core/     greyscreen-core     Pure logic. Settings, events, classification, clips, session machine, library schema, shared media types. No threads, no OS calls except settings and library file I/O.
+  core/     greyscreen-core     Pure logic. Settings, keybinds, events, classification, clips, session machine, library schema, death review, storage retention, update rules, feedback report, install rules, shared media types. No threads, no OS calls except settings and library file I/O.
   mp4/      greyscreen-mp4      Pure-Rust MP4: H.264 and AAC helpers, fragmented writer, finalize, clip writer, recovery.
-  league/   greyscreen-league   Live Client Data API client and poller. The Windows game-window locator sits behind cfg(windows).
-  capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session.
-  engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library. Fake media source for the Mac.
-  thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. Used by the engine's background thumbnail worker.
-  app/      greyscreen          The Rune UI binary.
-  cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`.
+  league/   greyscreen-league   Live Client Data API client and poller, champion icon download, GitHub release client for updates, feedback HTTP client. The Windows game-window locator sits behind cfg(windows).
+  capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session, global hotkeys, installer, single-instance event, crash filter.
+  engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library, makes thumbnails, enforces the storage limit, deletes games, updates, sends feedback. Fake media source for the Mac.
+  thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
+  app/      greyscreen          The Rune UI binary. It also holds the setup window.
+  cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `demo` (seeds or clears a fake library).
 ```
 
-Dependency direction: `core` ← `mp4` ← `capture`; `core` ← `league`; (`core`, `mp4`, `league`, `capture` on Windows) ← `engine` ← (`app`, `cli`).
+Dependency direction: `core` ← (`mp4`, `league`, `capture`, `engine`); `mp4` ← (`capture`, `engine`); `league` ← (`engine`, `app`, `cli`); `thumbs` ← (`engine`, `app`, `cli`); `capture` (Windows only) ← (`engine`, `app`, `cli`); `engine` ← (`app`, `cli`). `app` also uses `core` and `league` directly.
 
 ## Clocks and time units
 
@@ -153,26 +153,37 @@ Recording --Ended(result)--> Tail(until = now + 5 s) --Tick past until--> Finali
 Recording/Tail --Gone or MediaFailed--> Finalizing
 Armed/Starting --Gone--> Idle
 Cooldown --Gone--> Idle
-Any --Skipped--> Cooldown
+Idle/Armed/Cooldown/Starting(game) --Skipped--> Cooldown
 ```
 
-`Effect` values: `StartMedia(CaptureTarget)`, `StopMedia`, `Finalize { result }`, `Highlight(TimedEvent, Vec<Highlight>)`, `Status(EngineStatus)`. Manual recording (`Input::UserStart`/`UserStop`) is `Idle --UserStart--> Starting` with `PrimaryMonitor`. It is used by the test recording.
+- `Finalized` goes to Idle, not Cooldown, when `Gone` arrived during Tail or Finalizing, or the recording was manual.
+- A failed start returns to Armed and retries `StartMedia` every 5 s, at most 5 times, then reports an error and goes to Cooldown. Starting with no `MediaStarted` within 15 s counts as a failed start.
+- Cooldown also accepts `WindowFound` with a different pid.
+- A recording longer than 3 hours stops.
+- `Input::SettingsChanged { auto_record }` turning off stops a game recording and ignores `WindowFound`. In that case the status is `GameRunning` while a game is on. Turning it on starts recording a game that is already running. `Input::Retry` (the Retry button) leaves Cooldown and starts again.
+
+`Effect` values: `StartMedia(CaptureTarget)`, `StopMedia`, `Finalize { result }`, `Highlight(TimedEvent)`, `Status(Status)`. Manual recording (`Input::UserStart`/`UserStop`) is `Idle --UserStart--> Starting` with `PrimaryMonitor`. It is used by the test recording.
 
 ## Engine data flow
 
 ```
 league poller ──LeagueMsg──┐
-                           ├─> engine control thread: SessionState::step -> effects
+                           ├─> engine-control thread: Session::step -> effects
 media session ─MediaEvent──┤          │
                            │          ├─> writer thread: GameWriter (fMP4 .part, finalize at stop)
-                           │          ├─> ClipRing (Arc<Packet> deque, ~(pre + post + 2) s)
+                           │          ├─> ClipRing (Arc<Packet> deque)
                            │          └─> ClipPlanner -> clip jobs (thread per clip) -> clips/*.mp4
 UI commands ──EngineCmd────┘          └─> UiMsg sink -> AppHandle::update
 ```
 
-- `EngineCmd`: `ApplySettings(Settings)`, `StartTestRecording { secs: u32 }`, `StopRecording`, `RescanLibrary`, `SaveClipNow`, `Shutdown`.
-- `UiMsg`: `Status(EngineStatus)`, `Feed(FeedItem)`, `ClipSaved(ClipEntry)`, `RecordingSaved(RecordingEntry)`, `Library(Vec<RecordingEntry>)`, `Notice { level, text }`.
-- `EngineStatus`: `Idle`, `Waiting`, `Recording { since: Hns, game: Option<GameInfo> }`, `Finalizing`, `Error(String)`.
+Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `engine-updates`, `engine-feedback`, and on Windows a global hotkey listener. The library scan, delete, storage cleanup and settings save run on short worker threads.
+
+- `EngineCmd`: `ApplySettings(Settings)`, `StartTestRecording { secs: u32 }`, `StopRecording`, `Retry`, `RescanLibrary`, `DeleteRecording { id }`, `SaveClipNow`, `GlobalAction(Action)`, `CheckForUpdates`, `InstallUpdate`, `SendFeedback(FeedbackDraft)`, `Shutdown`.
+- `UiMsg`: `Status(EngineStatus)`, `Feed(FeedItem)`, `ClipSaved(ClipEntry)`, `RecordingSaved(RecordingEntry)`, `Library(Vec<RecordingEntry>)`, `Notice { level, text }`, `HotkeyStatus { errors }`, `Update(UpdateState)`, `Feedback(FeedbackResult)`, `Thumbnail(PathBuf)`.
+- `EngineStatus` (`core::session::Status`): `Idle`, `GameRunning` (a game is on and auto record is off), `Waiting`, `Recording { since: Hns, game: Option<GameInfo> }`, `Finalizing`, `Error(String)`.
+- Deleting a game moves its folder to the Recycle Bin (Trash on macOS).
+- At start the engine recovers any `game.mp4.part` left by a crash.
+- Storage limit: when `storage_limit_gb` is set, the engine checks after each game and at start. It deletes the `game.mp4` of the oldest games first (the sidecar and clips stay), then whole old games, and never the game being recorded. It posts an info notice.
 
 ## On disk
 
@@ -186,10 +197,12 @@ UI commands ──EngineCmd────┘          └─> UiMsg sink -> AppHan
       12-34_MyKill.mp4
       12-34_MyKill.jpg  clip thumbnail
 %APPDATA%\Greyscreen\settings.json                macOS ~/Library/Application Support/Greyscreen/settings.json
-%LOCALAPPDATA%\Greyscreen\logs\greyscreen.log.YYYY-MM-DD
+%LOCALAPPDATA%\Greyscreen\logs\greyscreen.log.YYYY-MM-DD, crash.txt
+%LOCALAPPDATA%\Greyscreen\cache\champions\       champion icons from Data Dragon
+%LOCALAPPDATA%\Programs\Greyscreen\greyscreen.exe    the installed copy (Windows)
 ```
 
-The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 3339), `duration_secs`, `video` (relative path), `game` (`GameInfo` + `result`), `events` (`[{ id, game_secs, rec_secs, kind, highlights }]`), `clips` (`[{ file, start_secs, end_secs, label }]`), `encoder` (string), `video_format` (`width`, `height`, `fps`). It may also hold `review` (`{ deaths: [{ event_id, tags, note }] }`, tags in snake_case from `core::review::DeathTag`). `review` is left out while nothing is tagged or noted, and older sidecars without it still read.
+The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 3339), `duration_secs`, `video` (relative path, empty after the storage limit deleted the video), `game` (`GameInfo` + `result`), `events` (`[{ id, game_secs, rec_secs, kind, highlights }]`), `clips` (`[{ file, start_secs, end_secs, label }]`), `encoder` (string), `video_format` (`width`, `height`, `fps`). It may also hold `review` (`{ deaths: [{ event_id, tags, note }] }`, tags in snake_case from `core::review::DeathTag`). `review` is left out while nothing is tagged or noted, and older sidecars without it still read.
 
 ## Settings (`core::settings`, serde with `#[serde(default)]`)
 
@@ -199,14 +212,16 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `auto_record` | `bool` | `true` |
 | `record_full_game` | `bool` | `true` |
 | `quality` | `Quality { Balanced, High, Max }` | `High` |
-| `resolution` | `Resolution { Native, P1440, P1080, P720 }` | `P1080` |
+| `resolution` | `Resolution { Native, Height(u32) }`, height clamped to 144 to 4320 (old `P1440`, `P1080`, `P720` values still load) | `Height(1080)` |
 | `fps` | `u32` (30 or 60) | `60` |
 | `audio` | `bool` | `true` |
 | `capture_cursor` | `bool` | `true` |
 | `clips.enabled` | `bool` | `true` |
-| `clips.pre_secs` / `clips.post_secs` | `u32` | `15` / `5` |
+| `clips.pre_secs` / `clips.post_secs` | `u32`, 1 to 120 | `15` / `5` |
 | `clips.kills`, `deaths`, `multikills`, `objectives`, `aces` | `bool` | `true` |
 | `clips.assists`, `structures` | `bool` | `false` |
+| `keybinds` | map of action id to key text, only the changed ones | empty |
+| `storage_limit_gb` | `Option<u32>`, snapped to 50, 100, 250 or 500 | `None` (no limit) |
 | `check_updates` | `bool` | `true` |
 | `nav_style` | `NavStyle { Sidebar, Dock }` | `Sidebar` |
 | `sidebar_collapsed` | `bool` | `false` |
@@ -214,31 +229,53 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `list_width` | `u32` points, 240 to 440 | `300` |
 | `client_id` | `Option<String>` | `None` (a random UUID is stored the first time feedback is sent) |
 
-Layout: on the Games screen the games list is the first column inside the inset content card, then a hairline divider, then the review (the same in both nav styles). The nav sidebar's edge and the list/review divider drag to resize; double-click a handle resets its default, and the widths clamp to the ranges above and save when the drag ends. The rail (56 points, also forced below 1200 points of window width) is not resizable. Values outside a range are clamped when settings load.
+An old `save_clip_hotkey` key is read once and moved into `keybinds`. It is never written back. `Settings::validate` clamps every range above when settings load.
 
 Bitrate: the mean bitrate at 1080p60 is 8, 12 or 20 Mbps for Balanced, High or Max. It scales with pixel count to the power 0.75 and with fps/60 to the power 0.8. Peak is 2.0 times the mean. `CaptureConfig::for_encode_size` rescales with the same 0.75 exponent when the real encode size is smaller than `bitrate_pixels`.
 
-Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Balanced, High or Max. With `Some(q)` the encoder uses Quality rate control with `AVEncCommonQuality = q`, and mean and peak only cap through `MaxBitRate` and the buffer size. If the encoder rejects or misreads either value, it falls back to peak-constrained VBR at the mean and peak, and logs one warning. `MediaEvent::Started.encoder` ends with the mode, for example `(quality 70)` or `(vbr 18.5 Mbps)`. `Settings::estimated_mb_per_minute` returns 0.6 times the mean bitrate plus audio, for the size line in Settings (Native counts as 1440p). The 0.6 factor is a placeholder until real recordings give numbers.
+Quality: `CaptureConfig.quality` is `Some(60)`, `Some(70)` or `Some(80)` for Balanced, High or Max. With `Some(q)` the encoder uses Quality rate control with `AVEncCommonQuality = q`, and mean and peak only cap through `MaxBitRate` and the buffer size. If the encoder rejects or misreads either value, it falls back to peak-constrained VBR at the mean and peak, and logs one warning. `MediaEvent::Started.encoder` ends with the mode, for example `(quality 70)` or `(vbr 18.5 Mbps)`. `Settings::estimated_mb_per_minute` returns 0.6 times the mean bitrate plus audio, for the size line in the Recording settings (Native counts as the height of the tallest connected display). The 0.6 factor is a placeholder until real recordings give numbers.
 
-`greyscreen-cli record` takes `--preset`, `--rc quality|vbr`, `--quality N`, `--bitrate MBPS`, `--peak MBPS` and `--height H` to override the config for A/B tests.
+`greyscreen-cli record` takes `--preset`, `--rc quality|vbr`, `--quality N`, `--bitrate MBPS`, `--peak MBPS`, `--fps`, `--height H`, `--no-audio` and `--cursor` to override the config for A/B tests.
+
+## Keybinds
+
+Every key action is one line in `actions!` in `crates/core/src/keybinds/action.rs`, with an id, label, group, scope and default keys. `Mod` means Ctrl on Windows and Cmd on macOS. Global scope works in game through `RegisterHotKey`; App scope only works in the window. Defaults:
+
+| Group | Action (keys) |
+|---|---|
+| Recording | Save clip (F9, Global) |
+| Review | Play or pause (Space), Seek back 5 s (Left, J), Seek forward 5 s (Right, L), Previous event (Shift+Left), Next event (Shift+Right), Frame back (,), Frame forward (.), Slower (\[), Faster (\]), Mute (M), Review deaths (D), Next death (N), Previous death (P), Replay death (R), Toggle fullscreen (F), Go back or close the game (Escape, fixed) |
+| General | Open settings (Mod+,), Go to Home (Mod+1), Go to Games (Mod+2), Go to Clips (Mod+3), Previous game (Up), Next game (Down), Focus the player (Enter), Collapse or expand the navigation (Mod+\\), Search games (Mod+F), Send feedback (no key) |
+
+The Keybinds settings page lists every action, rebinds on click, and refuses a key that another action uses. A Global key that Windows refuses shows an error next to the action.
+
+## UI model (`crates/app`)
+
+`Ui` holds the state and `view::root` draws it. `Ui::apply(UiMsg)` is the only way engine messages change it. Rune scenes (`--snap out.png --scene NAME`) render the screens headless, and the `Runtime` tests drive the same code.
+
+- **Screens.** `Screen` is `Home`, `Games` or `Clips`. Settings is a sheet over the current screen, not a screen. There is no Recordings page.
+- **Home.** A state card (Idle, Off, Waiting, Recording with a clock, Finalizing, Error, with Save clip, Retry, Stop and "Test recording (10 s)"), then the last game, recent clips and a week summary. A first-run welcome card shows while the library is empty. While recording, Home shows the live feed of events.
+- **Games.** The games list (search by champion, mode or result, grouped by day, right-click menu with Open, Review deaths, Show in folder and Delete) is the first column inside the content card, then a hairline divider, then the review player with its events and clips panel. Games and the list can be picked with Up and Down.
+- **Clips.** Recent clips across all games.
+- **Death review.** Review deaths (D) plays each of the user's deaths in turn, from 12 s before to 3 s after. A switch slows the last 4 s to half speed. Each death takes tags and a free note, saved to `review` in the sidecar. A summary follows the last death.
+- **Nav styles.** `NavStyle::Sidebar` has Home, Games and Clips, the five newest games, an engine status block, a storage block and footer buttons for Send feedback and Settings. The nav sidebar's edge and the list/review divider drag to resize; double-click a handle resets its default, and the widths save when the drag ends. The sidebar folds to a 56-point rail when `sidebar_collapsed` is set or the window is under 1200 points wide; the rail is not resizable. `NavStyle::Dock` removes the sidebar and shows a floating pill at the bottom: record status, Home, Games, Clips, Settings, Send feedback. While a game plays in review the dock slides away until the pointer nears the bottom edge.
+- **Settings sheet.** Sections: Recording (including the nav style), Clips, Storage (folder and limit), Keybinds, and Updates & About (version, updates, logs, feedback, and Start with Windows on Windows). A search box filters the rows. Every change updates `ui.settings` and sends `ApplySettings`; Start with Windows writes the registry directly.
+- **Setup window** (`crates/app/src/setup`). A fixed 460 by 420 window titled "Greyscreen Setup", with its own `Phase` state (`Ready`, `Closing`, `Copying`, `Done`, `Failed`). Windows only starts it when `greyscreen.exe` runs from outside the install folder and no installed copy matches it. It installs to `%LOCALAPPDATA%\Programs\Greyscreen`, with a Start with Windows option, a Start Menu shortcut and an Installed apps entry; the user can also run it without installing. An update launch (`--update`) or a run that matches the installed copy installs silently instead. `GREYSCREEN_NO_INSTALL` skips all of this. `--hidden` starts the app without a window.
+- **Update banner.** See Updates.
+- **Feedback dialog.** See Feedback.
 
 ## Updates
 
 `greyscreen-league::updates` lists the GitHub releases of `andresmarpz/greyscreen` and downloads `greyscreen.exe`, checking size, the SHA-256 `digest` GitHub reports (skipped when missing) and the `MZ` header. `greyscreen-core::update` holds the pure rules: a build that is a prerelease sees previews and stable releases, a stable build sees stable only, and the newest newer release wins (`preview.N` orders by N, a stable release beats its previews). The running version is the workspace version, so it must equal the release tag without the `v` (`just release` enforces it).
 
-The engine's update thread checks 10 s after start and every 6 hours when "Check for updates automatically" is on, only for the installed copy on Windows and never while a session is not idle. A manual check works anywhere. An installed copy downloads to `%TEMP%\Greyscreen\greyscreen-<tag>.exe`; "Install and restart" launches that file, and the existing installer path asks the running copy to quit and replaces it. A copy that is not installed only links to the release page. `UiMsg::Update(UpdateState)` drives the About card, and `Ui::update_available` holds the pending release for other screens. A downloaded update also shows a toast-style banner at the top centre of every screen and both nav styles, with "Restart to update" and "Later" (hidden until a newer version); it stays hidden while a game is in progress and in theater mode.
+The engine's update thread checks 10 s after start and every 6 hours when "Check for updates automatically" is on, only for the installed copy on Windows, and it waits 60 s and tries again while a session is active. A manual check works anywhere. An installed copy downloads to `%TEMP%\Greyscreen\greyscreen-<tag>.exe`; "Install and restart" launches that file, and the existing installer path asks the running copy to quit and replaces it. A copy that is not installed only links to the release page. `UiMsg::Update(UpdateState)` drives the About card, and `Ui::update_available` holds the pending release for other screens. A downloaded update also shows a toast-style banner at the top centre of every screen and both nav styles, with "Restart to update" and "Later" (hidden until a newer version); it stays hidden while the engine is waiting, recording or finalizing, and in theater mode.
 
 ## Feedback
 
 "Send feedback" (nav footer, rail, dock, Settings > Updates & About, and the unbound App action `send_feedback`) opens a dialog: kind (Bug, Idea, Other), message (required, 5000 characters), optional email, and "Include recent logs" (on by default). `EngineCmd::SendFeedback(FeedbackDraft)` runs on its own `engine-feedback` thread, which builds the `FeedbackReport` (`greyscreen-core::feedback`), sends it through `FeedbackTransport` (`greyscreen-league::FeedbackClient`, `ureq`) and answers with `UiMsg::Feedback(FeedbackResult)`. A failure carries the same report as JSON for the "Copy report" button.
 
-`POST {API base}/v1/feedback` with header `x-greyscreen-version` and body `{kind: "bug"|"idea"|"other", message, email|null, app_version, os, log_tail|null, client_id}`; answers 202 `{id}`, 400 `{error}`, 429. The base is `greyscreen_core::api::BASE_URL`, or `GREYSCREEN_API_URL`. `log_tail` is the last 300 lines of the newest `greyscreen.log.*`, with the home folder replaced by `~` and the values of `summoner`/`riotId` style fields redacted, and is `null` when the box is not ticked. `client_id` is `Settings.client_id`, not tied to any identity.
+`POST {API base}/v1/feedback` with header `x-greyscreen-version` and body `{kind: "bug"|"idea"|"other", message, email|null, app_version, os, log_tail|null, client_id}`; answers 202 `{id}`, 400 `{error}`, 429. The base is `greyscreen_core::api::BASE_URL` (`https://api.greyscreen.app`), or the `GREYSCREEN_API_URL` environment variable when it is not blank, without a trailing slash. The backend is `apps/api` (see its README). `log_tail` is the last 300 lines of the newest `greyscreen.log.*`, with the home folder replaced by `~` and the values of `summoner`/`riotId` style fields redacted, and is `null` when the box is not ticked. `client_id` is `Settings.client_id`, not tied to any identity.
 
 ## Rules for code
 
-- No comments or doc comments, except one line in plain English when a "why" is not obvious. Names carry the meaning. Never mention tickets or files in code.
-- Files stay under 500 lines, excluding tests. Tests go in a sibling `tests.rs` (`#[cfg(test)] mod tests;`) or in `tests/` for integration tests.
-- `unsafe` only in `capture`, `thumbs` and the Windows locator, and each block carries a `// SAFETY:` line (clippy `undocumented_unsafe_blocks`).
-- No `unwrap`/`expect` outside tests, except on a mutex lock.
-- Libraries return `thiserror` errors. Binaries use `anyhow`.
-- `just ci` passes before every push. It runs fmt, clippy on macOS and on Windows through cargo-xwin, and the tests.
+They live in `AGENTS.md`.

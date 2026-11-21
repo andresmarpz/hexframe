@@ -1,6 +1,6 @@
 # Adversarial review, 2026-11-21
 
-A fresh reviewer read `capture`, `engine`, `mp4` and `league` against the architecture and research notes. Nothing was run on Windows. The fix tickets F1 to F4 in `docs/roadmap.md` cover every item.
+A fresh reviewer read `capture`, `engine`, `mp4` and `league` against the architecture and research notes. Nothing was run on Windows. Every item has since been fixed (fix tickets F1 to F4, in the git history).
 
 | # | Defect | Failure | Fix ticket |
 |---|---|---|---|

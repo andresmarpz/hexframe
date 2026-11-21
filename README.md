@@ -11,11 +11,11 @@ Free, open-source, and written in Rust.
 - **Automatic event timeline:** Starts and stops with each match, plotting kills and objectives.
 - **Highlight clips:** Cuts clips around chosen moments without re-encoding.
 - **Crash-safe MP4 files:** Saves fragmented recordings and repairs unfinished files after a crash.
-- **One small exe:** Native tray app with no installer or extra runtime.
+- **One small exe:** Native tray app with no extra runtime. It installs itself for your user, with no admin rights.
 
 ## Install
 
-Download `greyscreen-windows-x64.zip` from GitHub Releases, unzip it anywhere, and run `greyscreen.exe`.
+Download `GreyscreenSetup.exe` from the [latest release](https://github.com/andresmarpz/greyscreen/releases) and run it. A setup window installs Greyscreen to `%LOCALAPPDATA%\Programs\Greyscreen` and adds a Start Menu shortcut, with an option to start with Windows. To remove it, use Windows Settings > Apps; your recordings and settings stay. Greyscreen checks for updates and offers to restart into the new version.
 
 **Requirements:**
 
@@ -34,9 +34,9 @@ Each match is saved to `Videos\Greyscreen\<date>_<champion>_<mode>\`:
 - `game.json`: the match event timeline.
 - `clips\`: automatic highlight clips.
 
-Open **Recordings** to review a match and click any event marker to jump to that moment. To verify capture before a match, use **Test recording (10 s)** on the **Status** screen to record your primary monitor.
+The **Games** screen lists every match: pick one to review it and click any event marker to jump to that moment. **Review deaths** (`D`) steps through each death so you can tag it and add a note. **Clips** shows the recent highlight clips and **Home** shows the current state. To verify capture before a match, use **Test recording (10 s)** on **Home** to record your primary monitor.
 
-**Settings** cover quality (`Balanced`, `High`, `Max`), resolution (`Native`, `1440p`, `1080p`, `720p`), frame rate (`30` or `60` fps), audio, clip options, and the output folder.
+**Settings** (the gear in the sidebar, or `Ctrl+,`) cover quality (`Balanced`, `High`, `Max`), resolution, frame rate (`30` or `60` fps), audio, clip options, the output folder, a storage limit, keybinds, and the navigation style (sidebar or dock). Press `F9` during a game to save a clip of the last seconds.
 
 - Settings file: `%APPDATA%\Greyscreen\settings.json`
 - Logs folder: `%LOCALAPPDATA%\Greyscreen\logs`
@@ -103,7 +103,7 @@ just ci
 # Build Windows release executables
 just build-win
 
-# Build and package dist/greyscreen-windows-x64.zip
+# Build both exes plus README.txt into dist/
 just dist
 
 # Simulate a League match, then run the UI against it with fake capture
@@ -116,14 +116,17 @@ GREYSCREEN_LIVE_URL=http://127.0.0.1:2999 cargo run -p greyscreen
 | Path | Description |
 | --- | --- |
 | `crates/app` | The Rune UI binary. |
-| `crates/cli` | The `doctor`, `record`, `recover`, and `fake-league` CLI tool. |
+| `crates/cli` | The `doctor`, `record`, `recover`, `fake-league`, `thumb` and `demo` CLI tool. |
 | `crates/core` | Settings, events, the session state machine, and clip logic. |
 | `crates/engine` | The recording engine. |
 | `crates/capture` | Windows capture and hardware encoding. |
 | `crates/mp4` | Pure Rust fragmented MP4 writer. |
-| `crates/league` | Live Client Data API client. |
+| `crates/thumbs` | JPEG thumbnails from MP4 frames through the OS decoder. |
+| `apps/web` | The website. |
+| `apps/api` | The feedback backend on Cloudflare. |
+| `crates/league` | Live Client Data API client, plus the update and feedback clients. |
 
-Design notes live in [docs/architecture.md](docs/architecture.md), [docs/plan.md](docs/plan.md), [docs/roadmap.md](docs/roadmap.md), and [docs/research/](docs/research/).
+Design notes live in [docs/architecture.md](docs/architecture.md), [docs/roadmap.md](docs/roadmap.md), and [docs/research/](docs/research/).
 
 ## Status
 
