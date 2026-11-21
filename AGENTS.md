@@ -35,6 +35,7 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 - `just release <tag>`: runs `just ci`, builds and publishes a GitHub release from the Mac, then redeploys the website. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. GitHub Actions has no minutes to spare, so releases never go through CI. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.
 - `just dist`: build both exes and copy them with `README.txt` into `dist/` as separate files.
+- `just mac-app`: build an ad-hoc signed `dist/mac/Greyscreen.app` (fake capture media, for UI testing only) and install it to `~/Applications/Greyscreen.app`.
 - `just fmt`: format the workspace.
 - `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
 - `just web-build`: build the website into `apps/web/dist`.

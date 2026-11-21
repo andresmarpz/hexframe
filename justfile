@@ -32,6 +32,10 @@ dist: build-win
 
 ci: lint check-win test
 
+# Builds an ad-hoc signed Greyscreen.app for UI testing on this Mac and installs it in ~/Applications. Never published.
+mac-app:
+    packaging/macos/build-app.sh
+
 # Regenerates every raster from the SVG sources in brand/.
 brand:
     mkdir -p apps/web/public
