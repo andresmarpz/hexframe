@@ -15,6 +15,7 @@ greyscreen-mp4 = { path = "crates/mp4" }
 greyscreen-league = { path = "crates/league" }
 greyscreen-capture = { path = "crates/capture" }
 greyscreen-engine = { path = "crates/engine" }
+greyscreen-thumbs = { path = "crates/thumbs" }
 windows = "0.62"
 wasapi = "0.27"
 ureq = { version = "3", features = ["rustls"] }

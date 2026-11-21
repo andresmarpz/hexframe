@@ -38,6 +38,7 @@ crates/
   league/   greyscreen-league   Live Client Data API client and poller. The Windows game-window locator sits behind cfg(windows).
   capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session.
   engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library. Fake media source for the Mac.
+  thumbs/   greyscreen-thumbs   One MP4 frame to a JPEG thumbnail through the OS decoder. macOS through AVFoundation; other targets return `Unsupported`.
   app/      greyscreen          The Rune UI binary.
   cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`.
 ```
@@ -222,7 +223,7 @@ The engine's update thread checks 10 s after start and every 6 hours when "Check
 
 - No comments or doc comments, except one line in plain English when a "why" is not obvious. Names carry the meaning. Never mention tickets or files in code.
 - Files stay under 500 lines, excluding tests. Tests go in a sibling `tests.rs` (`#[cfg(test)] mod tests;`) or in `tests/` for integration tests.
-- `unsafe` only in `capture` and the Windows locator, and each block carries a `// SAFETY:` line (clippy `undocumented_unsafe_blocks`).
+- `unsafe` only in `capture`, `thumbs` and the Windows locator, and each block carries a `// SAFETY:` line (clippy `undocumented_unsafe_blocks`).
 - No `unwrap`/`expect` outside tests, except on a mutex lock.
 - Libraries return `thiserror` errors. Binaries use `anyhow`.
 - `just ci` passes before every push. It runs fmt, clippy on macOS and on Windows through cargo-xwin, and the tests.
