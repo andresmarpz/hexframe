@@ -57,6 +57,7 @@ fn main() {
         min_size: Some((720.0, 520.0)),
         scenes: ui::SCENES,
         poll: Some(Ui::poll),
+        on_key: Some(Ui::on_key),
         ..AppSpec::new("Greyscreen", (960.0, 640.0), Ui::preview, view::root)
     };
     let mut app = App::new(spec).keep_running().release_gpu_when_closed();

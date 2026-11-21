@@ -4,8 +4,8 @@ use greyscreen_core::library::{ClipEntry, EventEntry};
 use rune::{El, GrowthSpec, ScrollSpec, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
-use super::timeline::{category, color, seek_target};
-use crate::ui::{ReviewState, Source, Ui, format_clock};
+use super::timeline::{category, color};
+use crate::ui::{ReviewState, Source, Ui, format_clock, seek_target};
 use crate::view::{card, hairline};
 
 const PANEL_WIDTH: f32 = 280.0;

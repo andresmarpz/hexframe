@@ -1,4 +1,5 @@
-use super::timeline::{Category, category, drag_target, marker_x, seek_target};
+use super::timeline::{Category, category, drag_target, marker_x};
+use crate::ui::seek_target;
 
 fn labels(names: &[&str]) -> Vec<String> {
     names.iter().map(|n| (*n).to_owned()).collect()

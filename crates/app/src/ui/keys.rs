@@ -1,0 +1,83 @@
+use greyscreen_core::library::EventEntry;
+use rune::{Key, KeyEvent, Tx};
+
+use super::jump::{next_target, previous_target};
+use super::{Screen, Source, Ui};
+
+const STEP_SECS: f64 = 5.0;
+
+impl Ui {
+    pub(crate) fn on_key(&mut self, ev: &KeyEvent, tx: &mut Tx) -> bool {
+        let m = ev.mods;
+        if self.screen != Screen::Review
+            || self.review.is_none()
+            || m.cmd
+            || m.ctrl
+            || m.alt
+            || m.logo
+        {
+            return false;
+        }
+        let theater = self.in_theater();
+        match &ev.key {
+            Key::Escape if theater => self.set_theater(false, tx),
+            Key::Escape => self.go(Screen::Recordings),
+            Key::Left => self.review_step(-STEP_SECS),
+            Key::Right => self.review_step(STEP_SECS),
+            Key::Text(t) => match t.to_lowercase().as_str() {
+                " " => self.review_toggle(),
+                "f" => self.set_theater(!theater, tx),
+                "j" => self.review_jump(previous_target),
+                "l" => self.review_jump(next_target),
+                _ => return false,
+            },
+            _ => return false,
+        }
+        if let Some(review) = &mut self.review {
+            review.wake_controls(tx.clock());
+        }
+        self.sync_full_screen(tx);
+        true
+    }
+
+    pub(crate) fn in_theater(&self) -> bool {
+        self.review.as_ref().is_some_and(|r| r.theater)
+    }
+
+    pub(crate) fn set_theater(&mut self, on: bool, tx: &mut Tx) {
+        if let Some(review) = &mut self.review {
+            review.theater = on;
+            review.wake_controls(tx.clock());
+        }
+        self.sync_full_screen(tx);
+    }
+
+    pub(crate) fn sync_full_screen(&mut self, tx: &mut Tx) {
+        let want = self.in_theater();
+        if want != self.window_full_screen {
+            self.window_full_screen = want;
+            tx.toggle_full_screen();
+        }
+    }
+
+    fn review_step(&mut self, delta: f64) {
+        if let Some(review) = &mut self.review {
+            review.seek(review.time() + delta);
+        }
+    }
+
+    fn review_toggle(&self) {
+        if let Some(review) = &self.review {
+            review.toggle();
+        }
+    }
+
+    fn review_jump(&mut self, pick: fn(&[EventEntry], f64) -> Option<f64>) {
+        if let Some(review) = &mut self.review
+            && review.source == Source::Game
+            && let Some(target) = pick(&review.entry.meta.events, review.time())
+        {
+            review.seek(target);
+        }
+    }
+}

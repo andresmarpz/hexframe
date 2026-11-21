@@ -1,18 +1,24 @@
+mod icons;
 mod panel;
+mod theater;
 mod timeline;
 
 #[cfg(test)]
 mod tests;
 
 use greyscreen_core::game::GameResult;
-use rune::{Color, El, PlayerState, col, el, row, text};
-use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit};
+use rune::{Color, El, PlayerState, Tx, col, el, row, text};
+use rune_kit::{
+    Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
+};
 
 use super::title_style;
 use crate::ui::{ReviewState, Screen, Ui, format_clock, format_date};
 
 const VIDEO_RATIO: f32 = 16.0 / 9.0;
 const NO_VIDEO: &str = "No video for this game";
+
+pub(super) use theater::screen as theater;
 
 pub(super) fn page(s: &Ui, k: &Kit) -> El {
     match &s.review {
@@ -96,6 +102,14 @@ fn video(review: &ReviewState, k: &Kit) -> El {
         .aspect_ratio(VIDEO_RATIO)
         .radius(8.0)
         .fill(Color::BLACK);
+    video_frame(review, k, frame)
+}
+
+fn video_frame(review: &ReviewState, k: &Kit, frame: El) -> El {
+    let frame = frame.on_double_press_tx(|ui: &mut Ui, tx: &mut Tx| {
+        let on = !ui.in_theater();
+        ui.set_theater(on, tx);
+    });
     let message = |label: String| {
         frame
             .clone()
@@ -123,6 +137,15 @@ fn controls(review: &ReviewState, k: &Kit) -> El {
         })
         .build(k)
         .key("review-play");
+    let theater = IconButton::new(&icons::EXPAND)
+        .label("Theater")
+        .help("Theater")
+        .shortcut("F")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Large)
+        .on_press_tx(|ui: &mut Ui, tx: &mut Tx| ui.set_theater(true, tx))
+        .build(k)
+        .key("review-theater");
     let clock = format!(
         "{} / {}",
         format_clock(review.time() as u32),
@@ -134,6 +157,7 @@ fn controls(review: &ReviewState, k: &Kit) -> El {
         .gap(12.0)
         .center_y()
         .child(play)
+        .child(theater)
         .child(
             text(clock)
                 .key("review-clock")

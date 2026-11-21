@@ -17,21 +17,30 @@ const CARD_RADIUS: f32 = 10.0;
 pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let k = Kit::neutral(cx.system_dark());
     let mut layer: Vec<El> = Vec::new();
-    let page = match s.screen {
-        Screen::Status => status::page(s, &k),
-        Screen::Recordings => recordings::page(s, &k),
-        Screen::Settings => settings::page(s, &k, &mut layer),
-        Screen::Review => review::page(s, &k),
+    let theater = s.review.as_ref().filter(|r| r.theater);
+    let body = match theater {
+        Some(review) => review::theater(review),
+        None => window(s, &k, &mut layer),
     };
     if let Some((notice, _)) = &s.notice {
         layer.push(toast(notice, &k));
     }
-    let body = col()
+    rune_kit::root(body, layer)
+}
+
+fn window(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
+    let page = match s.screen {
+        Screen::Status => status::page(s, k),
+        Screen::Recordings => recordings::page(s, k),
+        Screen::Settings => settings::page(s, k, layer),
+        Screen::Review => review::page(s, k),
+    };
+    col()
         .key("window")
         .w_full()
         .h_full()
         .fill(k.c.page)
-        .child(nav::bar(s, &k))
+        .child(nav::bar(s, k))
         .child(
             col()
                 .key("content")
@@ -52,8 +61,7 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
                         .gap(16.0)
                         .child(page),
                 ),
-        );
-    rune_kit::root(body, layer)
+        )
 }
 
 fn page_header(k: &Kit, title: &str, subtitle: &str, action: Option<El>) -> El {

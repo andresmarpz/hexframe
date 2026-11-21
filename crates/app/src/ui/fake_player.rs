@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 
 use rune::{El, PlayerState};
@@ -15,6 +15,11 @@ pub(crate) enum Call {
 
 thread_local! {
     static CALLS: RefCell<Vec<Call>> = const { RefCell::new(Vec::new()) };
+    static TIME: Cell<f64> = const { Cell::new(0.0) };
+}
+
+pub(crate) fn set_time(secs: f64) {
+    TIME.set(secs);
 }
 
 pub(crate) fn calls() -> Vec<Call> {
@@ -51,7 +56,7 @@ impl ReviewPlayer for FakePlayer {
     }
 
     fn time(&self) -> f64 {
-        0.0
+        TIME.get()
     }
 
     fn duration(&self) -> Option<f64> {

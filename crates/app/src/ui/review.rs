@@ -67,7 +67,12 @@ pub(crate) struct ReviewState {
     pub shown_state: Option<PlayerState>,
     pub shown_time: f64,
     pub settling: bool,
+    pub theater: bool,
+    pub controls_visible: bool,
+    pub last_move: f64,
 }
+
+const CONTROLS_HIDE_SECS: f64 = 2.5;
 
 impl ReviewState {
     pub(crate) fn open(entry: RecordingEntry, make: PlayerFactory) -> Self {
@@ -84,7 +89,24 @@ impl ReviewState {
             shown_state: None,
             shown_time: 0.0,
             settling: false,
+            theater: false,
+            controls_visible: true,
+            last_move: 0.0,
         }
+    }
+
+    pub(crate) fn wake_controls(&mut self, clock: f64) {
+        self.last_move = clock;
+        self.controls_visible = true;
+    }
+
+    pub(crate) fn hide_idle_controls(&mut self, clock: f64) -> bool {
+        let idle = clock - self.last_move >= CONTROLS_HIDE_SECS;
+        if self.theater && self.controls_visible && self.is_playing() && idle {
+            self.controls_visible = false;
+            return true;
+        }
+        false
     }
 
     pub(crate) fn duration(&self) -> f64 {

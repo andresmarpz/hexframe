@@ -2,13 +2,13 @@ use greyscreen_core::library::EventEntry;
 use rune::{Color, Drag, El, Phase, el};
 use rune_kit::Kit;
 
-use crate::ui::{ReviewState, Source, Ui};
+use super::panel::event_label;
+use crate::ui::{ReviewState, Source, Ui, seek_target};
 
 const HEIGHT: f32 = 28.0;
 const TRACK_HEIGHT: f32 = 4.0;
 const MARKER_WIDTH: f32 = 8.0;
 const MARKER_HEIGHT: f32 = 18.0;
-const SEEK_LEAD_SECS: f64 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Category {
@@ -53,10 +53,6 @@ pub(super) fn marker_x(rec_secs: f64, duration: f64, width: f32) -> f32 {
     (rec_secs / duration).clamp(0.0, 1.0) as f32 * width
 }
 
-pub(super) fn seek_target(rec_secs: f64) -> f64 {
-    (rec_secs - SEEK_LEAD_SECS).max(0.0)
-}
-
 pub(super) fn drag_target(x: f32, width: f32, duration: f64) -> f64 {
     if width <= 0.0 {
         return 0.0;
@@ -73,6 +69,7 @@ fn marker(event: &EventEntry, review: &ReviewState, k: &Kit) -> El {
         .absolute(x, (HEIGHT - MARKER_HEIGHT) / 2.0)
         .radius(2.0)
         .fill(color(k, category(&event.highlights)))
+        .help(event_label(event))
         .on_press(move |ui: &mut Ui| ui.review_seek(seek_target(rec_secs)))
 }
 

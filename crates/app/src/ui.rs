@@ -9,6 +9,8 @@ use greyscreen_engine::{
 use rune::{TextEdit, Tx};
 
 mod format;
+mod jump;
+mod keys;
 mod preview;
 mod review;
 
@@ -18,6 +20,7 @@ pub(crate) mod fake_player;
 mod tests;
 
 pub(crate) use format::{format_clock, format_date, format_size};
+pub(crate) use jump::seek_target;
 pub(crate) use review::{PlayerFactory, ReviewState, Source};
 
 #[cfg(test)]
@@ -50,6 +53,12 @@ pub(crate) const SCENES: &[Scene] = &[
     ("settings", |ui| ui.screen = Screen::Settings),
     ("review", |ui| {
         ui.open_review_entry(preview::review_entry());
+    }),
+    ("review-theater", |ui| {
+        ui.open_review_entry(preview::review_entry());
+        if let Some(review) = &mut ui.review {
+            review.theater = true;
+        }
     }),
 ];
 
@@ -90,6 +99,7 @@ pub(crate) struct Ui {
     pub review: Option<ReviewState>,
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
+    pub window_full_screen: bool,
     pub pre_secs: TextEdit,
     pub post_secs: TextEdit,
 }
@@ -118,6 +128,7 @@ impl Ui {
             review: None,
             player_factory: review::rune_player,
             resolution_open: false,
+            window_full_screen: false,
             pre_secs: TextEdit::new(settings.clips.pre_secs.to_string()),
             post_secs: TextEdit::new(settings.clips.post_secs.to_string()),
             settings,
@@ -230,6 +241,7 @@ impl Ui {
 
     pub(crate) fn poll(&mut self, clock: f64, tx: &mut Tx) -> bool {
         let mut changed = false;
+        self.sync_full_screen(tx);
         if let Some((_, until)) = &self.notice
             && clock >= *until
         {
@@ -246,6 +258,7 @@ impl Ui {
         }
         if let Some(review) = &mut self.review {
             changed |= review.changed_since_shown();
+            changed |= review.hide_idle_controls(clock);
             if review.needs_ticks() {
                 tx.wake_after(PLAYBACK_TICK);
             }

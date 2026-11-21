@@ -1,7 +1,7 @@
 use crossbeam_channel::{Receiver, unbounded};
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{Env, Runtime};
+use rune::{Env, Key, KeyEvent, Mods, Runtime};
 
 use crate::ui::fake_player::{self, Call};
 use crate::ui::{Screen, Source, Ui, parse_clip_secs};
@@ -248,4 +248,133 @@ fn the_resolution_menu_opens_under_its_trigger_and_picks_a_value() {
     );
     tap(&mut rt, "option3");
     assert!(!rt.state.resolution_open);
+}
+
+fn press(rt: &mut Runtime<Ui>, key: Key) {
+    rt.key(KeyEvent {
+        key,
+        mods: Mods::default(),
+    });
+    rt.frame(1.0 / 60.0);
+}
+
+fn press_char(rt: &mut Runtime<Ui>, c: &str) {
+    press(rt, Key::Text(c.into()));
+}
+
+fn key_review_runtime() -> Runtime<Ui> {
+    let mut rt = review_runtime();
+    rt.on_key = Some(Ui::on_key);
+    rt
+}
+
+fn in_theater(rt: &Runtime<Ui>) -> bool {
+    rt.state.in_theater()
+}
+
+#[test]
+fn f_toggles_theater_and_escape_leaves_it() {
+    let mut rt = key_review_runtime();
+    assert!(!in_theater(&rt));
+    press_char(&mut rt, "f");
+    assert!(in_theater(&rt));
+    assert!(rt.state.window_full_screen);
+    press_char(&mut rt, "F");
+    assert!(!in_theater(&rt));
+    press_char(&mut rt, "f");
+    press(&mut rt, Key::Escape);
+    assert!(!in_theater(&rt));
+    assert!(!rt.state.window_full_screen);
+    assert_eq!(rt.state.screen, Screen::Review);
+}
+
+#[test]
+fn escape_outside_theater_goes_back_to_the_recordings() {
+    let mut rt = key_review_runtime();
+    press(&mut rt, Key::Escape);
+    assert_eq!(rt.state.screen, Screen::Recordings);
+    assert!(rt.state.review.is_none());
+}
+
+#[test]
+fn theater_shows_the_timeline_and_hides_the_navigation() {
+    let mut rt = key_review_runtime();
+    assert!(rt.find("nav-status").is_some());
+    press_char(&mut rt, "f");
+    assert!(rt.find("timeline").is_some());
+    assert!(rt.find("marker-9").is_some());
+    assert!(rt.find("theater-exit").is_some());
+    assert!(rt.find("nav-status").is_none());
+    assert!(rt.find("review-header").is_none());
+    assert!(rt.find("event-5").is_none());
+}
+
+#[test]
+fn the_theater_button_and_exit_button_switch_modes() {
+    let mut rt = review_runtime();
+    tap(&mut rt, "review-theater");
+    assert!(in_theater(&rt));
+    tap(&mut rt, "theater-exit");
+    assert!(!in_theater(&rt));
+}
+
+#[test]
+fn double_pressing_the_video_toggles_theater() {
+    let mut rt = review_runtime();
+    let (x, y) = rt.find("review-video").expect("video");
+    for _ in 0..2 {
+        rt.pointer_down(x, y);
+        rt.pointer_up(x, y);
+    }
+    rt.frame(1.0 / 60.0);
+    assert!(in_theater(&rt));
+}
+
+#[test]
+fn a_marker_seeks_the_same_way_in_theater() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "f");
+    fake_player::clear_calls();
+    tap(&mut rt, "marker-9");
+    assert_seeks_to(5.2);
+}
+
+#[test]
+fn space_toggles_playback() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, " ");
+    assert_eq!(fake_player::calls(), vec![Call::Play]);
+}
+
+#[test]
+fn arrow_keys_seek_five_seconds() {
+    let mut rt = key_review_runtime();
+    fake_player::set_time(6.0);
+    press(&mut rt, Key::Right);
+    assert_seeks_to(10.0);
+    fake_player::clear_calls();
+    press(&mut rt, Key::Left);
+    assert_seeks_to(1.0);
+    fake_player::set_time(0.0);
+}
+
+#[test]
+fn j_and_l_jump_between_event_markers() {
+    let mut rt = key_review_runtime();
+    fake_player::set_time(5.0);
+    press_char(&mut rt, "l");
+    assert_seeks_to(6.1);
+    fake_player::clear_calls();
+    press_char(&mut rt, "j");
+    assert_seeks_to(3.4);
+    fake_player::set_time(0.0);
+}
+
+#[test]
+fn keys_do_nothing_outside_the_review_screen() {
+    let mut rt = runtime();
+    rt.on_key = Some(Ui::on_key);
+    press_char(&mut rt, "f");
+    assert_eq!(rt.state.screen, Screen::Status);
+    assert!(!in_theater(&rt));
 }

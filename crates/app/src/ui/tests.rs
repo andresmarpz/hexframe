@@ -2,6 +2,7 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::{ClipEntry, EngineStatus, FeedItem, NoticeLevel, RecordingEntry, UiMsg};
 use rune::Tx;
 
+use super::jump::{next_target, previous_target};
 use super::{FEED_CAP, Ui};
 
 fn ui() -> Ui {
@@ -133,4 +134,40 @@ fn a_library_message_replaces_the_recordings() {
     let mut tx = Tx::default();
     ui.apply(UiMsg::Library(vec![entry(0)]), &mut tx);
     assert_eq!(ui.recordings.len(), 1);
+}
+
+fn event_at(rec_secs: f64) -> greyscreen_core::library::EventEntry {
+    let mut event = entry(0).meta.events[0].clone();
+    event.rec_secs = rec_secs;
+    event
+}
+
+fn events() -> Vec<greyscreen_core::library::EventEntry> {
+    [30.0, 10.0, 20.0].map(event_at).to_vec()
+}
+
+#[test]
+fn next_event_is_the_first_landing_spot_after_now() {
+    assert_eq!(next_target(&events(), 0.0), Some(7.0));
+    assert_eq!(next_target(&events(), 7.0), Some(17.0));
+    assert_eq!(next_target(&events(), 16.0), Some(17.0));
+    assert_eq!(next_target(&events(), 17.0), Some(27.0));
+    assert_eq!(next_target(&events(), 27.0), None);
+    assert_eq!(next_target(&[], 0.0), None);
+}
+
+#[test]
+fn previous_event_is_the_last_landing_spot_before_now() {
+    assert_eq!(previous_target(&events(), 100.0), Some(27.0));
+    assert_eq!(previous_target(&events(), 27.0), Some(17.0));
+    assert_eq!(previous_target(&events(), 17.5), Some(7.0));
+    assert_eq!(previous_target(&events(), 7.0), None);
+    assert_eq!(previous_target(&[], 5.0), None);
+}
+
+#[test]
+fn events_in_the_first_seconds_land_at_zero() {
+    let early = [1.0, 2.0].map(event_at).to_vec();
+    assert_eq!(next_target(&early, 0.0), None);
+    assert_eq!(previous_target(&early, 4.0), Some(0.0));
 }
