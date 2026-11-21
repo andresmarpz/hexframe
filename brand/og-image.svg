@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <title>Greyscreen — Automatic League of Legends Game Recorder</title>
+  <defs>
+    <linearGradient id="og-bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#141518"/>
+      <stop offset="100%" stop-color="#0E0F11"/>
+    </linearGradient>
+    <radialGradient id="og-glow" cx="260" cy="240" r="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4392F7" stop-opacity="0.14"/>
+      <stop offset="65%" stop-color="#4392F7" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="#4392F7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="og-glow-right" cx="920" cy="340" r="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4392F7" stop-opacity="0.09"/>
+      <stop offset="100%" stop-color="#4392F7" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="og-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#FFFFFF" fill-opacity="0.045"/>
+    </pattern>
+    <linearGradient id="og-card-bg" x1="648" y1="112" x2="648" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1D1E22"/>
+      <stop offset="100%" stop-color="#17181B"/>
+    </linearGradient>
+    <linearGradient id="og-viewport" x1="672" y1="184" x2="1116" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#141820"/>
+      <stop offset="100%" stop-color="#0E1014"/>
+    </linearGradient>
+    <linearGradient id="og-hex" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5EA7FF"/>
+      <stop offset="100%" stop-color="#3582E8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Canvas -->
+  <rect width="1200" height="630" fill="url(#og-bg)"/>
+  <rect width="1200" height="630" fill="url(#og-grid)"/>
+  <rect width="1200" height="630" fill="url(#og-glow)"/>
+  <rect width="1200" height="630" fill="url(#og-glow-right)"/>
+  <rect x="0.5" y="0.5" width="1199" height="629" stroke="#FFFFFF" stroke-opacity="0.06"/>
+
+  <!-- Left column: Brand + Tagline + Specs -->
+  <!-- Mark + Wordmark lockup -->
+  <g transform="translate(80, 146) scale(0.088)">
+    <path
+      fill="url(#og-hex)"
+      fill-rule="evenodd"
+      d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"
+    />
+    <path
+      fill="#F4F6FA"
+      d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"
+    />
+  </g>
+  <g transform="translate(184, 144) scale(0.88)" fill="#EFF0F2">
+    <path d="M2,24 H12.2 V50.6 H43.8 V24 H54 V88 H43.8 V59.8 H12.2 V88 H2 Z"/>
+    <path fill-rule="evenodd" d="M87.0,38.6 C100.8,38.6 110.0,48.6 110.0,63.0 V67.4 H74.2 C74.8,76.0 80.0,81.0 87.8,81.0 C93.8,81.0 97.6,78.4 99.6,74.8 L108.8,77.2 C105.6,85.0 97.8,89.4 87.4,89.4 C72.8,89.4 64.0,79.2 64.0,64.0 C64.0,48.8 73.2,38.6 87.0,38.6 Z M74.4,59.4 H99.6 C99.2,51.6 94.0,47.0 87.0,47.0 C79.8,47.0 74.8,51.6 74.4,59.4 Z"/>
+    <path d="M117.5,40 H129.0 L138.5,54.95 L148.0,40 H159.5 L144.25,64.0 L159.5,88 H148.0 L138.5,73.05 L129.0,88 H117.5 L132.75,64.0 Z"/>
+    <path d="M172.5,36.8 C172.5,26.0 178.4,21.5 188.6,21.5 H196.5 V30.0 H189.8 C184.6,30.0 182.7,32.0 182.7,37.0 V40 H195.2 V48.4 H182.7 V88 H172.5 V48.4 H165.5 V40 H172.5 Z"/>
+    <path d="M202.5,40 H212.3 V48.8 H212.9 C215.2,42.8 220.4,39.2 227.6,39.2 C228.8,39.2 229.8,39.3 230.8,39.5 V49.0 C229.6,48.7 228.2,48.6 226.6,48.6 C218.2,48.6 212.7,53.4 212.7,61.8 V88 H202.5 Z"/>
+    <path fill-rule="evenodd" d="M258.0,38.6 C271.4,38.6 279.5,45.2 279.5,56.8 V88 H269.7 V81.0 H269.1 C265.8,86.4 259.6,89.4 252.2,89.4 C241.8,89.4 235.5,83.4 235.5,74.8 C235.5,66.0 242.0,60.8 254.6,59.8 L269.3,58.6 V56.2 C269.3,50.2 265.2,46.8 257.8,46.8 C251.4,46.8 247.4,49.4 246.2,54.2 L236.8,52.4 C238.8,43.8 246.8,38.6 258.0,38.6 Z M255.6,81.4 C263.4,81.4 269.3,76.8 269.3,70.2 V65.8 L256.8,66.8 C249.8,67.4 245.7,70.1 245.7,74.4 C245.7,78.8 249.6,81.4 255.6,81.4 Z"/>
+    <path d="M290.5,40 H300.3 V47.6 H300.9 C303.6,41.8 308.8,38.6 316.0,38.6 C323.0,38.6 327.8,41.8 329.8,47.8 H330.4 C333.4,41.8 339.0,38.6 346.6,38.6 C355.4,38.6 360.5,44.4 360.5,54.8 V88 H350.3 V57.4 C350.3,50.8 347.2,47.4 341.8,47.4 C335.6,47.4 330.6,51.6 330.6,58.6 V88 H320.4 V57.4 C320.4,50.8 317.4,47.4 312.0,47.4 C305.8,47.4 300.7,51.6 300.7,58.6 V88 H290.5 Z"/>
+    <path fill-rule="evenodd" d="M393.0,38.6 C406.8,38.6 416.0,48.6 416.0,63.0 V67.4 H380.2 C380.8,76.0 386.0,81.0 393.8,81.0 C399.8,81.0 403.6,78.4 405.6,74.8 L414.8,77.2 C411.6,85.0 403.8,89.4 393.4,89.4 C378.8,89.4 370.0,79.2 370.0,64.0 C370.0,48.8 379.2,38.6 393.0,38.6 Z M380.4,59.4 H405.6 C405.2,51.6 400.0,47.0 393.0,47.0 C385.8,47.0 380.8,51.6 380.4,59.4 Z"/>
+  </g>
+
+  <!-- Tagline area -->
+  <text x="84" y="294" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5">Automatic League of Legends</text>
+  <text x="84" y="334" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5">game recorder and review timeline.</text>
+
+  <text x="84" y="388" fill="#A2A5AA" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="400">GPU-encoded captures, automatic highlight clips, zero bloat.</text>
+
+  <!-- Quiet spec pills -->
+  <g transform="translate(84, 434)">
+    <rect x="0" y="0" width="114" height="32" rx="16" fill="#232529" stroke="#2F3238" stroke-width="1"/>
+    <circle cx="18" cy="16" r="4" fill="#4392F7"/>
+    <text x="30" y="21" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="500">Windows</text>
+
+    <rect x="126" y="0" width="132" height="32" rx="16" fill="#232529" stroke="#2F3238" stroke-width="1"/>
+    <circle cx="144" cy="16" r="4" fill="#5DC879"/>
+    <text x="156" y="21" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="500">GPU Encoded</text>
+
+    <rect x="270" y="0" width="110" height="32" rx="16" fill="#232529" stroke="#2F3238" stroke-width="1"/>
+    <circle cx="288" cy="16" r="4" fill="#DFA11A"/>
+    <text x="300" y="21" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13.5" font-weight="500">Free App</text>
+  </g>
+
+  <!-- Right column: Subtle product preview (Review + Event Timeline) -->
+  <g transform="translate(640, 108)">
+    <!-- Outer app card -->
+    <rect x="0" y="0" width="496" height="414" rx="14" fill="url(#og-card-bg)" stroke="#2E3036" stroke-width="1.2"/>
+
+    <!-- Top bar inside preview -->
+    <rect x="20" y="20" width="48" height="24" rx="6" fill="#25272C" stroke="#31343B" stroke-width="1"/>
+    <text x="31" y="36" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11.5" font-weight="500">Back</text>
+    <text x="80" y="37" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="600">Ahri</text>
+    <rect x="122" y="22" width="60" height="20" rx="4" fill="#26282E"/>
+    <text x="130" y="36" fill="#A2A5AA" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="10.5" font-weight="600">CLASSIC</text>
+    <rect x="190" y="22" width="38" height="20" rx="4" fill="#1E3654"/>
+    <text x="198" y="36" fill="#6BB0FF" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="10.5" font-weight="600">WIN</text>
+    <text x="240" y="36" fill="#7D8087" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12">7 / 3 / 11  ·  33:12</text>
+
+    <!-- Clips count pill top right -->
+    <rect x="404" y="21" width="72" height="22" rx="11" fill="#1E2F44"/>
+    <circle cx="416" cy="32" r="3.5" fill="#4392F7"/>
+    <text x="425" y="36" fill="#6BB0FF" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11" font-weight="500">6 clips</text>
+
+    <line x1="1" y1="60" x2="495" y2="60" stroke="#FFFFFF" stroke-opacity="0.06"/>
+
+    <!-- Video viewport frame -->
+    <rect x="20" y="76" width="308" height="174" rx="8" fill="url(#og-viewport)" stroke="#2A2D34" stroke-width="1"/>
+    <!-- Subtle geometric map/HUD hint inside viewport -->
+    <line x1="20" y1="163" x2="328" y2="163" stroke="#4392F7" stroke-opacity="0.07"/>
+    <line x1="174" y1="76" x2="174" y2="250" stroke="#4392F7" stroke-opacity="0.07"/>
+    <rect x="34" y="90" width="54" height="18" rx="4" fill="#1C1E24" stroke="#2D3038" stroke-width="0.8"/>
+    <text x="42" y="102.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">09:47</text>
+    <!-- Centered subtle play watermark -->
+    <circle cx="174" cy="163" r="24" fill="#1C1E24" fill-opacity="0.9" stroke="#353944" stroke-width="1"/>
+    <path d="M169,154 L183,163 L169,172 Z" fill="#EFF0F2"/>
+    <!-- Minimap hint bottom-right of viewport -->
+    <rect x="272" y="196" width="44" height="44" rx="4" fill="#161920" stroke="#2C303A" stroke-width="1"/>
+    <circle cx="294" cy="218" r="3" fill="#4392F7"/>
+    <circle cx="284" cy="208" r="2.5" fill="#5DC879"/>
+    <circle cx="304" cy="228" r="2.5" fill="#F0645E"/>
+
+    <!-- Timeline controls under video -->
+    <rect x="20" y="264" width="28" height="28" rx="6" fill="#26282E" stroke="#33363E" stroke-width="1"/>
+    <path d="M31,273 L39,278 L31,283 Z" fill="#EFF0F2"/>
+    <text x="58" y="282" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="11.5">09:47 / 33:12</text>
+
+    <!-- Scrubber Track + 6 Colored Event Markers -->
+    <rect x="20" y="310" width="308" height="4" rx="2" fill="#2D3038"/>
+    <rect x="20" y="310" width="126" height="4" rx="2" fill="#4392F7"/>
+    <!-- Event markers on timeline -->
+    <rect x="34" y="303" width="7" height="18" rx="2" fill="#72757B"/>
+    <rect x="74" y="303" width="7" height="18" rx="2" fill="#DFA11A"/>
+    <rect x="112" y="303" width="7" height="18" rx="2" fill="#6BB0FF"/>
+    <rect x="148" y="303" width="7" height="18" rx="2" fill="#F0645E"/>
+    <rect x="192" y="303" width="7" height="18" rx="2" fill="#5DC879"/>
+    <rect x="234" y="303" width="7" height="18" rx="2" fill="#F59573"/>
+    <rect x="278" y="303" width="7" height="18" rx="2" fill="#DFA11A"/>
+
+    <!-- Active event hover detail strip -->
+    <rect x="20" y="340" width="308" height="54" rx="8" fill="#1F2126" stroke="#31343D" stroke-width="1"/>
+    <circle cx="36" cy="360" r="4" fill="#6BB0FF"/>
+    <text x="48" y="364" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12.5" font-weight="500">Double Kill · Lux and Leona</text>
+    <text x="278" y="364" fill="#7D8087" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="11">10:01</text>
+    <text x="48" y="382" fill="#8C9098" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Auto-clip saved · 09:46 – 10:11</text>
+
+    <!-- Right side Event list rail -->
+    <rect x="344" y="76" width="132" height="318" rx="8" fill="#18191D" stroke="#292B31" stroke-width="1"/>
+    <text x="356" y="98" fill="#8C9098" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11" font-weight="600">Events (10)</text>
+    <line x1="345" y1="108" x2="475" y2="108" stroke="#FFFFFF" stroke-opacity="0.06"/>
+
+    <!-- Event rows -->
+    <circle cx="358" cy="128" r="3.5" fill="#72757B"/>
+    <text x="370" y="131.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">01:05</text>
+    <text x="406" y="131.5" fill="#D2D5DC" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Spawning</text>
+
+    <circle cx="358" cy="158" r="3.5" fill="#DFA11A"/>
+    <text x="370" y="161.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">03:18</text>
+    <text x="406" y="161.5" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">First blood</text>
+
+    <rect x="348" y="174" width="124" height="26" rx="5" fill="#23262D"/>
+    <circle cx="358" cy="187" r="3.5" fill="#6BB0FF"/>
+    <text x="370" y="190.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">09:47</text>
+    <text x="406" y="190.5" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11" font-weight="500">My kill</text>
+
+    <circle cx="358" cy="216" r="3.5" fill="#F0645E"/>
+    <text x="370" y="219.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">13:22</text>
+    <text x="406" y="219.5" fill="#D2D5DC" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">My death</text>
+
+    <circle cx="358" cy="246" r="3.5" fill="#5DC879"/>
+    <text x="370" y="249.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">18:40</text>
+    <text x="406" y="249.5" fill="#D2D5DC" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Turret</text>
+
+    <circle cx="358" cy="276" r="3.5" fill="#F59573"/>
+    <text x="370" y="279.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">22:14</text>
+    <text x="406" y="279.5" fill="#D2D5DC" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Dragon</text>
+
+    <circle cx="358" cy="306" r="3.5" fill="#DFA11A"/>
+    <text x="370" y="309.5" fill="#A2A5AA" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10">27:50</text>
+    <text x="406" y="309.5" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Multikill</text>
+
+    <line x1="345" y1="328" x2="475" y2="328" stroke="#FFFFFF" stroke-opacity="0.06"/>
+    <text x="356" y="348" fill="#8C9098" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="10.5" font-weight="600">Clips</text>
+    <text x="356" y="369" fill="#6BB0FF" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11" font-weight="500">Double kill</text>
+    <text x="356" y="386" fill="#A2A5AA" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">Baron steal</text>
+  </g>
+</svg>

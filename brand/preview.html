@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greyscreen — Brand &amp; Design System Preview</title>
+<style>
+  /* Embedded tokens.css */
+  :root {
+    color-scheme: dark;
+    --hf-bg: #121314;
+    --hf-surface-1: #1C1D20;
+    --hf-surface-2: #24262A;
+    --hf-surface-3: #2D3036;
+    --hf-surface-raised: #222429;
+    --hf-surface-overlay: #1F2126;
+    --hf-surface-inverse: #EFF0F2;
+    --hf-hover: rgba(255, 255, 255, 0.045);
+    --hf-pressed: rgba(255, 255, 255, 0.08);
+    --hf-control-track: #17181B;
+    --hf-control-off: #2D3036;
+    --hf-knob: #FAFAFA;
+    --hf-border-subtle: #232529;
+    --hf-border: #2C2E33;
+    --hf-border-strong: #3C3F47;
+    --hf-border-focus: #4392F7;
+    --hf-text: #EFF0F2;
+    --hf-text-muted: #A2A5AA;
+    --hf-text-faint: #72757B;
+    --hf-text-inverse: #121314;
+    --hf-accent: #4392F7;
+    --hf-accent-hover: #5BA2FA;
+    --hf-accent-pressed: #317EE2;
+    --hf-accent-soft: #1B2B40;
+    --hf-accent-border: #294872;
+    --hf-accent-text: #6BB0FF;
+    --hf-accent-fg: #FFFFFF;
+    --hf-success-bg: #1B3121;
+    --hf-success-fg: #5DC879;
+    --hf-success-border: #255232;
+    --hf-warning-bg: #362A14;
+    --hf-warning-fg: #DFA11A;
+    --hf-warning-border: #5E4208;
+    --hf-danger-bg: #3C2322;
+    --hf-danger-fg: #FF847D;
+    --hf-danger-icon: #F0645E;
+    --hf-danger-border: #6C3531;
+    --hf-info-bg: #1B2B40;
+    --hf-info-fg: #6BB0FF;
+    --hf-info-border: #294872;
+    --hf-recording-dot: #F0524D;
+    --hf-tone-big: #DFA11A;
+    --hf-tone-big-bg: #362A14;
+    --hf-tone-death: #F0645E;
+    --hf-tone-death-bg: #3C2322;
+    --hf-tone-kill: #6BB0FF;
+    --hf-tone-kill-bg: #1B2B40;
+    --hf-tone-team: #5DC879;
+    --hf-tone-team-bg: #1B3121;
+    --hf-tone-enemy: #F59573;
+    --hf-tone-enemy-bg: #3D281F;
+    --hf-tone-neutral: #72757B;
+    --hf-tone-neutral-bg: #25272C;
+    --hf-shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.42), 0 0 0 1px var(--hf-border);
+    --hf-shadow-floating: 0 6px 18px rgba(0, 0, 0, 0.48), 0 0 0 1px var(--hf-border);
+    --hf-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.58), 0 0 0 1px var(--hf-border-strong);
+    --hf-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --hf-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --hf-radius-xs: 2px;
+    --hf-radius-sm: 4px;
+    --hf-radius-md: 6px;
+    --hf-radius-lg: 8px;
+    --hf-radius-xl: 10px;
+    --hf-radius-2xl: 12px;
+    --hf-radius-pill: 9999px;
+    --hf-duration-fast: 120ms;
+    --hf-ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+    --hf-bg: #F0F1F4;
+    --hf-surface-1: #FFFFFF;
+    --hf-surface-2: #F5F6F8;
+    --hf-surface-3: #E6E8EE;
+    --hf-surface-raised: #FFFFFF;
+    --hf-surface-overlay: #FFFFFF;
+    --hf-surface-inverse: #1A1C1F;
+    --hf-hover: rgba(26, 28, 31, 0.045);
+    --hf-pressed: rgba(26, 28, 31, 0.085);
+    --hf-control-track: #E8EAEF;
+    --hf-control-off: #D6D9E2;
+    --hf-knob: #FFFFFF;
+    --hf-border-subtle: #E8EAEE;
+    --hf-border: #DCDFE6;
+    --hf-border-strong: #C5C9D3;
+    --hf-border-focus: #2F7FE3;
+    --hf-text: #1A1C1F;
+    --hf-text-muted: #606369;
+    --hf-text-faint: #8B8F98;
+    --hf-text-inverse: #FFFFFF;
+    --hf-accent: #2F7FE3;
+    --hf-accent-hover: #246EC9;
+    --hf-accent-pressed: #1C5CB0;
+    --hf-accent-soft: #E5F0FD;
+    --hf-accent-border: #B4D3FA;
+    --hf-accent-text: #1C62B6;
+    --hf-accent-fg: #FFFFFF;
+    --hf-success-bg: #E1F6E6;
+    --hf-success-fg: #117A37;
+    --hf-success-border: #A9DDB6;
+    --hf-warning-bg: #FDF0D5;
+    --hf-warning-fg: #945B00;
+    --hf-warning-border: #EACA92;
+    --hf-danger-bg: #FDE7E5;
+    --hf-danger-fg: #B3312E;
+    --hf-danger-icon: #C93632;
+    --hf-danger-border: #F8BCB7;
+    --hf-info-bg: #E5F0FD;
+    --hf-info-fg: #1C62B6;
+    --hf-info-border: #B4D3FA;
+    --hf-recording-dot: #D63934;
+    --hf-tone-big: #B47409;
+    --hf-tone-big-bg: #FDF0D5;
+    --hf-tone-death: #C93632;
+    --hf-tone-death-bg: #FDE7E5;
+    --hf-tone-kill: #2570D4;
+    --hf-tone-kill-bg: #E5F0FD;
+    --hf-tone-team: #188A42;
+    --hf-tone-team-bg: #E1F6E6;
+    --hf-tone-enemy: #C45534;
+    --hf-tone-enemy-bg: #FBEAE4;
+    --hf-tone-neutral: #8A8E96;
+    --hf-tone-neutral-bg: #ECEDF1;
+    --hf-shadow-raised: 0 1px 2px rgba(20, 24, 34, 0.06), 0 0 0 1px var(--hf-border);
+    --hf-shadow-floating: 0 6px 18px rgba(20, 24, 34, 0.10), 0 0 0 1px var(--hf-border);
+    --hf-shadow-overlay: 0 14px 36px rgba(20, 24, 34, 0.14), 0 0 0 1px var(--hf-border);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--hf-bg);
+    color: var(--hf-text);
+    font-family: var(--hf-font-sans);
+    font-size: 14px;
+    line-height: 21px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+  .mono { font-family: var(--hf-font-mono); }
+
+  /* Top App-Style Navbar */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: 52px;
+    background: var(--hf-bg);
+    border-bottom: 1px solid var(--hf-border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em; }
+  .topbar-nav { display: flex; align-items: center; gap: 4px; }
+  .nav-link {
+    text-decoration: none;
+    color: var(--hf-text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: var(--hf-radius-md);
+    transition: background var(--hf-duration-fast), color var(--hf-duration-fast);
+  }
+  .nav-link:hover { background: var(--hf-hover); color: var(--hf-text); }
+
+  /* Layout */
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 24px 72px; display: flex; flex-direction: column; gap: 40px; }
+  .hero { display: flex; flex-direction: column; gap: 8px; }
+  .hero h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; }
+  .hero p { margin: 0; color: var(--hf-text-muted); max-width: 680px; }
+
+  .section { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 70px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .section-head h2 { margin: 0; font-size: 16px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .section-head span { font-size: 12px; color: var(--hf-text-muted); }
+
+  /* Card primitive */
+  .card {
+    background: var(--hf-surface-1);
+    border: 1px solid var(--hf-border);
+    border-radius: var(--hf-radius-xl);
+    overflow: hidden;
+  }
+  .card-header {
+    height: 42px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hf-border-subtle);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .card-header .muted { color: var(--hf-text-muted); font-weight: 400; font-size: 12px; }
+  .card-body { padding: 20px; }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .grid-6 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 780px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* Fixed Dark/Light Specimen Canvases */
+  .canvas-dark {
+    background: #121314;
+    color: #EFF0F2;
+    border: 1px solid #2C2E33;
+    border-radius: var(--hf-radius-xl);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .canvas-light {
+    background: #F0F1F4;
+    color: #1A1C1F;
+    border: 1px solid #DCDFE6;
+    border-radius: var(--hf-radius-xl);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .canvas-tag { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; }
+
+  /* Icon Scale Strip */
+  .taskbar-strip {
+    border-radius: var(--hf-radius-lg);
+    padding: 18px 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .taskbar-dark { background: #141518; border: 1px solid #282A30; color: #A2A5AA; }
+  .taskbar-light { background: #E9ECEF; border: 1px solid #D3D7DF; color: #5C6068; }
+  .icon-sample { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .icon-sample span { font-size: 11px; font-family: var(--hf-font-mono); }
+
+  /* Browser Tab Mock */
+  .tab-bar { display: flex; gap: 12px; flex-wrap: wrap; }
+  .browser-tab {
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px 8px 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .browser-tab.dark { background: #1E2025; color: #EFF0F2; border: 1px solid #2F323A; border-bottom: none; }
+  .browser-tab.light { background: #FFFFFF; color: #1A1C1F; border: 1px solid #D8DCE3; border-bottom: none; }
+
+  /* Tray Strip */
+  .tray-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    border-radius: var(--hf-radius-lg);
+    background: #1B1D22;
+    border: 1px solid #2C2F37;
+    color: #EFF0F2;
+    font-size: 12px;
+  }
+
+  /* Swatches */
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 10px; }
+  .swatch {
+    border: 1px solid var(--hf-border);
+    border-radius: var(--hf-radius-lg);
+    overflow: hidden;
+    background: var(--hf-surface-1);
+  }
+  .swatch-chip { height: 52px; border-bottom: 1px solid var(--hf-border-subtle); }
+  .swatch-meta { padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .swatch-name { font-size: 12px; font-weight: 500; }
+  .swatch-code { font-size: 11px; color: var(--hf-text-muted); font-family: var(--hf-font-mono); }
+
+  /* Mini Timeline */
+  .timeline-demo {
+    position: relative;
+    height: 28px;
+    display: flex;
+    align-items: center;
+  }
+  .timeline-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--hf-surface-3);
+    position: relative;
+  }
+  .timeline-fill {
+    width: 44%;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--hf-accent);
+  }
+  .timeline-tick {
+    position: absolute;
+    top: 5px;
+    width: 8px;
+    height: 18px;
+    border-radius: 2px;
+    transform: translateX(-50%);
+  }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    height: 32px;
+    padding: 0 13px;
+    border-radius: var(--hf-radius-md);
+    font-family: var(--hf-font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid transparent;
+    transition: background var(--hf-duration-fast) var(--hf-ease-snappy), border-color var(--hf-duration-fast);
+  }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--hf-bg), 0 0 0 4px var(--hf-border-focus); }
+  .btn-primary { background: var(--hf-accent); color: var(--hf-accent-fg); }
+  .btn-primary:hover { background: var(--hf-accent-hover); }
+  .btn-secondary { background: var(--hf-surface-2); color: var(--hf-text); border-color: var(--hf-border); }
+  .btn-secondary:hover { background: var(--hf-surface-3); border-color: var(--hf-border-strong); }
+  .btn-ghost { background: transparent; color: var(--hf-text-muted); }
+  .btn-ghost:hover { background: var(--hf-hover); color: var(--hf-text); }
+  .btn-disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Pills & Badges */
+  .pill {
+    height: 24px;
+    padding: 0 10px;
+    border-radius: var(--hf-radius-pill);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .pill-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .badge {
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--hf-radius-sm);
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* Controls: Switch, Segmented, Input */
+  .switch {
+    width: 36px;
+    height: 20px;
+    border-radius: var(--hf-radius-pill);
+    background: var(--hf-control-off);
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    position: relative;
+    transition: background var(--hf-duration-fast) var(--hf-ease-snappy);
+  }
+  .switch[aria-checked="true"] { background: var(--hf-accent); }
+  .switch-knob {
+    display: block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--hf-knob);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.28);
+    transition: transform var(--hf-duration-fast) var(--hf-ease-snappy);
+  }
+  .switch[aria-checked="true"] .switch-knob { transform: translateX(16px); }
+
+  .segmented {
+    display: inline-flex;
+    background: var(--hf-control-track);
+    border: 1px solid var(--hf-border-subtle);
+    border-radius: var(--hf-radius-lg);
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg-btn {
+    border: none;
+    background: transparent;
+    color: var(--hf-text-muted);
+    font-family: var(--hf-font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: var(--hf-radius-md);
+    cursor: pointer;
+    transition: background var(--hf-duration-fast), color var(--hf-duration-fast);
+  }
+  .seg-btn.active {
+    background: var(--hf-surface-2);
+    color: var(--hf-text);
+    box-shadow: var(--hf-shadow-raised);
+  }
+
+  .input {
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--hf-radius-md);
+    border: 1px solid var(--hf-border);
+    background: var(--hf-bg);
+    color: var(--hf-text);
+    font-family: var(--hf-font-sans);
+    font-size: 13px;
+    outline: none;
+  }
+  .input:focus { border-color: var(--hf-border-focus); box-shadow: 0 0 0 3px var(--hf-accent-soft); }
+
+  /* Settings Row */
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hf-border-subtle);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 14px; font-weight: 500; }
+  .setting-desc { font-size: 12px; color: var(--hf-text-muted); margin-top: 1px; }
+
+  /* Recordings Table */
+  .rec-table { width: 100%; border-collapse: collapse; }
+  .rec-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--hf-text-muted);
+    height: 34px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--hf-border-subtle);
+  }
+  .rec-table td { height: 58px; padding: 0 12px; font-size: 13px; border-bottom: 1px solid var(--hf-border-subtle); }
+  .rec-table tr:last-child td { border-bottom: none; }
+  .rec-table tbody tr:hover { background: var(--hf-hover); }
+  .rec-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rail-cell { padding-left: 0 !important; padding-right: 0 !important; width: 10px; }
+  .rail { width: 3px; height: 40px; border-radius: 2px; }
+  .champ-badge {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--hf-surface-2); border: 1px solid var(--hf-border);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px; color: var(--hf-text-muted);
+  }
+
+  /* Hover Card */
+  .hover-card {
+    background: var(--hf-surface-raised);
+    border-radius: var(--hf-radius-md);
+    box-shadow: var(--hf-shadow-floating);
+    padding: 10px 12px;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .hover-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; font-weight: 500; }
+  .hover-card-row { display: flex; gap: 10px; font-size: 12px; }
+  .hover-card-lead { width: 52px; color: var(--hf-text-muted); flex-shrink: 0; }
+
+  /* Type Specimen */
+  .type-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 180px;
+    align-items: baseline;
+    gap: 16px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--hf-border-subtle);
+  }
+  .type-row:last-child { border-bottom: none; }
+  .type-meta { font-size: 11px; color: var(--hf-text-muted); font-family: var(--hf-font-mono); }
+
+  /* Voice Do / Don't */
+  .voice-item { padding: 14px 16px; border-bottom: 1px solid var(--hf-border-subtle); display: flex; flex-direction: column; gap: 4px; }
+  .voice-item:last-child { border-bottom: none; }
+  .voice-tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .og-frame {
+    width: 100%;
+    border-radius: var(--hf-radius-xl);
+    overflow: hidden;
+    border: 1px solid var(--hf-border);
+    box-shadow: var(--hf-shadow-overlay);
+    background: #121314;
+  }
+  .og-frame svg { display: block; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <svg width="20" height="20" viewBox="0 0 1024 1024" fill="none" aria-hidden="true">
+        <path fill="var(--hf-accent)" fill-rule="evenodd" d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"/>
+        <path fill="var(--hf-text)" d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"/>
+      </svg>
+      <span>Greyscreen Brand System</span>
+    </div>
+    <nav class="topbar-nav">
+      <a class="nav-link" href="#logos">Logos</a>
+      <a class="nav-link" href="#icons">Icons</a>
+      <a class="nav-link" href="#colors">Colours</a>
+      <a class="nav-link" href="#type">Typography</a>
+      <a class="nav-link" href="#components">Components</a>
+      <a class="nav-link" href="#voice">Voice</a>
+      <button id="theme-toggle" class="btn btn-secondary" style="margin-left:8px;" type="button">Switch to Light</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- Intro -->
+    <section class="hero">
+      <h1>Greyscreen Brand &amp; Design System</h1>
+      <p>Derived directly from the native Windows app: cool slate neutrals, hairline borders, a single cobalt-blue accent, tabular typography, and six semantic timeline event tones. Toggle the theme in the top right to review both modes.</p>
+    </section>
+
+    <!-- 1. Logos -->
+    <section class="section" id="logos">
+      <div class="section-head">
+        <h2>Logo System</h2>
+        <span>Concentric rounded hexagon frame + isometric 60° play prism + geometric neo-grotesque wordmark</span>
+      </div>
+      <div class="grid-2">
+        <!-- Dark canvas -->
+        <div class="canvas-dark">
+          <div class="canvas-tag">Dark Surface · #121314 (Primary)</div>
+          <div>
+            <!-- logo-horizontal-dark -->
+            <svg height="48" viewBox="0 0 548 112" fill="none" role="img" aria-label="Greyscreen horizontal logo dark">
+              <g transform="translate(4, 4) scale(0.1015625)">
+                <path fill="#4392F7" fill-rule="evenodd" d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"/>
+                <path fill="#EFF0F2" d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"/>
+              </g>
+              <g transform="translate(124, 0)" fill="#EFF0F2">
+                <path d="M2,24 H12.2 V50.6 H43.8 V24 H54 V88 H43.8 V59.8 H12.2 V88 H2 Z"/>
+                <path fill-rule="evenodd" d="M87.0,38.6 C100.8,38.6 110.0,48.6 110.0,63.0 V67.4 H74.2 C74.8,76.0 80.0,81.0 87.8,81.0 C93.8,81.0 97.6,78.4 99.6,74.8 L108.8,77.2 C105.6,85.0 97.8,89.4 87.4,89.4 C72.8,89.4 64.0,79.2 64.0,64.0 C64.0,48.8 73.2,38.6 87.0,38.6 Z M74.4,59.4 H99.6 C99.2,51.6 94.0,47.0 87.0,47.0 C79.8,47.0 74.8,51.6 74.4,59.4 Z"/>
+                <path d="M117.5,40 H129.0 L138.5,54.95 L148.0,40 H159.5 L144.25,64.0 L159.5,88 H148.0 L138.5,73.05 L129.0,88 H117.5 L132.75,64.0 Z"/>
+                <path d="M172.5,36.8 C172.5,26.0 178.4,21.5 188.6,21.5 H196.5 V30.0 H189.8 C184.6,30.0 182.7,32.0 182.7,37.0 V40 H195.2 V48.4 H182.7 V88 H172.5 V48.4 H165.5 V40 H172.5 Z"/>
+                <path d="M202.5,40 H212.3 V48.8 H212.9 C215.2,42.8 220.4,39.2 227.6,39.2 C228.8,39.2 229.8,39.3 230.8,39.5 V49.0 C229.6,48.7 228.2,48.6 226.6,48.6 C218.2,48.6 212.7,53.4 212.7,61.8 V88 H202.5 Z"/>
+                <path fill-rule="evenodd" d="M258.0,38.6 C271.4,38.6 279.5,45.2 279.5,56.8 V88 H269.7 V81.0 H269.1 C265.8,86.4 259.6,89.4 252.2,89.4 C241.8,89.4 235.5,83.4 235.5,74.8 C235.5,66.0 242.0,60.8 254.6,59.8 L269.3,58.6 V56.2 C269.3,50.2 265.2,46.8 257.8,46.8 C251.4,46.8 247.4,49.4 246.2,54.2 L236.8,52.4 C238.8,43.8 246.8,38.6 258.0,38.6 Z M255.6,81.4 C263.4,81.4 269.3,76.8 269.3,70.2 V65.8 L256.8,66.8 C249.8,67.4 245.7,70.1 245.7,74.4 C245.7,78.8 249.6,81.4 255.6,81.4 Z"/>
+                <path d="M290.5,40 H300.3 V47.6 H300.9 C303.6,41.8 308.8,38.6 316.0,38.6 C323.0,38.6 327.8,41.8 329.8,47.8 H330.4 C333.4,41.8 339.0,38.6 346.6,38.6 C355.4,38.6 360.5,44.4 360.5,54.8 V88 H350.3 V57.4 C350.3,50.8 347.2,47.4 341.8,47.4 C335.6,47.4 330.6,51.6 330.6,58.6 V88 H320.4 V57.4 C320.4,50.8 317.4,47.4 312.0,47.4 C305.8,47.4 300.7,51.6 300.7,58.6 V88 H290.5 Z"/>
+                <path fill-rule="evenodd" d="M393.0,38.6 C406.8,38.6 416.0,48.6 416.0,63.0 V67.4 H380.2 C380.8,76.0 386.0,81.0 393.8,81.0 C399.8,81.0 403.6,78.4 405.6,74.8 L414.8,77.2 C411.6,85.0 403.8,89.4 393.4,89.4 C378.8,89.4 370.0,79.2 370.0,64.0 C370.0,48.8 379.2,38.6 393.0,38.6 Z M380.4,59.4 H405.6 C405.2,51.6 400.0,47.0 393.0,47.0 C385.8,47.0 380.8,51.6 380.4,59.4 Z"/>
+              </g>
+            </svg>
+          </div>
+          <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #232529;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <svg width="44" height="44" viewBox="0 0 1024 1024" fill="none">
+                <path fill="#4392F7" fill-rule="evenodd" d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"/>
+                <path fill="#4392F7" d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"/>
+              </svg>
+              <span style="font-size:12px;color:#A2A5AA;">mark.svg</span>
+            </div>
+            <div class="tray-strip">
+              <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+                <path fill="#FFFFFF" fill-rule="evenodd" d="M14.70,2.55 A2.60,2.60 0 0,1 17.30,2.55 L27.00,8.15 A2.60,2.60 0 0,1 28.30,10.40 L28.30,21.60 A2.60,2.60 0 0,1 27.00,23.85 L17.30,29.45 A2.60,2.60 0 0,1 14.70,29.45 L5.00,23.85 A2.60,2.60 0 0,1 3.70,21.60 L3.70,10.40 A2.60,2.60 0 0,1 5.00,8.15 Z M7.74,10.77 A0.80,0.80 0 0,0 7.34,11.46 L7.34,20.54 A0.80,0.80 0 0,0 7.74,21.23 L15.60,25.77 A0.80,0.80 0 0,0 16.40,25.77 L24.26,21.23 A0.80,0.80 0 0,0 24.66,20.54 L24.66,11.46 A0.80,0.80 0 0,0 24.26,10.77 L16.40,6.23 A0.80,0.80 0 0,0 15.60,6.23 Z"/>
+                <path fill="#FFFFFF" d="M21.50,15.22 A0.90,0.90 0 0,1 21.50,16.78 L13.93,21.15 A0.90,0.90 0 0,1 12.58,20.37 L12.57,11.63 A0.90,0.90 0 0,1 13.92,10.85 Z"/>
+              </svg>
+              <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+                <defs><mask id="tray-mask-p"><rect width="32" height="32" fill="#FFF"/><circle cx="24.5" cy="24.5" r="7" fill="#000"/></mask></defs>
+                <g mask="url(#tray-mask-p)">
+                  <path fill="#FFFFFF" fill-rule="evenodd" d="M14.70,2.55 A2.60,2.60 0 0,1 17.30,2.55 L27.00,8.15 A2.60,2.60 0 0,1 28.30,10.40 L28.30,21.60 A2.60,2.60 0 0,1 27.00,23.85 L17.30,29.45 A2.60,2.60 0 0,1 14.70,29.45 L5.00,23.85 A2.60,2.60 0 0,1 3.70,21.60 L3.70,10.40 A2.60,2.60 0 0,1 5.00,8.15 Z M7.74,10.77 A0.80,0.80 0 0,0 7.34,11.46 L7.34,20.54 A0.80,0.80 0 0,0 7.74,21.23 L15.60,25.77 A0.80,0.80 0 0,0 16.40,25.77 L24.26,21.23 A0.80,0.80 0 0,0 24.66,20.54 L24.66,11.46 A0.80,0.80 0 0,0 24.26,10.77 L16.40,6.23 A0.80,0.80 0 0,0 15.60,6.23 Z"/>
+                  <path fill="#FFFFFF" d="M21.50,15.22 A0.90,0.90 0 0,1 21.50,16.78 L13.93,21.15 A0.90,0.90 0 0,1 12.58,20.37 L12.57,11.63 A0.90,0.90 0 0,1 13.92,10.85 Z"/>
+                </g>
+                <circle cx="24.5" cy="24.5" r="5" fill="#F0524D"/>
+              </svg>
+              <span style="color:#A2A5AA;">Tray Idle / Rec</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Light canvas -->
+        <div class="canvas-light">
+          <div class="canvas-tag">Light Surface · #F0F1F4</div>
+          <div>
+            <!-- logo-horizontal-light -->
+            <svg height="48" viewBox="0 0 548 112" fill="none" role="img" aria-label="Greyscreen horizontal logo light">
+              <g transform="translate(4, 4) scale(0.1015625)">
+                <path fill="#2F7FE3" fill-rule="evenodd" d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"/>
+                <path fill="#1A1C1F" d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"/>
+              </g>
+              <g transform="translate(124, 0)" fill="#1A1C1F">
+                <path d="M2,24 H12.2 V50.6 H43.8 V24 H54 V88 H43.8 V59.8 H12.2 V88 H2 Z"/>
+                <path fill-rule="evenodd" d="M87.0,38.6 C100.8,38.6 110.0,48.6 110.0,63.0 V67.4 H74.2 C74.8,76.0 80.0,81.0 87.8,81.0 C93.8,81.0 97.6,78.4 99.6,74.8 L108.8,77.2 C105.6,85.0 97.8,89.4 87.4,89.4 C72.8,89.4 64.0,79.2 64.0,64.0 C64.0,48.8 73.2,38.6 87.0,38.6 Z M74.4,59.4 H99.6 C99.2,51.6 94.0,47.0 87.0,47.0 C79.8,47.0 74.8,51.6 74.4,59.4 Z"/>
+                <path d="M117.5,40 H129.0 L138.5,54.95 L148.0,40 H159.5 L144.25,64.0 L159.5,88 H148.0 L138.5,73.05 L129.0,88 H117.5 L132.75,64.0 Z"/>
+                <path d="M172.5,36.8 C172.5,26.0 178.4,21.5 188.6,21.5 H196.5 V30.0 H189.8 C184.6,30.0 182.7,32.0 182.7,37.0 V40 H195.2 V48.4 H182.7 V88 H172.5 V48.4 H165.5 V40 H172.5 Z"/>
+                <path d="M202.5,40 H212.3 V48.8 H212.9 C215.2,42.8 220.4,39.2 227.6,39.2 C228.8,39.2 229.8,39.3 230.8,39.5 V49.0 C229.6,48.7 228.2,48.6 226.6,48.6 C218.2,48.6 212.7,53.4 212.7,61.8 V88 H202.5 Z"/>
+                <path fill-rule="evenodd" d="M258.0,38.6 C271.4,38.6 279.5,45.2 279.5,56.8 V88 H269.7 V81.0 H269.1 C265.8,86.4 259.6,89.4 252.2,89.4 C241.8,89.4 235.5,83.4 235.5,74.8 C235.5,66.0 242.0,60.8 254.6,59.8 L269.3,58.6 V56.2 C269.3,50.2 265.2,46.8 257.8,46.8 C251.4,46.8 247.4,49.4 246.2,54.2 L236.8,52.4 C238.8,43.8 246.8,38.6 258.0,38.6 Z M255.6,81.4 C263.4,81.4 269.3,76.8 269.3,70.2 V65.8 L256.8,66.8 C249.8,67.4 245.7,70.1 245.7,74.4 C245.7,78.8 249.6,81.4 255.6,81.4 Z"/>
+                <path d="M290.5,40 H300.3 V47.6 H300.9 C303.6,41.8 308.8,38.6 316.0,38.6 C323.0,38.6 327.8,41.8 329.8,47.8 H330.4 C333.4,41.8 339.0,38.6 346.6,38.6 C355.4,38.6 360.5,44.4 360.5,54.8 V88 H350.3 V57.4 C350.3,50.8 347.2,47.4 341.8,47.4 C335.6,47.4 330.6,51.6 330.6,58.6 V88 H320.4 V57.4 C320.4,50.8 317.4,47.4 312.0,47.4 C305.8,47.4 300.7,51.6 300.7,58.6 V88 H290.5 Z"/>
+                <path fill-rule="evenodd" d="M393.0,38.6 C406.8,38.6 416.0,48.6 416.0,63.0 V67.4 H380.2 C380.8,76.0 386.0,81.0 393.8,81.0 C399.8,81.0 403.6,78.4 405.6,74.8 L414.8,77.2 C411.6,85.0 403.8,89.4 393.4,89.4 C378.8,89.4 370.0,79.2 370.0,64.0 C370.0,48.8 379.2,38.6 393.0,38.6 Z M380.4,59.4 H405.6 C405.2,51.6 400.0,47.0 393.0,47.0 C385.8,47.0 380.8,51.6 380.4,59.4 Z"/>
+              </g>
+            </svg>
+          </div>
+          <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #DCDFE6;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <svg width="44" height="44" viewBox="0 0 1024 1024" fill="none">
+                <path fill="#4392F7" fill-rule="evenodd" d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"/>
+                <path fill="#4392F7" d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"/>
+              </svg>
+              <span style="font-size:12px;color:#606369;">mark.svg (same cobalt)</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <svg height="26" viewBox="0 0 420 112" fill="none">
+                <g fill="#1A1C1F">
+                  <path d="M2,24 H12.2 V50.6 H43.8 V24 H54 V88 H43.8 V59.8 H12.2 V88 H2 Z"/>
+                  <path fill-rule="evenodd" d="M87.0,38.6 C100.8,38.6 110.0,48.6 110.0,63.0 V67.4 H74.2 C74.8,76.0 80.0,81.0 87.8,81.0 C93.8,81.0 97.6,78.4 99.6,74.8 L108.8,77.2 C105.6,85.0 97.8,89.4 87.4,89.4 C72.8,89.4 64.0,79.2 64.0,64.0 C64.0,48.8 73.2,38.6 87.0,38.6 Z M74.4,59.4 H99.6 C99.2,51.6 94.0,47.0 87.0,47.0 C79.8,47.0 74.8,51.6 74.4,59.4 Z"/>
+                  <path d="M117.5,40 H129.0 L138.5,54.95 L148.0,40 H159.5 L144.25,64.0 L159.5,88 H148.0 L138.5,73.05 L129.0,88 H117.5 L132.75,64.0 Z"/>
+                  <path d="M172.5,36.8 C172.5,26.0 178.4,21.5 188.6,21.5 H196.5 V30.0 H189.8 C184.6,30.0 182.7,32.0 182.7,37.0 V40 H195.2 V48.4 H182.7 V88 H172.5 V48.4 H165.5 V40 H172.5 Z"/>
+                  <path d="M202.5,40 H212.3 V48.8 H212.9 C215.2,42.8 220.4,39.2 227.6,39.2 C228.8,39.2 229.8,39.3 230.8,39.5 V49.0 C229.6,48.7 228.2,48.6 226.6,48.6 C218.2,48.6 212.7,53.4 212.7,61.8 V88 H202.5 Z"/>
+                  <path fill-rule="evenodd" d="M258.0,38.6 C271.4,38.6 279.5,45.2 279.5,56.8 V88 H269.7 V81.0 H269.1 C265.8,86.4 259.6,89.4 252.2,89.4 C241.8,89.4 235.5,83.4 235.5,74.8 C235.5,66.0 242.0,60.8 254.6,59.8 L269.3,58.6 V56.2 C269.3,50.2 265.2,46.8 257.8,46.8 C251.4,46.8 247.4,49.4 246.2,54.2 L236.8,52.4 C238.8,43.8 246.8,38.6 258.0,38.6 Z M255.6,81.4 C263.4,81.4 269.3,76.8 269.3,70.2 V65.8 L256.8,66.8 C249.8,67.4 245.7,70.1 245.7,74.4 C245.7,78.8 249.6,81.4 255.6,81.4 Z"/>
+                  <path d="M290.5,40 H300.3 V47.6 H300.9 C303.6,41.8 308.8,38.6 316.0,38.6 C323.0,38.6 327.8,41.8 329.8,47.8 H330.4 C333.4,41.8 339.0,38.6 346.6,38.6 C355.4,38.6 360.5,44.4 360.5,54.8 V88 H350.3 V57.4 C350.3,50.8 347.2,47.4 341.8,47.4 C335.6,47.4 330.6,51.6 330.6,58.6 V88 H320.4 V57.4 C320.4,50.8 317.4,47.4 312.0,47.4 C305.8,47.4 300.7,51.6 300.7,58.6 V88 H290.5 Z"/>
+                  <path fill-rule="evenodd" d="M393.0,38.6 C406.8,38.6 416.0,48.6 416.0,63.0 V67.4 H380.2 C380.8,76.0 386.0,81.0 393.8,81.0 C399.8,81.0 403.6,78.4 405.6,74.8 L414.8,77.2 C411.6,85.0 403.8,89.4 393.4,89.4 C378.8,89.4 370.0,79.2 370.0,64.0 C370.0,48.8 379.2,38.6 393.0,38.6 Z M380.4,59.4 H405.6 C405.2,51.6 400.0,47.0 393.0,47.0 C385.8,47.0 380.8,51.6 380.4,59.4 Z"/>
+                </g>
+              </svg>
+              <span style="font-size:12px;color:#606369;">wordmark-light.svg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Windows App Icon Scale Test + Favicon -->
+    <section class="section" id="icons">
+      <div class="section-head">
+        <h2>Windows App Icon &amp; Favicon</h2>
+        <span>Verified at 256, 48, 32, and 16 px on dark &amp; light taskbars</span>
+      </div>
+
+      <!-- Hidden reusable app-icon symbol (never display:none or gradients break in Chromium) -->
+      <svg width="0" height="0" style="position:absolute;pointer-events:none;" aria-hidden="true">
+        <defs>
+          <linearGradient id="p-tile-bg" x1="512" y1="32" x2="512" y2="992" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#1E2026"/><stop offset="100%" stop-color="#111215"/>
+          </linearGradient>
+          <radialGradient id="p-tile-glow" cx="512" cy="460" r="420" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#4392F7" stop-opacity="0.16"/>
+            <stop offset="65%" stop-color="#4392F7" stop-opacity="0.03"/>
+            <stop offset="100%" stop-color="#4392F7" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="p-tile-rim" x1="512" y1="32" x2="512" y2="992" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.18"/>
+            <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.07"/>
+            <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.04"/>
+          </linearGradient>
+          <linearGradient id="p-hex" x1="512" y1="156" x2="512" y2="868" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#5EA7FF"/><stop offset="100%" stop-color="#3582E8"/>
+          </linearGradient>
+          <linearGradient id="p-play" x1="512" y1="390" x2="512" y2="634" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#F7F9FC"/><stop offset="100%" stop-color="#DCE2EC"/>
+          </linearGradient>
+          <symbol id="sym-app-icon" viewBox="0 0 1024 1024">
+            <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#p-tile-bg)"/>
+            <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#p-tile-glow)"/>
+            <rect x="40" y="40" width="944" height="944" rx="208" fill="none" stroke="url(#p-tile-rim)" stroke-width="16"/>
+            <path fill="url(#p-hex)" fill-rule="evenodd" d="M476.00,176.78 A72.00,72.00 0 0,1 548.00,176.78 L784.31,313.22 A72.00,72.00 0 0,1 820.31,375.57 L820.31,648.43 A72.00,72.00 0 0,1 784.31,710.78 L548.00,847.22 A72.00,72.00 0 0,1 476.00,847.22 L239.69,710.78 A72.00,72.00 0 0,1 203.69,648.43 L203.69,375.57 A72.00,72.00 0 0,1 239.69,313.22 Z M302.03,379.23 A20.00,20.00 0 0,0 292.03,396.55 L292.03,627.45 A20.00,20.00 0 0,0 302.03,644.77 L502.00,760.23 A20.00,20.00 0 0,0 522.00,760.23 L721.97,644.77 A20.00,20.00 0 0,0 731.97,627.45 L731.97,396.55 A20.00,20.00 0 0,0 721.97,379.23 L522.00,263.77 A20.00,20.00 0 0,0 502.00,263.77 Z"/>
+            <path fill="url(#p-play)" d="M649.00,492.95 A22.00,22.00 0 0,1 649.00,531.05 L460.00,640.17 A22.00,22.00 0 0,1 427.00,621.12 L427.00,402.88 A22.00,22.00 0 0,1 460.00,383.83 Z"/>
+          </symbol>
+          <symbol id="sym-app-icon-16" viewBox="0 0 16 16">
+            <rect x="0.5" y="0.5" width="15" height="15" rx="3.5" fill="#16181D" stroke="#2D3038" stroke-width="1"/>
+            <path fill="#4A98FA" fill-rule="evenodd" d="M7.50,2.89 A1.00,1.00 0 0,1 8.50,2.89 L12.18,5.01 A1.00,1.00 0 0,1 12.68,5.88 L12.68,10.12 A1.00,1.00 0 0,1 12.18,10.99 L8.50,13.11 A1.00,1.00 0 0,1 7.50,13.11 L3.82,10.99 A1.00,1.00 0 0,1 3.32,10.12 L3.32,5.88 A1.00,1.00 0 0,1 3.82,5.01 Z M5.03,6.11 A0.30,0.30 0 0,0 4.88,6.37 L4.88,9.63 A0.30,0.30 0 0,0 5.03,9.89 L7.85,11.51 A0.30,0.30 0 0,0 8.15,11.51 L10.97,9.89 A0.30,0.30 0 0,0 11.12,9.63 L11.12,6.37 A0.30,0.30 0 0,0 10.97,6.11 L8.15,4.49 A0.30,0.30 0 0,0 7.85,4.49 Z"/>
+            <path fill="#F4F6FA" d="M10.03,7.70 A0.35,0.35 0 0,1 10.03,8.30 L7.25,9.91 A0.35,0.35 0 0,1 6.73,9.60 L6.72,6.40 A0.35,0.35 0 0,1 7.25,6.09 Z"/>
+          </symbol>
+        </defs>
+      </svg>
+
+      <div class="card">
+        <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="taskbar-strip taskbar-dark">
+            <div class="icon-sample"><svg width="256" height="256"><use href="#sym-app-icon"/></svg><span>256 px</span></div>
+            <div class="icon-sample"><svg width="48" height="48"><use href="#sym-app-icon"/></svg><span>48 px</span></div>
+            <div class="icon-sample"><svg width="32" height="32"><use href="#sym-app-icon"/></svg><span>32 px</span></div>
+            <div class="icon-sample"><svg width="16" height="16"><use href="#sym-app-icon"/></svg><span>16 px (scaled)</span></div>
+            <div class="icon-sample"><svg width="16" height="16"><use href="#sym-app-icon-16"/></svg><span>16 px (tuned)</span></div>
+          </div>
+          <div class="taskbar-strip taskbar-light">
+            <div class="icon-sample"><svg width="48" height="48"><use href="#sym-app-icon"/></svg><span>48 px (light)</span></div>
+            <div class="icon-sample"><svg width="32" height="32"><use href="#sym-app-icon"/></svg><span>32 px (light)</span></div>
+            <div class="icon-sample"><svg width="16" height="16"><use href="#sym-app-icon-16"/></svg><span>16 px (tuned)</span></div>
+            <div style="margin-left:auto;" class="tab-bar">
+              <div class="browser-tab dark">
+                <svg width="16" height="16"><use href="#sym-app-icon-16"/></svg>
+                <span>Greyscreen — Recordings</span>
+              </div>
+              <div class="browser-tab light">
+                <svg width="16" height="16"><use href="#sym-app-icon-16"/></svg>
+                <span>Greyscreen — Windows</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. OG Social Card -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Social Card (og-image.svg)</h2>
+        <span>1200 × 630 · Dark surface · Pure vector product hint</span>
+      </div>
+      <div class="og-frame">
+        <svg viewBox="0 0 1200 630" fill="none">
+          <defs>
+            <linearGradient id="ogp-bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#141518"/><stop offset="100%" stop-color="#0E0F11"/></linearGradient>
+            <radialGradient id="ogp-glow" cx="260" cy="240" r="420" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4392F7" stop-opacity="0.14"/><stop offset="100%" stop-color="#4392F7" stop-opacity="0"/></radialGradient>
+            <pattern id="ogp-grid" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#FFFFFF" fill-opacity="0.045"/></pattern>
+            <linearGradient id="ogp-card" x1="648" y1="112" x2="648" y2="520" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#1D1E22"/><stop offset="100%" stop-color="#17181B"/></linearGradient>
+            <linearGradient id="ogp-hex" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#5EA7FF"/><stop offset="100%" stop-color="#3582E8"/></linearGradient>
+          </defs>
+          <rect width="1200" height="630" fill="url(#ogp-bg)"/>
+          <rect width="1200" height="630" fill="url(#ogp-grid)"/>
+          <rect width="1200" height="630" fill="url(#ogp-glow)"/>
+          <g transform="translate(80, 146) scale(0.088)">
+            <path fill="url(#ogp-hex)" fill-rule="evenodd" d="M468.00,101.40 A88.00,88.00 0 0,1 556.00,101.40 L845.59,268.60 A88.00,88.00 0 0,1 889.59,344.81 L889.59,679.19 A88.00,88.00 0 0,1 845.59,755.40 L556.00,922.60 A88.00,88.00 0 0,1 468.00,922.60 L178.41,755.40 A88.00,88.00 0 0,1 134.41,679.19 L134.41,344.81 A88.00,88.00 0 0,1 178.41,268.60 Z M248.60,346.07 A24.00,24.00 0 0,0 236.60,366.86 L236.60,657.14 A24.00,24.00 0 0,0 248.60,677.93 L500.00,823.07 A24.00,24.00 0 0,0 524.00,823.07 L775.40,677.93 A24.00,24.00 0 0,0 787.40,657.14 L787.40,366.86 A24.00,24.00 0 0,0 775.40,346.07 L524.00,200.93 A24.00,24.00 0 0,0 500.00,200.93 Z"/>
+            <path fill="#F4F6FA" d="M682.00,487.75 A28.00,28.00 0 0,1 682.00,536.25 L448.00,671.35 A28.00,28.00 0 0,1 406.00,647.10 L406.00,376.90 A28.00,28.00 0 0,1 448.00,352.65 Z"/>
+          </g>
+          <g transform="translate(184, 144) scale(0.88)" fill="#EFF0F2">
+            <path d="M2,24 H12.2 V50.6 H43.8 V24 H54 V88 H43.8 V59.8 H12.2 V88 H2 Z"/>
+            <path fill-rule="evenodd" d="M87.0,38.6 C100.8,38.6 110.0,48.6 110.0,63.0 V67.4 H74.2 C74.8,76.0 80.0,81.0 87.8,81.0 C93.8,81.0 97.6,78.4 99.6,74.8 L108.8,77.2 C105.6,85.0 97.8,89.4 87.4,89.4 C72.8,89.4 64.0,79.2 64.0,64.0 C64.0,48.8 73.2,38.6 87.0,38.6 Z M74.4,59.4 H99.6 C99.2,51.6 94.0,47.0 87.0,47.0 C79.8,47.0 74.8,51.6 74.4,59.4 Z"/>
+            <path d="M117.5,40 H129.0 L138.5,54.95 L148.0,40 H159.5 L144.25,64.0 L159.5,88 H148.0 L138.5,73.05 L129.0,88 H117.5 L132.75,64.0 Z"/>
+            <path d="M172.5,36.8 C172.5,26.0 178.4,21.5 188.6,21.5 H196.5 V30.0 H189.8 C184.6,30.0 182.7,32.0 182.7,37.0 V40 H195.2 V48.4 H182.7 V88 H172.5 V48.4 H165.5 V40 H172.5 Z"/>
+            <path d="M202.5,40 H212.3 V48.8 H212.9 C215.2,42.8 220.4,39.2 227.6,39.2 C228.8,39.2 229.8,39.3 230.8,39.5 V49.0 C229.6,48.7 228.2,48.6 226.6,48.6 C218.2,48.6 212.7,53.4 212.7,61.8 V88 H202.5 Z"/>
+            <path fill-rule="evenodd" d="M258.0,38.6 C271.4,38.6 279.5,45.2 279.5,56.8 V88 H269.7 V81.0 H269.1 C265.8,86.4 259.6,89.4 252.2,89.4 C241.8,89.4 235.5,83.4 235.5,74.8 C235.5,66.0 242.0,60.8 254.6,59.8 L269.3,58.6 V56.2 C269.3,50.2 265.2,46.8 257.8,46.8 C251.4,46.8 247.4,49.4 246.2,54.2 L236.8,52.4 C238.8,43.8 246.8,38.6 258.0,38.6 Z M255.6,81.4 C263.4,81.4 269.3,76.8 269.3,70.2 V65.8 L256.8,66.8 C249.8,67.4 245.7,70.1 245.7,74.4 C245.7,78.8 249.6,81.4 255.6,81.4 Z"/>
+            <path d="M290.5,40 H300.3 V47.6 H300.9 C303.6,41.8 308.8,38.6 316.0,38.6 C323.0,38.6 327.8,41.8 329.8,47.8 H330.4 C333.4,41.8 339.0,38.6 346.6,38.6 C355.4,38.6 360.5,44.4 360.5,54.8 V88 H350.3 V57.4 C350.3,50.8 347.2,47.4 341.8,47.4 C335.6,47.4 330.6,51.6 330.6,58.6 V88 H320.4 V57.4 C320.4,50.8 317.4,47.4 312.0,47.4 C305.8,47.4 300.7,51.6 300.7,58.6 V88 H290.5 Z"/>
+            <path fill-rule="evenodd" d="M393.0,38.6 C406.8,38.6 416.0,48.6 416.0,63.0 V67.4 H380.2 C380.8,76.0 386.0,81.0 393.8,81.0 C399.8,81.0 403.6,78.4 405.6,74.8 L414.8,77.2 C411.6,85.0 403.8,89.4 393.4,89.4 C378.8,89.4 370.0,79.2 370.0,64.0 C370.0,48.8 379.2,38.6 393.0,38.6 Z M380.4,59.4 H405.6 C405.2,51.6 400.0,47.0 393.0,47.0 C385.8,47.0 380.8,51.6 380.4,59.4 Z"/>
+          </g>
+          <text x="84" y="294" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5">Automatic League of Legends</text>
+          <text x="84" y="334" fill="#EFF0F2" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5">game recorder and review timeline.</text>
+          <text x="84" y="388" fill="#A2A5AA" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18">GPU-encoded captures, automatic highlight clips, zero bloat.</text>
+          <g transform="translate(84, 434)">
+            <rect width="114" height="32" rx="16" fill="#232529" stroke="#2F3238"/><circle cx="18" cy="16" r="4" fill="#4392F7"/><text x="30" y="21" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="13.5" font-weight="500">Windows</text>
+            <rect x="126" width="132" height="32" rx="16" fill="#232529" stroke="#2F3238"/><circle cx="144" cy="16" r="4" fill="#5DC879"/><text x="156" y="21" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="13.5" font-weight="500">GPU Encoded</text>
+            <rect x="270" width="110" height="32" rx="16" fill="#232529" stroke="#2F3238"/><circle cx="288" cy="16" r="4" fill="#DFA11A"/><text x="300" y="21" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="13.5" font-weight="500">Free App</text>
+          </g>
+          <g transform="translate(640, 108)">
+            <rect width="496" height="414" rx="14" fill="url(#ogp-card)" stroke="#2E3036" stroke-width="1.2"/>
+            <rect x="20" y="20" width="48" height="24" rx="6" fill="#25272C" stroke="#31343B"/><text x="31" y="36" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="11.5" font-weight="500">Back</text>
+            <text x="80" y="37" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="16" font-weight="600">Ahri</text>
+            <rect x="122" y="22" width="60" height="20" rx="4" fill="#26282E"/><text x="130" y="36" fill="#A2A5AA" font-family="system-ui, sans-serif" font-size="10.5" font-weight="600">CLASSIC</text>
+            <rect x="190" y="22" width="38" height="20" rx="4" fill="#1E3654"/><text x="198" y="36" fill="#6BB0FF" font-family="system-ui, sans-serif" font-size="10.5" font-weight="600">WIN</text>
+            <text x="240" y="36" fill="#7D8087" font-family="system-ui, sans-serif" font-size="12">7 / 3 / 11 · 33:12</text>
+            <rect x="404" y="21" width="72" height="22" rx="11" fill="#1E2F44"/><circle cx="416" cy="32" r="3.5" fill="#4392F7"/><text x="425" y="36" fill="#6BB0FF" font-family="system-ui, sans-serif" font-size="11" font-weight="500">6 clips</text>
+            <line x1="1" y1="60" x2="495" y2="60" stroke="#FFFFFF" stroke-opacity="0.06"/>
+            <rect x="20" y="76" width="308" height="174" rx="8" fill="#11141B" stroke="#2A2D34"/>
+            <circle cx="174" cy="163" r="24" fill="#1C1E24" stroke="#353944"/><path d="M169,154 L183,163 L169,172 Z" fill="#EFF0F2"/>
+            <rect x="272" y="196" width="44" height="44" rx="4" fill="#161920" stroke="#2C303A"/><circle cx="294" cy="218" r="3" fill="#4392F7"/><circle cx="284" cy="208" r="2.5" fill="#5DC879"/><circle cx="304" cy="228" r="2.5" fill="#F0645E"/>
+            <rect x="20" y="264" width="28" height="28" rx="6" fill="#26282E" stroke="#33363E"/><path d="M31,273 L39,278 L31,283 Z" fill="#EFF0F2"/>
+            <text x="58" y="282" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="11.5">09:47 / 33:12</text>
+            <rect x="20" y="310" width="308" height="4" rx="2" fill="#2D3038"/><rect x="20" y="310" width="126" height="4" rx="2" fill="#4392F7"/>
+            <rect x="34" y="303" width="7" height="18" rx="2" fill="#72757B"/><rect x="74" y="303" width="7" height="18" rx="2" fill="#DFA11A"/><rect x="112" y="303" width="7" height="18" rx="2" fill="#6BB0FF"/><rect x="148" y="303" width="7" height="18" rx="2" fill="#F0645E"/><rect x="192" y="303" width="7" height="18" rx="2" fill="#5DC879"/><rect x="234" y="303" width="7" height="18" rx="2" fill="#F59573"/><rect x="278" y="303" width="7" height="18" rx="2" fill="#DFA11A"/>
+            <rect x="20" y="340" width="308" height="54" rx="8" fill="#1F2126" stroke="#31343D"/><circle cx="36" cy="360" r="4" fill="#6BB0FF"/><text x="48" y="364" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="12.5" font-weight="500">Double Kill · Lux and Leona</text><text x="278" y="364" fill="#7D8087" font-family="ui-monospace, monospace" font-size="11">10:01</text><text x="48" y="382" fill="#8C9098" font-family="system-ui, sans-serif" font-size="11">Auto-clip saved · 09:46 – 10:11</text>
+            <rect x="344" y="76" width="132" height="318" rx="8" fill="#18191D" stroke="#292B31"/><text x="356" y="98" fill="#8C9098" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Events (10)</text><line x1="345" y1="108" x2="475" y2="108" stroke="#FFFFFF" stroke-opacity="0.06"/>
+            <circle cx="358" cy="128" r="3.5" fill="#72757B"/><text x="370" y="131.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">01:05</text><text x="406" y="131.5" fill="#D2D5DC" font-family="system-ui, sans-serif" font-size="11">Spawning</text>
+            <circle cx="358" cy="158" r="3.5" fill="#DFA11A"/><text x="370" y="161.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">03:18</text><text x="406" y="161.5" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="11">First blood</text>
+            <rect x="348" y="174" width="124" height="26" rx="5" fill="#23262D"/><circle cx="358" cy="187" r="3.5" fill="#6BB0FF"/><text x="370" y="190.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">09:47</text><text x="406" y="190.5" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="11" font-weight="500">My kill</text>
+            <circle cx="358" cy="216" r="3.5" fill="#F0645E"/><text x="370" y="219.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">13:22</text><text x="406" y="219.5" fill="#D2D5DC" font-family="system-ui, sans-serif" font-size="11">My death</text>
+            <circle cx="358" cy="246" r="3.5" fill="#5DC879"/><text x="370" y="249.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">18:40</text><text x="406" y="249.5" fill="#D2D5DC" font-family="system-ui, sans-serif" font-size="11">Turret</text>
+            <circle cx="358" cy="276" r="3.5" fill="#F59573"/><text x="370" y="279.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">22:14</text><text x="406" y="279.5" fill="#D2D5DC" font-family="system-ui, sans-serif" font-size="11">Dragon</text>
+            <circle cx="358" cy="306" r="3.5" fill="#DFA11A"/><text x="370" y="309.5" fill="#A2A5AA" font-family="ui-monospace, monospace" font-size="10">27:50</text><text x="406" y="309.5" fill="#EFF0F2" font-family="system-ui, sans-serif" font-size="11">Multikill</text>
+            <line x1="345" y1="328" x2="475" y2="328" stroke="#FFFFFF" stroke-opacity="0.06"/><text x="356" y="348" fill="#8C9098" font-family="system-ui, sans-serif" font-size="10.5" font-weight="600">Clips</text><text x="356" y="369" fill="#6BB0FF" font-family="system-ui, sans-serif" font-size="11" font-weight="500">Double kill</text><text x="356" y="386" fill="#A2A5AA" font-family="system-ui, sans-serif" font-size="11">Baron steal</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 4. Colour System -->
+    <section class="section" id="colors">
+      <div class="section-head">
+        <h2>Colour Palette</h2>
+        <span>Swatches react to the active Dark / Light theme</span>
+      </div>
+      <div class="card">
+        <div class="card-header"><span>Surfaces, Hairlines, Text &amp; Cobalt Accent</span><span class="muted">Cool Slate Neutral · OKLCH 265°</span></div>
+        <div class="card-body">
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-bg)"></div><div class="swatch-meta"><span class="swatch-name">Canvas</span><span class="swatch-code">--hf-bg</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-surface-1)"></div><div class="swatch-meta"><span class="swatch-name">Surface 1 (Card)</span><span class="swatch-code">--hf-surface-1</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-surface-2)"></div><div class="swatch-meta"><span class="swatch-name">Surface 2 (Button)</span><span class="swatch-code">--hf-surface-2</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-surface-3)"></div><div class="swatch-meta"><span class="swatch-name">Surface 3 (Track)</span><span class="swatch-code">--hf-surface-3</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-border)"></div><div class="swatch-meta"><span class="swatch-name">Hairline Border</span><span class="swatch-code">--hf-border</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-text)"></div><div class="swatch-meta"><span class="swatch-name">Text Primary</span><span class="swatch-code">--hf-text</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-text-muted)"></div><div class="swatch-meta"><span class="swatch-name">Text Muted</span><span class="swatch-code">--hf-text-muted</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-accent)"></div><div class="swatch-meta"><span class="swatch-name">Cobalt Accent</span><span class="swatch-code">--hf-accent</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-accent-soft)"></div><div class="swatch-meta"><span class="swatch-name">Accent Soft</span><span class="swatch-code">--hf-accent-soft</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-success-fg)"></div><div class="swatch-meta"><span class="swatch-name">Victory / Success</span><span class="swatch-code">--hf-success-fg</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-danger-icon)"></div><div class="swatch-meta"><span class="swatch-name">Defeat / Recording</span><span class="swatch-code">--hf-danger-icon</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-warning-fg)"></div><div class="swatch-meta"><span class="swatch-name">Warning / Big</span><span class="swatch-code">--hf-warning-fg</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Six Event Tones -->
+      <div class="card">
+        <div class="card-header"><span>Six In-Game Event Tones</span><span class="muted">Timeline markers, event dots &amp; feed</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:18px;">
+          <div class="grid-6">
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-tone-big)"></div><div class="swatch-meta"><span class="swatch-name">Big moments</span><span class="swatch-code">Amber · #DFA11A</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-tone-death)"></div><div class="swatch-meta"><span class="swatch-name">Death</span><span class="swatch-code">Red · #F0645E</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-tone-kill)"></div><div class="swatch-meta"><span class="swatch-name">Kill</span><span class="swatch-code">Blue · #6BB0FF</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-tone-team)"></div><div class="swatch-meta"><span class="swatch-name">Team objective</span><span class="swatch-code">Green · #5DC879</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-tone-enemy)"></div><div class="swatch-meta"><span class="swatch-name">Enemy objective</span><span class="swatch-code">Coral · #F59573</span></div></div>
+            <div class="swatch"><div class="swatch-chip" style="background:var(--hf-tone-neutral)"></div><div class="swatch-meta"><span class="swatch-name">Neutral</span><span class="swatch-code">Grey · #72757B</span></div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span class="mono tabular" style="font-size:12px;color:var(--hf-text-muted);white-space:nowrap;">14:22 / 33:12</span>
+            <div class="timeline-demo" style="flex:1;">
+              <div class="timeline-track"><div class="timeline-fill"></div></div>
+              <div class="timeline-tick" style="left:6%;background:var(--hf-tone-neutral);" title="Minions spawning"></div>
+              <div class="timeline-tick" style="left:16%;background:var(--hf-tone-big);" title="First blood"></div>
+              <div class="timeline-tick" style="left:29%;background:var(--hf-tone-kill);" title="My kill"></div>
+              <div class="timeline-tick" style="left:41%;background:var(--hf-tone-death);" title="My death"></div>
+              <div class="timeline-tick" style="left:57%;background:var(--hf-tone-team);" title="Turret"></div>
+              <div class="timeline-tick" style="left:72%;background:var(--hf-tone-enemy);" title="Enemy dragon"></div>
+              <div class="timeline-tick" style="left:86%;background:var(--hf-tone-big);" title="Multikill 2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Typography -->
+    <section class="section" id="type">
+      <div class="section-head">
+        <h2>Typography &amp; Tabular Figures</h2>
+        <span>Inter (UI / Display) · JetBrains Mono (Clocks / Feed) · Tabular figures everywhere numbers align</span>
+      </div>
+      <div class="card">
+        <div class="type-row">
+          <div class="type-meta">Display / Clock<br>40px / 44px · 400</div>
+          <div class="mono tabular" style="font-size:40px;line-height:44px;letter-spacing:-0.025em;">12:34</div>
+          <div class="type-meta">elapsed timer</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Page Title<br>22px / 28px · 500</div>
+          <div style="font-size:22px;line-height:28px;font-weight:500;letter-spacing:-0.015em;">Waiting for a game</div>
+          <div class="type-meta">screen &amp; status heading</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Body Medium<br>14px / 21px · 500</div>
+          <div style="font-size:14px;line-height:21px;font-weight:500;">Record automatically</div>
+          <div class="type-meta">card headers, rows</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Body<br>14px / 21px · 400</div>
+          <div style="font-size:14px;line-height:21px;color:var(--hf-text-muted);">Start when a League game starts, stop when it ends.</div>
+          <div class="type-meta">subtitles, descriptions</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">UI / Tabular<br>13px / 20px · 400</div>
+          <div class="tabular" style="font-size:13px;line-height:20px;">8 games · 4W 3L · 3h 51m recorded · 12.4 GB</div>
+          <div class="type-meta">font-variant-numeric: tabular-nums</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta">Micro / Header<br>11px / 15px · 500</div>
+          <div style="font-size:11px;line-height:15px;font-weight:500;color:var(--hf-text-muted);">About 55 MB per minute, about 1.6 GB for a 30-minute game</div>
+          <div class="type-meta">table heads, helper hints</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Components -->
+    <section class="section" id="components">
+      <div class="section-head">
+        <h2>Core Components</h2>
+        <span>Interactive buttons, pills, settings controls, recordings table &amp; hover card</span>
+      </div>
+
+      <div class="grid-2">
+        <!-- Buttons & Pills -->
+        <div class="card">
+          <div class="card-header"><span>Buttons, Pills &amp; Badges</span><span class="muted">Restrained, tinted</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:18px;">
+            <div class="btn-row">
+              <button class="btn btn-primary" type="button">Download for Windows</button>
+              <button class="btn btn-secondary" type="button">Save clip (last 30 s)</button>
+              <button class="btn btn-ghost" type="button">Open</button>
+              <button class="btn btn-secondary btn-disabled" type="button" disabled>Disabled</button>
+            </div>
+            <div class="btn-row">
+              <span class="pill" style="background:var(--hf-danger-bg);color:var(--hf-danger-fg);"><span class="pill-dot" style="background:var(--hf-danger-icon);"></span>Recording</span>
+              <span class="pill" style="background:var(--hf-surface-2);color:var(--hf-text-muted);"><span class="pill-dot" style="background:var(--hf-text-faint);"></span>Idle</span>
+              <span class="pill" style="background:var(--hf-success-bg);color:var(--hf-success-fg);"><span class="pill-dot" style="background:var(--hf-success-fg);"></span>Saved</span>
+              <span class="pill" style="background:var(--hf-accent-soft);color:var(--hf-accent-text);"><span class="pill-dot" style="background:var(--hf-accent);"></span>6 clips</span>
+            </div>
+            <div class="btn-row">
+              <span class="badge" style="background:var(--hf-accent);color:#FFFFFF;">WIN</span>
+              <span class="badge" style="background:var(--hf-accent-soft);color:var(--hf-accent-text);">MY KILL</span>
+              <span class="badge" style="background:var(--hf-warning-bg);color:var(--hf-warning-fg);">MULTIKILL 2</span>
+              <span class="badge" style="background:var(--hf-danger-bg);color:var(--hf-danger-fg);">MY DEATH</span>
+              <span class="badge" style="background:var(--hf-surface-2);color:var(--hf-text-muted);">CLASSIC</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Controls -->
+        <div class="card">
+          <div class="card-header"><span>Controls &amp; Inputs</span><span class="muted">Hairline-divided rows</span></div>
+          <div>
+            <div class="setting-row">
+              <div><div class="setting-label">Record automatically</div><div class="setting-desc">Start when a League game starts, stop when it ends.</div></div>
+              <button class="switch" role="switch" aria-checked="true" aria-label="Record automatically" type="button"><span class="switch-knob"></span></button>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-label">Quality</div><div class="setting-desc">Higher quality uses more disk space.</div></div>
+              <div class="segmented" role="radiogroup" aria-label="Quality">
+                <button class="seg-btn" type="button">Balanced</button>
+                <button class="seg-btn active" type="button">High</button>
+                <button class="seg-btn" type="button">Max</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-label">Before the moment</div><div class="setting-desc">1 to 120 seconds.</div></div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input class="input tabular" type="text" value="15" style="width:68px;" aria-label="Seconds before">
+                <span style="font-size:12px;color:var(--hf-text-muted);">sec</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recordings Table + Hover Card -->
+      <div class="grid-2" style="grid-template-columns: 1.65fr 1fr;">
+        <div class="card">
+          <div class="card-header"><span>Recordings Table</span><span class="muted tabular">3 games · 2W 1L</span></div>
+          <table class="rec-table">
+            <thead>
+              <tr>
+                <th class="rail-cell"></th>
+                <th>Champion</th>
+                <th>Result</th>
+                <th class="num">KDA</th>
+                <th class="num">Duration</th>
+                <th class="num">Size</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="rail-cell"><div class="rail" style="background:var(--hf-tone-team);"></div></td>
+                <td><div style="display:flex;align-items:center;gap:10px;"><span class="champ-badge">Ah</span><div><div style="font-weight:500;">Ahri</div><div style="font-size:11px;color:var(--hf-text-muted);">Summoner's Rift</div></div></div></td>
+                <td style="color:var(--hf-success-fg);">Victory</td>
+                <td class="num">7 <span style="color:var(--hf-text-faint)">/</span> <span style="color:var(--hf-danger-fg)">3</span> <span style="color:var(--hf-text-faint)">/</span> 11</td>
+                <td class="num">33:12</td>
+                <td class="num" style="color:var(--hf-text-muted);">1.8 GB</td>
+              </tr>
+              <tr>
+                <td class="rail-cell"><div class="rail" style="background:var(--hf-tone-death);"></div></td>
+                <td><div style="display:flex;align-items:center;gap:10px;"><span class="champ-badge">Jx</span><div><div style="font-weight:500;">Jinx</div><div style="font-size:11px;color:var(--hf-text-muted);">Summoner's Rift</div></div></div></td>
+                <td style="color:var(--hf-danger-fg);">Defeat</td>
+                <td class="num">1 <span style="color:var(--hf-text-faint)">/</span> <span style="color:var(--hf-danger-fg)">4</span> <span style="color:var(--hf-text-faint)">/</span> 13</td>
+                <td class="num">41:06</td>
+                <td class="num" style="color:var(--hf-text-muted);">2.2 GB</td>
+              </tr>
+              <tr>
+                <td class="rail-cell"><div class="rail" style="background:var(--hf-tone-team);"></div></td>
+                <td><div style="display:flex;align-items:center;gap:10px;"><span class="champ-badge">Ys</span><div><div style="font-weight:500;">Yasuo</div><div style="font-size:11px;color:var(--hf-text-muted);">ARAM</div></div></div></td>
+                <td style="color:var(--hf-success-fg);">Victory</td>
+                <td class="num">10 <span style="color:var(--hf-text-faint)">/</span> <span style="color:var(--hf-danger-fg)">2</span> <span style="color:var(--hf-text-faint)">/</span> 6</td>
+                <td class="num">19:06</td>
+                <td class="num" style="color:var(--hf-text-muted);">1.0 GB</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span>Event Hover Card</span><span class="muted">150 ms intent delay</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:14px;justify-content:center;">
+            <div class="hover-card">
+              <div class="hover-card-head">
+                <span style="display:flex;align-items:center;gap:6px;"><span class="pill-dot" style="background:var(--hf-tone-big);"></span>Double Kill</span>
+                <span class="mono tabular" style="font-size:11px;color:var(--hf-text-muted);">10:01</span>
+              </div>
+              <div class="hover-card-row"><span class="hover-card-lead">Victims</span><span>Lux, Leona</span></div>
+              <div class="hover-card-row"><span class="hover-card-lead">Assists</span><span style="color:var(--hf-text-muted);">Lee Sin</span></div>
+              <div class="hover-card-row"><span class="hover-card-lead">Clip</span><span class="tabular" style="color:var(--hf-accent-text);">09:46 – 10:11</span></div>
+            </div>
+            <div style="font-size:12px;color:var(--hf-text-muted);">Anchored 8 px above timeline markers or left of event panel rows.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Voice & Tone -->
+    <section class="section" id="voice">
+      <div class="section-head">
+        <h2>Voice &amp; Tone</h2>
+        <span>Short, plain, factual — zero gamer clichés</span>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span style="color:var(--hf-success-fg);">Do</span><span class="muted">Calm, direct, useful</span></div>
+          <div class="voice-item"><span class="voice-tag" style="color:var(--hf-text-muted);">Hero</span><span>Automatic League of Legends recorder and review timeline.</span></div>
+          <div class="voice-item"><span class="voice-tag" style="color:var(--hf-text-muted);">Setting</span><span>60 is smoother, 30 uses less disk space.</span></div>
+          <div class="voice-item"><span class="voice-tag" style="color:var(--hf-text-muted);">Empty state</span><span>No recordings yet. Play a game, or run a test recording from Status.</span></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span style="color:var(--hf-danger-fg);">Don't</span><span class="muted">Hype, exclamation marks, esports jargon</span></div>
+          <div class="voice-item"><span class="voice-tag" style="color:var(--hf-text-muted);">Hero</span><span style="color:var(--hf-text-muted);">Dominate the Rift and capture every insane play!</span></div>
+          <div class="voice-item"><span class="voice-tag" style="color:var(--hf-text-muted);">Setting</span><span style="color:var(--hf-text-muted);">Crank it to 60 FPS for buttery-smooth pro gameplay!</span></div>
+          <div class="voice-item"><span class="voice-tag" style="color:var(--hf-text-muted);">Empty state</span><span style="color:var(--hf-text-muted);">Looks empty in here! Queue up and get some pentakills!</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const root = document.documentElement;
+    const toggle = document.getElementById('theme-toggle');
+    toggle.addEventListener('click', () => {
+      const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      root.setAttribute('data-theme', next);
+      toggle.textContent = next === 'light' ? 'Switch to Dark' : 'Switch to Light';
+    });
+    document.querySelectorAll('.switch').forEach(sw => {
+      sw.addEventListener('click', () => {
+        sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+      });
+    });
+    document.querySelectorAll('.segmented').forEach(group => {
+      group.querySelectorAll('.seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

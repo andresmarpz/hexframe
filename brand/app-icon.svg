@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <title>Greyscreen App Icon</title>
+  <defs>
+    <linearGradient id="tile-bg" x1="512" y1="32" x2="512" y2="992" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E2026"/>
+      <stop offset="100%" stop-color="#111215"/>
+    </linearGradient>
+    <radialGradient id="tile-glow" cx="512" cy="460" r="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4392F7" stop-opacity="0.16"/>
+      <stop offset="65%" stop-color="#4392F7" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#4392F7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tile-rim" x1="512" y1="32" x2="512" y2="992" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="hex-cobalt" x1="512" y1="156" x2="512" y2="868" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5EA7FF"/>
+      <stop offset="100%" stop-color="#3582E8"/>
+    </linearGradient>
+    <linearGradient id="play-ink" x1="512" y1="390" x2="512" y2="634" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F7F9FC"/>
+      <stop offset="100%" stop-color="#DCE2EC"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#tile-bg)"/>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#tile-glow)"/>
+  <rect x="40" y="40" width="944" height="944" rx="208" stroke="url(#tile-rim)" stroke-width="16"/>
+  <path
+    fill="url(#hex-cobalt)"
+    fill-rule="evenodd"
+    d="M476.00,176.78 A72.00,72.00 0 0,1 548.00,176.78 L784.31,313.22 A72.00,72.00 0 0,1 820.31,375.57 L820.31,648.43 A72.00,72.00 0 0,1 784.31,710.78 L548.00,847.22 A72.00,72.00 0 0,1 476.00,847.22 L239.69,710.78 A72.00,72.00 0 0,1 203.69,648.43 L203.69,375.57 A72.00,72.00 0 0,1 239.69,313.22 Z M302.03,379.23 A20.00,20.00 0 0,0 292.03,396.55 L292.03,627.45 A20.00,20.00 0 0,0 302.03,644.77 L502.00,760.23 A20.00,20.00 0 0,0 522.00,760.23 L721.97,644.77 A20.00,20.00 0 0,0 731.97,627.45 L731.97,396.55 A20.00,20.00 0 0,0 721.97,379.23 L522.00,263.77 A20.00,20.00 0 0,0 502.00,263.77 Z"
+  />
+  <path
+    fill="url(#play-ink)"
+    d="M649.00,492.95 A22.00,22.00 0 0,1 649.00,531.05 L460.00,640.17 A22.00,22.00 0 0,1 427.00,621.12 L427.00,402.88 A22.00,22.00 0 0,1 460.00,383.83 Z"
+  />
+</svg>

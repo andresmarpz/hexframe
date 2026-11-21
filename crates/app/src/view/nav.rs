@@ -8,8 +8,8 @@ use crate::ui::{Screen, Ui, format_clock};
 
 static LOGO: Icon = Icon {
     name: "greyscreen-logo",
-    view: 64.0,
-    body: r#"<polygon points="32,8 52.8,20 52.8,44 32,56 11.2,44 11.2,20" stroke="currentColor" stroke-width="6" stroke-linejoin="round" fill="none"/><polygon points="27,23 27,41 42,32" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>"#,
+    view: 1024.0,
+    body: r#"<path fill="currentColor" fill-rule="evenodd" d="M468,101.4A88,88 0 0 1 556,101.4L845.59,268.6A88,88 0 0 1 889.59,344.81L889.59,679.19A88,88 0 0 1 845.59,755.4L556,922.6A88,88 0 0 1 468,922.6L178.41,755.4A88,88 0 0 1 134.41,679.19L134.41,344.81A88,88 0 0 1 178.41,268.6ZM248.6,346.07A24,24 0 0 0 236.6,366.86L236.6,657.14A24,24 0 0 0 248.6,677.93L500,823.07A24,24 0 0 0 524,823.07L775.4,677.93A24,24 0 0 0 787.4,657.14L787.4,366.86A24,24 0 0 0 775.4,346.07L524,200.93A24,24 0 0 0 500,200.93Z"/><path fill="currentColor" d="M682,487.75A28,28 0 0 1 682,536.25L448,671.35A28,28 0 0 1 406,647.1L406,376.9A28,28 0 0 1 448,352.65Z"/>"#,
 };
 
 const ITEMS: [(Screen, &str, &str); 3] = [

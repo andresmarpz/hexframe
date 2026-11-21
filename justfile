@@ -32,6 +32,26 @@ dist: build-win
 
 ci: lint check-win test
 
+# Regenerates every raster from the SVG sources in brand/.
+brand:
+    mkdir -p apps/web/public
+    rsvg-convert -w 512 -h 512 brand/app-icon.svg -o crates/app/assets/icon.png
+    d=$(mktemp -d); \
+    rsvg-convert -w 16 -h 16 brand/app-icon-16.svg -o $d/16.png; \
+    for n in 24 32 48 64 128 256; do rsvg-convert -w $n -h $n brand/app-icon.svg -o $d/$n.png; done; \
+    magick $d/16.png $d/24.png $d/32.png $d/48.png $d/64.png $d/128.png $d/256.png crates/app/assets/greyscreen.ico; \
+    rm -rf $d
+    rsvg-convert -w 32 -h 32 brand/tray-icon.svg -o crates/app/assets/tray.png
+    rsvg-convert -w 32 -h 32 brand/tray-recording.svg -o crates/app/assets/tray-recording.png
+    cp brand/favicon.svg apps/web/public/favicon.svg
+    d=$(mktemp -d); \
+    rsvg-convert -w 32 -h 32 brand/favicon.svg -o $d/32.png; \
+    rsvg-convert -w 16 -h 16 brand/favicon.svg -o $d/16.png; \
+    magick $d/32.png $d/16.png apps/web/public/favicon.ico; \
+    rm -rf $d
+    rsvg-convert -w 180 -h 180 brand/app-icon.svg -o apps/web/public/apple-touch-icon.png
+    rsvg-convert -w 1200 -h 630 brand/og-image.svg -o apps/web/public/og.png
+
 web-tokens:
     cargo run -q --locked -p greyscreen --example export_tokens > apps/web/src/styles/rune-tokens.css
 

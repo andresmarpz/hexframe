@@ -1,0 +1,343 @@
+/* Greyscreen Design System — Design Tokens
+ * Dark theme is the primary default (:root).
+ * Light theme activates via [data-theme="light"] or system preference
+ * when dark is not explicitly forced via [data-theme="dark"].
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces & Backgrounds */
+  --hf-bg: #121314;
+  --hf-surface-1: #1C1D20;
+  --hf-surface-2: #24262A;
+  --hf-surface-3: #2D3036;
+  --hf-surface-raised: #222429;
+  --hf-surface-overlay: #1F2126;
+  --hf-surface-inverse: #EFF0F2;
+  --hf-scrim: rgba(0, 0, 0, 0.45);
+
+  /* Interactive States */
+  --hf-hover: rgba(255, 255, 255, 0.045);
+  --hf-pressed: rgba(255, 255, 255, 0.08);
+  --hf-control-track: #222428;
+  --hf-control-off: #2D3036;
+  --hf-knob: #FAFAFA;
+
+  /* Borders & Hairlines */
+  --hf-border-subtle: #232529;
+  --hf-border: #2C2E33;
+  --hf-border-strong: #3C3F47;
+  --hf-border-focus: #4392F7;
+
+  /* Text & Icons */
+  --hf-text: #EFF0F2;
+  --hf-text-muted: #A2A5AA;
+  --hf-text-faint: #72757B;
+  --hf-text-inverse: #121314;
+  --hf-icon: #EFF0F2;
+  --hf-icon-muted: #A2A5AA;
+  --hf-icon-faint: #72757B;
+
+  /* Brand Accent (Cobalt Blue) */
+  --hf-accent: #4392F7;
+  --hf-accent-hover: #5BA2FA;
+  --hf-accent-pressed: #317EE2;
+  --hf-accent-soft: #1B2B40;
+  --hf-accent-border: #294872;
+  --hf-accent-text: #6BB0FF;
+  --hf-accent-fg: #FFFFFF;
+
+  /* Status Roles */
+  --hf-success-bg: #1B3121;
+  --hf-success-fg: #5DC879;
+  --hf-success-border: #255232;
+  --hf-success-icon: #5DC879;
+
+  --hf-warning-bg: #362A14;
+  --hf-warning-fg: #DFA11A;
+  --hf-warning-border: #5E4208;
+  --hf-warning-icon: #DFA11A;
+
+  --hf-danger-bg: #3C2322;
+  --hf-danger-fg: #FF847D;
+  --hf-danger-border: #6C3531;
+  --hf-danger-icon: #F0645E;
+
+  --hf-info-bg: #1B2B40;
+  --hf-info-fg: #6BB0FF;
+  --hf-info-border: #294872;
+  --hf-info-icon: #6BB0FF;
+
+  --hf-recording-dot: #F0524D;
+
+  /* Six In-Game Event Tones (Timeline Markers, Event Dots, Live Feed) */
+  --hf-tone-big: #DFA11A;
+  --hf-tone-big-bg: #362A14;
+  --hf-tone-death: #F0645E;
+  --hf-tone-death-bg: #3C2322;
+  --hf-tone-kill: #6BB0FF;
+  --hf-tone-kill-bg: #1B2B40;
+  --hf-tone-team: #5DC879;
+  --hf-tone-team-bg: #1B3121;
+  --hf-tone-enemy: #F59573;
+  --hf-tone-enemy-bg: #3D281F;
+  --hf-tone-neutral: #72757B;
+  --hf-tone-neutral-bg: #25272C;
+
+  /* Elevation & Shadows */
+  --hf-shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.42), 0 0 0 1px var(--hf-border);
+  --hf-shadow-floating: 0 6px 18px rgba(0, 0, 0, 0.48), 0 0 0 1px var(--hf-border);
+  --hf-shadow-overlay: 0 14px 36px rgba(0, 0, 0, 0.58), 0 0 0 1px var(--hf-border-strong);
+  --hf-shadow-button: 0 1px 1.5px rgba(0, 0, 0, 0.36);
+  --hf-shadow-focus: 0 0 0 2px var(--hf-bg), 0 0 0 4px var(--hf-border-focus);
+
+  /* Typography Families */
+  --hf-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --hf-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* Type Scale */
+  --hf-text-display-size: 2.5rem;      /* 40px — Elapsed clock / hero headline */
+  --hf-text-display-lh: 2.75rem;       /* 44px */
+  --hf-text-display-ls: -0.025em;
+
+  --hf-text-title-size: 1.375rem;      /* 22px — Page & status titles */
+  --hf-text-title-lh: 1.75rem;         /* 28px */
+  --hf-text-title-ls: -0.015em;
+
+  --hf-text-heading-size: 1rem;        /* 16px — Card / section titles */
+  --hf-text-heading-lh: 1.375rem;      /* 22px */
+  --hf-text-heading-ls: -0.01em;
+
+  --hf-text-body-size: 0.875rem;       /* 14px — Default body & card rows */
+  --hf-text-body-lh: 1.3125rem;        /* 21px */
+
+  --hf-text-ui-size: 0.8125rem;        /* 13px — Controls, buttons, table cells */
+  --hf-text-ui-lh: 1.25rem;            /* 20px */
+
+  --hf-text-caption-size: 0.75rem;     /* 12px — Secondary metadata, mono feed */
+  --hf-text-caption-lh: 1.125rem;      /* 18px */
+
+  --hf-text-micro-size: 0.6875rem;     /* 11px — Table headers, helper hints, badges */
+  --hf-text-micro-lh: 0.9375rem;       /* 15px */
+
+  /* Font Weights */
+  --hf-weight-regular: 400;
+  --hf-weight-medium: 500;
+  --hf-weight-semibold: 600;
+
+  /* Spacing Scale (4px base grid) */
+  --hf-space-1: 4px;
+  --hf-space-2: 8px;
+  --hf-space-3: 12px;
+  --hf-space-4: 16px;
+  --hf-space-5: 20px;
+  --hf-space-6: 24px;
+  --hf-space-8: 32px;
+  --hf-space-10: 40px;
+  --hf-space-12: 48px;
+  --hf-space-16: 64px;
+
+  /* Layout Dimensions */
+  --hf-app-max-width: 880px;
+  --hf-web-max-width: 1120px;
+  --hf-nav-height: 52px;
+  --hf-page-gutter: 24px;
+
+  /* Border Radii */
+  --hf-radius-xs: 2px;
+  --hf-radius-sm: 4px;
+  --hf-radius-md: 6px;
+  --hf-radius-lg: 8px;
+  --hf-radius-xl: 10px;
+  --hf-radius-2xl: 12px;
+  --hf-radius-pill: 9999px;
+
+  /* Motion */
+  --hf-duration-instant: 80ms;
+  --hf-duration-fast: 120ms;
+  --hf-duration-base: 160ms;
+  --hf-duration-slow: 220ms;
+  --hf-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --hf-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --hf-ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Light Theme — Explicit Attribute */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --hf-bg: #F0F1F4;
+  --hf-surface-1: #FFFFFF;
+  --hf-surface-2: #F5F6F8;
+  --hf-surface-3: #E6E8EE;
+  --hf-surface-raised: #FFFFFF;
+  --hf-surface-overlay: #FFFFFF;
+  --hf-surface-inverse: #1A1C1F;
+  --hf-scrim: rgba(15, 18, 24, 0.28);
+
+  --hf-hover: rgba(26, 28, 31, 0.045);
+  --hf-pressed: rgba(26, 28, 31, 0.085);
+  --hf-control-track: #E8EAEF;
+  --hf-control-off: #D6D9E2;
+  --hf-knob: #FFFFFF;
+
+  --hf-border-subtle: #E8EAEE;
+  --hf-border: #DCDFE6;
+  --hf-border-strong: #C5C9D3;
+  --hf-border-focus: #2F7FE3;
+
+  --hf-text: #1A1C1F;
+  --hf-text-muted: #606369;
+  --hf-text-faint: #8B8F98;
+  --hf-text-inverse: #FFFFFF;
+  --hf-icon: #1A1C1F;
+  --hf-icon-muted: #606369;
+  --hf-icon-faint: #8B8F98;
+
+  --hf-accent: #2F7FE3;
+  --hf-accent-hover: #246EC9;
+  --hf-accent-pressed: #1C5CB0;
+  --hf-accent-soft: #E5F0FD;
+  --hf-accent-border: #B4D3FA;
+  --hf-accent-text: #1C62B6;
+  --hf-accent-fg: #FFFFFF;
+
+  --hf-success-bg: #E1F6E6;
+  --hf-success-fg: #117A37;
+  --hf-success-border: #A9DDB6;
+  --hf-success-icon: #188A42;
+
+  --hf-warning-bg: #FDF0D5;
+  --hf-warning-fg: #945B00;
+  --hf-warning-border: #EACA92;
+  --hf-warning-icon: #B47409;
+
+  --hf-danger-bg: #FDE7E5;
+  --hf-danger-fg: #B3312E;
+  --hf-danger-border: #F8BCB7;
+  --hf-danger-icon: #C93632;
+
+  --hf-info-bg: #E5F0FD;
+  --hf-info-fg: #1C62B6;
+  --hf-info-border: #B4D3FA;
+  --hf-info-icon: #2570D4;
+
+  --hf-recording-dot: #D63934;
+
+  --hf-tone-big: #B47409;
+  --hf-tone-big-bg: #FDF0D5;
+  --hf-tone-death: #C93632;
+  --hf-tone-death-bg: #FDE7E5;
+  --hf-tone-kill: #2570D4;
+  --hf-tone-kill-bg: #E5F0FD;
+  --hf-tone-team: #188A42;
+  --hf-tone-team-bg: #E1F6E6;
+  --hf-tone-enemy: #C45534;
+  --hf-tone-enemy-bg: #FBEAE4;
+  --hf-tone-neutral: #8A8E96;
+  --hf-tone-neutral-bg: #ECEDF1;
+
+  --hf-shadow-raised: 0 1px 2px rgba(20, 24, 34, 0.06), 0 0 0 1px var(--hf-border);
+  --hf-shadow-floating: 0 6px 18px rgba(20, 24, 34, 0.10), 0 0 0 1px var(--hf-border);
+  --hf-shadow-overlay: 0 14px 36px rgba(20, 24, 34, 0.14), 0 0 0 1px var(--hf-border);
+  --hf-shadow-button: 0 1px 1.5px rgba(20, 24, 34, 0.07);
+}
+
+/* Light Theme — System Preference (unless dark is explicitly forced) */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --hf-bg: #F0F1F4;
+    --hf-surface-1: #FFFFFF;
+    --hf-surface-2: #F5F6F8;
+    --hf-surface-3: #E6E8EE;
+    --hf-surface-raised: #FFFFFF;
+    --hf-surface-overlay: #FFFFFF;
+    --hf-surface-inverse: #1A1C1F;
+    --hf-scrim: rgba(15, 18, 24, 0.28);
+
+    --hf-hover: rgba(26, 28, 31, 0.045);
+    --hf-pressed: rgba(26, 28, 31, 0.085);
+    --hf-control-track: #E8EAEF;
+    --hf-control-off: #D6D9E2;
+    --hf-knob: #FFFFFF;
+
+    --hf-border-subtle: #E8EAEE;
+    --hf-border: #DCDFE6;
+    --hf-border-strong: #C5C9D3;
+    --hf-border-focus: #2F7FE3;
+
+    --hf-text: #1A1C1F;
+    --hf-text-muted: #606369;
+    --hf-text-faint: #8B8F98;
+    --hf-text-inverse: #FFFFFF;
+    --hf-icon: #1A1C1F;
+    --hf-icon-muted: #606369;
+    --hf-icon-faint: #8B8F98;
+
+    --hf-accent: #2F7FE3;
+    --hf-accent-hover: #246EC9;
+    --hf-accent-pressed: #1C5CB0;
+    --hf-accent-soft: #E5F0FD;
+    --hf-accent-border: #B4D3FA;
+    --hf-accent-text: #1C62B6;
+    --hf-accent-fg: #FFFFFF;
+
+    --hf-success-bg: #E1F6E6;
+    --hf-success-fg: #117A37;
+    --hf-success-border: #A9DDB6;
+    --hf-success-icon: #188A42;
+
+    --hf-warning-bg: #FDF0D5;
+    --hf-warning-fg: #945B00;
+    --hf-warning-border: #EACA92;
+    --hf-warning-icon: #B47409;
+
+    --hf-danger-bg: #FDE7E5;
+    --hf-danger-fg: #B3312E;
+    --hf-danger-border: #F8BCB7;
+    --hf-danger-icon: #C93632;
+
+    --hf-info-bg: #E5F0FD;
+    --hf-info-fg: #1C62B6;
+    --hf-info-border: #B4D3FA;
+    --hf-info-icon: #2570D4;
+
+    --hf-recording-dot: #D63934;
+
+    --hf-tone-big: #B47409;
+    --hf-tone-big-bg: #FDF0D5;
+    --hf-tone-death: #C93632;
+    --hf-tone-death-bg: #FDE7E5;
+    --hf-tone-kill: #2570D4;
+    --hf-tone-kill-bg: #E5F0FD;
+    --hf-tone-team: #188A42;
+    --hf-tone-team-bg: #E1F6E6;
+    --hf-tone-enemy: #C45534;
+    --hf-tone-enemy-bg: #FBEAE4;
+    --hf-tone-neutral: #8A8E96;
+    --hf-tone-neutral-bg: #ECEDF1;
+
+    --hf-shadow-raised: 0 1px 2px rgba(20, 24, 34, 0.06), 0 0 0 1px var(--hf-border);
+    --hf-shadow-floating: 0 6px 18px rgba(20, 24, 34, 0.10), 0 0 0 1px var(--hf-border);
+    --hf-shadow-overlay: 0 14px 36px rgba(20, 24, 34, 0.14), 0 0 0 1px var(--hf-border);
+    --hf-shadow-button: 0 1px 1.5px rgba(20, 24, 34, 0.07);
+  }
+}
+
+/* Tabular Figures Utility */
+.hf-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hf-duration-instant: 0ms;
+    --hf-duration-fast: 0ms;
+    --hf-duration-base: 0ms;
+    --hf-duration-slow: 0ms;
+  }
+}
