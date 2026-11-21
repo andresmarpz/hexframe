@@ -29,3 +29,8 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 - `just fmt`: format the workspace.
 
 The Mac cannot run Windows code: compile-check it with `just check-win`.
+
+## Rune on Windows
+
+- Rune is pinned to `eb9f1104`. Rune `1dc3b333` (#1222) and everything after it make live window resize lag about a second on Windows. Before you bump the pin, resize a release build on Windows and compare it against this one.
+- Do not call `rune::single_instance`. It also makes live resize lag on Windows. The app uses `greyscreen_capture::instance` instead, a named event that brings the running window forward.
