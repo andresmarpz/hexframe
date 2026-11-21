@@ -233,3 +233,36 @@ fn the_sheet_keeps_its_full_height_in_a_tall_window() {
     let rt = open_sheet();
     assert_eq!(bounds(&rt, "settings-sheet")[3], 484.0);
 }
+
+fn press_escape(rt: &mut rune::Runtime<crate::ui::Ui>) {
+    rt.key(KeyEvent {
+        key: Key::Escape,
+        mods: Mods::default(),
+    });
+    settle(rt);
+}
+
+fn focused_search() -> rune::Runtime<crate::ui::Ui> {
+    let mut rt = open_sheet();
+    type_search(&mut rt, "fps");
+    rt.update(|_, tx| tx.focus("settings-search", true));
+    settle(&mut rt);
+    rt
+}
+
+#[test]
+fn escape_in_the_search_clears_the_text_and_keeps_the_sheet() {
+    let mut rt = focused_search();
+    press_escape(&mut rt);
+    assert!(rt.state.settings_search.text.is_empty());
+    assert!(rt.state.settings_open);
+    assert!(rt.find("quality-row").is_some());
+}
+
+#[test]
+fn a_second_escape_closes_the_sheet() {
+    let mut rt = focused_search();
+    press_escape(&mut rt);
+    press_escape(&mut rt);
+    assert!(!rt.state.settings_open);
+}

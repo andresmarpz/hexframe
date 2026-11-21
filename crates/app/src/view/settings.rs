@@ -1,5 +1,5 @@
 use greyscreen_core::keybinds::Group;
-use rune::{El, ScrollSpec, col, el, row, text};
+use rune::{El, KeyEvent, ScrollSpec, Tx, col, el, row, text};
 use rune_kit::{Dialog, Kit, SidebarRow, TextInput, glyphs};
 
 mod about;
@@ -73,6 +73,7 @@ fn search_bar(s: &Ui, k: &Kit) -> El {
         .clear_button()
         .width(Some(SHEET_WIDTH - 32.0))
         .on_edit(|ui: &mut Ui| &mut ui.settings_search)
+        .on_key(|ui: &mut Ui, ev: &KeyEvent, _: &mut Tx| ui.clear_settings_search_on_escape(ev))
         .build(k)
         .key("settings-search");
     row().w_full().px(16.0).pb(12.0).child(input)

@@ -1,4 +1,4 @@
-use rune::TextEdit;
+use rune::{Key, KeyEvent, TextEdit};
 
 use super::Ui;
 
@@ -56,6 +56,15 @@ impl Ui {
         self.resolution_open = false;
         self.storage_open = false;
         self.stop_rebinding();
+    }
+
+    pub(crate) fn clear_settings_search_on_escape(&mut self, ev: &KeyEvent) -> bool {
+        let escape = ev.key == Key::Escape;
+        let consume = escape && !self.settings_search.text.is_empty();
+        if consume {
+            self.settings_search.clear();
+        }
+        consume
     }
 
     pub(crate) fn toggle_settings(&mut self) {
