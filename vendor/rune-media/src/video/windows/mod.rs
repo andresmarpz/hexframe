@@ -25,7 +25,7 @@ mod still;
 mod vsync;
 
 use super::*;
-use decoder::{Decoded, Facts, Job, News, Pic, Pipe};
+use decoder::{Decoded, Facts, Job, News, Pic, Pipe, Seek};
 use machine::{Effect, Event, Phase};
 use std::time::Duration;
 
@@ -59,6 +59,8 @@ pub(crate) struct Native {
     layered: bool,
     /// The layer presented pictures since the surface last got one: the surface is behind.
     behind: bool,
+    /// When the phase began to wait for its picture (Buffering), for `machine::overdue`.
+    waiting: Option<Instant>,
 }
 
 /// The window's side of a clip's layer (`layer`): what the decoder has made of its ask.
@@ -178,6 +180,7 @@ pub(super) fn drive(shared: &Arc<Shared>) {
         }
         _ => {}
     }
+    c.landing = native.waiting.is_some();
     drop(c);
     drop(native);
     shared.settle(false);
@@ -229,6 +232,9 @@ pub(super) fn pull(shared: &Arc<Shared>, surface: &NativeSurface, target: Instan
     if let Some(pipe) = &native.pipe {
         pipe.lock().touched = Some(now);
     }
+    if let Some(at) = native.waiting.and_then(|since| machine::overdue(native.phase, since, now)) {
+        native.restart(shared, &c, at);
+    }
     native.reconcile(shared, &mut c, target, true);
     if c.failed() {
         native.due = None;
@@ -245,6 +251,7 @@ pub(super) fn pull(shared: &Arc<Shared>, surface: &NativeSurface, target: Instan
     }
     let shown = native.shown;
     native.show(shared, &mut c, surface, target, lead);
+    c.landing = native.waiting.is_some();
     let (active, due) = native.next(&c, now);
     native.due = due;
     let cost = now.elapsed().as_nanos();
@@ -264,20 +271,43 @@ impl Native {
         if decoder::logging() && std::mem::discriminant(&before) != std::mem::discriminant(&self.phase) {
             decoder::log!("{:?} -> {:?}", before, self.phase);
         }
+        let mut sought = false;
         for effect in effects {
             match effect {
                 Effect::Open { at } => self.open(shared, c, at),
-                Effect::Seek { to } => {
+                Effect::Seek { to, fast } => {
                     let generation = self.seeks.next().0;
                     if let Some(pipe) = &self.pipe {
-                        pipe.lock().seek = Some((to, generation));
+                        pipe.lock().seek = Some(Seek { to, generation, fast });
                         pipe.poke();
                     }
                     self.shown = None;
+                    sought = true;
                 }
                 Effect::Clock(anchor) => self.clock.set(anchor),
             }
         }
+        // Each seek starts the wait for its picture again.
+        self.waiting = match self.phase {
+            Phase::Buffering { .. } if sought || !matches!(before, Phase::Buffering { .. }) => Some(Instant::now()),
+            Phase::Buffering { .. } => self.waiting,
+            _ => None,
+        };
+    }
+
+    /// The decoder never delivered the picture at `at`: it stops, and a new one opens there.
+    fn restart(&mut self, shared: &Arc<Shared>, c: &Control, at: f64) {
+        if decoder::logging() {
+            decoder::log!("waited {:?} for the picture at {at:.3}: the decoder starts again there", machine::STUCK);
+        }
+        if let Some(pipe) = self.pipe.take() {
+            pipe.lock().stop = true;
+            pipe.poke();
+        }
+        self.shown = None;
+        self.event(shared, c, Event::Released { at });
+        // The old decoder may never get to stop: its sound keeps the old, stopped clock.
+        self.clock = Arc::new(audio::Clock::default());
     }
 
     fn open(&mut self, shared: &Arc<Shared>, c: &Control, at: f64) {
@@ -348,11 +378,12 @@ impl Native {
         }
         let lead = vsync::period().as_secs_f64() / 2.0;
         if let Some(to) = c.seek.take() {
+            let fast = std::mem::take(&mut c.fast);
             // A parked clip opens again to show the seek's picture.
             if let Phase::Idle { .. } = self.phase {
                 self.shown = None;
             }
-            self.event(shared, c, Event::Seek { to });
+            self.event(shared, c, Event::Seek { to, fast });
         }
         if c.playing() != self.playing {
             self.playing = c.playing();
@@ -391,6 +422,7 @@ impl Native {
         {
             self.event(shared, c, Event::Open { play: c.playing() });
         }
+        c.landing = self.waiting.is_some();
     }
 
     /// The picture the clip's layer shows, while it shows the pictures.
@@ -507,7 +539,7 @@ impl Native {
                     self.event(shared, c, Event::Pause { at: pts });
                 }
             }
-            (None, Phase::Paused { at }) => self.event(shared, c, Event::Seek { to: clip_time(c, at) }),
+            (None, Phase::Paused { at }) => self.event(shared, c, Event::Seek { to: clip_time(c, at), fast: false }),
             _ => {}
         }
     }

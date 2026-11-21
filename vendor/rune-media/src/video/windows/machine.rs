@@ -7,6 +7,10 @@
 
 use rune_core::machine::Effects;
 use rune_core::time::Instant;
+use std::time::Duration;
+
+/// Buffering this long means the decoder is wedged: it starts again at the phase's time.
+pub(super) const STUCK: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Phase {
@@ -66,7 +70,8 @@ pub(super) enum Event {
     Play { target: Instant, lead: f64, rate: f64 },
     /// Hold the picture on screen, at `at`.
     Pause { at: f64 },
-    Seek { to: f64 },
+    /// `fast`: the keyframe at or before `to` is enough (a scrub's preview).
+    Seek { to: f64, fast: bool },
     Rate { target: Instant, rate: f64 },
     /// Playing, with no picture due and the decoder behind: hold the clock at `at`.
     Stalled { at: f64 },
@@ -85,7 +90,7 @@ pub(super) enum Effect {
     /// Start a decoder at `at`.
     Open { at: f64 },
     /// Move the decoder to `to`.
-    Seek { to: f64 },
+    Seek { to: f64, fast: bool },
     /// The clock changed: sound follows it (`None`: silent).
     Clock(Option<Anchor>),
 }
@@ -151,25 +156,25 @@ pub(super) fn step(phase: &mut Phase, event: Event) -> Effects<Effect> {
             *phase = P::Paused { at };
             Effects::none()
         }
-        (P::Idle { .. }, Event::Seek { to }) => {
+        (P::Idle { .. }, Event::Seek { to, .. }) => {
             *phase = P::Idle { at: to };
             Effects::none()
         }
-        (P::Opening { play, .. }, Event::Seek { to }) => {
+        (P::Opening { play, .. }, Event::Seek { to, fast }) => {
             *phase = P::Opening { at: to, play };
-            Effects::one(Effect::Seek { to })
+            Effects::one(Effect::Seek { to, fast })
         }
-        (P::Buffering { play, .. }, Event::Seek { to }) => {
+        (P::Buffering { play, .. }, Event::Seek { to, fast }) => {
             *phase = P::Buffering { at: to, play };
-            Effects::one(Effect::Seek { to })
+            Effects::one(Effect::Seek { to, fast })
         }
-        (P::Playing { .. }, Event::Seek { to }) => {
+        (P::Playing { .. }, Event::Seek { to, fast }) => {
             *phase = P::Buffering { at: to, play: true };
-            Effects::two(Effect::Clock(None), Effect::Seek { to })
+            Effects::two(Effect::Clock(None), Effect::Seek { to, fast })
         }
-        (P::Paused { .. } | P::Ended { .. }, Event::Seek { to }) => {
+        (P::Paused { .. } | P::Ended { .. }, Event::Seek { to, fast }) => {
             *phase = P::Buffering { at: to, play: false };
-            Effects::one(Effect::Seek { to })
+            Effects::one(Effect::Seek { to, fast })
         }
         (P::Playing { clock }, Event::Rate { target, rate }) => {
             let clock = Anchor { at: target, pos: clock.position(target), rate };
@@ -206,5 +211,15 @@ pub(super) fn step(phase: &mut Phase, event: Event) -> Effects<Effect> {
     }
 }
 
+/// The time a Buffering phase that began at `since` waits for, once it has waited past
+/// [`STUCK`]: the decoder never delivered it.
+pub(super) fn overdue(phase: Phase, since: Instant, now: Instant) -> Option<f64> {
+    match phase {
+        Phase::Buffering { at, .. } if now.saturating_duration_since(since) > STUCK => Some(at),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
+#[path = "machine/tests.rs"]
 mod tests;

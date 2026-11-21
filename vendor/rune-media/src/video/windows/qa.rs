@@ -28,9 +28,34 @@ pub(super) fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join("qa-bars-60fps.m4v")
 }
 
-/// The fixture's frame number for a clip time.
+/// A 10 minute clip like the fixture, its index at the end as in a finished recording, made once
+/// with ffmpeg (on PATH) in the temp folder: 3.5 MB is too much for the repository.
+pub(super) fn long_fixture() -> PathBuf {
+    let path = std::env::temp_dir().join("rune-media-qa-bars-10min.m4v");
+    if path.exists() {
+        return path;
+    }
+    let delay = 0.021_333_333;
+    let video = "color=c=black:s=160x90:r=60:d=600,format=yuv420p,geq=lum='if(mod(floor(N/pow(2\\,floor(X*10/W)))\\,2)\\,235\\,16)':cb=128:cr=128";
+    let audio = format!("aevalsrc=exprs='0.1*sin(2*PI*220*(t+{delay}))+0.8*sin(2*PI*1000*(t+{delay}))*lt(mod(t+{delay}\\,1)\\,0.05)':s=48000:c=stereo:d=600");
+    let (encoded, partial) = (path.with_extension("encoded.m4v"), path.with_extension("part.m4v"));
+    let ffmpeg = |args: &[&std::ffi::OsStr]| {
+        let ran = std::process::Command::new("ffmpeg").args(["-v", "error", "-y"]).args(args).status();
+        assert!(ran.is_ok_and(|s| s.success()), "the long fixture needs ffmpeg on PATH");
+    };
+    let encode = ["-f", "lavfi", "-i", video, "-f", "lavfi", "-i", &audio, "-c:v", "libx264", "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", "60", "-bf", "0", "-crf", "35", "-c:a", "aac", "-b:a", "24k", "-shortest"];
+    ffmpeg(&[encode.map(std::ffi::OsStr::new).as_slice(), &[encoded.as_os_str()]].concat());
+    // As in `make-qa-bars.sh`, without the move to the front: the index stays at the end.
+    let copy = ["-c", "copy", "-use_editlist", "0", "-avoid_negative_ts", "disabled"];
+    ffmpeg(&[&[std::ffi::OsStr::new("-i"), encoded.as_os_str()], copy.map(std::ffi::OsStr::new).as_slice(), &[partial.as_os_str()]].concat());
+    let _ = std::fs::remove_file(&encoded);
+    std::fs::rename(&partial, &path).expect("the long fixture");
+    path
+}
+
+/// The frame number the fixture's bars spell for a clip time: ten bars count to 1023.
 pub(super) fn frame_of(time: f64) -> u32 {
-    (time * FPS).round() as u32
+    (time * FPS).round() as u32 % (1 << BARS)
 }
 
 /// One frame of the window the test stands in for.

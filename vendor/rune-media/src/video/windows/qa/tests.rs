@@ -195,3 +195,74 @@ fn the_layer_plays_with_sound_and_a_pause_there_holds_its_picture() {
     let held = rig.run(0.5);
     assert!(held.iter().all(|s| s.picture == shot.picture && s.time == shot.time), "the paused picture moved");
 }
+
+/// Seeks one a frame for a second, as a drag on a seek bar sends them: `to` names each.
+fn storm(rig: &mut Rig, count: u32, fast: bool, to: impl Fn(u32) -> f64) -> Vec<Shot> {
+    let mut shots = Vec::new();
+    for i in 0..count {
+        if fast { rig.player.seek_fast(to(i)) } else { rig.player.seek(to(i)) }
+        shots.push(rig.frame());
+        std::thread::sleep(Duration::from_secs(1) / count);
+    }
+    shots
+}
+
+/// After a last seek to `to` while playing: pictures that name the time, moving on from `to`,
+/// within `SEEK_MS`, and the sound back in sync.
+fn assert_plays_on_from(rig: &mut Rig, to: f64, what: &str) {
+    let sought = Instant::now();
+    let landed = rig.until(2.0, what, |_, s| s.state == PlayerState::Playing && s.picture == Some(frame_of(s.time)) && s.time >= to);
+    let took = landed.at.duration_since(sought).as_secs_f64() * 1000.0;
+    eprintln!("{what}: playing again after {took:.1} ms");
+    assert!(took < SEEK_MS, "{what}: playing again after {took:.1} ms");
+    assert!(landed.time - to < 2.0 / FPS, "{what}: landed at {:.4}, not {to}", landed.time);
+    fake::take();
+    let shots = rig.run(2.0);
+    assert_pictures_follow(&shots, what);
+    let heard = fake::take();
+    let back = first_sound(&heard, landed.at).map(|t| t.duration_since(landed.at).as_secs_f64());
+    assert!(back.is_some_and(|b| b < 0.15), "{what}: the sound came back after {back:?} s");
+    assert_in_sync(rig, &heard, landed.at + secs(0.5), what);
+}
+
+#[test]
+fn a_storm_of_seeks_while_playing_plays_on_from_the_last() {
+    let mut rig = open_playing(true);
+    rig.run(0.5);
+    storm(&mut rig, 60, false, |i| 0.5 + f64::from(i) * 0.06);
+    rig.player.seek(1.5);
+    assert_plays_on_from(&mut rig, 1.5, "after 60 seeks forward in a second");
+    storm(&mut rig, 60, false, |i| if i % 2 == 0 { 4.5 } else { 0.8 });
+    rig.player.seek(2.0);
+    assert_plays_on_from(&mut rig, 2.0, "after 60 seeks back and forth in a second");
+}
+
+#[test]
+fn a_scrub_shows_keyframes_then_plays_on_from_where_it_stops() {
+    let mut rig = open_playing(true);
+    rig.run(0.5);
+    rig.player.pause();
+    let shots = storm(&mut rig, 30, true, |i| 0.6 + f64::from(i) * 0.15);
+    let keyframes: Vec<u32> = shots.iter().filter_map(|s| s.picture).filter(|p| *p > 0 && p % 60 == 0).collect();
+    eprintln!("the scrub showed keyframes {keyframes:?}");
+    assert!(keyframes.len() >= 3, "the scrub showed keyframes {keyframes:?}");
+    assert!(!rig.player.is_playing());
+    rig.player.seek(3.3);
+    rig.player.play();
+    assert_plays_on_from(&mut rig, 3.3, "after a scrub");
+}
+
+#[test]
+fn a_long_seek_lands_as_soon_as_a_short_one() {
+    let mut rig = Rig::open(&long_fixture(), true);
+    rig.player.play();
+    rig.until(5.0, "the first picture", |_, s| s.picture.is_some());
+    rig.run(0.5);
+    rig.player.seek(500.0);
+    assert_plays_on_from(&mut rig, 500.0, "10 min of 10 forward");
+    rig.player.seek(20.0);
+    assert_plays_on_from(&mut rig, 20.0, "8 min back");
+    storm(&mut rig, 60, false, |i| f64::from(i) * 9.5);
+    rig.player.seek(300.0);
+    assert_plays_on_from(&mut rig, 300.0, "after 60 seeks across the clip in a second");
+}

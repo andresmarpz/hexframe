@@ -213,6 +213,7 @@ pub(super) fn step(c: &mut Control, event: Event) -> Effects<Effect> {
             let seconds = if seconds.is_finite() { seconds.max(0.0) } else { 0.0 };
             let seconds = c.duration.map_or(seconds, |d| seconds.min(d));
             c.seek = Some(seconds);
+            c.fast = false;
             c.time = seconds;
             match c.run {
                 Run::Ended => c.run = Run::Paused,
@@ -514,6 +515,9 @@ impl Control {
     }
     pub(crate) fn playing(&self) -> bool {
         matches!(self.run, Run::Playing { .. })
+    }
+    pub(crate) fn seeking(&self) -> bool {
+        self.seek.is_some() || self.landing || matches!(self.stage, Stage::Ready { settle, .. } if settle.waiting())
     }
     pub(crate) fn failed(&self) -> bool {
         matches!(self.run, Run::Failed { .. })

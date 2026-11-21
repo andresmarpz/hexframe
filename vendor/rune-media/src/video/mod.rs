@@ -47,6 +47,11 @@ mod unsupported;
 use unsupported as backend;
 #[cfg(target_os = "windows")]
 mod windows;
+/// The Windows player's phases are plain data: their tests run on every host.
+#[cfg(all(test, not(target_os = "windows")))]
+#[path = "windows/machine.rs"]
+#[allow(dead_code)]
+mod machine;
 #[cfg(target_os = "windows")]
 use self::windows as backend;
 #[cfg(target_os = "windows")]
@@ -360,6 +365,19 @@ impl Player {
     /// Jump to `seconds` (clamped to the clip). Keeps playing if it was playing.
     pub fn seek(&self, seconds: f64) {
         self.send(Event::Seek(seconds));
+    }
+    /// Jump to the keyframe at or before `seconds` and show it, without decoding on to the exact
+    /// picture: for previews while scrubbing. [`Player::time`] reports the keyframe's time once
+    /// it lands. Windows only; elsewhere it is [`Player::seek`].
+    pub fn seek_fast(&self, seconds: f64) {
+        self.edit(|c| {
+            step(c, Event::Seek(seconds));
+            c.fast = true;
+        });
+    }
+    /// A seek (or a stalled clip) still waits for its picture.
+    pub fn seeking(&self) -> bool {
+        self.shared.ctl.lock().unwrap().seeking()
     }
     /// Playback speed while playing; 1 is normal. Negative and non-finite rates are ignored.
     pub fn set_rate(&self, rate: f32) {
@@ -697,6 +715,10 @@ pub(crate) struct Control {
     pub volume: f32,
     /// A seek not yet carried out, by a player, a poster, a decoder or the headless clock.
     seek: Option<f64>,
+    /// That seek may land on the keyframe before its time (`Player::seek_fast`).
+    pub fast: bool,
+    /// The platform player waits for a picture (Windows: a seek, a stall or an open).
+    pub landing: bool,
     // Reported by pulls and ticks.
     pub time: f64,
     pub duration: Option<f64>,
@@ -724,6 +746,8 @@ impl Default for Control {
             muted: true,
             volume: 1.0,
             seek: None,
+            fast: false,
+            landing: false,
             time: 0.0,
             duration: None,
             size: None,

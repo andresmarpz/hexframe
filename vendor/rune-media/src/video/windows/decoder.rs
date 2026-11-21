@@ -42,8 +42,8 @@ const GPU_WAIT: Duration = Duration::from_secs(3);
 /// What the UI asks of the decoder and what the decoder hands back, under one lock.
 #[derive(Default)]
 pub(super) struct Inbox {
-    /// A seek to land: clip seconds and the generation its pictures carry.
-    pub seek: Option<(f64, u32)>,
+    /// A seek to land; a newer one replaces it.
+    pub seek: Option<Seek>,
     pub looping: bool,
     /// Play sound, at this gain (unmuted, and the clip has some).
     pub sound: Option<f32>,
@@ -66,6 +66,16 @@ pub(super) struct Inbox {
     /// The clip can't have a layer (a rotated clip, software pictures, no video processor): the
     /// UI keeps drawing it.
     pub layer_refused: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Seek {
+    /// Clip seconds.
+    pub to: f64,
+    /// The generation its pictures carry.
+    pub generation: u32,
+    /// The keyframe at or before `to` is enough: the first picture after it shows.
+    pub fast: bool,
 }
 
 pub(super) enum News {
@@ -353,6 +363,8 @@ impl Decoder {
         let mut skipped: Option<f64> = None;
         let mut delivered = false;
         let mut retried = false;
+        // A fast seek shows the first picture it decodes, the keyframe at or before its time.
+        let mut keyframe = false;
         loop {
             // Take the UI's asks, then wait for room in the queue and a free texture.
             {
@@ -361,22 +373,28 @@ impl Decoder {
                     if s.stop {
                         return Ok(());
                     }
-                    if let Some((to, g)) = s.seek.take() {
+                    if let Some(seek) = s.seek.take() {
                         // The clip's end is its last picture's time, not the next loop's start.
                         let meta = self.facts.meta;
-                        let to = if meta.duration > 0.0 { to.min(meta.duration - meta.frame * 0.5).max(0.0) } else { to };
+                        let to = if meta.duration > 0.0 { seek.to.min(meta.duration - meta.frame * 0.5).max(0.0) } else { seek.to };
                         end_due = None;
-                        s.frames.clear();
+                        let stale = std::mem::take(&mut s.frames);
                         s.ended = None;
-                        generation = g;
+                        // The source seeks with the inbox free: the UI never waits on it, and a
+                        // newer seek replaces this one before a picture is read.
+                        drop(s);
+                        drop(stale);
+                        generation = seek.generation;
                         skip_before = to;
                         epoch = 0.0;
-                        (skipped, delivered, retried) = (None, false, false);
+                        (skipped, delivered, retried, keyframe) = (None, false, false, seek.fast);
                         mf::seek(&self.reader, to)?;
                         self.reopen_streams();
                         if let Some(o) = &self.output {
                             o.seek(to);
                         }
+                        s = pipe.lock();
+                        continue;
                     }
                     if self.output.is_some() != s.sound.is_some() {
                         let on = s.sound.is_some();
@@ -445,10 +463,10 @@ impl Decoder {
             }
             if let Some(sample) = read.sample.take() {
                 if video {
-                    if read.time + self.facts.meta.frame * 0.5 < skip_before {
+                    if !keyframe && read.time + self.facts.meta.frame * 0.5 < skip_before {
                         skipped = Some(read.time);
                     } else {
-                        delivered = true;
+                        (delivered, keyframe) = (true, false);
                         let (picture, texture) = self.picture(&sample)?;
                         let pts = epoch + read.time;
                         let blitted = self.blit_on_layer(pipe, job, texture);
