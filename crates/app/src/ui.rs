@@ -47,6 +47,7 @@ pub(crate) use scenes::all as scene_list;
 pub(crate) use settings_sheet::SettingsSection;
 pub(crate) use shell::{
     DockState, LibraryTotals, PaneDrag, PaneEdge, RECENT_LIMIT, Screen, WindowSizeWatch,
+    remember_window,
 };
 pub(crate) use update::UpdateUi;
 

@@ -151,6 +151,7 @@ pub struct Settings {
     pub nav_width: u32,
     pub list_width: u32,
     pub window_size: Option<(u32, u32)>,
+    pub window_maximized: bool,
     pub client_id: Option<String>,
     #[serde(default = "yes")]
     pub first_run_done: bool,
@@ -185,6 +186,7 @@ impl Default for Settings {
             nav_width: NAV_WIDTH.default,
             list_width: LIST_WIDTH.default,
             window_size: None,
+            window_maximized: false,
             client_id: None,
             first_run_done: false,
         }

@@ -65,6 +65,8 @@ fn main() {
             traffic_lights: Some((16.0, 17.0)),
             ..Chrome::DEFAULT
         })
+        .maximized(settings.window_maximized)
+        .on_window(ui::remember_window)
         .keep_running()
         .release_gpu_when_closed();
     if std::env::args().any(|arg| arg == HIDDEN_FLAG) {
