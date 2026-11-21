@@ -10,3 +10,4 @@ pub mod retention;
 pub mod session;
 pub mod settings;
 pub mod time;
+pub mod update;

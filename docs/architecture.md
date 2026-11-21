@@ -204,6 +204,7 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `clips.pre_secs` / `clips.post_secs` | `u32` | `15` / `5` |
 | `clips.kills`, `deaths`, `multikills`, `objectives`, `aces` | `bool` | `true` |
 | `clips.assists`, `structures` | `bool` | `false` |
+| `check_updates` | `bool` | `true` |
 
 Bitrate: the mean bitrate at 1080p60 is 8, 12 or 20 Mbps for Balanced, High or Max. It scales with pixel count to the power 0.75 and with fps/60 to the power 0.8. Peak is 2.0 times the mean. `CaptureConfig::for_encode_size` rescales with the same 0.75 exponent when the real encode size is smaller than `bitrate_pixels`.
 

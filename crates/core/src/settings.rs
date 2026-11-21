@@ -99,6 +99,7 @@ pub struct Settings {
     #[serde(deserialize_with = "hotkey::deserialize_lenient")]
     pub save_clip_hotkey: Option<Hotkey>,
     pub storage_limit_gb: Option<u32>,
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -115,6 +116,7 @@ impl Default for Settings {
             clips: ClipSettings::default(),
             save_clip_hotkey: Some(Hotkey::default()),
             storage_limit_gb: None,
+            check_updates: true,
         }
     }
 }
