@@ -256,3 +256,110 @@ fn dropping_the_handle_stops_the_thread() {
         }
     }
 }
+
+fn secs(hns: i64) -> f64 {
+    hns as f64 / HNS_PER_SEC as f64
+}
+
+fn next_event(rx: &crossbeam_channel::Receiver<LeagueMsg>) -> greyscreen_core::game::TimedEvent {
+    loop {
+        if let LeagueMsg::Event(event) = recv(rx) {
+            return event;
+        }
+    }
+}
+
+fn kill() -> serde_json::Value {
+    json!({"EventName":"ChampionKill","KillerName":"Faker#KR1","VictimName":"Chovy","Assisters":[]})
+}
+
+#[test]
+fn a_frozen_loading_clock_does_not_shift_later_events() {
+    let server = FakeServer::start();
+    server.with(|s| {
+        s.ready = true;
+        s.game_time_base = 0.0;
+        s.freeze();
+        s.push_event_now(json!({"EventName":"GameStart"}));
+    });
+    let switch = Switch::on();
+    let (_handle, rx) = spawn(&server, &switch);
+    assert!(matches!(recv(&rx), LeagueMsg::WindowFound { .. }));
+    assert!(matches!(recv(&rx), LeagueMsg::Ready(_)));
+    let start = next_event(&rx);
+    assert_eq!(start.kind, GameEvent::GameStart);
+
+    std::thread::sleep(Duration::from_millis(400));
+    server.with(|s| s.unfreeze());
+    let mut pushed = Vec::new();
+    for _ in 0..3 {
+        pushed.push(mono_now());
+        server.with(|s| s.push_event_now(kill()));
+        std::thread::sleep(Duration::from_millis(150));
+    }
+    for at in pushed {
+        let event = next_event(&rx);
+        assert!(
+            (secs(event.at - at)).abs() < 0.25,
+            "event landed {:.2} s from where it happened",
+            secs(event.at - at)
+        );
+    }
+}
+
+#[test]
+fn a_paused_game_clock_keeps_events_on_the_wall_clock() {
+    let server = FakeServer::start();
+    server.with(|s| {
+        s.ready = true;
+        s.game_time_base = 20.0;
+    });
+    let switch = Switch::on();
+    let (_handle, rx) = spawn(&server, &switch);
+    assert!(matches!(recv(&rx), LeagueMsg::WindowFound { .. }));
+    assert!(matches!(recv(&rx), LeagueMsg::Ready(_)));
+    expect_silence(&rx, 100);
+
+    let first = mono_now();
+    server.with(|s| s.push_event_now(kill()));
+    let first_event = next_event(&rx);
+    server.with(|s| s.freeze());
+    std::thread::sleep(Duration::from_millis(500));
+    server.with(|s| s.unfreeze());
+    let second = mono_now();
+    server.with(|s| s.push_event_now(kill()));
+    let second_event = next_event(&rx);
+
+    assert!(secs(first_event.at - first).abs() < 0.25);
+    assert!(secs(second_event.at - second).abs() < 0.25);
+    assert!(secs(second_event.at - first_event.at) > 0.45);
+}
+
+#[test]
+fn events_that_arrive_in_one_batch_keep_their_own_times() {
+    let server = FakeServer::start();
+    server.with(|s| s.ready = true);
+    let switch = Switch::on();
+    let (_handle, rx) = spawn(&server, &switch);
+    assert!(matches!(recv(&rx), LeagueMsg::WindowFound { .. }));
+    assert!(matches!(recv(&rx), LeagueMsg::Ready(_)));
+    expect_silence(&rx, 100);
+
+    server.with(|s| s.stall = Duration::from_millis(600));
+    std::thread::sleep(Duration::from_millis(100));
+    let mut pushed = Vec::new();
+    for _ in 0..3 {
+        pushed.push(mono_now());
+        server.with(|s| s.push_event_now(kill()));
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    server.with(|s| s.stall = Duration::ZERO);
+    for at in pushed {
+        let event = next_event(&rx);
+        assert!(
+            secs(event.at - at).abs() < 0.3,
+            "event landed {:.2} s from where it happened",
+            secs(event.at - at)
+        );
+    }
+}

@@ -17,12 +17,24 @@ pub struct Script {
     pub events: Vec<Value>,
     pub game_time_base: f64,
     pub stall: Duration,
+    frozen: Option<f64>,
     started: Instant,
 }
 
 impl Script {
     pub fn game_time(&self) -> f64 {
-        self.game_time_base + self.started.elapsed().as_secs_f64()
+        self.frozen
+            .unwrap_or_else(|| self.game_time_base + self.started.elapsed().as_secs_f64())
+    }
+
+    pub fn freeze(&mut self) {
+        self.frozen = Some(self.game_time());
+    }
+
+    pub fn unfreeze(&mut self) {
+        if let Some(frozen) = self.frozen.take() {
+            self.game_time_base = frozen - self.started.elapsed().as_secs_f64();
+        }
     }
 
     pub fn push_event_now(&mut self, mut event: Value) -> u32 {
@@ -53,6 +65,7 @@ impl FakeServer {
             events: Vec::new(),
             game_time_base: 100.0,
             stall: Duration::ZERO,
+            frozen: None,
             started: Instant::now(),
         }));
         let thread = {
