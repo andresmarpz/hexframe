@@ -75,7 +75,7 @@ bun run deploy --stage prod        # shows a plan, asks to approve, then creates
 
 Alchemy applies the SQL files in `migrations/` on every deploy. It keeps its own state in an R2 bucket in your account. Use `--stage dev` for a separate cloud copy. Stages never share resources.
 
-The deploy prints `url: https://<name>.<account>.workers.dev`. Set the desktop app's API base setting (`GREYSCREEN_API_BASE`) to that URL with no trailing slash. A custom domain can come later.
+The deploy prints `url: https://<name>.<account>.workers.dev`. Set the desktop app's API base setting (`GREYSCREEN_API_URL`) to that URL with no trailing slash. A custom domain can come later.
 
 ## Layout
 
