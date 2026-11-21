@@ -147,6 +147,10 @@ pub(super) fn step(phase: &mut Phase, event: Event) -> Effects<Effect> {
             *phase = P::Paused { at };
             Effects::one(Effect::Clock(None))
         }
+        (P::Paused { .. }, Event::Pause { at }) => {
+            *phase = P::Paused { at };
+            Effects::none()
+        }
         (P::Idle { .. }, Event::Seek { to }) => {
             *phase = P::Idle { at: to };
             Effects::none()

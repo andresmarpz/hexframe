@@ -354,16 +354,16 @@ impl Native {
         }
         if c.playing() != self.playing {
             self.playing = c.playing();
-            let on_layer = self.on_layer();
+            let held = self.held_at();
             let event = if self.playing {
                 Event::Play { target, lead, rate: f64::from(c.rate) }
             } else {
-                Event::Pause { at: on_layer.or(self.shown).unwrap_or_else(|| self.at()) }
+                Event::Pause { at: held.or(self.shown).unwrap_or_else(|| self.at()) }
             };
             self.event(shared, c, event);
-            // Paused on the layer: the time is the picture the layer shows, which the surface
-            // gets when the window draws the clip again (`show`).
-            if let (false, Some(at)) = (self.playing, on_layer) {
+            // Paused while the surface is behind: the time is where the pause holds, and the
+            // surface gets that picture when the window draws the clip again (`hold`).
+            if let (false, Some(at)) = (self.playing, held) {
                 c.time = clip_time(c, at);
             }
         }
@@ -396,6 +396,15 @@ impl Native {
         let pipe = self.pipe.as_ref().filter(|_| self.layered)?;
         let generation = self.seeks.current().0;
         pipe.lock().layer_presented.filter(|(_, g)| *g == generation).map(|(pts, _)| pts)
+    }
+
+    /// Where a pause holds while the surface is behind: the picture the layer shows, or the
+    /// clock when the window let go of the layer without drawing the clip again.
+    fn held_at(&self) -> Option<f64> {
+        self.on_layer().or(match self.phase {
+            Phase::Playing { clock } if self.behind => Some(clock.position(Instant::now())),
+            _ => None,
+        })
     }
 
     /// The phase's time, for a pause before any picture showed.
@@ -431,21 +440,15 @@ impl Native {
             }
             return;
         }
+        if let (true, Phase::Paused { at } | Phase::Ended { at }) = (self.behind, self.phase) {
+            return self.hold(shared, c, surface, &pipe, generation, at);
+        }
         let picked = {
             let mut inbox = pipe.lock();
             while inbox.frames.front().is_some_and(|f| f.generation != generation) {
                 inbox.frames.pop_front();
             }
             match self.phase {
-                // Held after the layer showed the pictures: the surface gets the one the layer
-                // showed last, which the decoder keeps at the queue's front.
-                Phase::Paused { at } | Phase::Ended { at } if self.behind => {
-                    let mut held = None;
-                    while inbox.frames.front().is_some_and(|f| f.pts <= at) {
-                        held = inbox.frames.pop_front();
-                    }
-                    held
-                }
                 Phase::Buffering { .. } => inbox.frames.pop_front(),
                 Phase::Paused { .. } if self.shown.is_none() => inbox.frames.pop_front(),
                 Phase::Playing { clock } => {
@@ -460,13 +463,6 @@ impl Native {
             }
         };
         let Some(frame) = picked else {
-            if let (true, Phase::Paused { at }) = (self.behind, self.phase) {
-                // The layer's picture left the queue: decode it again.
-                self.behind = false;
-                self.event(shared, c, Event::Seek { to: at });
-                return;
-            }
-            self.behind = false;
             self.check_end(shared, c, &pipe, generation, target);
             return;
         };
@@ -475,6 +471,42 @@ impl Native {
         self.put(c, surface, frame);
         if let Phase::Buffering { .. } = self.phase {
             self.event(shared, c, Event::Shown { pts, target, lead, rate: f64::from(c.rate) });
+        }
+    }
+
+    /// Puts the held picture on a surface the layer got ahead of: the newest at or before `at`,
+    /// or the next one when the pause came while the decoder presented it. Gone from the queue,
+    /// a paused clip seeks to it.
+    fn hold(&mut self, shared: &Arc<Shared>, c: &mut Control, surface: &NativeSurface, pipe: &Pipe, generation: u32, at: f64) {
+        self.behind = false;
+        let frame = self.facts.map_or(1.0 / 30.0, |f| f.meta.frame);
+        let held = {
+            let mut inbox = pipe.lock();
+            while inbox.frames.front().is_some_and(|f| f.generation != generation) {
+                inbox.frames.pop_front();
+            }
+            let mut held = None;
+            while inbox.frames.front().is_some_and(|f| f.pts <= at) {
+                held = inbox.frames.pop_front();
+            }
+            if held.is_none() && inbox.frames.front().is_some_and(|f| f.pts <= at + frame * 1.5) {
+                held = inbox.frames.pop_front();
+            }
+            held.filter(|f| f.pts >= at - frame * 1.5)
+        };
+        pipe.poke();
+        match (held, self.phase) {
+            (Some(held), _) => {
+                let pts = held.pts;
+                self.put(c, surface, held);
+                if let Phase::Paused { at } = self.phase
+                    && at != pts
+                {
+                    self.event(shared, c, Event::Pause { at: pts });
+                }
+            }
+            (None, Phase::Paused { at }) => self.event(shared, c, Event::Seek { to: clip_time(c, at) }),
+            _ => {}
         }
     }
 

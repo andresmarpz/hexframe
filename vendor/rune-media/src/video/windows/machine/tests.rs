@@ -28,3 +28,22 @@ fn a_seek_while_parked_keeps_the_phase_idle_at_the_target() {
     assert_eq!(phase, Phase::Idle { at: 7.5 });
     assert_eq!(effects(&mut phase, Event::Open { play: false }), vec![Effect::Open { at: 7.5 }]);
 }
+
+#[test]
+fn a_paused_clip_moves_its_hold_to_the_picture_it_shows() {
+    let mut phase = Phase::Paused { at: 4.0 };
+    assert_eq!(effects(&mut phase, Event::Pause { at: 4.016 }), vec![]);
+    assert_eq!(phase, Phase::Paused { at: 4.016 });
+}
+
+#[test]
+fn the_sound_moves_a_running_clock_at_its_rate_only() {
+    let at = Instant::now();
+    let mut phase = Phase::Playing { clock: Anchor { at, pos: 1.0, rate: 1.0 } };
+    let heard = Anchor { at, pos: 1.004, rate: 1.0 };
+    assert_eq!(effects(&mut phase, Event::Synced { clock: heard }), vec![]);
+    assert_eq!(phase, Phase::Playing { clock: heard });
+    let other = Anchor { at, pos: 1.0, rate: 2.0 };
+    assert_eq!(effects(&mut phase, Event::Synced { clock: other }), vec![]);
+    assert_eq!(phase, Phase::Playing { clock: heard });
+}
