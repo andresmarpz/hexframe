@@ -105,6 +105,59 @@ fn the_write_slot_is_never_the_published_or_pending_one() {
 }
 
 #[test]
+fn the_slot_being_read_survives_later_arrivals() {
+    let mut guard = HoldBack::default();
+    arrive(&mut guard, scene(1));
+    arrive(&mut guard, scene(2));
+    let read = guard.start_reading();
+    assert!(read.is_some());
+    for step in 3..12u8 {
+        let (slot, _) = arrive(&mut guard, scene(step));
+        assert_ne!(Some(slot), read);
+    }
+    guard.done_reading();
+    assert_eq!(guard.reading(), None);
+}
+
+#[test]
+fn the_write_slot_avoids_published_pending_and_read_slots_in_any_sequence() {
+    let mut guard = HoldBack::default();
+    let mut seed: u32 = 0x9e37_79b9;
+    let mut drops = 0;
+    for step in 0..5000u32 {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        let slot = guard.write_slot();
+        let taken = [guard.published(), guard.pending(), guard.reading()];
+        assert!(slot < RING_SLOTS);
+        assert!(
+            !taken.contains(&Some(slot)),
+            "step {step}: {slot} in {taken:?}"
+        );
+        match seed % 8 {
+            0 => {
+                guard.promote();
+            }
+            1 => {
+                guard.start_reading();
+            }
+            2 => guard.done_reading(),
+            3 => guard.publish_now(slot),
+            4 => {
+                *guard.thumb_mut(slot) = torn_from(&scene(30), 300);
+                guard.arrive(slot);
+            }
+            _ => {
+                *guard.thumb_mut(slot) = scene(30);
+                drops += usize::from(matches!(guard.arrive(slot), Arrival::Dropped(_)));
+            }
+        }
+    }
+    assert!(drops > 0);
+}
+
+#[test]
 fn promote_publishes_the_held_frame() {
     let mut guard = HoldBack::default();
     let (first, _) = arrive(&mut guard, scene(5));

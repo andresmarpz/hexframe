@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-pub const RING_SLOTS: usize = 3;
+pub const RING_SLOTS: usize = 4;
 pub const THUMB_MAX_WIDTH: u32 = 64;
 pub const COPY_WAIT_BUDGET: Duration = Duration::from_millis(12);
 pub const COPY_WAIT_SLOW: Duration = Duration::from_millis(4);
@@ -24,13 +24,27 @@ pub struct HoldBack {
     thumbs: [Vec<u8>; RING_SLOTS],
     published: Option<usize>,
     pending: Option<usize>,
+    reading: Option<usize>,
 }
 
 impl HoldBack {
     pub fn write_slot(&self) -> usize {
         (0..RING_SLOTS)
-            .find(|&slot| Some(slot) != self.published && Some(slot) != self.pending)
+            .find(|&slot| ![self.published, self.pending, self.reading].contains(&Some(slot)))
             .unwrap_or(0)
+    }
+
+    pub fn start_reading(&mut self) -> Option<usize> {
+        self.reading = self.published;
+        self.reading
+    }
+
+    pub fn done_reading(&mut self) {
+        self.reading = None;
+    }
+
+    pub fn reading(&self) -> Option<usize> {
+        self.reading
     }
 
     pub fn thumb_mut(&mut self, slot: usize) -> &mut Vec<u8> {
@@ -83,6 +97,7 @@ impl HoldBack {
     pub fn reset(&mut self) {
         self.published = None;
         self.pending = None;
+        self.reading = None;
     }
 }
 

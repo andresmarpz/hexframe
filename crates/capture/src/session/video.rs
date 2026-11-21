@@ -128,11 +128,9 @@ impl Video {
     }
 
     fn process_frame(&mut self) -> Result<bool, Exit> {
-        let Some((texture, size, seq)) = self.wgc.latest() else {
+        if !self.wgc.has_frame() {
             return Ok(false);
-        };
-        self.seq = seq;
-        self.stats.c.captured = seq;
+        }
         match self.wait_for_input() {
             Ok(true) => {}
             Ok(false) => {
@@ -141,8 +139,15 @@ impl Video {
             }
             Err(error) => return self.encoder_error("encoder poll", &error).map(|()| true),
         }
+        let Some((texture, size, seq)) = self.wgc.latest() else {
+            return Ok(false);
+        };
+        self.seq = seq;
+        self.stats.c.captured = seq;
         let crop = self.client_area.crop(size);
-        let frame = match self.converter.convert(&texture, size, crop) {
+        let converted = self.converter.convert(&texture, size, crop);
+        self.wgc.done_reading();
+        let frame = match converted {
             Ok(frame) => frame,
             Err(VprocError::Busy) => {
                 self.stats.busy += 1;

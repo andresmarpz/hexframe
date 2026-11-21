@@ -1,26 +1,24 @@
+mod setup;
+
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::CaptureTarget;
-use greyscreen_core::media::capture_min_update_interval_hns;
 use greyscreen_core::tear::{Arrival, CopyWaits, HoldBack, Wait};
 use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
-use windows::Foundation::{TimeSpan, TypedEventHandler};
+use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
-    Direct3D11CaptureFramePool, GraphicsCaptureAccess, GraphicsCaptureAccessKind,
-    GraphicsCaptureItem, GraphicsCaptureSession,
+    Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession,
 };
 use windows::Graphics::DirectX::DirectXPixelFormat;
 use windows::Graphics::SizeInt32;
-use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
-use windows::Win32::Foundation::{E_POINTER, HWND, POINT};
+use windows::Win32::Foundation::E_POINTER;
 use windows::Win32::Graphics::Direct3D11::{D3D11_TEXTURE2D_DESC, ID3D11Texture2D};
-use windows::Win32::Graphics::Gdi::{HMONITOR, MONITOR_DEFAULTTOPRIMARY, MonitorFromPoint};
 use windows::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
-use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
-use windows::core::{IInspectable, Interface, factory};
+use windows::core::{IInspectable, Interface};
 
+use self::setup::{configure_session, create_item};
 use crate::clock::QpcMap;
 use crate::d3d::GpuDevice;
 use crate::frame_copy::{Copied, FrameCopier};
@@ -51,12 +49,13 @@ struct Latest {
 struct Published {
     current: Option<Latest>,
     pending: Option<Latest>,
+    holdback: HoldBack,
     seq: u64,
 }
 
 struct Worker {
     copier: Option<FrameCopier>,
-    holdback: HoldBack,
+    thumb: Vec<u8>,
     pool_size: (i32, i32),
 }
 
@@ -136,7 +135,7 @@ impl WgcCapture {
             published: Mutex::new(Published::default()),
             worker: Mutex::new(Worker {
                 copier: Some(copier),
-                holdback: HoldBack::default(),
+                thumb: Vec::new(),
                 pool_size: (item_size.Width, item_size.Height),
             }),
             waits: Mutex::new(CopyWaits::default()),
@@ -205,12 +204,24 @@ impl WgcCapture {
             .as_ref()
             .is_some_and(|pending| mono_now() - pending.at >= self.shared.promote_after);
         if stale {
+            published.holdback.promote();
             published.current = published.pending.take();
         }
-        published
+        let latest = published
             .current
             .as_ref()
-            .map(|latest| (latest.texture.clone(), latest.size, latest.seq))
+            .map(|latest| (latest.texture.clone(), latest.size, latest.seq))?;
+        published.holdback.start_reading();
+        Some(latest)
+    }
+
+    pub fn has_frame(&self) -> bool {
+        let published = lock(&self.shared.published);
+        published.current.is_some() || published.pending.is_some()
+    }
+
+    pub fn done_reading(&self) {
+        lock(&self.shared.published).holdback.done_reading();
     }
 
     pub fn fill_stats(&self, stats: &mut CaptureStats) {
@@ -263,7 +274,6 @@ impl WgcCapture {
         if let Some(copier) = &mut worker.copier {
             copier.release();
         }
-        worker.holdback.reset();
         let waits = *lock(&self.shared.waits);
         tracing::info!(
             frames = self.shared.frames.load(Ordering::Relaxed),
@@ -293,7 +303,8 @@ impl Shared {
             let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
             // SAFETY: the surface is a live D3D11 texture owned by the checked-out frame.
             let source: ID3D11Texture2D = unsafe { access.GetInterface()? };
-            Some(worker.copy(&source, content)?)
+            let slot = lock(&self.published).holdback.write_slot();
+            Some(worker.copy(&source, content, slot)?)
         } else {
             None
         };
@@ -326,22 +337,22 @@ impl Shared {
             }
             return;
         }
-        let Worker {
-            copier, holdback, ..
-        } = worker;
+        let Worker { copier, thumb, .. } = worker;
         let Some(texture) = copier.as_ref().and_then(|c| c.texture(copy.slot)) else {
             return;
         };
         let checked = copy.copied.thumbed
             && copier.as_ref().is_some_and(|copier| {
                 copier
-                    .read_thumb(holdback.thumb_mut(copy.slot))
+                    .read_thumb(thumb)
                     .inspect_err(|error| tracing::debug!(%error, "thumbnail read failed"))
                     .is_ok()
             });
-        let mut published = lock(&self.published);
-        if published.pending.is_none() && holdback.pending().is_some() {
-            holdback.promote();
+        let mut guard = lock(&self.published);
+        let published = &mut *guard;
+        let holdback = &mut published.holdback;
+        if checked {
+            std::mem::swap(holdback.thumb_mut(copy.slot), thumb);
         }
         published.seq += 1;
         let entry = Latest {
@@ -402,6 +413,7 @@ impl Worker {
         &mut self,
         source: &ID3D11Texture2D,
         content: SizeInt32,
+        slot: usize,
     ) -> windows::core::Result<Taken> {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         // SAFETY: `desc` is a live out value and `source` is a live texture.
@@ -410,74 +422,12 @@ impl Worker {
             (content.Width as u32).min(desc.Width),
             (content.Height as u32).min(desc.Height),
         );
-        let slot = self.holdback.write_slot();
         let copier = self
             .copier
             .as_mut()
             .ok_or_else(|| windows::core::Error::from(E_POINTER))?;
         let copied = copier.copy(source, size, slot)?;
         Ok(Taken { slot, size, copied })
-    }
-}
-
-fn create_item(target: &CaptureTarget) -> windows::core::Result<GraphicsCaptureItem> {
-    let interop = factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
-    match target {
-        CaptureTarget::GameWindow { hwnd, .. } => {
-            let hwnd = HWND(*hwnd as *mut core::ffi::c_void);
-            // SAFETY: CreateForWindow validates the handle and returns an error for an invalid one.
-            unsafe { interop.CreateForWindow(hwnd) }
-        }
-        CaptureTarget::PrimaryMonitor => {
-            // SAFETY: MonitorFromPoint takes a value point and always returns a monitor with DEFAULTTOPRIMARY.
-            let monitor: HMONITOR =
-                unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
-            // SAFETY: CreateForMonitor validates the handle and returns an error for an invalid one.
-            unsafe { interop.CreateForMonitor(monitor) }
-        }
-    }
-}
-
-fn configure_session(session: &GraphicsCaptureSession, options: WgcOptions) -> bool {
-    let WgcOptions {
-        fps,
-        cursor,
-        display_hz,
-    } = options;
-    tracing::info!(cursor, "graphics capture cursor");
-    if let Err(error) = session.SetIsCursorCaptureEnabled(cursor) {
-        tracing::warn!(%error, cursor, "set cursor capture failed");
-    }
-    tracing::info!(step = "borderless access", "graphics capture");
-    request_borderless();
-    let border_hidden = match session.SetIsBorderRequired(false) {
-        Ok(()) => true,
-        Err(error) => {
-            tracing::warn!(%error, "disable capture border failed");
-            false
-        }
-    };
-    let interval = TimeSpan {
-        Duration: capture_min_update_interval_hns(fps, display_hz),
-    };
-    tracing::info!(
-        interval_ms = interval.Duration as f64 / 10_000.0,
-        display_hz,
-        "graphics capture update interval"
-    );
-    if let Err(error) = session.SetMinUpdateInterval(interval) {
-        tracing::warn!(%error, "set minimum update interval failed");
-    }
-    border_hidden
-}
-
-fn request_borderless() {
-    let status = GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless)
-        .and_then(|operation| operation.join());
-    match status {
-        Ok(AppCapabilityAccessStatus::Allowed) => {}
-        Ok(status) => tracing::warn!(status = status.0, "borderless capture access not allowed"),
-        Err(error) => tracing::warn!(%error, "borderless capture access request failed"),
     }
 }
 
