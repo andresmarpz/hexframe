@@ -2,7 +2,7 @@ use jiff::Zoned;
 use rune::{Cursor, El, col, el, row, text};
 use rune_kit::Kit;
 
-use super::thumb::{self, ASPECT};
+use super::widgets::thumb::{self, ASPECT};
 use super::{card, hairline};
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips, when};
 use crate::ui::{Ui, format_clock};

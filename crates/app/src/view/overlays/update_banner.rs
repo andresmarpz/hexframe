@@ -6,7 +6,7 @@ use crate::ui::Ui;
 
 const TOP_GAP: f32 = 52.0;
 
-pub(super) fn layer(s: &Ui, k: &Kit) -> Option<El> {
+pub(crate) fn layer(s: &Ui, k: &Kit) -> Option<El> {
     let info = s.update_banner()?;
     Some(
         row()

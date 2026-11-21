@@ -10,7 +10,7 @@ mod recording;
 mod storage;
 mod updates;
 
-use super::clearable::clear_when_filled;
+use super::widgets::clear_when_filled;
 use super::{card, hairline};
 use crate::ui::{SettingsSection, Ui};
 use catalog::Row;

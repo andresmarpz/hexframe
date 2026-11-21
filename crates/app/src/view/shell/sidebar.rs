@@ -10,7 +10,7 @@ use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, SidebarRow};
 
 use self::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME, LOGO, SIDEBAR};
 use crate::ui::{PaneEdge, Screen, Ui};
-use crate::view::grip::grip;
+use crate::view::widgets::grip;
 
 const BRAND_HEIGHT: f32 = 48.0;
 const LIGHTS_HEIGHT: f32 = 40.0;

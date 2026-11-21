@@ -5,7 +5,7 @@ use rune_kit::Kit;
 
 use super::card::hoverable;
 use crate::ui::{ReviewState, Source, Ui, seek_target};
-use crate::view::tone::tone_color;
+use crate::view::widgets::tone_color;
 
 const HEIGHT: f32 = 28.0;
 const TRACK_HEIGHT: f32 = 4.0;

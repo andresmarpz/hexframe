@@ -14,7 +14,7 @@ const MESSAGE_ROWS: usize = 5;
 const SUBTITLE: &str = "Tell us what went wrong or what you'd like to see.";
 pub(crate) const THANKS: &str = "Thanks, we got it.";
 
-pub(super) fn dialog(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<f32>) {
+pub(crate) fn dialog(s: &Ui, k: &Kit, layer: &mut Vec<El>, window_height: Option<f32>) {
     let feedback = &s.feedback;
     if !feedback.open {
         return;

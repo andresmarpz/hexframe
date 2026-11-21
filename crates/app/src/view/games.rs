@@ -6,8 +6,8 @@ use std::rc::Rc;
 use rune::{El, Key, LoopSpec, Tx, col, el, text};
 use rune_kit::{Button, ButtonVariant, Kit, Sidebar, SidebarHeader, TextInput, glyphs};
 
-use super::clearable::clear_when_filled;
-use super::grip::grip;
+use super::widgets::clear_when_filled;
+use super::widgets::grip;
 use crate::ui::library::format::summary;
 use crate::ui::{ListItem, PaneEdge, Ui};
 
@@ -171,6 +171,6 @@ fn footer(s: &Ui, k: &Kit) -> El {
         .color(k.c.text_faint)
         .truncate()
         .px(8.0)
-        .pb(super::dock_clearance(s))
+        .pb(super::layout::dock_clearance(s))
         .a11y_hidden()
 }

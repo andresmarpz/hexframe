@@ -20,8 +20,8 @@ use rune_kit::{
     Toolbar, glyphs,
 };
 
-use super::champion::champion_icon;
-use super::delete::delete_key;
+use super::overlays::delete_key;
+use super::widgets::champion::champion_icon;
 use crate::ui::library::format::{kda, mode_label, total_time, when};
 use crate::ui::{ReviewState, Ui, format_clock};
 

@@ -10,7 +10,7 @@ use jiff::Zoned;
 use rune::{Color, El, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
 
-use super::champion::champion_icon;
+use super::widgets::champion::champion_icon;
 use super::{card, title_style};
 use crate::ui::library::format::mode_label;
 use crate::ui::{Detail, Ui, format_clock};

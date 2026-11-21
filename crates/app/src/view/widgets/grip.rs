@@ -5,7 +5,7 @@ use crate::ui::{PaneEdge, Ui};
 const GRIP_WIDTH: f32 = 6.0;
 const STEP: f64 = 8.0;
 
-pub(super) fn grip(s: &Ui, edge: PaneEdge, key: &'static str, label: &'static str) -> El {
+pub(crate) fn grip(s: &Ui, edge: PaneEdge, key: &'static str, label: &'static str) -> El {
     let range = edge.range();
     el().key(key)
         .role("separator")

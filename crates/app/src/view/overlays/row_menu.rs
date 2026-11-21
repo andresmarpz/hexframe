@@ -5,7 +5,7 @@ use rune_kit::{Kit, Menu, MenuItem};
 use crate::ui::Ui;
 use crate::ui::library::format::{death_hint, death_total};
 
-pub(super) fn menu(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
+pub(crate) fn menu(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
     let Some(open) = s.row_menu() else {
         return;
     };
