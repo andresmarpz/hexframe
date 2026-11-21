@@ -22,3 +22,6 @@ pub(crate) fn format_size_rate(mb_per_minute: f64, native_height: Option<u32>) -
     let suffix = native_height.map_or(String::new(), |h| format!(" ({h}p)"));
     format!("About {per_minute:.0} MB per minute at these settings{suffix}.")
 }
+
+#[cfg(test)]
+mod tests;
