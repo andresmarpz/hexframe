@@ -1,18 +1,18 @@
 use rune::Icon;
 
-pub(super) static LOGO: Icon = Icon {
+pub(in crate::view::shell) static LOGO: Icon = Icon {
     name: "greyscreen-logo",
     view: 1024.0,
     body: r#"<path fill="currentColor" fill-rule="evenodd" d="M468,101.4A88,88 0 0 1 556,101.4L845.59,268.6A88,88 0 0 1 889.59,344.81L889.59,679.19A88,88 0 0 1 845.59,755.4L556,922.6A88,88 0 0 1 468,922.6L178.41,755.4A88,88 0 0 1 134.41,679.19L134.41,344.81A88,88 0 0 1 178.41,268.6ZM248.6,346.07A24,24 0 0 0 236.6,366.86L236.6,657.14A24,24 0 0 0 248.6,677.93L500,823.07A24,24 0 0 0 524,823.07L775.4,677.93A24,24 0 0 0 787.4,657.14L787.4,366.86A24,24 0 0 0 775.4,346.07L524,200.93A24,24 0 0 0 500,200.93Z"/><path fill="currentColor" d="M682,487.75A28,28 0 0 1 682,536.25L448,671.35A28,28 0 0 1 406,647.1L406,376.9A28,28 0 0 1 448,352.65Z"/>"#,
 };
 
-pub(super) static HOME: Icon = Icon {
+pub(in crate::view::shell) static HOME: Icon = Icon {
     name: "greyscreen-home",
     view: 16.0,
     body: r#"<path d="M2.5 7.4 8 2.6l5.5 4.8M4 6.4V13h8V6.4M6.5 13V9.5h3V13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#,
 };
 
-pub(super) static GAMES: Icon = Icon {
+pub(in crate::view::shell) static GAMES: Icon = Icon {
     name: "greyscreen-games",
     view: 16.0,
     body: concat!(
@@ -21,7 +21,7 @@ pub(super) static GAMES: Icon = Icon {
     ),
 };
 
-pub(super) static CLIPS: Icon = Icon {
+pub(in crate::view::shell) static CLIPS: Icon = Icon {
     name: "greyscreen-clips",
     view: 16.0,
     body: concat!(
@@ -30,7 +30,7 @@ pub(super) static CLIPS: Icon = Icon {
     ),
 };
 
-pub(super) static GEAR: Icon = Icon {
+pub(in crate::view::shell) static GEAR: Icon = Icon {
     name: "greyscreen-gear",
     view: 16.0,
     body: concat!(

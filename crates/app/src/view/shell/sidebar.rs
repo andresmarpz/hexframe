@@ -1,4 +1,4 @@
-mod icons;
+pub(super) mod icons;
 mod status;
 
 use rune::tok::type_;

@@ -1,4 +1,5 @@
 use greyscreen_core::keybinds::Action;
+use greyscreen_core::settings::NavStyle;
 use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
 use rune::{PointerPress, TextEdit};
@@ -32,6 +33,11 @@ fn sheet(ui: &mut Ui, section: SettingsSection) {
     ui.open_settings(section);
 }
 
+fn docked(ui: &mut Ui) {
+    idle(ui);
+    ui.settings.nav_style = NavStyle::Dock;
+}
+
 fn demo(ui: &mut Ui) {
     home(ui);
     ui.recordings = preview::demo_recordings();
@@ -43,6 +49,14 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.last_game = ui.recordings.first().cloned();
     }),
     ("demo", demo),
+    ("dock", |ui| {
+        docked(ui);
+        ui.go(Screen::Home);
+    }),
+    ("dock-games", |ui| {
+        docked(ui);
+        ui.open_review_entry(preview::review_entry());
+    }),
     ("home-first-run", |ui| {
         first_run(ui);
         ui.go(Screen::Home);

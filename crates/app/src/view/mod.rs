@@ -9,6 +9,7 @@ mod settings;
 mod shell;
 pub(crate) mod thumb;
 
+use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::NoticeLevel;
 use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
 use rune_kit::{Kit, Page, SplitView, Toast, ToastRegion, Toolbar};
@@ -46,45 +47,73 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 }
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
-    let screen = match s.screen {
-        Screen::Home => home_screen(s, k),
-        Screen::Games => games_screen(s, k, cx),
-        Screen::Clips => clips_screen(s, k),
-    };
-    row()
-        .key("window")
-        .w_full()
-        .h_full()
-        .fill(k.c.bg_deep)
-        .child(shell::sidebar::panel(s, k, cx.titlebar_inset()))
-        .child(col().grow(1.0).min_w(0.0).h_full().child(screen))
+    match s.settings.nav_style {
+        NavStyle::Sidebar => row()
+            .key("window")
+            .w_full()
+            .h_full()
+            .fill(k.c.bg_deep)
+            .child(shell::sidebar::panel(s, k, cx.titlebar_inset()))
+            .child(
+                col()
+                    .grow(1.0)
+                    .min_w(0.0)
+                    .h_full()
+                    .child(screen(s, k, cx, 0.0)),
+            ),
+        NavStyle::Dock => col()
+            .key("window")
+            .w_full()
+            .h_full()
+            .fill(k.c.bg_deep)
+            .child(
+                col()
+                    .w_full()
+                    .grow(1.0)
+                    .min_h(0.0)
+                    .child(screen(s, k, cx, cx.titlebar_inset())),
+            )
+            .child(shell::dock::layer(s, k)),
+    }
 }
 
-fn home_screen(s: &Ui, k: &Kit) -> El {
+fn screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
+    match s.screen {
+        Screen::Home => home_screen(s, k, inset),
+        Screen::Games => games_screen(s, k, cx, inset),
+        Screen::Clips => clips_screen(s, k, inset),
+    }
+}
+
+fn home_screen(s: &Ui, k: &Kit, inset: f32) -> El {
     let (main, toolbar) = match s.detail() {
         Detail::Live => (
-            fixed_content(home::page(s, k)),
+            fixed_content(s, home::page(s, k)),
             Toolbar::new().title("Recording"),
         ),
-        _ => (scrolling_content(home::page(s, k)), Toolbar::new()),
+        _ => (scrolling_content(s, home::page(s, k)), Toolbar::new()),
     };
-    Page::new(main).toolbar(toolbar).build(k)
-}
-
-fn clips_screen(s: &Ui, k: &Kit) -> El {
-    Page::new(scrolling_content(clips::page(s, k)))
-        .title("Clips")
+    Page::new(main)
+        .toolbar(toolbar)
+        .titlebar_inset(inset)
         .build(k)
 }
 
-fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
+fn clips_screen(s: &Ui, k: &Kit, inset: f32) -> El {
+    Page::new(scrolling_content(s, clips::page(s, k)))
+        .title("Clips")
+        .titlebar_inset(inset)
+        .build(k)
+}
+
+fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>, inset: f32) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
         (Detail::Game, Some(review)) => (review::page(s, k), review::toolbar(review, k)),
         (Detail::Live, _) => (
-            fixed_content(home::page(s, k)),
+            fixed_content(s, home::page(s, k)),
             Toolbar::new().title("Recording"),
         ),
-        _ => (fixed_content(games::pick(s, k)), Toolbar::new()),
+        _ => (fixed_content(s, games::pick(s, k)), Toolbar::new()),
     };
     SplitView::new(main)
         .sidebar(
@@ -93,6 +122,7 @@ fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
             games::content(s, k),
         )
         .toolbar(toolbar)
+        .titlebar_inset(inset)
         .reduced_motion(cx.is_reduced_motion())
         .build(k)
 }
@@ -106,28 +136,35 @@ fn content_column() -> El {
         .items_center()
 }
 
-fn page_column() -> El {
+fn page_column(s: &Ui) -> El {
     col()
         .key("page")
         .w_full()
         .max_w(PAGE_MAX_WIDTH)
         .px(PAGE_GUTTER)
         .pt(20.0)
-        .pb(PAGE_GUTTER)
+        .pb(PAGE_GUTTER.max(dock_clearance(s)))
         .gap(16.0)
 }
 
-fn fixed_content(page: El) -> El {
-    content_column().child(page_column().h_full().min_h(0.0).child(page))
+fn dock_clearance(s: &Ui) -> f32 {
+    match s.settings.nav_style {
+        NavStyle::Sidebar => 0.0,
+        NavStyle::Dock => shell::dock::CLEARANCE,
+    }
 }
 
-fn scrolling_content(page: El) -> El {
+fn fixed_content(s: &Ui, page: El) -> El {
+    content_column().child(page_column(s).h_full().min_h(0.0).child(page))
+}
+
+fn scrolling_content(s: &Ui, page: El) -> El {
     content_column()
         .scroll(ScrollSpec {
             stick_bottom: false,
         })
         .scroll_edge_fade(SCROLL_FADE)
-        .child(page_column().child(page))
+        .child(page_column(s).child(page))
 }
 
 fn card(k: &Kit) -> El {

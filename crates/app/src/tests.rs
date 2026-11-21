@@ -10,6 +10,7 @@ use crate::view;
 mod clips_screen;
 mod coach;
 mod death_review;
+mod dock;
 mod keybinds;
 mod match_flow;
 mod nav;
@@ -42,7 +43,7 @@ fn live_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
 }
 
 fn tap(rt: &mut Runtime<Ui>, key: &str) {
-    if rt.state.settings_open && key != "nav-settings" {
+    if rt.state.settings_open && key != "nav-settings" && key != "dock-settings" {
         let target = key.to_owned();
         rt.update(move |_, tx| tx.scroll_into_view(target));
         for _ in 0..40 {
