@@ -32,6 +32,6 @@ pub(super) fn grip(s: &Ui, edge: PaneEdge, key: &'static str, label: &'static st
             },
         )
         .on_double_press(move |ui: &mut Ui| ui.reset_pane_edge(edge))
-        .on_step(move |ui: &mut Ui, steps, _| ui.step_pane_edge(edge, steps as i32))
+        .on_step(move |ui: &mut Ui, steps, _| ui.step_pane_edge(edge, steps))
         .focusable(false)
 }
