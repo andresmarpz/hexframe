@@ -106,16 +106,21 @@ web-deploy:
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy --prebuilt --prod --yes
     for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen-lake.vercel.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
-# Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
-# The full gate and the Windows build run side by side.
-[parallel]
-release tag: ci dist
+# The tree must be clean and its commit already on origin/main. The release tags that commit, so later pushes to main do not stop it.
+# Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
+release tag:
     git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
-    git fetch -q origin && test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || { echo "push main first"; exit 1; }
+    git fetch -q origin && git merge-base --is-ancestor HEAD origin/main || { echo "push main first"; exit 1; }
     version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1); test "{{tag}}" = "v$version" || { echo "tag {{tag}} must equal v$version: set the workspace version to the full release version first"; exit 1; }
+    just release-publish {{tag}} "$(git rev-parse HEAD)"
+
+# The full gate and the Windows build run side by side.
+[parallel, private]
+release-publish tag sha: ci dist
+    test "$(git rev-parse HEAD)" = "{{sha}}" || { echo "HEAD moved during the build, release not published"; exit 1; }
     scripts/release-meta.sh notes {{tag}} > dist/notes.md
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt -R andresmarpz/greyscreen --target main --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
+    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt -R andresmarpz/greyscreen --target {{sha}} --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
     just web-deploy
 
 # Rewrites the title and notes of every published release from its changelog entry.
