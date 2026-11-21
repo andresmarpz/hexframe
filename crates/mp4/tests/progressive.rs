@@ -1,3 +1,6 @@
+#[macro_use]
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -185,10 +188,6 @@ fn faststart(media: &Media) -> Vec<u8> {
     [head, moov, mdat(&layout.payload)].concat()
 }
 
-fn tool_available(name: &str) -> bool {
-    Command::new(name).arg("-version").output().is_ok()
-}
-
 struct TempFile(PathBuf);
 
 impl TempFile {
@@ -272,15 +271,6 @@ fn verify_playable(file: &TempFile) {
         "decode errors: {}",
         String::from_utf8_lossy(&decode.stderr)
     );
-}
-
-macro_rules! require_ffmpeg {
-    () => {
-        if !(tool_available("ffprobe") && tool_available("ffmpeg")) {
-            eprintln!("skipped: ffprobe or ffmpeg is not on PATH");
-            return;
-        }
-    };
 }
 
 #[test]

@@ -1,3 +1,6 @@
+#[macro_use]
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -126,19 +129,6 @@ fn packets(media: &Media, loops: usize, with_audio: bool) -> Vec<Packet> {
     }
     timed.sort_by(|a, b| a.0.total_cmp(&b.0));
     timed.into_iter().map(|(_, p)| p).collect()
-}
-
-fn tool_available(name: &str) -> bool {
-    Command::new(name).arg("-version").output().is_ok()
-}
-
-macro_rules! require_ffmpeg {
-    () => {
-        if !(tool_available("ffprobe") && tool_available("ffmpeg")) {
-            eprintln!("skipped: ffprobe or ffmpeg is not on PATH");
-            return;
-        }
-    };
 }
 
 struct TempPath(PathBuf);
