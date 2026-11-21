@@ -59,9 +59,15 @@ web-deploy:
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy apps/web/dist --prod --yes
 
 # Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
-# A tag with a dash (v0.2.0-preview.1) becomes a prerelease.
-release tag notes="": ci dist
+# Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
+release tag: ci dist
     git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
     git fetch -q origin && test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || { echo "push main first"; exit 1; }
     version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1); case "{{tag}}" in v$version*) ;; *) echo "tag {{tag}} does not match version $version"; exit 1;; esac
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt -R andresmarpz/greyscreen --target main --title "{{tag}}" --notes "{{notes}}" {{ if tag =~ '-' { "--prerelease" } else { "" } }}
+    scripts/release-meta.sh notes {{tag}} > dist/notes.md
+    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt -R andresmarpz/greyscreen --target main --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
+    just web-deploy
+
+# Rewrites the title and notes of every published release from its changelog entry.
+release-sync:
+    for entry in apps/web/src/content/changelog/*.md; do v=$(basename "$entry" .md); GH_TOKEN=$(gh auth token --user andresmarpz) gh release edit "v$v" -R andresmarpz/greyscreen --title "$(scripts/release-meta.sh title "$v")" --notes "$(scripts/release-meta.sh notes "$v")"; done
