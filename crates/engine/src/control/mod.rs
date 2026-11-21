@@ -1,7 +1,9 @@
+mod clips;
 mod effects;
 mod meta;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -10,10 +12,13 @@ use crossbeam_channel::{Receiver, Sender, never, select, tick, unbounded};
 use greyscreen_core::media::{MediaEvent, MediaSession, MediaSource};
 use greyscreen_core::session::{Input, Session, SessionState, Status};
 use greyscreen_core::settings::Settings;
-use greyscreen_core::time::mono_now;
+use greyscreen_core::time::{Hns, mono_now, secs_to_hns};
 use greyscreen_league::LeagueMsg;
 
 use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
+use crate::clipjob::ClipResult;
+use crate::library;
+use crate::settings_save::SettingsSaver;
 use crate::writer::Report;
 use meta::Recording;
 
@@ -25,6 +30,13 @@ pub(crate) type Sink = Arc<dyn Fn(UiMsg) + Send + Sync>;
 pub(crate) enum Internal {
     MediaStopped(u64),
     WriterDone(Report),
+    ClipDone(ClipResult),
+}
+
+pub(crate) struct Spec {
+    pub(crate) settings: Settings,
+    pub(crate) media: Arc<dyn MediaSource>,
+    pub(crate) settings_path: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -49,11 +61,12 @@ struct Control {
     internal_tx: Sender<Internal>,
     internal_rx: Receiver<Internal>,
     shutting_down: bool,
+    test_stop_at: Option<Hns>,
+    settings_saver: SettingsSaver,
 }
 
 pub(crate) fn spawn(
-    settings: Settings,
-    media: Arc<dyn MediaSource>,
+    spec: Spec,
     guard: LeagueGuard,
     league_rx: Receiver<LeagueMsg>,
     cmd_rx: Receiver<EngineCmd>,
@@ -64,7 +77,7 @@ pub(crate) fn spawn(
         .spawn(move || {
             let panic_sink = sink.clone();
             let outcome = catch_unwind(AssertUnwindSafe(|| {
-                Control::new(settings, media, sink).run(cmd_rx, league_rx);
+                Control::new(spec, sink).run(cmd_rx, league_rx);
             }));
             if outcome.is_err() {
                 tracing::error!("engine control thread panicked");
@@ -86,9 +99,16 @@ pub(crate) fn spawn(
 }
 
 impl Control {
-    fn new(settings: Settings, media: Arc<dyn MediaSource>, sink: Sink) -> Self {
+    fn new(spec: Spec, sink: Sink) -> Self {
+        let Spec {
+            settings,
+            media,
+            settings_path,
+        } = spec;
         let (internal_tx, internal_rx) = unbounded();
         Self {
+            settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
+            test_stop_at: None,
             session: Session::new(settings.auto_record),
             settings,
             media,
@@ -108,6 +128,7 @@ impl Control {
 
     fn run(mut self, mut cmd_rx: Receiver<EngineCmd>, mut league_rx: Receiver<LeagueMsg>) {
         let ticker = tick(TICK);
+        library::spawn_startup(self.settings.output_dir.clone(), self.sink.clone());
         let mut deadline: Option<Instant> = None;
         loop {
             let media_rx = self.media_rx.clone();
@@ -150,9 +171,11 @@ impl Control {
             EngineCmd::Shutdown => self.shutting_down = true,
             EngineCmd::StopRecording => self.feed(Input::UserStop),
             EngineCmd::ApplySettings(settings) => self.apply_settings(settings),
-            EngineCmd::StartTestRecording { .. }
-            | EngineCmd::RescanLibrary
-            | EngineCmd::SaveClipNow => tracing::debug!(?cmd, "command not handled yet"),
+            EngineCmd::StartTestRecording { secs } => self.start_test_recording(secs),
+            EngineCmd::RescanLibrary => {
+                library::spawn_scan(self.settings.output_dir.clone(), self.sink.clone());
+            }
+            EngineCmd::SaveClipNow => self.save_clip_now(),
         }
     }
 
@@ -160,6 +183,7 @@ impl Control {
         settings.validate();
         let auto_record = settings.auto_record;
         let keep = effects::ring_keep(&settings);
+        self.settings_saver.save(settings.clone());
         self.settings = settings;
         if let Some(recording) = self.recording.as_mut() {
             recording.ring.set_keep(keep);
@@ -182,11 +206,37 @@ impl Control {
     fn on_tick(&mut self) {
         let now = mono_now();
         self.feed(Input::Tick(now));
+        self.stop_test_recording(now);
+        self.run_due_clips(now);
         if let Some(recording) = self.recording.as_mut()
             && recording.sidecar_due(now)
             && let Err(err) = recording.write_sidecar(now)
         {
             tracing::warn!(%err, "cannot write recording sidecar");
+        }
+    }
+
+    fn start_test_recording(&mut self, secs: u32) {
+        self.feed(Input::UserStart);
+        if matches!(self.session.state(), SessionState::Starting { .. }) {
+            self.test_stop_at = Some(mono_now() + secs_to_hns(f64::from(secs)));
+        }
+    }
+
+    fn stop_test_recording(&mut self, now: Hns) {
+        let Some(stop_at) = self.test_stop_at else {
+            return;
+        };
+        if now < stop_at {
+            return;
+        }
+        match self.session.state() {
+            SessionState::Starting { .. } => {}
+            SessionState::Recording { manual: true, .. } => {
+                self.test_stop_at = None;
+                self.feed(Input::UserStop);
+            }
+            _ => self.test_stop_at = None,
         }
     }
 

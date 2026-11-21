@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
@@ -6,6 +6,7 @@ use crossbeam_channel::{Sender, unbounded};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::media::MediaSource;
+use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
 use greyscreen_league::{GameLocator, LeagueMsg, LiveClient, Poller};
 
@@ -46,6 +47,7 @@ pub struct FeedItem {
 pub struct RecordingEntry {
     pub meta: RecordingMeta,
     pub folder: PathBuf,
+    pub size_bytes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,22 +89,111 @@ fn default_locator() -> Box<dyn GameLocator> {
     Box::new(greyscreen_league::AlwaysPresent)
 }
 
+pub struct EngineConfig {
+    pub settings: Settings,
+    pub media: Arc<dyn MediaSource>,
+    pub league: LeagueFactory,
+    pub sink: UiSink,
+    pub settings_path: Option<PathBuf>,
+}
+
+impl std::fmt::Debug for EngineConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EngineConfig")
+            .field("settings_path", &self.settings_path)
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Debug)]
 pub struct Engine;
 
 impl Engine {
     pub fn start(
-        mut settings: Settings,
+        settings: Settings,
         media: Arc<dyn MediaSource>,
         league: LeagueFactory,
         sink: UiSink,
     ) -> EngineHandle {
+        Self::start_with(EngineConfig {
+            settings,
+            media,
+            league,
+            sink,
+            settings_path: Some(paths::settings_file()),
+        })
+    }
+
+    pub fn start_with(config: EngineConfig) -> EngineHandle {
+        let EngineConfig {
+            mut settings,
+            media,
+            league,
+            sink,
+            settings_path,
+        } = config;
         settings.validate();
         let (cmd, cmd_rx) = unbounded();
         let (league_tx, league_rx) = unbounded();
         let guard = league(league_tx);
-        let thread = control::spawn(settings, media, guard, league_rx, cmd_rx, Arc::from(sink));
+        let thread = control::spawn(
+            control::Spec {
+                settings,
+                media,
+                settings_path,
+            },
+            guard,
+            league_rx,
+            cmd_rx,
+            Arc::from(sink),
+        );
         EngineHandle { cmd, thread }
+    }
+}
+
+pub fn reveal(path: &Path) {
+    let path = path.to_path_buf();
+    let spawned = std::thread::Builder::new()
+        .name("reveal".into())
+        .spawn(move || reveal_now(&path));
+    if let Err(err) = spawned {
+        tracing::warn!(%err, "cannot start reveal thread");
+    }
+}
+
+#[cfg(windows)]
+fn reveal_now(path: &Path) {
+    let mut command = std::process::Command::new("explorer.exe");
+    if path.is_dir() {
+        command.arg(path);
+    } else {
+        let mut select = std::ffi::OsString::from("/select,");
+        select.push(path);
+        command.arg(select);
+    }
+    run_viewer(command);
+}
+
+#[cfg(target_os = "macos")]
+fn reveal_now(path: &Path) {
+    let mut command = std::process::Command::new("open");
+    if !path.is_dir() {
+        command.arg("-R");
+    }
+    command.arg(path);
+    run_viewer(command);
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn reveal_now(path: &Path) {
+    tracing::debug!(path = %path.display(), "reveal is not supported on this platform");
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+fn run_viewer(mut command: std::process::Command) {
+    // explorer.exe returns a nonzero exit code even when it succeeds
+    if let Err(err) = command.status() {
+        tracing::warn!(%err, "cannot reveal path");
     }
 }
 

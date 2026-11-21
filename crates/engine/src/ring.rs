@@ -56,7 +56,6 @@ impl ClipRing {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn range(&self, start: Hns, end: Hns) -> Vec<Arc<Packet>> {
         let idrs = || self.packets.iter().filter(|p| is_idr(p));
         let first = idrs()

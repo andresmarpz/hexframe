@@ -3,11 +3,14 @@ mod clipjob;
 mod control;
 pub mod fake;
 mod library;
+mod recovery;
 mod ring;
+mod settings_save;
 mod writer;
 
 pub use api::{
-    ClipEntry, Engine, EngineCmd, EngineHandle, EngineStatus, FeedItem, LeagueFactory, LeagueGuard,
-    NoticeLevel, RecordingEntry, UiMsg, UiSink, league_factory_default,
+    ClipEntry, Engine, EngineCmd, EngineConfig, EngineHandle, EngineStatus, FeedItem,
+    LeagueFactory, LeagueGuard, NoticeLevel, RecordingEntry, UiMsg, UiSink, league_factory_default,
+    reveal,
 };
 pub use fake::FakeMediaSource;

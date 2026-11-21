@@ -2,6 +2,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::thread;
 
 use crossbeam_channel::{bounded, never};
+use greyscreen_core::clips::ClipPlanner;
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
 use greyscreen_core::highlight::classify;
 use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
@@ -14,15 +15,17 @@ use jiff::Zoned;
 use super::meta::{self, Recording};
 use super::{Control, Internal, StartedMedia};
 use crate::api::{FeedItem, NoticeLevel, RecordingEntry, UiMsg};
+use crate::library;
 use crate::ring::ClipRing;
 use crate::writer::{GameWriter, VIDEO_FILE};
 
-const DEFAULT_NATIVE_HEIGHT: u32 = 1080;
+const NATIVE_HEIGHT_CEILING: u32 = 2160;
 const MEDIA_QUEUE: usize = 1024;
 const RING_MARGIN_SECS: u32 = 5;
 
 pub(super) fn ring_keep(settings: &Settings) -> Hns {
-    let secs = settings.clips.pre_secs + settings.clips.post_secs + RING_MARGIN_SECS;
+    let clip_secs = settings.clips.pre_secs + settings.clips.post_secs;
+    let secs = clip_secs.max(super::clips::MANUAL_CLIP_SECS) + RING_MARGIN_SECS;
     secs_to_hns(f64::from(secs))
 }
 
@@ -58,7 +61,7 @@ impl Control {
     }
 
     fn start_media(&mut self, target: CaptureTarget) {
-        let cfg = self.settings.capture_config(DEFAULT_NATIVE_HEIGHT);
+        let cfg = self.settings.capture_config(NATIVE_HEIGHT_CEILING);
         let (tx, rx) = bounded(MEDIA_QUEUE);
         match self.media.start(target, cfg, tx) {
             Ok(session) => {
@@ -129,6 +132,7 @@ impl Control {
             });
             recording.dirty = true;
         }
+        self.plan_clip(event.at, event.id, &highlights);
         let item: FeedItem = meta::feed_item(&event, rec_secs, highlights);
         self.send(UiMsg::Feed(item));
     }
@@ -172,6 +176,7 @@ impl Control {
     pub(super) fn on_internal(&mut self, msg: Internal) {
         match msg {
             Internal::MediaStopped(generation) => self.on_media_stopped(generation),
+            Internal::ClipDone(result) => self.on_clip_done(result),
             Internal::WriterDone(report) => {
                 if let Some(recording) = self.recording.as_mut() {
                     recording.report = Some(report);
@@ -248,6 +253,16 @@ impl Control {
             media_stopped: false,
             dirty: false,
             last_write: mono_now(),
+            planner: self.settings.clips.enabled.then(|| {
+                ClipPlanner::new(
+                    secs_to_hns(f64::from(self.settings.clips.pre_secs)),
+                    secs_to_hns(f64::from(self.settings.clips.post_secs)),
+                )
+            }),
+            queued: Vec::new(),
+            pending_clips: 0,
+            clips_flushed: false,
+            clip_names: Default::default(),
         };
         if let Err(err) = recording.write_sidecar(mono_now()) {
             tracing::warn!(%err, "cannot write recording sidecar");
@@ -282,7 +297,8 @@ impl Control {
         }
     }
 
-    fn try_complete(&mut self) {
+    pub(super) fn try_complete(&mut self) {
+        self.flush_clips();
         let Some(mut recording) = self.recording.take_if(|r| r.ready()) else {
             return;
         };
@@ -311,8 +327,10 @@ impl Control {
                 format!("Cannot save recording details: {err}"),
             );
         }
+        self.test_stop_at = None;
         self.feed(Input::Finalized);
         self.send(UiMsg::RecordingSaved(RecordingEntry {
+            size_bytes: library::size_bytes(&recording.folder),
             meta: recording.meta,
             folder: recording.folder,
         }));

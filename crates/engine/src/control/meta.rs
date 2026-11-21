@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use greyscreen_core::clips::{ClipPlan, ClipPlanner};
 use greyscreen_core::game::{GameInfo, GameResult, Player, Team, TimedEvent};
 use greyscreen_core::highlight::Highlight;
 use greyscreen_core::library::{self, RecordingMeta};
@@ -17,7 +19,6 @@ const SIDECAR_DEBOUNCE: Hns = 5 * HNS_PER_SEC;
 const MANUAL_NAME: &str = "Test";
 const MANUAL_MODE: &str = "MANUAL";
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(super) struct Recording {
     pub(super) meta: RecordingMeta,
@@ -32,6 +33,11 @@ pub(super) struct Recording {
     pub(super) media_stopped: bool,
     pub(super) dirty: bool,
     pub(super) last_write: Hns,
+    pub(super) planner: Option<ClipPlanner>,
+    pub(super) queued: Vec<ClipPlan>,
+    pub(super) pending_clips: usize,
+    pub(super) clips_flushed: bool,
+    pub(super) clip_names: HashSet<String>,
 }
 
 impl Recording {
@@ -57,6 +63,8 @@ impl Recording {
         self.result.is_some()
             && self.media_stopped
             && (self.writer.is_none() || self.report.is_some())
+            && self.clips_flushed
+            && self.pending_clips == 0
     }
 
     pub(super) fn write_sidecar(&mut self, now: Hns) -> Result<(), library::LibraryError> {
