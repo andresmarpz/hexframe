@@ -9,6 +9,8 @@ const SIZE: (u32, u32) = (320, 180);
 const LAST: u32 = 359;
 /// Beats come once a second, so a window of 2.2 s always holds two.
 const LAYER_RUN: f64 = 2.7;
+/// How long a seek may show the picture from before it.
+const SEEK_MS: f64 = 250.0;
 
 fn secs(d: f64) -> Duration {
     Duration::from_secs_f64(d)
@@ -105,10 +107,17 @@ fn a_seek_lands_on_its_picture_paused_and_playing() {
     fake::take();
     rig.player.seek(1.0);
     let sought = Instant::now();
+    // Until the seek's first picture is decoded, the surface keeps the one from before it.
+    let landed = rig.until(1.0, "the seek while playing", |_, s| s.picture == Some(frame_of(s.time)));
+    let took = landed.at.duration_since(sought).as_secs_f64() * 1000.0;
+    eprintln!("the seek while playing showed its picture after {took:.1} ms");
+    assert!(took < SEEK_MS, "the seek while playing showed its picture after {took:.1} ms");
+    assert!((landed.time - 1.0).abs() < 0.5 / FPS, "the seek while playing landed at {:.4}", landed.time);
     let shots = rig.run(2.5);
     assert_pictures_follow(&shots, "after a seek while playing");
     let time = rig.player.time();
-    assert!((time - 3.5).abs() < 0.25, "2.5 s after a seek to 1 s the time is {time:.3}");
+    let expected = landed.time + landed.at.elapsed().as_secs_f64();
+    assert!((time - expected).abs() < 0.25, "2.5 s after the seek landed the time is {time:.3}, not {expected:.3}");
     assert_in_sync(&rig, &fake::take(), sought + secs(0.5), "after a seek");
 }
 
