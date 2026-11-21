@@ -1,3 +1,4 @@
+mod doctor;
 mod fake_league;
 
 use std::path::PathBuf;
@@ -35,7 +36,8 @@ fn main() -> ExitCode {
             speed,
             script,
         } => finish(run_fake_league(port, speed, script)),
-        Command::Doctor | Command::Record | Command::Recover => {
+        Command::Doctor => doctor::run(),
+        Command::Record | Command::Recover => {
             eprintln!("not implemented yet");
             ExitCode::from(2)
         }
