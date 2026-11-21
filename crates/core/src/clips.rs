@@ -70,7 +70,9 @@ impl ClipPlanner {
             && end - open.start <= MAX_PLAN
         {
             open.end = open.end.max(end);
-            open.labels.push(label.to_owned());
+            if !open.labels.iter().any(|known| known == label) {
+                open.labels.push(label.to_owned());
+            }
             open.events.push(event_id);
             return;
         }

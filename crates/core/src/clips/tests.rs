@@ -140,3 +140,16 @@ fn flush_returns_pending_plans_in_order_and_empties_the_planner() {
     assert_eq!(labels, ["A", "B"]);
     assert!(p.flush().is_empty());
 }
+
+#[test]
+fn merged_plans_list_each_label_once() {
+    let mut planner =
+        ClipPlanner::new(crate::time::secs_to_hns(5.0), crate::time::secs_to_hns(5.0));
+    planner.on_highlight(crate::time::secs_to_hns(10.0), "MyKill", 1);
+    planner.on_highlight(crate::time::secs_to_hns(12.0), "MyKill", 2);
+    planner.on_highlight(crate::time::secs_to_hns(13.0), "Dragon", 3);
+    let plans = planner.flush();
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].label, "MyKill+Dragon");
+    assert_eq!(plans[0].events, vec![1, 2, 3]);
+}
