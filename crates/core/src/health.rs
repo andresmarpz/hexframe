@@ -89,12 +89,16 @@ impl RecordingHealth {
                 Level::Bad => "audio bad".to_owned(),
             });
         }
-        parts.push(format!(
-            "{:.0} Mbps",
-            f64::from(self.avg_bitrate_kbps) / 1000.0
-        ));
+        let mbps = format!("{:.1}", f64::from(self.avg_bitrate_kbps) / 1000.0);
+        parts.push(format!("{} Mbps", mbps.trim_end_matches(".0")));
         parts.join(" · ")
     }
+}
+
+pub const HEALTH_SINCE: &str = "0.1.11-preview.14";
+
+pub fn no_health_text() -> String {
+    format!("No health data (recorded before {HEALTH_SINCE})")
 }
 
 pub fn ticks_to_ms(ticks: i64, timescale: u32) -> f64 {

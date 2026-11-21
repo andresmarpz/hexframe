@@ -24,6 +24,7 @@ const FPS_WIDTH: f32 = 120.0;
 const SOUND_VOLUME_WIDTH: f32 = 200.0;
 const PERCENT_WIDTH: f32 = 32.0;
 const RESOLUTION_WIDTH: f32 = 180.0;
+const DIAGNOSTICS_NOTE: &str = "Saves a per-second log next to each recording, for finding stutter. Applies to your next game.";
 const NEXT_GAME: &str =
     "Recording now. Quality, resolution and frame rate changes apply to your next game.";
 
@@ -115,6 +116,14 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
             ),
             settings.sound_effects,
             |ui| ui.change(|s| s.sound_effects = !s.sound_effects),
+        ),
+        Row::Diagnostics => toggle_row(
+            k,
+            "recording-diagnostics",
+            "Detailed recording diagnostics",
+            Some(DIAGNOSTICS_NOTE),
+            settings.recording_diagnostics,
+            |ui| ui.change(|s| s.recording_diagnostics = !s.recording_diagnostics),
         ),
         _ => setting_row(
             k,

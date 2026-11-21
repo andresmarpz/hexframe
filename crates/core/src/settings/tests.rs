@@ -636,3 +636,31 @@ fn validate_caps_the_sound_volume() {
     s.validate();
     assert_eq!(s.sound_volume, 100);
 }
+
+#[test]
+fn detailed_diagnostics_are_off_by_default_and_reach_the_capture_config() {
+    let off = Settings::default();
+    assert!(!off.recording_diagnostics);
+    assert!(!off.capture_config(1440).diagnostics);
+    let on = Settings {
+        recording_diagnostics: true,
+        ..Settings::default()
+    };
+    assert!(on.capture_config(1440).diagnostics);
+}
+
+#[test]
+fn the_diagnostics_setting_round_trips_and_older_files_without_it_load_as_off() {
+    let dir = scratch_dir();
+    let path = dir.join("settings.json");
+    let on = Settings {
+        recording_diagnostics: true,
+        ..Settings::default()
+    };
+    on.save(&path).unwrap();
+    assert!(Settings::load(&path).recording_diagnostics);
+    fs::write(&path, r#"{"fps":30}"#).unwrap();
+    let old = Settings::load(&path);
+    assert_eq!(old.fps, 30);
+    assert!(!old.recording_diagnostics);
+}

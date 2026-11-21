@@ -34,13 +34,13 @@ This is the contract every ticket builds against. Each decision cites the resear
 ```
 crates/
   core/     greyscreen-core     Pure logic. Settings, keybinds, events, event categories, classification, clips, session machine, library schema, death review, storage retention, update rules, feedback report, install rules, shared media types. No threads, no OS calls except settings and library file I/O.
-  mp4/      greyscreen-mp4      Pure-Rust MP4: H.264 and AAC helpers, fragmented writer, finalize, clip writer, recovery.
+  mp4/      greyscreen-mp4      Pure-Rust MP4: H.264 and AAC helpers, fragmented writer, finalize, clip writer, recovery, read-only inspect (sample tables of a finished or unfinished file).
   league/   greyscreen-league   Live Client Data API client and poller, champion icon download, GitHub release client for updates, feedback HTTP client. The Windows game-window locator sits behind cfg(windows).
   capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFT, WASAPI, AAC MFT, capture session, global hotkeys, installer, single-instance event, crash filter.
   engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library, makes thumbnails, enforces the storage limit, deletes games, updates, sends feedback. Fake media source for the Mac.
   thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder. macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
   app/      greyscreen          The Rune UI binary. It also holds the setup window.
-  cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `demo` (seeds or clears a fake library).
+  cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `analyze` (recording health report), `demo` (seeds or clears a fake library).
   qa/       greyscreen-qa       Headless UI QA (`docs/qa.md`). A library (case format, locators, tree checks, script compiler, image diff) and a runner binary that drives the app binary through Rune's `--script`, `--tree` and `--snap`. No Greyscreen dependencies; never shipped.
 ```
 
@@ -90,10 +90,13 @@ pub struct CaptureConfig {
     pub audio: bool,
     pub audio_bitrate: u32,      // 192_000
     pub cursor: bool,
+    pub diagnostics: bool,       // Settings.recording_diagnostics: capture also sends Setup and samples CPU and memory
 }
 pub enum MediaEvent {
     Started { t0: Hns, video: VideoFormat, audio: Option<AudioFormat>, encoder: String },
     Packet(Packet),
+    Stats(Box<CaptureStats>),    // about once a second: cumulative counters, see Recording health
+    Setup(Box<CaptureSetup>),    // once after Started, only with diagnostics on
     Warning(String),
     Failed(String),  // the session is dead; the engine stops it
 }
@@ -193,6 +196,7 @@ Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `e
   2026-11-20_19-55-01_Ahri_CLASSIC/
     game.mp4            (game.mp4.part while recording)
     game.json           library sidecar, the source of truth for the UI
+    diagnostics.jsonl   only with Detailed recording diagnostics on, one line per second
     thumb.jpg           game thumbnail, made in the background
     clips/
       12-34_MyKill.mp4
@@ -204,7 +208,7 @@ Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `e
 %LOCALAPPDATA%\Programs\Greyscreen\greyscreen.exe    the installed copy (Windows)
 ```
 
-The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 3339), `duration_secs`, `video` (relative path, empty after the storage limit deleted the video), `game` (`GameInfo` + `result`), `events` (`[{ id, game_secs, rec_secs, kind, highlights }]`), `clips` (`[{ file, start_secs, end_secs, label }]`), `encoder` (string), `video_format` (`width`, `height`, `fps`). It may also hold `review` (`{ deaths: [{ event_id, tags, note }], filter: [category, ...] }`, tags in snake_case from `core::review::DeathTag`, categories in snake_case from `core::categories::EventCategory`). `review.filter` is the per-game event filter: the categories shown for this game only, left out while the game follows the default in Settings. `review` is left out while nothing is tagged, noted or filtered, and older sidecars without it still read. Unknown category names are skipped.
+The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 3339), `duration_secs`, `video` (relative path, empty after the storage limit deleted the video), `game` (`GameInfo` + `result`), `events` (`[{ id, game_secs, rec_secs, kind, highlights }]`), `clips` (`[{ file, start_secs, end_secs, label }]`), `encoder` (string), `video_format` (`width`, `height`, `fps`). It may also hold `review` (`{ deaths: [{ event_id, tags, note }], filter: [category, ...] }`, tags in snake_case from `core::review::DeathTag`, categories in snake_case from `core::categories::EventCategory`). `review.filter` is the per-game event filter: the categories shown for this game only, left out while the game follows the default in Settings. `review` is left out while nothing is tagged, noted or filtered, and older sidecars without it still read. Unknown category names are skipped. It may also hold `health` (see Recording health), written once when the game is finalized and left out for older recordings.
 
 ## Settings (`core::settings`, serde with `#[serde(default)]`)
 
@@ -218,6 +222,7 @@ The sidecar `game.json` (serde, `version: 1`) holds: `id`, `started_at` (RFC 333
 | `fps` | `u32` (30 or 60) | `60` |
 | `audio` | `bool` | `true` |
 | `capture_cursor` | `bool` | `true` |
+| `recording_diagnostics` | `bool`, "Detailed recording diagnostics" (Settings > Recording). Takes effect on the next recording | `false` |
 | `sound_effects` | `bool` | `true` |
 | `sound_volume` | `u32` percent, 0 to 100 | `60` |
 | `clips.enabled` | `bool` | `true` |
@@ -266,12 +271,65 @@ The Keybinds settings page lists every action, rebinds on click, and refuses a k
 - **Review player on Windows.** The review plays the video's own sound on every platform. Rune's `rune-media` is vendored in `vendor/rune-media` with Windows fixes (`vendor/rune-media/GREYSCREEN_PATCHES.md`): its sound is read ahead on a reader of its own and leads the clock, pause on the compositor layer shows the layer's picture and time, and a seek past the last picture shows that picture. So the app pauses with a plain pause and lets a seek reach the clip's end.
 - **Playback logs.** Start Greyscreen with `GREYSCREEN_VIDEO_LOG=1` (quit the running copy first; in PowerShell: `$env:GREYSCREEN_VIDEO_LOG=1; & "$env:LOCALAPPDATA\Programs\Greyscreen\greyscreen.exe"`). Every player call (play, pause, seek, rate, volume, mute, with the player's time and state) then goes to `greyscreen.log` at debug level under the `playback` target. On Windows, Rune's own log (`RUNE_VIDEO_LOG=frames`: phases, layer steps, every pull) goes to `rune-video.log` in the same logs folder.
 - **Nav styles.** `NavStyle::Sidebar` has Home, Games and Clips, the five newest games, an engine status block, a storage block and footer buttons for Send feedback and Settings. The nav sidebar's edge and the list/review divider drag to resize; double-click a handle resets its default, and the widths save when the drag ends. The sidebar folds to a 56-point rail when `sidebar_collapsed` is set or the window is under 1200 points wide; the rail is not resizable. `NavStyle::Dock` removes the sidebar and shows a floating pill at the bottom: record status, Home, Games, Clips, Settings, Send feedback. While a game plays in review the dock slides away until the pointer nears the bottom edge.
+- **Recording health.** The review toolbar has an info IconButton (`review-health`) that opens a kit Popover titled "Recording health". It shows `RecordingHealth::summary_line()` (for example `59.8 fps · 0.3% dropped · audio OK · 18 Mbps`), then one row per `RecordingHealth::findings()`: a kit tone pill (success, warning, danger for OK, WARNING, BAD), the area and the detail. A recording without `health` shows "No health data (recorded before 0.1.11-preview.14)". Pressing outside or the close button closes it.
 - **Event filter.** `core::categories` sorts every event into one `EventCategory` from its kind and whether the local player is involved (`Player::answers_to`): my deaths, kills and assists (in that order when more than one applies), teammates' kills and enemies' kills (kills that do not involve me, by the killer's team, or the victim's team when the killer is not a player), my multikills and others' multikills, aces, dragons, barons, heralds and void grubs, towers and inhibitors, game flow (game start, minions spawning, first blood, first brick, inhibitor respawns, unknown events) and game end. The shown set is `Settings.review_events`; a game's `review.filter` overrides it for that game. It applies to the events list, the timeline markers and Previous/Next event. Death review always uses all my deaths. The Filter menu in the events panel lists every category with a check, plus "Save as my default" (writes the game's set to Settings and drops the override) and "Use my default" (drops the override). A badge shows while the game's set differs from the default. Ticking a category in the menu saves the override at once.
 - **Sound effects** (`crates/app/src/sfx`). Four short sounds from the `soft` pack of Hex (MIT, see `crates/app/assets/sounds/README.md`): recording started, recording saved, clip saved and failed. `Ui::apply` hands every `UiMsg` to `Sfx::on_msg` first, so they play while the window is hidden in the tray. Recording started is a `Status` change into `Recording`. Recording saved is `RecordingSaved`. Clip saved is `ClipSaved` for a manual clip only (`MANUAL_CLIP_LABEL`), so highlight clips stay silent. Failed is an `Error` notice, an `Error` status or a failed feedback send, and a burst of them makes one sound (2 s gap). Nothing plays with `sound_effects` off or `sound_volume` at 0. The wavs are embedded; Rune's audio player opens files, not memory, so a background thread writes them to `<cache>/sounds` at start (repairing stale copies), and each play makes a `Player::audio` clip at the volume, dropped when it ends or after 3 s. A missing file, an unwritable cache or a clip that fails to load only logs. Dragging the volume slider saves on release and plays the clip sound once.
 - **Settings sheet.** Sections: Recording (including the nav style, Sound effects and Sound volume), Clips, Review (the default shown events, with Reset to default), Storage (folder and limit), Keybinds, and Updates & About (version, updates, logs, feedback, and Start with Windows on Windows). A search box filters the rows. Every change updates `ui.settings` and sends `ApplySettings`; Start with Windows writes the registry directly.
 - **Setup window** (`crates/app/src/setup`). A fixed 460 by 420 window titled "Greyscreen Setup", with its own `Phase` state (`Ready`, `Closing`, `Copying`, `Done`, `Failed`). Windows only starts it when `greyscreen.exe` runs from outside the install folder and no installed copy matches it. It installs to `%LOCALAPPDATA%\Programs\Greyscreen`, with a Start with Windows option, a Start Menu shortcut and an Installed apps entry; the user can also run it without installing. An update launch (`--update`) or a run that matches the installed copy installs silently instead. `GREYSCREEN_NO_INSTALL` skips all of this. `--hidden` starts the app without a window.
 - **Update banner.** See Updates.
 - **Feedback dialog.** See Feedback.
+
+## Recording health and diagnostics
+
+Capture counts what it already knows. The video thread sends `MediaEvent::Stats(CaptureStats)` about once a second. Every field is cumulative since the start, except the two `window_*_max_us` gauges, which cover the last second:
+
+- `ticks`, `captured` (WGC frames the game window delivered), `repeated` (ticks that re-encoded an unchanged frame), `dropped` (ticks lost because the encoder was not ready or a step failed), `skipped` and `resyncs` (ticks jumped over after a stall), `soft_errors`.
+- `encode` (a fixed 100-bucket `LatencyHistogram`, 0.5 ms each) is the time from submitting a frame to the encoder until its packet is read. The thread reads packets at its next poll, so a value near one frame interval means the encoder keeps up, and a value above two frame intervals means it lags. `window_encode_max_us` and `window_step_max_us` (the longest pass of the capture loop) are the per-second maxima.
+- Audio, from atomics the audio thread owns: `audio_packets`, `audio_discontinuities` (WASAPI data-discontinuity flags), `audio_gaps` with `audio_gap_longest_ms` and `audio_gap_total_ms` (silence filled because a packet arrived later than its slot; the first packet's padding from `t0` does not count), `audio_idle_ms` (silence filled by timeout while the game made no sound).
+- Gauges: `in_flight` (frames inside the encoder), `pcm_queue` (PCM blocks waiting for AAC), and with diagnostics on `cpu_pct` (Greyscreen's process CPU, 100 is one core) and `mem_mb` (working set).
+
+No frame is allocated or logged for this: the counters are integer adds on the capture thread, the histogram is a fixed array, and the snapshot is one boxed copy per second. The 10-second log line stays.
+
+The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and every `Stats`. It derives from the packets: encoded frames, missing frames (the dts holes, so `dropped` is exactly what the file lacks), the longest gap between video packets, audio dts gaps, the audio start offset against the first video frame (the writer drops audio that ends before the first key frame), and the audio minus video duration at the end (drift). `finish` builds `RecordingHealth`, which `game.json` stores as `health` (all fields `#[serde(default)]`, so partial or older files read):
+
+| Field | Meaning |
+|---|---|
+| `target_fps`, `width`, `height`, `duration_secs` | the encode format and the video track length |
+| `frames_expected` | encoded plus dropped |
+| `frames_captured`, `source_fps` | frames the game window delivered, and that count per second |
+| `frames_encoded`, `frames_dropped`, `frames_repeated` | encoded, missing (dts holes), and ticks that re-encoded an unchanged frame |
+| `dropped_pct`, `repeated_pct` | of `frames_expected` and of `frames_encoded` |
+| `longest_video_gap_ms` | the longest time between two video packets (16.7 ms at 60 fps is normal) |
+| `encoder` | the hardware MFT name and rate-control mode |
+| `encode_ms` (`avg`, `p95`, `max`) | the encode latency above, left out when capture sent no timing |
+| `audio` (`packets`, `gaps`, `longest_gap_ms`, `discontinuities`, `idle_silence_ms`, `start_offset_ms`, `drift_ms`) | `gaps` counts audio dts holes plus filled gaps; `drift_ms` is audio minus video track length; `start_offset_ms` is the first kept audio packet against the first video frame; left out without an audio track |
+| `file_bytes`, `avg_bitrate_kbps` | the finalized file size and its average bitrate (video and audio) |
+| `capture_errors`, `capture_soft_errors` | `MediaEvent::Failed` count while recording, and recovered capture step failures |
+
+Verdicts (`greyscreen-core::health::verdict`, shared by the popover and the analyzer) are OK below the first number, WARNING from it and BAD from the second: dropped frames 0.5% and 2%, repeated frames 5% and 20%, longest video gap 100 ms and 500 ms, audio gap 50 ms and 250 ms, audio drift 50 ms and 250 ms, audio start offset 50 ms and 250 ms. Encode p95 above one frame interval warns and above two is bad. Any capture error is bad, any soft error warns, and an average bitrate under 1 Mbps at 720p or more over 30 s warns.
+
+### Detailed diagnostics (`diagnostics.jsonl`)
+
+With `Settings.recording_diagnostics` on, `CaptureConfig.diagnostics` is true. Capture then sends one `MediaEvent::Setup(CaptureSetup)` after `Started`, and fills the CPU and memory gauges. The engine opens `diagnostics.jsonl` in the game folder. A `diag-writer` thread owns the file behind a `BufWriter` and a bounded channel: the control thread only does `try_send`, and a full queue drops the line, so a slow disk never stalls recording. Every line is one JSON object with a `type`:
+
+- `setup` (first line): `adapter`, `driver_version` (the DXGI user-mode driver version, with the NVIDIA panel number in brackets), `display_width`, `display_height`, `display_hz` (the monitor's current mode), `window_width`, `window_height` (the game's client area), `frame_width`, `frame_height` (the captured frame), `crop_left`, `crop_top`, `crop_width`, `crop_height`, `encode_width`, `encode_height`, `fps`, `encoder`, `bitrate`, `peak`, `quality`, `gop_frames`, `audio`.
+- `second` (one per second): `t` (seconds since capture start), `captured`, `encoded`, `dropped`, `repeated` (all counts for that second), `encode_ms_max`, `step_ms_max`, `audio_packets` (total), `av_skew_ms` (audio end minus video end as the engine has received them), `queue_writer` (packets waiting for the file writer, of 4096), `queue_media` (events waiting for the engine), `queue_encoder`, `queue_pcm`, `cpu_pct`, `mem_mb` (both absent when Windows refuses the read).
+
+GPU encoder load is not recorded: Windows exposes it only through performance counters, which cost more than this log may.
+
+### `greyscreen-cli analyze`
+
+`greyscreen-cli analyze <recording folder or mp4> [--json]` needs no ffmpeg. `greyscreen_mp4::inspect` reads only the index: the full `moov` at the end of a finalized file, or the fragment headers of an unfinished `game.mp4.part` (which also reports complete fragments and cut-off trailing bytes). It then reports, per area with OK, WARNING or BAD:
+
+- File: finalized or truncated, size, resolution.
+- Video frames: real frame count, average fps against the target, missing frames, a histogram of frame intervals (1, 2, 3, 4 to 5, 6 to 10 and more than 10 frames).
+- Video gaps: every gap above two frame intervals, with its timestamp and the frames it lost (the 20 longest are listed).
+- Keyframes: count and interval (min, average, max), bad without any, warning above 5 s.
+- Bitrate: average, min and max over 10 s windows (all windows in `--json`).
+- Audio continuity: packets, samples against the timeline, gaps with timestamps. A/V duration: audio minus video at the end.
+- From `game.json`: every `health` finding. From `diagnostics.jsonl`: seconds with drops, slowest encode and capture step, deepest queues, CPU and memory peaks, the setup facts.
+
+The analysis is one pass over about 400 thousand sample rows, well under a second for a one-hour file; a test checks that.
 
 ## Updates
 

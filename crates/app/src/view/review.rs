@@ -2,6 +2,7 @@ mod card;
 mod controls;
 mod death_summary;
 mod deaths;
+mod health;
 mod icons;
 mod panel;
 mod theater;

@@ -48,6 +48,7 @@ impl Level {
 #[serde(rename_all = "lowercase")]
 pub enum Area {
     Video,
+    Pacing,
     Gaps,
     Encoder,
     Audio,
@@ -59,6 +60,7 @@ impl Area {
     pub fn label(self) -> &'static str {
         match self {
             Area::Video => "Video frames",
+            Area::Pacing => "Frame pacing",
             Area::Gaps => "Video gaps",
             Area::Encoder => "Encoder",
             Area::Audio => "Audio",
@@ -104,7 +106,7 @@ pub(super) fn findings(health: &RecordingHealth) -> Vec<Finding> {
     let repeated = Level::grade(health.repeated_pct, REPEATED_WARN_PCT, REPEATED_BAD_PCT);
     if repeated > Level::Ok {
         out.push(finding(
-            Area::Video,
+            Area::Pacing,
             repeated,
             format!(
                 "{:.1}% repeated frames: the game ran at about {:.0} fps",

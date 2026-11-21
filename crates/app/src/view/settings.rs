@@ -305,7 +305,8 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         | Row::Cursor
         | Row::NavStyle
         | Row::SoundEffects
-        | Row::SoundVolume => recording::render(s, k, layer, row),
+        | Row::SoundVolume
+        | Row::Diagnostics => recording::render(s, k, layer, row),
         Row::ClipsEnabled | Row::Moments | Row::ClipWindow | Row::ClipHotkey => {
             clips::render(s, k, row)
         }

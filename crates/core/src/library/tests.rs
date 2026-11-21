@@ -295,3 +295,30 @@ fn a_sidecar_without_a_filter_reads_as_no_override() {
     let review: ReviewData = serde_json::from_value(json).unwrap();
     assert_eq!(review.filter, None);
 }
+
+#[test]
+fn a_sidecar_without_health_has_no_health_section_and_old_ones_still_read() {
+    let mut json = serde_json::to_value(meta("a", zoned(20, 19))).unwrap();
+    assert!(json.get("health").is_none());
+    json.as_object_mut().unwrap().remove("health");
+    let read: RecordingMeta = serde_json::from_value(json).unwrap();
+    assert!(read.health.is_none());
+}
+
+#[test]
+fn health_survives_a_write_and_read_of_the_sidecar() {
+    let root = tempfile::tempdir().unwrap();
+    let mut with_health = meta("a", zoned(20, 19));
+    with_health.health = Some(RecordingHealth {
+        target_fps: 60,
+        frames_encoded: 600,
+        dropped_pct: 0.5,
+        ..RecordingHealth::default()
+    });
+    write_meta(root.path(), &with_health).unwrap();
+    let read = read_meta(root.path()).unwrap();
+    assert_eq!(read.health, with_health.health);
+    let raw: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.path().join(META_FILE)).unwrap()).unwrap();
+    assert_eq!(raw["health"]["frames_encoded"], 600);
+}

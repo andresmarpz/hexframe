@@ -108,10 +108,7 @@ fn details(out: &mut String, report: &Report) {
         diagnostics(out, diag);
     }
     if report.health.is_none() {
-        line!(
-            out,
-            "\nNo health summary in game.json (recorded before 0.1.12)."
-        );
+        line!(out, "\n{}.", greyscreen_core::health::no_health_text());
     }
     if report.diagnostics.is_none() {
         line!(

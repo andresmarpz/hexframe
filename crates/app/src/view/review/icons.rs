@@ -1,5 +1,15 @@
 use rune::Icon;
 
+pub(super) static INFO: Icon = Icon {
+    name: "greyscreen-info",
+    view: 16.0,
+    body: concat!(
+        r#"<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/>"#,
+        r#"<path d="M8 7.2v3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>"#,
+        r#"<circle cx="8" cy="5" r="0.9" fill="currentColor"/>"#
+    ),
+};
+
 pub(super) static PLAY: Icon = Icon {
     name: "greyscreen-play",
     view: 16.0,

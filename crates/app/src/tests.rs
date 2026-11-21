@@ -26,6 +26,7 @@ mod playback;
 mod qa_cases;
 mod review_filter;
 mod review_flow;
+mod review_health;
 mod review_markers;
 mod review_narrow;
 mod review_volume;

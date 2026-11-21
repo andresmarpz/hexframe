@@ -176,6 +176,12 @@ impl Ui {
         }
     }
 
+    pub(crate) fn review_health(&mut self, open: bool) {
+        if let Some(review) = &mut self.review {
+            review.health_open = open;
+        }
+    }
+
     fn review_step_speed(&mut self, delta: i32) {
         if let Some(review) = &mut self.review {
             review.step_speed(delta);

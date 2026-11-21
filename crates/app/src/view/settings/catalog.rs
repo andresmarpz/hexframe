@@ -16,6 +16,7 @@ pub(super) enum Row {
     NavStyle,
     SoundEffects,
     SoundVolume,
+    Diagnostics,
     ClipsEnabled,
     Moments,
     ClipWindow,
@@ -49,6 +50,9 @@ impl Row {
                 "sound effects sounds noise chime click beep notification mute quiet"
             }
             Self::SoundVolume => "sound effects volume loud quiet level sounds",
+            Self::Diagnostics => {
+                "detailed recording diagnostics debug health performance log frame drops stutter analyze"
+            }
             Self::ClipsEnabled => "save highlight clips auto clips",
             Self::Moments => {
                 "moments kills deaths assists multikills objectives structures aces dragon baron herald turrets"
@@ -103,6 +107,7 @@ pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
             Row::NavStyle,
             Row::SoundEffects,
             Row::SoundVolume,
+            Row::Diagnostics,
         ],
         SettingsSection::Clips => vec![
             Row::ClipsEnabled,

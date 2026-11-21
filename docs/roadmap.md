@@ -9,7 +9,8 @@ Status on 2026-11-21. `docs/architecture.md` describes how the app works today. 
 - Live Client poller, event classification, session state machine with start retries.
 - Engine: game writer, clip ring and planner, clip jobs, library scan, thumbnails, storage limit, delete to the Recycle Bin, global hotkeys, updater, feedback.
 - App: Home, Games and Clips screens, Sidebar and Dock navigation, settings sheet, keybinds, death review, update banner, feedback dialog, setup window and self-install on Windows.
-- CLI: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `demo`.
+- CLI: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `analyze`, `demo`.
+- Recording health: a `health` summary in every `game.json`, the Recording health popover in the review toolbar, the optional `diagnostics.jsonl` and `greyscreen-cli analyze`.
 - Backend `apps/api`: feedback and experimental crash upload on Cloudflare.
 - Website, brand assets and releases from the Mac (`just release`). The latest preview is `0.1.9-preview.11`; each release has its changelog in `apps/web/src/content/changelog/`.
 - Adversarial review of capture, engine, mp4 and league (`docs/reviews/2026-11-21-adversarial.md`). Every item it found is fixed.

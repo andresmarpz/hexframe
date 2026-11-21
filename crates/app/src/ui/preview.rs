@@ -1,4 +1,5 @@
 mod death;
+mod health;
 mod thumbs;
 
 use std::path::PathBuf;
@@ -16,6 +17,7 @@ use jiff::{SignedDuration, Unit};
 use super::{Screen, Ui};
 
 pub(super) use death::death_entry;
+pub(super) use health::{healthy, struggling};
 pub(super) use thumbs::copy_playable;
 
 pub(super) fn ui() -> Ui {

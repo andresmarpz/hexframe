@@ -1,5 +1,11 @@
 use super::{Scene, death, game, idle};
-use crate::ui::PanelTab;
+use crate::ui::{PanelTab, Ui, preview};
+
+fn set_health(ui: &mut Ui, health: Option<greyscreen_core::health::RecordingHealth>) {
+    if let Some(review) = &mut ui.review {
+        review.entry.meta.health = health;
+    }
+}
 
 pub(super) const SCENES: &[Scene] = &[
     ("review", game),
@@ -24,6 +30,20 @@ pub(super) const SCENES: &[Scene] = &[
             );
             review.filter_menu = true;
         }
+    }),
+    ("review-health", |ui| {
+        game(ui);
+        set_health(ui, Some(preview::healthy()));
+        ui.review_health(true);
+    }),
+    ("review-health-warnings", |ui| {
+        game(ui);
+        set_health(ui, Some(preview::struggling()));
+        ui.review_health(true);
+    }),
+    ("review-health-none", |ui| {
+        game(ui);
+        ui.review_health(true);
     }),
     ("review-speed-menu", |ui| {
         game(ui);

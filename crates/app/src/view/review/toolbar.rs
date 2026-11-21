@@ -6,7 +6,7 @@ use rune_kit::{
     Toolbar, glyphs,
 };
 
-use super::{icons, tabular, tone_pill};
+use super::{health, icons, tabular, tone_pill};
 use crate::ui::library::format::{kda, mode_label, total_time, when};
 use crate::ui::{ReviewState, Ui, format_clock};
 use crate::view::overlays::delete_key;
@@ -108,6 +108,7 @@ pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     Toolbar::new()
         .leading(line)
         .trailing(deaths_button(review, k))
+        .trailing(health::trigger(review, k))
         .trailing(folder)
         .trailing(delete)
 }

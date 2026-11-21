@@ -373,3 +373,25 @@ fn the_wide_sheet_gives_the_nav_and_the_search_the_extra_room() {
     let search = nav_rect_of(&rt, "settings-search");
     assert!(search[2] > dialog[2] - 64.0, "search spans the sheet");
 }
+
+#[test]
+fn the_diagnostics_switch_is_off_by_default_and_applies_through_the_engine() {
+    let (mut rt, rx) = super::live_runtime();
+    assert!(!rt.state.settings.recording_diagnostics);
+    super::tap(&mut rt, "nav-settings");
+    super::tap(&mut rt, "recording-diagnostics-switch");
+    assert!(rt.state.settings.recording_diagnostics);
+    let Ok(greyscreen_engine::EngineCmd::ApplySettings(sent)) = rx.try_recv() else {
+        panic!("no ApplySettings sent");
+    };
+    assert!(sent.recording_diagnostics);
+}
+
+#[test]
+fn searching_for_stutter_finds_the_diagnostics_row() {
+    let mut rt = super::runtime();
+    super::tap(&mut rt, "nav-settings");
+    type_search(&mut rt, "stutter");
+    assert!(rt.find("recording-diagnostics").is_some());
+    assert!(rt.find("auto-record").is_none());
+}
