@@ -192,7 +192,7 @@ fn recording_section(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                 "resolution-row",
                 "Resolution",
                 Some("Larger games are scaled down to this."),
-                resolution.key("resolution"),
+                resolution,
             ),
             setting_row(
                 k,

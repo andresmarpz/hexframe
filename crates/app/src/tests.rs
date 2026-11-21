@@ -209,3 +209,30 @@ fn leaving_the_review_screen_drops_the_player() {
     tap(&mut rt, "review-back");
     assert!(rt.state.review.is_none());
 }
+
+#[test]
+fn the_resolution_menu_opens_under_its_trigger_and_picks_a_value() {
+    let mut rt = runtime();
+    tap(&mut rt, "nav-settings");
+    tap(&mut rt, "resolution-trigger");
+    for _ in 0..30 {
+        rt.frame(1.0 / 60.0);
+    }
+    assert!(rt.state.resolution_open);
+    let (trigger, _) = rt.presented("resolution-trigger").expect("trigger");
+    let (menu, _) = rt.presented("resolution-content").expect("menu");
+    let trigger_bottom = trigger[1] + trigger[3];
+    assert!(
+        (menu[1] - trigger_bottom).abs() < 12.0,
+        "menu top {} should sit under the trigger bottom {trigger_bottom}",
+        menu[1]
+    );
+    let trigger_right = trigger[0] + trigger[2];
+    let menu_right = menu[0] + menu[2];
+    assert!(
+        (menu_right - trigger_right).abs() < 12.0,
+        "menu right edge {menu_right} should line up with the trigger {trigger_right}"
+    );
+    tap(&mut rt, "option3");
+    assert!(!rt.state.resolution_open);
+}
