@@ -52,7 +52,7 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
                         .child(recording_section(s, k, layer))
                         .child(clips_section(s, k))
                         .child(storage_section(s, k))
-                        .child(about_section(k)),
+                        .child(about_section(s, k)),
                 ),
         )
 }
@@ -365,7 +365,7 @@ fn storage_section(s: &Ui, k: &Kit) -> El {
     )
 }
 
-fn about_section(k: &Kit) -> El {
+fn about_section(s: &Ui, k: &Kit) -> El {
     let version = text(format!("Version {}", env!("CARGO_PKG_VERSION")))
         .key("version")
         .font(k.ty.body)
@@ -376,19 +376,25 @@ fn about_section(k: &Kit) -> El {
         .on_press(|_: &mut Ui| reveal(&paths::logs_dir()))
         .build(k)
         .key("open-logs");
-    section(
-        k,
-        "about-card",
-        "About",
-        vec![
-            setting_row(k, "version-row", "Greyscreen", None, version),
-            setting_row(
-                k,
-                "logs-row",
-                "Logs",
-                Some("Attach these when you report a problem."),
-                logs,
-            ),
-        ],
-    )
+    let mut rows = vec![
+        setting_row(k, "version-row", "Greyscreen", None, version),
+        setting_row(
+            k,
+            "logs-row",
+            "Logs",
+            Some("Attach these when you report a problem."),
+            logs,
+        ),
+    ];
+    if cfg!(windows) {
+        rows.push(toggle_row(
+            k,
+            "start-with-windows",
+            "Start with Windows",
+            Some("Open in the tray when you sign in."),
+            s.start_with_windows,
+            Ui::toggle_start_with_windows,
+        ));
+    }
+    section(k, "about-card", "About", rows)
 }

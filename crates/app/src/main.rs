@@ -10,6 +10,7 @@ mod tests;
 
 use std::sync::Arc;
 
+use greyscreen_core::install::HIDDEN_FLAG;
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use greyscreen_core::settings::Settings;
@@ -31,8 +32,33 @@ fn media_source() -> Arc<dyn MediaSource> {
     Arc::new(greyscreen_engine::FakeMediaSource::new())
 }
 
+#[cfg(windows)]
+fn install_step() -> Option<greyscreen_capture::install::InstallError> {
+    use greyscreen_core::install::UNINSTALL_FLAG;
+    if std::env::args().any(|arg| arg == UNINSTALL_FLAG) {
+        greyscreen_capture::install::uninstall();
+        std::process::exit(0);
+    }
+    if greyscreen_capture::install::is_installed_copy()
+        || std::env::var_os("GREYSCREEN_NO_INSTALL").is_some()
+    {
+        return None;
+    }
+    match greyscreen_capture::install::install_and_relaunch() {
+        Ok(true) => std::process::exit(0),
+        Ok(false) => None,
+        Err(err) => Some(err),
+    }
+}
+
 fn main() {
     let headless = rune::is_headless();
+    #[cfg(windows)]
+    let install_error = if headless { None } else { install_step() };
+    #[cfg(windows)]
+    if !headless {
+        greyscreen_capture::install::set_process_app_id();
+    }
     #[cfg(windows)]
     let instance = if headless {
         None
@@ -45,6 +71,10 @@ fn main() {
     };
     let _log_guard = (!headless).then(logging::init).flatten();
     tracing::info!("greyscreen {} starting", env!("GREYSCREEN_BUILD"));
+    #[cfg(windows)]
+    if let Some(err) = &install_error {
+        tracing::warn!(%err, "cannot install, running from this folder");
+    }
     #[cfg(windows)]
     greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
     #[cfg(windows)]
@@ -62,6 +92,9 @@ fn main() {
         ..AppSpec::new("Greyscreen", (960.0, 640.0), Ui::preview, view::root)
     };
     let mut app = App::new(spec).keep_running().release_gpu_when_closed();
+    if std::env::args().any(|arg| arg == HIDDEN_FLAG) {
+        app = app.windowless();
+    }
     let mut settings = Settings::load(&paths::settings_file());
     settings.validate();
     let (_tray, _engine) = if headless {
@@ -83,8 +116,26 @@ fn main() {
             league_factory_default(),
             Box::new(move |msg| sink_handle.update(move |ui: &mut Ui, tx| ui.apply(msg, tx))),
         );
+        #[cfg(windows)]
+        if install_error.is_some() {
+            handle.update(|ui: &mut Ui, tx| {
+                ui.show_notice(
+                    greyscreen_engine::NoticeLevel::Warn,
+                    "Could not install, running from this folder".into(),
+                    tx,
+                );
+            });
+        }
         let cmd = engine.cmd.clone();
-        app = app.init(move || Ui::live(settings, cmd));
+        app = app.init(move || {
+            #[allow(unused_mut)]
+            let mut ui = Ui::live(settings, cmd);
+            #[cfg(windows)]
+            {
+                ui.start_with_windows = greyscreen_capture::install::start_with_windows();
+            }
+            ui
+        });
         (tray::start(handle), Some(engine))
     };
     app.run();

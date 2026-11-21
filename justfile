@@ -26,8 +26,8 @@ build-win:
     @ls -lh target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe
 
 dist: build-win
+    rm -rf dist
     mkdir -p dist
-    rm -f dist/greyscreen-windows-x64.zip
-    zip -j dist/greyscreen-windows-x64.zip target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt
+    cp target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt dist/
 
 ci: lint check-win test

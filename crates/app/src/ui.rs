@@ -100,6 +100,7 @@ pub(crate) struct Ui {
     pub player_factory: PlayerFactory,
     pub resolution_open: bool,
     pub window_full_screen: bool,
+    pub start_with_windows: bool,
     pub pre_secs: TextEdit,
     pub post_secs: TextEdit,
 }
@@ -129,9 +130,23 @@ impl Ui {
             player_factory: review::rune_player,
             resolution_open: false,
             window_full_screen: false,
+            start_with_windows: false,
             pre_secs: TextEdit::new(settings.clips.pre_secs.to_string()),
             post_secs: TextEdit::new(settings.clips.post_secs.to_string()),
             settings,
+        }
+    }
+
+    pub(crate) fn toggle_start_with_windows(&mut self) {
+        self.start_with_windows = !self.start_with_windows;
+        #[cfg(windows)]
+        {
+            let enabled = self.start_with_windows;
+            std::thread::spawn(move || {
+                if let Err(err) = greyscreen_capture::install::set_start_with_windows(enabled) {
+                    tracing::warn!(%err, "cannot change start with Windows");
+                }
+            });
         }
     }
 
@@ -233,7 +248,7 @@ impl Ui {
         self.status = status;
     }
 
-    fn show_notice(&mut self, level: NoticeLevel, text: String, tx: &mut Tx) {
+    pub(crate) fn show_notice(&mut self, level: NoticeLevel, text: String, tx: &mut Tx) {
         let until = tx.clock() + NOTICE_SECS;
         self.notice = Some((Notice { level, text }, until));
         tx.wake_at(until);

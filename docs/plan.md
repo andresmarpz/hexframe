@@ -41,7 +41,7 @@ The orchestrator (the main session) owns every decision. It reviews each pushed 
 
 ## First run on Windows (for the user)
 
-1. Download `greyscreen-windows-x64.zip` from the latest release (or the CI artifact) and unzip it.
+1. Download `greyscreen.exe` from the latest release (or the CI artifact) and run it. It installs itself to the Start Menu.
 2. Run `greyscreen-cli.exe doctor` in a terminal. It prints the GPU, the hardware encoders and the capture support.
 3. Run `greyscreen-cli.exe record --seconds 10`. It records the primary monitor and system audio to `test.mp4`.
 4. Start `greyscreen.exe` and play a game (Practice Tool is fine). Check the game folder under `Videos\Greyscreen`.

@@ -25,7 +25,7 @@ League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU 
 
 - `just ci`: fmt check, host clippy, typos, Windows clippy through cargo-xwin, tests.
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows.
-- `just dist`: build and zip both exes into `dist/greyscreen-windows-x64.zip`.
+- `just dist`: build both exes and copy them with `README.txt` into `dist/` as separate files.
 - `just fmt`: format the workspace.
 
 The Mac cannot run Windows code: compile-check it with `just check-win`.
