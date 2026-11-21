@@ -38,9 +38,15 @@ pub(crate) fn review_entry() -> RecordingEntry {
 type Scene = (&'static str, fn(&mut Ui));
 
 pub(crate) const SCENES: &[Scene] = &[
-    ("idle", |ui| {
+    ("home", |ui| {
         ui.status = EngineStatus::Idle;
         ui.feed.clear();
+    }),
+    ("home-recording", |ui| ui.screen = Screen::Home),
+    ("home-first-run", |ui| {
+        ui.status = EngineStatus::Idle;
+        ui.feed.clear();
+        ui.recordings.clear();
     }),
     ("idle-off", |ui| {
         ui.status = EngineStatus::Idle;
@@ -61,7 +67,7 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.status = EngineStatus::Waiting;
         ui.feed.clear();
     }),
-    ("recording", |ui| ui.screen = Screen::Status),
+    ("recording", |ui| ui.screen = Screen::Home),
     ("finalizing", |ui| ui.status = EngineStatus::Finalizing),
     ("error", |ui| {
         ui.status = EngineStatus::Error("The game window could not be captured.".into());
@@ -118,7 +124,7 @@ const PLAYBACK_TICK: Duration = Duration::from_millis(33);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Screen {
     #[default]
-    Status,
+    Home,
     Recordings,
     Settings,
     Review,
@@ -170,7 +176,7 @@ impl Ui {
 
     pub(crate) fn blank(settings: Settings) -> Ui {
         Ui {
-            screen: Screen::Status,
+            screen: Screen::Home,
             status: EngineStatus::Idle,
             feed: VecDeque::new(),
             recordings: Vec::new(),
@@ -262,6 +268,11 @@ impl Ui {
         if let Some(entry) = self.last_game.clone() {
             self.open_review_entry(entry);
         }
+    }
+
+    pub(crate) fn open_clip(&mut self, id: String, index: usize) {
+        self.open_review(id);
+        self.play_clip(index);
     }
 
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {

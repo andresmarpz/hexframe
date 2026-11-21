@@ -26,7 +26,7 @@ const COL_WHEN: f32 = 112.0;
 const COL_DURATION: f32 = 58.0;
 const COL_CLIPS: f32 = 44.0;
 const COL_SIZE: f32 = 62.0;
-const COL_ACTION: f32 = 68.0;
+const COL_ACTION: f32 = 56.0;
 const COLUMN_GAP: f32 = 12.0;
 const TABULAR: &str = "'tnum' 1";
 
@@ -55,7 +55,6 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
         .on_press(|ui: &mut Ui| ui.reveal_output_dir())
         .build(k)
         .key("open-folder");
-    let folder = s.settings.output_dir.display().to_string();
     let shown = s.filter.apply(&s.recordings);
     let mut page = col()
         .key("recordings")
@@ -63,7 +62,7 @@ pub(super) fn page(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
         .h_full()
         .min_h(0.0)
         .gap(12.0)
-        .child(page_header(k, "Recordings", &folder, Some(open)));
+        .child(page_header(k, "Recordings", "", Some(open)));
     if !s.recordings.is_empty() {
         page = page
             .child(
@@ -170,7 +169,7 @@ fn accent(rec: &RecordingEntry, k: &Kit) -> El {
         .a11y_hidden()
 }
 
-fn result_cell(result: GameResult, k: &Kit) -> El {
+pub(super) fn result_cell(result: GameResult, k: &Kit) -> El {
     let (label, color) = match result {
         GameResult::Win => ("Victory", k.c.success.fg),
         GameResult::Loss => ("Defeat", k.c.danger.fg),
@@ -179,7 +178,7 @@ fn result_cell(result: GameResult, k: &Kit) -> El {
     text(label).font(k.ty.ui.features(TABULAR)).color(color)
 }
 
-fn kda_cell(kda: Kda, k: &Kit) -> El {
+pub(super) fn kda_cell(kda: Kda, k: &Kit) -> El {
     let font = k.ty.ui.features(TABULAR);
     let figure = |n: u32, color: Color| text(n.to_string()).font(font).color(color);
     let slash = || text(" / ").font(font).color(k.c.text_faint);

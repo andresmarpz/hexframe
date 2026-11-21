@@ -1,11 +1,13 @@
 use greyscreen_core::game::{GameEvent, GameResult, Player};
-use greyscreen_core::library::EventEntry;
+use greyscreen_core::highlight::describe_label;
+use greyscreen_core::library::{ClipEntry, EventEntry};
 use greyscreen_engine::RecordingEntry;
 use jiff::Zoned;
 
 use super::format_size;
 
 const RECENT_DAYS: i64 = 6;
+const WEEK_SECS: i64 = 7 * 24 * 3600;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct Kda {
@@ -123,6 +125,107 @@ pub(crate) fn summary(recordings: &[&RecordingEntry], total: usize) -> String {
         total_time(secs),
         format_size(bytes),
     )
+}
+
+pub(crate) fn recent_games(recordings: &[RecordingEntry], limit: usize) -> Vec<&RecordingEntry> {
+    let mut games: Vec<&RecordingEntry> = recordings.iter().collect();
+    games.sort_by_key(|rec| std::cmp::Reverse(rec.meta.started_at.timestamp()));
+    games.truncate(limit);
+    games
+}
+
+pub(crate) fn humanize(name: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in name.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+            out.extend(c.to_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+pub(crate) fn clip_title(label: &str) -> String {
+    let known = describe_label(label);
+    if known.title == describe_label("").title {
+        humanize(label)
+    } else {
+        known.title.to_owned()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct WeekStats {
+    pub games: usize,
+    pub wins: usize,
+    pub losses: usize,
+    pub secs: f64,
+}
+
+impl WeekStats {
+    pub(crate) fn win_rate(&self) -> Option<u32> {
+        let decided = self.wins + self.losses;
+        (decided > 0).then(|| (self.wins as f64 * 100.0 / decided as f64).round() as u32)
+    }
+}
+
+pub(crate) fn week_stats(recordings: &[RecordingEntry], now: &Zoned) -> WeekStats {
+    let cutoff = now.timestamp().as_second() - WEEK_SECS;
+    let mut stats = WeekStats::default();
+    for rec in recordings {
+        if rec.meta.started_at.timestamp().as_second() < cutoff {
+            continue;
+        }
+        stats.games += 1;
+        stats.secs += rec.meta.duration_secs;
+        match rec.meta.game.result {
+            GameResult::Win => stats.wins += 1,
+            GameResult::Loss => stats.losses += 1,
+            GameResult::Unknown => {}
+        }
+    }
+    stats
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RecentClip<'a> {
+    pub entry: &'a RecordingEntry,
+    pub index: usize,
+    pub clip: &'a ClipEntry,
+}
+
+pub(crate) fn recent_clips(recordings: &[RecordingEntry], limit: usize) -> Vec<RecentClip<'_>> {
+    let mut clips: Vec<(f64, RecentClip<'_>)> = recordings
+        .iter()
+        .flat_map(|entry| {
+            let start = entry.meta.started_at.timestamp().as_second() as f64;
+            entry
+                .meta
+                .clips
+                .iter()
+                .enumerate()
+                .map(move |(index, clip)| {
+                    (start + clip.start_secs, RecentClip { entry, index, clip })
+                })
+        })
+        .collect();
+    clips.sort_by(|a, b| b.0.total_cmp(&a.0));
+    clips
+        .into_iter()
+        .take(limit)
+        .map(|(_, clip)| clip)
+        .collect()
+}
+
+pub(crate) fn game_secs_at(entry: &RecordingEntry, rec_secs: f64) -> f64 {
+    let offset = entry
+        .meta
+        .events
+        .first()
+        .map_or(0.0, |event| event.rec_secs - event.game_secs);
+    (rec_secs - offset).max(0.0)
 }
 
 #[cfg(test)]

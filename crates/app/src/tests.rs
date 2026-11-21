@@ -7,15 +7,16 @@ use crate::ui::fake_player::{self, Call};
 use crate::ui::{Screen, Source, Ui, parse_clip_secs};
 use crate::view;
 
+mod home;
 mod hotkey_storage;
 mod match_flow;
 mod nav_settings;
 mod recordings;
 mod review_flow;
-mod status;
+mod sidebar;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
-    let mut rt = Runtime::new(ui, view::root, (960.0, 640.0), Env::new(true, 1.0));
+    let mut rt = Runtime::new(ui, view::root, (1180.0, 680.0), Env::new(true, 1.0));
     rt.frame(0.0);
     rt
 }
@@ -41,13 +42,13 @@ fn tap(rt: &mut Runtime<Ui>, key: &str) {
 #[test]
 fn nav_buttons_switch_the_screen() {
     let mut rt = runtime();
-    assert_eq!(rt.state.screen, Screen::Status);
+    assert_eq!(rt.state.screen, Screen::Home);
     tap(&mut rt, "nav-recordings");
     assert_eq!(rt.state.screen, Screen::Recordings);
     tap(&mut rt, "nav-settings");
     assert_eq!(rt.state.screen, Screen::Settings);
-    tap(&mut rt, "nav-status");
-    assert_eq!(rt.state.screen, Screen::Status);
+    tap(&mut rt, "nav-home");
+    assert_eq!(rt.state.screen, Screen::Home);
 }
 
 #[test]
@@ -316,12 +317,12 @@ fn escape_outside_theater_goes_back_to_the_recordings() {
 #[test]
 fn theater_shows_the_timeline_and_hides_the_navigation() {
     let mut rt = key_review_runtime();
-    assert!(rt.find("nav-status").is_some());
+    assert!(rt.find("nav-home").is_some());
     press_char(&mut rt, "f");
     assert!(rt.find("timeline").is_some());
     assert!(rt.find("marker-9").is_some());
     assert!(rt.find("theater-exit").is_some());
-    assert!(rt.find("nav-status").is_none());
+    assert!(rt.find("nav-home").is_none());
     assert!(rt.find("review-header").is_none());
     assert!(rt.find("event-5").is_none());
     assert!(rt.find("theater-top").is_some());
@@ -394,7 +395,7 @@ fn keys_do_nothing_outside_the_review_screen() {
     let mut rt = runtime();
     rt.on_key = Some(Ui::on_key);
     press_char(&mut rt, "f");
-    assert_eq!(rt.state.screen, Screen::Status);
+    assert_eq!(rt.state.screen, Screen::Home);
     assert!(!in_theater(&rt));
 }
 
@@ -613,10 +614,10 @@ fn the_logo_clears_the_window_buttons() {
         "logo starts at {}, the buttons end at {inset}",
         brand[0]
     );
-    let tabs = nav_rect_of(&rt, "nav-tabs");
+    let nav = nav_rect_of(&rt, "nav");
     assert!(
-        brand[0] + brand[2] < tabs[0],
-        "the tabs still fit beside the logo"
+        brand[0] + brand[2] < nav[0] + nav[2],
+        "the logo fits inside the sidebar"
     );
 }
 
@@ -625,7 +626,7 @@ fn the_logo_clears_the_window_buttons_on_every_screen() {
     let mut rt = runtime();
     rt.set_titlebar_inset(Chrome::DEFAULT.titlebar_inset());
     settle(&mut rt);
-    for key in ["nav-recordings", "nav-settings", "nav-status"] {
+    for key in ["nav-recordings", "nav-settings", "nav-home"] {
         tap(&mut rt, key);
         settle(&mut rt);
         assert!(nav_rect_of(&rt, "nav-brand")[0] >= Chrome::DEFAULT.titlebar_inset());

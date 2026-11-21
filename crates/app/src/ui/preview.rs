@@ -7,9 +7,7 @@ use greyscreen_core::library::{
 };
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineStatus, FeedItem, RecordingEntry};
-use jiff::Zoned;
-use jiff::civil::date;
-use jiff::tz::TimeZone;
+use jiff::{SignedDuration, Unit, Zoned};
 
 use super::Ui;
 
@@ -99,8 +97,17 @@ fn feed() -> Vec<FeedItem> {
         .collect()
 }
 
+const CLIP_LABELS: [&str; 6] = [
+    "MyKill",
+    "Multikill2",
+    "Baron",
+    "FirstBlood",
+    "Turret",
+    "Multikill3",
+];
+
 struct Row {
-    when: (i8, i8, i8),
+    hours_ago: i64,
     champion: &'static str,
     mode: &'static str,
     result: GameResult,
@@ -110,14 +117,17 @@ struct Row {
 }
 
 fn entry(row: Row) -> RecordingEntry {
-    let (day, hour, minute) = row.when;
-    let started_at = date(2026, 11, day)
-        .at(hour, minute, 0, 0)
-        .to_zoned(TimeZone::UTC)
+    let now = Zoned::now()
+        .round(Unit::Hour)
         .unwrap_or_else(|_| Zoned::now());
+    let started_at = now
+        .checked_sub(SignedDuration::from_hours(row.hours_ago))
+        .unwrap_or(now);
     let id = format!(
-        "2026-11-{day:02}_{hour:02}-{minute:02}-00_{}_{}",
-        row.champion, row.mode
+        "{}_{}_{}",
+        started_at.strftime("%Y-%m-%d_%H-%M-%S"),
+        row.champion,
+        row.mode
     );
     let (kills, deaths, assists) = (
         row.clips + 1,
@@ -148,7 +158,7 @@ fn entry(row: Row) -> RecordingEntry {
             file: format!("clips/{i:02}-00_MyKill.mp4"),
             start_secs: 90.0 + i as f64 * 60.0,
             end_secs: 120.0 + i as f64 * 60.0,
-            label: "MyKill".into(),
+            label: CLIP_LABELS[(i + row.clips) % CLIP_LABELS.len()].into(),
         })
         .collect();
     RecordingEntry {
@@ -178,9 +188,9 @@ fn entry(row: Row) -> RecordingEntry {
 
 fn recordings() -> Vec<RecordingEntry> {
     use GameResult::*;
-    let row = |when, champion, mode, result, minutes, size_mb, clips| {
+    let row = |hours_ago, champion, mode, result, minutes, size_mb, clips| {
         entry(Row {
-            when,
+            hours_ago,
             champion,
             mode,
             result,
@@ -190,14 +200,14 @@ fn recordings() -> Vec<RecordingEntry> {
         })
     };
     vec![
-        row((20, 19, 55), "Ahri", "CLASSIC", Win, 33.2, 1_820, 6),
-        row((20, 18, 41), "Ahri", "CLASSIC", Loss, 28.8, 1_540, 3),
-        row((19, 22, 10), "Yasuo", "ARAM", Win, 19.1, 1_010, 9),
-        row((19, 20, 32), "Lux", "CLASSIC", Win, 36.7, 1_960, 5),
-        row((18, 21, 15), "Jinx", "CLASSIC", Loss, 41.1, 2_240, 0),
-        row((17, 23, 2), "Ahri", "ARAM", Win, 17.9, 940, 4),
-        row((16, 19, 20), "Viego", "CLASSIC", Unknown, 22.3, 1_190, 2),
-        row((15, 20, 48), "Thresh", "CLASSIC", Loss, 31.5, 1_680, 1),
+        row(2, "Ahri", "CLASSIC", Win, 33.2, 1_820, 6),
+        row(4, "Ahri", "CLASSIC", Loss, 28.8, 1_540, 3),
+        row(27, "Yasuo", "ARAM", Win, 19.1, 1_010, 9),
+        row(29, "Lux", "CLASSIC", Win, 36.7, 1_960, 5),
+        row(52, "Jinx", "CLASSIC", Loss, 41.1, 2_240, 0),
+        row(76, "Ahri", "ARAM", Win, 17.9, 940, 4),
+        row(190, "Viego", "CLASSIC", Unknown, 22.3, 1_190, 2),
+        row(215, "Thresh", "CLASSIC", Loss, 31.5, 1_680, 1),
     ]
 }
 

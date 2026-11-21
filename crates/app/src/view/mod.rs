@@ -1,9 +1,9 @@
 pub(crate) mod champion;
-mod nav;
+mod home;
 mod recordings;
 mod review;
 mod settings;
-mod status;
+mod sidebar;
 
 use greyscreen_engine::NoticeLevel;
 use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
@@ -35,26 +35,28 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 
 fn window(s: &Ui, k: &Kit, layer: &mut Vec<El>, titlebar_inset: f32) -> El {
     let content = match s.screen {
-        Screen::Status => fixed_content(status::page(s, k)),
+        Screen::Home if home::shows_feed(s) => fixed_content(home::page(s, k)),
+        Screen::Home => scrolling_content(home::page(s, k)),
         Screen::Recordings => fixed_content(recordings::page(s, k, layer)),
         Screen::Review => fixed_content(review::page(s, k)),
         Screen::Settings => scrolling_content(settings::page(s, k, layer)),
     };
-    col()
+    row()
         .key("window")
         .w_full()
         .h_full()
         .fill(k.c.page)
-        .child(nav::bar(s, k, titlebar_inset))
+        .child(sidebar::panel(s, k, titlebar_inset))
+        .child(el().w(1.0).h_full().fill(k.c.border_muted).a11y_hidden())
         .child(content)
 }
 
 fn content_column() -> El {
     col()
         .key("content")
-        .w_full()
+        .h_full()
         .grow(1.0)
-        .min_h(0.0)
+        .min_w(0.0)
         .items_center()
 }
 
@@ -88,12 +90,16 @@ fn page_header(k: &Kit, title: &str, subtitle: &str, action: Option<El>) -> El {
         .w_full()
         .center_y()
         .justify_between()
-        .child(
-            col()
+        .child({
+            let heading = col()
                 .gap(2.0)
-                .child(text(title).font(title_style(k)).color(k.c.text_base))
-                .child(text(subtitle).font(k.ty.body).color(k.c.text_muted)),
-        );
+                .child(text(title).font(title_style(k)).color(k.c.text_base));
+            if subtitle.is_empty() {
+                heading
+            } else {
+                heading.child(text(subtitle).font(k.ty.body).color(k.c.text_muted))
+            }
+        });
     if let Some(action) = action {
         header = header.child(action);
     }

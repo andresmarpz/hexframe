@@ -9,6 +9,7 @@ use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant
 use super::card::hoverable;
 use super::tabular;
 use super::timeline::event_color;
+use crate::ui::library_format::{clip_title, humanize};
 use crate::ui::{EventFilter, PanelTab, ReviewState, Source, Ui, format_clock, seek_target};
 use crate::view::{card, hairline};
 
@@ -31,28 +32,6 @@ pub(super) fn event_title(event: &EventEntry) -> String {
 fn kind_name(event: &EventEntry) -> String {
     let debug = format!("{:?}", event.kind);
     debug.chars().take_while(|c| c.is_alphanumeric()).collect()
-}
-
-fn clip_title(label: &str) -> String {
-    let known = describe_label(label);
-    if known.title == describe_label("").title {
-        humanize(label)
-    } else {
-        known.title.to_owned()
-    }
-}
-
-fn humanize(name: &str) -> String {
-    let mut out = String::new();
-    for (i, c) in name.chars().enumerate() {
-        if i > 0 && c.is_uppercase() {
-            out.push(' ');
-            out.extend(c.to_lowercase());
-        } else {
-            out.push(c);
-        }
-    }
-    out
 }
 
 fn tab_label(review: &ReviewState, tab: PanelTab) -> String {

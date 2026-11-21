@@ -38,8 +38,8 @@ fn the_empty_library_shows_a_state_and_no_table_header() {
     assert!(rt.find("recordings-header").is_none());
     assert!(rt.find("recordings-toolbar").is_none());
     assert!(rt.find("recordings-summary").is_none());
-    tap(&mut rt, "go-to-status");
-    assert_eq!(rt.state.screen, Screen::Status);
+    tap(&mut rt, "go-to-home");
+    assert_eq!(rt.state.screen, Screen::Home);
 }
 
 #[test]

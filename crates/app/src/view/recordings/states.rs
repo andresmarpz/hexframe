@@ -35,19 +35,19 @@ pub(super) fn empty(k: &Kit) -> El {
                 .child(
                     text(
                         "Play a League game and Greyscreen records it automatically, \
-                         or run a 10-second test from Status.",
+                         or run a 10-second test from Home.",
                     )
                     .font(k.ty.body)
                     .color(k.c.text_muted),
                 ),
         )
         .child(
-            Button::new("Go to Status")
+            Button::new("Go to Home")
                 .variant(ButtonVariant::Neutral)
                 .control_size(ControlSize::Large)
-                .on_press(|ui: &mut Ui| ui.go(Screen::Status))
+                .on_press(|ui: &mut Ui| ui.go(Screen::Home))
                 .build(k)
-                .key("go-to-status"),
+                .key("go-to-home"),
         )
 }
 

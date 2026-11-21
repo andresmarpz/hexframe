@@ -86,12 +86,12 @@ fn main() {
         tracing::warn!(%err, "cannot set app icon");
     }
     let spec = AppSpec {
-        min_size: Some((720.0, 520.0)),
+        min_size: Some((940.0, 520.0)),
         scenes: ui::SCENES,
         poll: Some(Ui::poll),
         setup: Some(|_, waker| view::champion::set_waker(waker)),
         on_key: Some(Ui::on_key),
-        ..AppSpec::new("Greyscreen", (960.0, 640.0), Ui::preview, view::root)
+        ..AppSpec::new("Greyscreen", (1180.0, 680.0), Ui::preview, view::root)
     };
     let mut app = App::new(spec).keep_running().release_gpu_when_closed();
     if std::env::args().any(|arg| arg == HIDDEN_FLAG) {

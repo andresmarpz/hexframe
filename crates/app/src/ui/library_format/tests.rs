@@ -154,3 +154,84 @@ fn summary_of_a_filtered_set_says_how_many_of_all() {
     let line = summary(&shown, recordings.len());
     assert!(line.starts_with("3 of 8 games · "), "{line}");
 }
+
+#[test]
+fn the_week_counts_only_the_last_seven_days() {
+    let recordings = Ui::preview().recordings;
+    let stats = week_stats(&recordings, &Zoned::now());
+    assert_eq!(stats.games, 6);
+    assert_eq!((stats.wins, stats.losses), (4, 2));
+    assert_eq!(stats.win_rate(), Some(67));
+    let secs: f64 = recordings[..6].iter().map(|r| r.meta.duration_secs).sum();
+    assert!((stats.secs - secs).abs() < 1e-6);
+}
+
+#[test]
+fn an_empty_week_has_no_win_rate() {
+    let stats = week_stats(&[], &Zoned::now());
+    assert_eq!(stats, WeekStats::default());
+    assert_eq!(stats.win_rate(), None);
+}
+
+#[test]
+fn unknown_results_stay_out_of_the_win_rate() {
+    let stats = WeekStats {
+        games: 3,
+        wins: 1,
+        losses: 0,
+        secs: 0.0,
+    };
+    assert_eq!(stats.win_rate(), Some(100));
+}
+
+#[test]
+fn recent_games_are_newest_first_and_capped() {
+    let mut recordings = Ui::preview().recordings;
+    recordings.reverse();
+    let shown = recent_games(&recordings, 5);
+    assert_eq!(shown.len(), 5);
+    let stamps: Vec<_> = shown
+        .iter()
+        .map(|r| r.meta.started_at.timestamp())
+        .collect();
+    assert!(stamps.windows(2).all(|pair| pair[0] >= pair[1]));
+    assert_eq!(shown[0].meta.id, Ui::preview().recordings[0].meta.id);
+}
+
+#[test]
+fn recent_clips_come_from_the_newest_game_first() {
+    let recordings = Ui::preview().recordings;
+    let clips = recent_clips(&recordings, 6);
+    assert_eq!(clips.len(), 6);
+    assert!(
+        clips
+            .iter()
+            .all(|c| c.entry.meta.id == recordings[0].meta.id)
+    );
+    let starts: Vec<f64> = clips.iter().map(|c| c.clip.start_secs).collect();
+    assert!(starts.windows(2).all(|pair| pair[0] >= pair[1]));
+}
+
+#[test]
+fn clips_run_over_the_games_that_have_them() {
+    let recordings = Ui::preview().recordings;
+    assert_eq!(
+        recent_clips(&recordings, 100).len(),
+        6 + 3 + 9 + 5 + 4 + 2 + 1
+    );
+    assert!(recent_clips(&[], 6).is_empty());
+}
+
+#[test]
+fn game_time_is_recording_time_minus_the_loading_screen() {
+    let recordings = Ui::preview().recordings;
+    assert_eq!(game_secs_at(&recordings[0], 98.0), 90.0);
+    assert_eq!(game_secs_at(&recordings[0], 2.0), 0.0);
+}
+
+#[test]
+fn clip_titles_use_the_display_title_or_split_the_label() {
+    assert_eq!(clip_title("MyKill"), "Kill");
+    assert_eq!(clip_title("Multikill2"), "Double kill");
+    assert_eq!(clip_title("SomethingNew"), "Something new");
+}
