@@ -256,5 +256,10 @@ fn a_failed_final_rename_is_repaired_by_recovery() {
     let entries = library_message(&second);
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].meta.video, "game.mp4");
+    assert!(
+        (1.0..5.0).contains(&entries[0].meta.duration_secs),
+        "{}",
+        entries[0].meta.duration_secs
+    );
     assert!(saved.folder.join("game.mp4").is_file());
 }

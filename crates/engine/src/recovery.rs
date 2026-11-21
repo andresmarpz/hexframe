@@ -8,7 +8,6 @@ use greyscreen_mp4::recover::recover;
 
 use crate::writer::{PART_FILE, VIDEO_FILE};
 
-const FREE_AND_MDAT_LEN: usize = 16;
 const TIMESCALE_V0: usize = 12;
 
 pub(crate) fn find_parts(output_dir: &Path) -> Vec<PathBuf> {
@@ -38,11 +37,6 @@ pub(crate) fn recover_part(part: &Path) {
 }
 
 fn finish(part: &Path) -> Result<PathBuf, String> {
-    let finished = part.with_file_name(VIDEO_FILE);
-    if already_finalized(part).map_err(|e| e.to_string())? {
-        fs::rename(part, &finished).map_err(|e| e.to_string())?;
-        return Ok(finished);
-    }
     recover(part).map_err(|e| e.to_string())
 }
 
@@ -51,26 +45,6 @@ fn read_header(file: &mut File, pos: u64) -> std::io::Result<[u8; 8]> {
     file.seek(SeekFrom::Start(pos))?;
     file.read_exact(&mut head)?;
     Ok(head)
-}
-
-fn already_finalized(part: &Path) -> std::io::Result<bool> {
-    let mut file = File::open(part)?;
-    let Ok(ftyp) = read_header(&mut file, 0) else {
-        return Ok(false);
-    };
-    if &ftyp[4..8] != b"ftyp" {
-        return Ok(false);
-    }
-    let ftyp_size = u64::from(u32::from_be_bytes([ftyp[0], ftyp[1], ftyp[2], ftyp[3]]));
-    let mut tail = [0u8; FREE_AND_MDAT_LEN];
-    file.seek(SeekFrom::Start(ftyp_size))?;
-    if file.read_exact(&mut tail).is_err() {
-        return Ok(false);
-    }
-    let small =
-        tail[0..4] == 8u32.to_be_bytes() && &tail[4..8] == b"free" && &tail[12..16] == b"mdat";
-    let large = tail[0..4] == 1u32.to_be_bytes() && &tail[4..8] == b"mdat";
-    Ok(small || large)
 }
 
 fn update_sidecar(folder: &Path, video: &Path) {
@@ -139,3 +113,6 @@ fn mvhd_duration(moov: &[u8]) -> Option<f64> {
     };
     (timescale > 0).then(|| duration as f64 / f64::from(timescale))
 }
+
+#[cfg(test)]
+mod tests;
