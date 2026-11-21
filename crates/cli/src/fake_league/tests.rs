@@ -68,7 +68,7 @@ fn poller_sees_ready_events_and_win() {
         tx,
         Duration::from_millis(40),
     );
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + Duration::from_secs(60);
     let (mut ready, mut events, mut result) = (false, 0, None);
     while result.is_none() {
         let left = deadline.saturating_duration_since(Instant::now());

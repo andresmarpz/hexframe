@@ -8,8 +8,8 @@ use ureq::tls::TlsConfig;
 use crate::dto::{EventData, GameStats, PlayerEntry};
 
 const DEFAULT_BASE: &str = "https://127.0.0.1:2999";
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
-const GLOBAL_TIMEOUT: Duration = Duration::from_secs(2);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+const GLOBAL_TIMEOUT: Duration = Duration::from_secs(4);
 
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
@@ -17,6 +17,8 @@ pub enum ClientError {
     Refused,
     #[error("api not ready (status {0})")]
     NotReady(u16),
+    #[error("request timed out")]
+    Timeout,
     #[error("bad response: {0}")]
     Bad(String),
 }
@@ -35,10 +37,14 @@ impl Default for LiveClient {
 
 impl LiveClient {
     pub fn new(base: &str) -> Self {
+        Self::with_timeouts(base, CONNECT_TIMEOUT, GLOBAL_TIMEOUT)
+    }
+
+    pub fn with_timeouts(base: &str, connect: Duration, global: Duration) -> Self {
         let config = ureq::Agent::config_builder()
             .tls_config(TlsConfig::builder().disable_verification(true).build())
-            .timeout_connect(Some(CONNECT_TIMEOUT))
-            .timeout_global(Some(GLOBAL_TIMEOUT))
+            .timeout_connect(Some(connect))
+            .timeout_global(Some(global))
             .http_status_as_error(false)
             .build();
         Self {
@@ -87,8 +93,8 @@ fn map_error(error: UreqError) -> ClientError {
     match error {
         UreqError::ConnectionFailed => ClientError::Refused,
         UreqError::Io(e) if e.kind() == ErrorKind::ConnectionRefused => ClientError::Refused,
-        // Windows retries a refused loopback connect until the timeout
-        UreqError::Timeout(ureq::Timeout::Connect) => ClientError::Refused,
+        UreqError::Timeout(_) => ClientError::Timeout,
+        UreqError::Io(e) if e.kind() == ErrorKind::TimedOut => ClientError::Timeout,
         other => ClientError::Bad(other.to_string()),
     }
 }

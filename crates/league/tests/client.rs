@@ -68,3 +68,18 @@ fn non_json_body_is_bad() {
     ));
     thread.join().unwrap();
 }
+
+#[test]
+fn stalled_server_times_out_as_timeout_not_refused() {
+    let server = FakeServer::start();
+    server.with(|s| {
+        s.ready = true;
+        s.stall = std::time::Duration::from_millis(400);
+    });
+    let client = LiveClient::with_timeouts(
+        &server.base,
+        std::time::Duration::from_millis(100),
+        std::time::Duration::from_millis(100),
+    );
+    assert!(matches!(client.gamestats(), Err(ClientError::Timeout)));
+}

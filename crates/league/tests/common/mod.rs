@@ -16,6 +16,7 @@ pub struct Script {
     pub active_player: Option<String>,
     pub events: Vec<Value>,
     pub game_time_base: f64,
+    pub stall: Duration,
     started: Instant,
 }
 
@@ -51,6 +52,7 @@ impl FakeServer {
             active_player: Some("Faker#KR1".into()),
             events: Vec::new(),
             game_time_base: 100.0,
+            stall: Duration::ZERO,
             started: Instant::now(),
         }));
         let thread = {
@@ -59,6 +61,8 @@ impl FakeServer {
             std::thread::spawn(move || {
                 for request in server.incoming_requests() {
                     let (status, body) = answer(&script, request.url());
+                    let stall = script.lock().unwrap().stall;
+                    std::thread::sleep(stall);
                     let header =
                         Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap();
                     drop(
@@ -155,8 +159,8 @@ impl GameLocator for Switch {
 }
 
 pub fn recv<T>(rx: &crossbeam_channel::Receiver<T>) -> T {
-    rx.recv_timeout(Duration::from_secs(5))
-        .expect("expected a message within 5 s")
+    rx.recv_timeout(Duration::from_secs(15))
+        .expect("expected a message within 15 s")
 }
 
 pub fn expect_silence<T: std::fmt::Debug>(rx: &crossbeam_channel::Receiver<T>, ms: u64) {

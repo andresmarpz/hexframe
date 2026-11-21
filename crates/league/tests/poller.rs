@@ -211,6 +211,25 @@ fn refused_polls_after_ready_emit_gone_once() {
 }
 
 #[test]
+fn timeouts_count_as_not_ready_and_never_emit_gone() {
+    let server = FakeServer::start();
+    server.with(|s| s.ready = true);
+    let switch = Switch::on();
+    let (tx, rx) = unbounded();
+    let client = LiveClient::with_timeouts(
+        &server.base,
+        Duration::from_millis(50),
+        Duration::from_millis(50),
+    );
+    let _handle = Poller::spawn_with_interval(client, Box::new(switch.clone()), tx, FAST);
+    assert!(matches!(recv(&rx), LeagueMsg::WindowFound { .. }));
+    assert!(matches!(recv(&rx), LeagueMsg::Ready(_)));
+
+    server.with(|s| s.stall = Duration::from_millis(150));
+    expect_silence(&rx, 1500);
+}
+
+#[test]
 fn window_lost_while_waiting_emits_gone() {
     let server = FakeServer::start();
     let switch = Switch::on();

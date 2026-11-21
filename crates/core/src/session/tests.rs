@@ -118,19 +118,132 @@ fn skipped_game_enters_cooldown_until_window_is_gone() {
 }
 
 #[test]
-fn media_failure_while_starting_rearms_with_error() {
+fn media_failure_while_starting_schedules_a_retry_in_five_seconds() {
     let mut s = Session::new(true);
     s.step(found());
+    s.step(Input::Tick(100 * SEC));
     s.step(Input::Ready(info()));
+    assert!(s.step(Input::MediaFailed("no gpu".into())).is_empty());
+    assert!(matches!(
+        s.state(),
+        SessionState::Armed { retry: Some(_), .. }
+    ));
+    assert!(s.step(Input::Tick(104 * SEC)).is_empty());
+    assert_eq!(
+        s.step(Input::Tick(105 * SEC)),
+        vec![Effect::StartMedia(WINDOW)]
+    );
+    assert!(matches!(s.state(), SessionState::Starting { .. }));
+    s.step(Input::MediaStarted { t0: 105 * SEC });
+    assert!(matches!(s.state(), SessionState::Recording { .. }));
+}
+
+#[test]
+fn failed_start_retries_five_times_then_errors_into_cooldown() {
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Tick(SEC));
+    s.step(Input::Ready(info()));
+    let mut now = SEC;
+    let mut starts = 0;
+    for _ in 0..5 {
+        s.step(Input::MediaFailed("no gpu".into()));
+        now += 5 * SEC;
+        let effects = s.step(Input::Tick(now));
+        assert_eq!(effects, vec![Effect::StartMedia(WINDOW)]);
+        starts += 1;
+    }
+    assert_eq!(starts, 5);
     assert_eq!(
         s.step(Input::MediaFailed("no gpu".into())),
         vec![Effect::Status(Status::Error("no gpu".into()))]
     );
-    assert_eq!(*s.state(), SessionState::Armed { hwnd: 7, pid: 42 });
+    assert_eq!(*s.state(), SessionState::Cooldown);
+    assert!(s.step(Input::Tick(now + 60 * SEC)).is_empty());
+}
+
+#[test]
+fn starting_times_out_after_fifteen_seconds_and_retries() {
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Tick(100 * SEC));
+    s.step(Input::Ready(info()));
+    assert!(s.step(Input::Tick(114 * SEC)).is_empty());
+    assert_eq!(s.step(Input::Tick(115 * SEC)), vec![Effect::StopMedia]);
+    assert!(matches!(
+        s.state(),
+        SessionState::Armed { retry: Some(_), .. }
+    ));
     assert_eq!(
-        s.step(Input::Ready(info())),
+        s.step(Input::Tick(120 * SEC)),
         vec![Effect::StartMedia(WINDOW)]
     );
+}
+
+#[test]
+fn starting_timeout_clock_begins_at_the_first_tick() {
+    let mut s = Session::new(true);
+    s.step(found());
+    s.step(Input::Ready(info()));
+    assert!(s.step(Input::Tick(1_000 * SEC)).is_empty());
+    assert!(matches!(s.state(), SessionState::Starting { .. }));
+    assert_eq!(s.step(Input::Tick(1_015 * SEC)), vec![Effect::StopMedia]);
+}
+
+#[test]
+fn manual_start_failure_returns_to_idle_with_error() {
+    let mut s = Session::new(true);
+    s.step(Input::UserStart);
+    assert_eq!(
+        s.step(Input::MediaFailed("no gpu".into())),
+        vec![Effect::Status(Status::Error("no gpu".into()))]
+    );
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn gone_during_tail_goes_idle_after_finalized() {
+    let mut s = recording_session(0);
+    s.step(Input::Ended(GameResult::Win));
+    let effects = s.step(Input::Gone);
+    assert!(effects.contains(&Effect::StopMedia));
+    s.step(Input::Finalized);
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn gone_while_recording_goes_idle_after_finalized() {
+    let mut s = recording_session(0);
+    s.step(Input::Gone);
+    s.step(Input::Finalized);
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn gone_during_finalizing_goes_idle_after_finalized() {
+    let mut s = recording_session(0);
+    s.step(Input::Ended(GameResult::Win));
+    s.step(Input::Tick(6 * SEC));
+    assert!(matches!(s.state(), SessionState::Finalizing { .. }));
+    assert!(s.step(Input::Gone).is_empty());
+    s.step(Input::Finalized);
+    assert_eq!(*s.state(), SessionState::Idle);
+}
+
+#[test]
+fn new_window_pid_in_cooldown_arms() {
+    let mut s = recording_session(0);
+    s.step(Input::Ended(GameResult::Win));
+    s.step(Input::Tick(6 * SEC));
+    s.step(Input::Finalized);
+    assert_eq!(*s.state(), SessionState::Cooldown);
+    s.step(found());
+    assert_eq!(*s.state(), SessionState::Cooldown);
+    assert_eq!(
+        s.step(Input::WindowFound { hwnd: 9, pid: 43 }),
+        vec![Effect::Status(Status::Waiting)]
+    );
+    assert!(matches!(s.state(), SessionState::Armed { pid: 43, .. }));
 }
 
 #[test]
@@ -140,7 +253,13 @@ fn media_failure_while_recording_finalizes() {
     assert!(effects.contains(&Effect::Finalize {
         result: GameResult::Unknown
     }));
-    assert_eq!(*s.state(), SessionState::Finalizing { manual: false });
+    assert_eq!(
+        *s.state(),
+        SessionState::Finalizing {
+            manual: false,
+            gone: false
+        }
+    );
 }
 
 #[test]
@@ -157,7 +276,13 @@ fn gone_while_recording_or_in_tail_finalizes() {
     assert!(effects.contains(&Effect::Finalize {
         result: GameResult::Loss
     }));
-    assert_eq!(*s.state(), SessionState::Finalizing { manual: false });
+    assert_eq!(
+        *s.state(),
+        SessionState::Finalizing {
+            manual: false,
+            gone: true
+        }
+    );
 }
 
 #[test]
@@ -169,13 +294,20 @@ fn tail_lasts_five_seconds_from_the_last_tick() {
         *s.state(),
         SessionState::Tail {
             until: 105 * SEC,
-            result: GameResult::Win
+            result: GameResult::Win,
+            gone: false
         }
     );
     assert!(s.step(Input::Tick(105 * SEC - 1)).is_empty());
     assert!(matches!(s.state(), SessionState::Tail { .. }));
     assert!(!s.step(Input::Tick(105 * SEC)).is_empty());
-    assert_eq!(*s.state(), SessionState::Finalizing { manual: false });
+    assert_eq!(
+        *s.state(),
+        SessionState::Finalizing {
+            manual: false,
+            gone: false
+        }
+    );
 }
 
 #[test]
@@ -243,7 +375,14 @@ fn user_start_is_ignored_outside_idle() {
     let mut s = Session::new(true);
     s.step(found());
     assert!(s.step(Input::UserStart).is_empty());
-    assert_eq!(*s.state(), SessionState::Armed { hwnd: 7, pid: 42 });
+    assert_eq!(
+        *s.state(),
+        SessionState::Armed {
+            hwnd: 7,
+            pid: 42,
+            retry: None
+        }
+    );
     let mut s = recording_session(0);
     assert!(s.step(Input::UserStart).is_empty());
 }
@@ -263,5 +402,12 @@ fn auto_record_off_ignores_window_found_until_turned_on() {
     assert_eq!(*s.state(), SessionState::Idle);
     s.step(Input::SettingsChanged { auto_record: true });
     assert!(!s.step(found()).is_empty());
-    assert_eq!(*s.state(), SessionState::Armed { hwnd: 7, pid: 42 });
+    assert_eq!(
+        *s.state(),
+        SessionState::Armed {
+            hwnd: 7,
+            pid: 42,
+            retry: None
+        }
+    );
 }
