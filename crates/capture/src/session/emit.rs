@@ -31,6 +31,8 @@ pub(crate) struct Sink {
     last_tick: Option<u64>,
     frame_ticks: i64,
     parameters: Option<(Vec<u8>, Vec<u8>)>,
+    fallback: Option<(Vec<u8>, Vec<u8>)>,
+    in_band: bool,
     outputs_without_parameters: u32,
     fault: Option<String>,
 }
@@ -49,6 +51,8 @@ impl Sink {
             last_tick: None,
             frame_ticks,
             parameters: None,
+            fallback: None,
+            in_band: false,
             outputs_without_parameters: 0,
             fault: None,
         }
@@ -76,6 +80,10 @@ impl Sink {
         let tick = matched.map_or(fallback, |tick| tick.max(fallback));
         self.last_tick = Some(tick);
         tick
+    }
+
+    pub(crate) fn set_fallback(&mut self, sps: Vec<u8>, pps: Vec<u8>) {
+        self.fallback = Some((sps, pps));
     }
 
     pub(crate) fn start(&mut self, sps: Vec<u8>, pps: Vec<u8>) {
@@ -110,21 +118,31 @@ impl Sink {
             let (sample, info) = annexb_to_avcc(&item.annexb);
             if !self.started {
                 if let (Some(sps), Some(pps)) = (&info.sps, &info.pps) {
+                    self.in_band = true;
                     self.start(sps.clone(), pps.clone());
+                } else if let Some((sps, pps)) = self.fallback.take() {
+                    self.start(sps, pps);
                 } else {
                     self.outputs_without_parameters += 1;
                 }
             }
+            // The encoder's header copy can differ in bytes from its in-band sets, so only in-band starts are compared.
             let known = self
                 .parameters
                 .as_ref()
+                .filter(|_| self.in_band)
                 .map(|(sps, pps)| (sps.as_slice(), pps.as_slice()));
-            if let Some(fault) = parameter_fault(
-                known,
-                info.sps.as_deref(),
-                info.pps.as_deref(),
-                self.outputs_without_parameters,
-            ) {
+            let fault = if self.started && !self.in_band {
+                None
+            } else {
+                parameter_fault(
+                    known,
+                    info.sps.as_deref(),
+                    info.pps.as_deref(),
+                    self.outputs_without_parameters,
+                )
+            };
+            if let Some(fault) = fault {
                 self.fault = Some(fault.to_string());
                 continue;
             }

@@ -85,7 +85,7 @@ pub(crate) fn build(
         sink.warning(message);
     }
     if let Some((sps, pps)) = parameter_sets(encoder.sequence_header()) {
-        sink.start(sps, pps);
+        sink.set_fallback(sps, pps);
     }
     Ok(Video {
         wgc,
