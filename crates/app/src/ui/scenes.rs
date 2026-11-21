@@ -3,13 +3,18 @@ use greyscreen_core::update::UpdateState;
 use greyscreen_engine::EngineStatus;
 use rune::{PointerPress, TextEdit};
 
-use super::{PanelTab, SettingsSection, Ui, death_review, preview, update};
+use super::{PanelTab, Screen, SettingsSection, Ui, death_review, preview, update};
 
 type Scene = (&'static str, fn(&mut Ui));
 
 fn idle(ui: &mut Ui) {
     ui.status = EngineStatus::Idle;
     ui.feed.clear();
+}
+
+fn home(ui: &mut Ui) {
+    idle(ui);
+    ui.go(Screen::Home);
 }
 
 fn first_run(ui: &mut Ui) {
@@ -28,32 +33,36 @@ fn sheet(ui: &mut Ui, section: SettingsSection) {
 }
 
 fn demo(ui: &mut Ui) {
-    idle(ui);
+    home(ui);
     ui.recordings = preview::demo_recordings();
 }
 
 pub(crate) const SCENES: &[Scene] = &[
     ("home", |ui| {
-        idle(ui);
+        home(ui);
         ui.last_game = ui.recordings.first().cloned();
     }),
     ("demo", demo),
-    ("home-first-run", first_run),
+    ("home-first-run", |ui| {
+        first_run(ui);
+        ui.go(Screen::Home);
+    }),
+    ("games-pick", idle),
     ("idle-off", |ui| {
-        idle(ui);
+        home(ui);
         ui.settings.auto_record = false;
     }),
     ("game-running-off", |ui| {
-        idle(ui);
+        home(ui);
         ui.status = EngineStatus::GameRunning;
         ui.settings.auto_record = false;
     }),
     ("last-game", |ui| {
-        idle(ui);
+        home(ui);
         ui.last_game = ui.recordings.first().cloned();
     }),
     ("waiting", |ui| {
-        idle(ui);
+        home(ui);
         ui.status = EngineStatus::Waiting;
     }),
     ("recording", |ui| ui.select_live()),
@@ -67,7 +76,7 @@ pub(crate) const SCENES: &[Scene] = &[
         ui.select_live();
     }),
     ("error", |ui| {
-        idle(ui);
+        home(ui);
         ui.status = EngineStatus::Error("The game window could not be captured.".into());
     }),
     ("recordings", game),
@@ -136,7 +145,7 @@ pub(crate) const SCENES: &[Scene] = &[
         )];
     }),
     ("coach-demo", |ui| {
-        idle(ui);
+        home(ui);
         death_review::scene_browse(ui);
     }),
     ("row-menu", |ui| {

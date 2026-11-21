@@ -3,18 +3,23 @@ use rune::{Key, Runtime};
 
 use super::{press, press_char, runtime, settle, tap};
 use crate::ui::death_entry;
-use crate::ui::{Detail, Ui};
+use crate::ui::{Detail, Screen, Ui};
 
 fn browsing() -> Runtime<Ui> {
     let mut rt = runtime();
     rt.on_key = Some(Ui::on_key);
     rt.update(|ui, _| {
         ui.status = EngineStatus::Idle;
-        ui.show_welcome();
+        ui.close_game();
         ui.recordings[0] = death_entry();
     });
     settle(&mut rt);
     rt
+}
+
+fn on_home(rt: &mut Runtime<Ui>) {
+    rt.update(|ui, _| ui.go(Screen::Home));
+    settle(rt);
 }
 
 fn first_game(rt: &Runtime<Ui>) -> String {
@@ -31,7 +36,8 @@ fn right_click(rt: &mut Runtime<Ui>, key: &str) {
 
 #[test]
 fn the_welcome_pane_shows_recent_clips_and_this_week() {
-    let rt = browsing();
+    let mut rt = browsing();
+    on_home(&mut rt);
     assert_eq!(rt.state.detail(), Detail::Welcome);
     assert!(rt.find("recent-clips").is_some());
     assert!(rt.find("this-week").is_some());
@@ -40,6 +46,7 @@ fn the_welcome_pane_shows_recent_clips_and_this_week() {
 #[test]
 fn a_clip_on_the_welcome_pane_opens_its_game_and_plays_it() {
     let mut rt = browsing();
+    on_home(&mut rt);
     let at = rt.state.recordings[1].meta.id.clone();
     rt.update(|ui, _| {
         ui.recordings.swap(0, 1);
@@ -82,7 +89,7 @@ fn escape_closes_the_row_menu_without_opening_the_game() {
     right_click(&mut rt, &id);
     press(&mut rt, Key::Escape);
     assert!(rt.state.row_menu().is_none());
-    assert_eq!(rt.state.detail(), Detail::Welcome);
+    assert_eq!(rt.state.detail(), Detail::Pick);
 }
 
 #[test]

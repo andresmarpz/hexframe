@@ -15,7 +15,7 @@ fn game_ids(rt: &Runtime<Ui>) -> Vec<String> {
 fn idle(rt: &mut Runtime<Ui>) {
     rt.update(|ui, _| {
         ui.status = EngineStatus::Idle;
-        ui.show_welcome();
+        ui.close_game();
     });
     settle(rt);
 }
@@ -64,7 +64,7 @@ fn the_live_row_goes_away_when_the_game_is_saved() {
     });
     settle(&mut rt);
     assert!(rt.find("live-row").is_none());
-    assert_eq!(rt.state.detail(), Detail::Welcome);
+    assert_eq!(rt.state.detail(), Detail::Pick);
 }
 
 #[test]
@@ -123,16 +123,18 @@ fn enter_moves_focus_to_the_player() {
 }
 
 #[test]
-fn an_empty_library_shows_the_welcome_panel_and_a_quiet_list() {
+fn an_empty_library_shows_a_quiet_list_and_the_welcome_panel_on_home() {
     let (mut rt, _rx) = live_runtime();
     rt.update(|ui, _| ui.recordings.clear());
-    settle(&mut rt);
-    assert!(rt.find("welcome").is_some());
+    tap(&mut rt, "nav-games");
     assert!(rt.find("games-empty").is_some());
+    assert!(rt.find("games-pick").is_some());
+    tap(&mut rt, "nav-home");
+    assert!(rt.find("welcome").is_some());
 }
 
 #[test]
-fn deleting_the_open_game_returns_to_the_welcome_panel() {
+fn deleting_the_open_game_returns_to_the_placeholder() {
     let mut rt = runtime();
     idle(&mut rt);
     let id = game_ids(&rt)[0].clone();
@@ -140,7 +142,7 @@ fn deleting_the_open_game_returns_to_the_welcome_panel() {
     let rest: Vec<_> = rt.state.recordings[1..].to_vec();
     rt.update(move |ui, _| ui.apply_library(rest));
     settle(&mut rt);
-    assert_eq!(rt.state.detail(), Detail::Welcome);
+    assert_eq!(rt.state.detail(), Detail::Pick);
 }
 
 #[test]

@@ -4,29 +4,13 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{El, Icon, Key, LoopSpec, TextStyle, Tx, col, el, row, text};
+use rune::{El, Key, LoopSpec, TextStyle, Tx, col, el, row, text};
 use rune_kit::{
-    Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, Sidebar, SidebarHeader,
-    TextInput, glyphs,
+    Button, ButtonVariant, ControlSize, Kit, Sidebar, SidebarHeader, TextInput, glyphs,
 };
 
 use crate::ui::library_format::summary;
 use crate::ui::{ListItem, Ui, format_clock};
-
-static LOGO: Icon = Icon {
-    name: "greyscreen-logo",
-    view: 1024.0,
-    body: r#"<path fill="currentColor" fill-rule="evenodd" d="M468,101.4A88,88 0 0 1 556,101.4L845.59,268.6A88,88 0 0 1 889.59,344.81L889.59,679.19A88,88 0 0 1 845.59,755.4L556,922.6A88,88 0 0 1 468,922.6L178.41,755.4A88,88 0 0 1 134.41,679.19L134.41,344.81A88,88 0 0 1 178.41,268.6ZM248.6,346.07A24,24 0 0 0 236.6,366.86L236.6,657.14A24,24 0 0 0 248.6,677.93L500,823.07A24,24 0 0 0 524,823.07L775.4,677.93A24,24 0 0 0 787.4,657.14L787.4,366.86A24,24 0 0 0 775.4,346.07L524,200.93A24,24 0 0 0 500,200.93Z"/><path fill="currentColor" d="M682,487.75A28,28 0 0 1 682,536.25L448,671.35A28,28 0 0 1 406,647.1L406,376.9A28,28 0 0 1 448,352.65Z"/>"#,
-};
-
-static GEAR: Icon = Icon {
-    name: "greyscreen-gear",
-    view: 16.0,
-    body: concat!(
-        r#"<path d="M6.60 2.78 L6.78 1.11 L9.22 1.11 L9.40 2.78 L10.70 3.32 L12.02 2.27 L13.73 3.98 L12.68 5.30 L13.22 6.60 L14.89 6.78 L14.89 9.22 L13.22 9.40 L12.68 10.70 L13.73 12.02 L12.02 13.73 L10.70 12.68 L9.40 13.22 L9.22 14.89 L6.78 14.89 L6.60 13.22 L5.30 12.68 L3.98 13.73 L2.27 12.02 L3.32 10.70 L2.78 9.40 L1.11 9.22 L1.11 6.78 L2.78 6.60 L3.32 5.30 L2.27 3.98 L3.98 2.27 L5.30 3.32Z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>"#,
-        r#"<circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.25"/>"#
-    ),
-};
 
 pub(super) const ROW_HEIGHT: f32 = 60.0;
 const PULSE_SECS: f64 = 1.4;
@@ -132,7 +116,6 @@ fn status_bar(s: &Ui, k: &Kit) -> El {
         .pl(4.0)
         .gap(8.0)
         .center_y()
-        .child(rune::icon(&LOGO, 18.0).color(k.c.bg_accent).a11y_hidden())
         .child(dot(shown.dot, shown.pulse))
         .child(
             text(shown.label)
@@ -152,15 +135,7 @@ fn status_bar(s: &Ui, k: &Kit) -> El {
                 .key("nav-save-clip"),
         );
     }
-    bar.child(
-        IconButton::new(&GEAR)
-            .label("Settings")
-            .help("Settings")
-            .variant(IconButtonVariant::GhostMuted)
-            .on_press(|ui: &mut Ui| ui.toggle_settings())
-            .build(k)
-            .key("nav-settings"),
-    )
+    bar
 }
 
 fn search(s: &Ui, k: &Kit) -> El {
@@ -184,6 +159,25 @@ fn search_key(ui: &mut Ui, ev: &rune::KeyEvent, tx: &mut Tx) -> bool {
         _ => return false,
     }
     true
+}
+
+pub(super) fn pick(s: &Ui, k: &Kit) -> El {
+    let (title, detail) = if s.recordings.is_empty() {
+        (
+            "No games yet",
+            "Games you play are recorded and show up here.",
+        )
+    } else {
+        ("Pick a game", "Choose a game from the list to review it.")
+    };
+    col()
+        .key("games-pick")
+        .w_full()
+        .h_full()
+        .gap(4.0)
+        .center()
+        .child(text(title).font(k.ty.body_medium).color(k.c.text_base))
+        .child(text(detail).font(k.ty.body).color(k.c.text_muted))
 }
 
 fn empty(s: &Ui, k: &Kit) -> El {

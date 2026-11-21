@@ -4,7 +4,7 @@ use rune::{KeyEvent, Tx};
 
 use super::jump::{next_target, previous_target};
 use super::key_event::combo_of;
-use super::{Detail, EventFilter, PanelTab, Source, Ui};
+use super::{Detail, EventFilter, PanelTab, Screen, Source, Ui};
 
 const STEP_SECS: f64 = 5.0;
 
@@ -26,8 +26,17 @@ impl Ui {
         match action {
             Action::OpenSettings => self.toggle_settings(),
             _ if self.settings_open => return false,
-            Action::FocusSearch => tx.focus("filter-champion", true),
-            Action::ToggleSidebar => self.sidebar.toggle(),
+            Action::GoHome => self.go(Screen::Home),
+            Action::GoGames => self.go(Screen::Games),
+            Action::FocusSearch => {
+                self.go(Screen::Games);
+                tx.focus("filter-champion", true);
+            }
+            Action::ToggleSidebar if self.screen == Screen::Games => self.sidebar.toggle(),
+            Action::ToggleSidebar => return false,
+            Action::PreviousGame | Action::NextGame if self.screen != Screen::Games => {
+                return false;
+            }
             Action::PreviousGame => self.step_selection(-1),
             Action::NextGame => self.step_selection(1),
             Action::FocusPlayer if self.detail() == Detail::Game => tx.focus("review-video", true),
@@ -49,7 +58,7 @@ impl Ui {
         }
         match action {
             Action::ExitFullscreen if theater => self.set_theater(false, tx),
-            Action::ExitFullscreen => self.show_welcome(),
+            Action::ExitFullscreen => self.close_game(),
             Action::ToggleFullscreen => self.set_theater(!theater, tx),
             Action::PlayPause => self.review_toggle(),
             Action::SeekBack => self.review_step(-STEP_SECS),
@@ -67,6 +76,8 @@ impl Ui {
             | Action::ReplayDeath
             | Action::SaveClip
             | Action::OpenSettings
+            | Action::GoHome
+            | Action::GoGames
             | Action::PreviousGame
             | Action::NextGame
             | Action::FocusPlayer

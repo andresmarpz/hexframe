@@ -98,6 +98,8 @@ actions! {
     ToggleFullscreen => Spec::new("toggle_fullscreen", "Toggle fullscreen", Group::Review, Scope::App, &["F"]),
     ExitFullscreen => Spec::new("exit_fullscreen", "Go back or close the game", Group::Review, Scope::App, &["Escape"]).fixed(),
     OpenSettings => Spec::new("open_settings", "Open settings", Group::General, Scope::App, &["Mod+,"]),
+    GoHome => Spec::new("go_home", "Go to Home", Group::General, Scope::App, &["Mod+1"]),
+    GoGames => Spec::new("go_recordings", "Go to Games", Group::General, Scope::App, &["Mod+2"]),
     PreviousGame => Spec::new("previous_game", "Previous game", Group::General, Scope::App, &["Up"]),
     NextGame => Spec::new("next_game", "Next game", Group::General, Scope::App, &["Down"]),
     FocusPlayer => Spec::new("focus_player", "Focus the player", Group::General, Scope::App, &["Enter"]),

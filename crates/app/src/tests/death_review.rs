@@ -394,7 +394,7 @@ fn escape_opens_the_summary_then_closes_the_mode() {
     assert!(review(&rt).death.is_none());
     assert_eq!(rt.state.detail(), Detail::Game);
     press(&mut rt, Key::Escape);
-    assert_eq!(rt.state.detail(), Detail::Welcome);
+    assert_eq!(rt.state.detail(), Detail::Pick);
 }
 
 #[test]

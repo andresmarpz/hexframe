@@ -1,17 +1,18 @@
 pub(crate) mod champion;
 mod delete;
+mod games;
 mod home;
 mod review;
 mod row_menu;
 mod settings;
-mod sidebar;
+mod shell;
 pub(crate) mod thumb;
 
 use greyscreen_engine::NoticeLevel;
 use rune::{Cx, El, ScrollSpec, TextStyle, col, el, row, text};
-use rune_kit::{Kit, SplitView, Toast, ToastRegion, Toolbar};
+use rune_kit::{Kit, Page, SplitView, Toast, ToastRegion, Toolbar};
 
-use crate::ui::{Detail, Ui};
+use crate::ui::{Detail, Screen, Ui};
 
 const PAGE_MAX_WIDTH: f32 = 880.0;
 const PAGE_GUTTER: f32 = 24.0;
@@ -44,25 +45,48 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 }
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
+    let screen = match s.screen {
+        Screen::Home => home_screen(s, k),
+        Screen::Games => games_screen(s, k, cx),
+    };
+    row()
+        .key("window")
+        .w_full()
+        .h_full()
+        .fill(k.c.bg_deep)
+        .child(shell::sidebar::panel(s, k, cx.titlebar_inset()))
+        .child(col().grow(1.0).min_w(0.0).h_full().child(screen))
+}
+
+fn home_screen(s: &Ui, k: &Kit) -> El {
+    let (main, toolbar) = match s.detail() {
+        Detail::Live => (
+            fixed_content(home::page(s, k)),
+            Toolbar::new().title("Recording"),
+        ),
+        _ => (scrolling_content(home::page(s, k)), Toolbar::new()),
+    };
+    Page::new(main).toolbar(toolbar).build(k)
+}
+
+fn games_screen(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
         (Detail::Game, Some(review)) => (review::page(s, k), review::toolbar(review, k)),
         (Detail::Live, _) => (
             fixed_content(home::page(s, k)),
             Toolbar::new().title("Recording"),
         ),
-        _ => (scrolling_content(home::page(s, k)), Toolbar::new()),
+        _ => (fixed_content(games::pick(s, k)), Toolbar::new()),
     };
     SplitView::new(main)
         .sidebar(
             &s.sidebar,
             |ui: &mut Ui| &mut ui.sidebar,
-            sidebar::content(s, k),
+            games::content(s, k),
         )
         .toolbar(toolbar)
-        .titlebar_inset(cx.titlebar_inset())
         .reduced_motion(cx.is_reduced_motion())
         .build(k)
-        .key("window")
 }
 
 fn content_column() -> El {

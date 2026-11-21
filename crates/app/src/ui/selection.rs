@@ -1,12 +1,13 @@
 use greyscreen_engine::{EngineStatus, RecordingEntry};
 use jiff::Zoned;
 
-use super::Ui;
 use super::library_format::day_heading;
+use super::{Screen, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Detail {
     Welcome,
+    Pick,
     Live,
     Game,
 }
@@ -27,12 +28,12 @@ impl Ui {
     }
 
     pub(crate) fn detail(&self) -> Detail {
-        if self.live_selected && self.live_row_visible() {
-            Detail::Live
-        } else if self.review.is_some() {
-            Detail::Game
-        } else {
-            Detail::Welcome
+        match self.screen {
+            Screen::Home if self.live_row_visible() => Detail::Live,
+            Screen::Home => Detail::Welcome,
+            Screen::Games if self.live_selected && self.live_row_visible() => Detail::Live,
+            Screen::Games if self.review.is_some() => Detail::Game,
+            Screen::Games => Detail::Pick,
         }
     }
 
@@ -44,10 +45,11 @@ impl Ui {
         if self.live_row_visible() {
             self.live_selected = true;
             self.review = None;
+            self.screen = Screen::Games;
         }
     }
 
-    pub(crate) fn show_welcome(&mut self) {
+    pub(crate) fn close_game(&mut self) {
         self.live_selected = false;
         self.review = None;
     }
@@ -108,7 +110,7 @@ impl Ui {
                     Some(self.recordings[i].meta.id.as_str()) == self.selected_id()
                 })
             }),
-            Detail::Welcome => None,
+            Detail::Welcome | Detail::Pick => None,
         };
         let next = match current {
             Some(at) => at.saturating_add_signed(delta).min(last),

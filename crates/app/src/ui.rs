@@ -25,6 +25,7 @@ pub(crate) mod recordings_filter;
 mod review;
 mod row_menu;
 mod scenes;
+mod screens;
 mod selection;
 mod settings_sheet;
 mod tone;
@@ -41,6 +42,7 @@ pub(crate) use jump::seek_target;
 pub(crate) use recordings_filter::RecordingsFilter;
 pub(crate) use review::{EventFilter, PanelTab, PlayerFactory, ReviewState, Source};
 pub(crate) use scenes::SCENES;
+pub(crate) use screens::Screen;
 pub(crate) use selection::{Detail, ListItem};
 pub(crate) use settings_sheet::SettingsSection;
 pub(crate) use tone::tone_color;
@@ -78,6 +80,7 @@ pub(crate) struct Notice {
 
 #[derive(Debug)]
 pub(crate) struct Ui {
+    pub screen: Screen,
     pub sidebar: PaneState,
     pub live_selected: bool,
     pub status: EngineStatus,
@@ -124,6 +127,7 @@ impl Ui {
 
     pub(crate) fn blank(settings: Settings) -> Ui {
         Ui {
+            screen: Screen::Home,
             sidebar: PaneState::new(SIDEBAR_WIDTH).range(SIDEBAR_MIN, SIDEBAR_MAX),
             live_selected: false,
             status: EngineStatus::Idle,
@@ -223,6 +227,7 @@ impl Ui {
         self.close_settings();
         self.review = Some(ReviewState::open(entry, self.player_factory));
         self.live_selected = false;
+        self.screen = Screen::Games;
     }
 
     pub(crate) fn play_clip(&mut self, index: usize) {

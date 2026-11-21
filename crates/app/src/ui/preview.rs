@@ -10,7 +10,7 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineStatus, FeedItem, RecordingEntry};
 use jiff::{SignedDuration, Unit, Zoned};
 
-use super::{Ui, preview_thumbs};
+use super::{Screen, Ui, preview_thumbs};
 
 pub(super) fn ui() -> Ui {
     let mut ui = Ui::blank(Settings::default());
@@ -22,6 +22,7 @@ pub(super) fn ui() -> Ui {
     ui.feed = feed().into();
     ui.recordings = recordings();
     ui.live_selected = true;
+    ui.screen = Screen::Games;
     if rune::is_headless() {
         seed_thumbs(&mut ui.recordings);
     }

@@ -474,7 +474,7 @@ fn closed_settings_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
     (rt, rx)
 }
 
-fn platform() -> Mods {
+pub(super) fn platform() -> Mods {
     if cfg!(target_os = "macos") {
         Mods {
             cmd: true,
@@ -536,5 +536,5 @@ fn the_fixed_escape_key_still_leaves_fullscreen_and_closes_the_game() {
     press_key(&mut rt, Key::Escape);
     assert!(!rt.state.in_theater());
     press_key(&mut rt, Key::Escape);
-    assert_eq!(rt.state.detail(), Detail::Welcome);
+    assert_eq!(rt.state.detail(), Detail::Pick);
 }

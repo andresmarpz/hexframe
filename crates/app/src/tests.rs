@@ -11,6 +11,7 @@ mod coach;
 mod death_review;
 mod keybinds;
 mod match_flow;
+mod nav;
 mod review_flow;
 mod selection;
 mod settings_sheet;
@@ -18,7 +19,11 @@ mod storage_limit;
 mod update;
 
 fn runtime_with(ui: Ui) -> Runtime<Ui> {
-    let mut rt = Runtime::new(ui, view::root, (1180.0, 680.0), Env::new(true, 1.0));
+    runtime_sized(ui, (1180.0, 680.0))
+}
+
+fn runtime_sized(ui: Ui, size: (f32, f32)) -> Runtime<Ui> {
+    let mut rt = Runtime::new(ui, view::root, size, Env::new(true, 1.0));
     rt.frame(0.0);
     rt
 }
@@ -79,6 +84,8 @@ fn save_clip_button_sends_the_command_while_recording() {
 #[test]
 fn clicking_a_game_row_opens_its_review_in_place() {
     let (mut rt, _rx) = live_runtime();
+    tap(&mut rt, "nav-games");
+    settle(&mut rt);
     let id = rt.state.recordings[1].meta.id.clone();
     tap(&mut rt, &id);
     assert_eq!(rt.state.detail(), Detail::Game);
@@ -151,7 +158,7 @@ fn clip_seconds_outside_the_range_are_ignored() {
 fn review_runtime() -> Runtime<Ui> {
     let mut ui = Ui::preview();
     ui.player_factory = fake_player::factory;
-    let mut rt = runtime_with(ui);
+    let mut rt = runtime_sized(ui, (1400.0, 680.0));
     rt.update(|ui, _| ui.open_review_entry(crate::ui::review_entry()));
     rt.frame(1.0 / 60.0);
     rt.frame(2.0 / 60.0);
@@ -291,7 +298,7 @@ fn f_toggles_theater_and_escape_leaves_it() {
 fn escape_outside_theater_closes_the_game() {
     let mut rt = key_review_runtime();
     press(&mut rt, Key::Escape);
-    assert_eq!(rt.state.detail(), Detail::Welcome);
+    assert_eq!(rt.state.detail(), Detail::Pick);
     assert!(rt.state.review.is_none());
 }
 
@@ -564,10 +571,12 @@ fn settle(rt: &mut Runtime<Ui>) {
 }
 
 #[test]
-fn the_sidebar_is_300_points_wide_and_the_gear_opens_the_settings_sheet() {
+fn the_games_list_is_300_points_wide_and_the_settings_row_opens_the_sheet() {
     let mut rt = runtime();
-    let nav = nav_rect_of(&rt, "sidebar");
-    assert!((nav[2] - 300.0).abs() < 24.0, "width {}", nav[2]);
+    let list = nav_rect_of(&rt, "sidebar");
+    assert!((list[2] - 300.0).abs() < 24.0, "width {}", list[2]);
+    let nav = nav_rect_of(&rt, "nav");
+    assert!((nav[2] - 220.0).abs() < 1.0, "width {}", nav[2]);
     assert!(rt.find("settings-sheet").is_none());
     tap(&mut rt, "nav-settings");
     assert!(rt.state.settings_open);
