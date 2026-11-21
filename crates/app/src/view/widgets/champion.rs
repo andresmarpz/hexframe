@@ -24,6 +24,17 @@ pub(crate) fn set_waker(waker: Waker) {
     drop(WAKER.set(waker));
 }
 
+#[cfg(test)]
+pub(crate) fn without_icons() {
+    ICONS.with(|icons| {
+        let mut icons = icons.borrow_mut();
+        icons.index = Some(ChampionIcons::open(
+            &std::env::temp_dir().join("greyscreen-no-icons"),
+        ));
+        icons.images.clear();
+    });
+}
+
 pub(crate) fn reload() {
     ICONS.with(|icons| {
         let mut icons = icons.borrow_mut();

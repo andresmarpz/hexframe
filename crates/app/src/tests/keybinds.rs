@@ -4,18 +4,16 @@ use crossbeam_channel::Receiver;
 use greyscreen_core::keybinds::{Action, KeyCombo};
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineCmd, UiMsg};
-use rune::{Env, Key, KeyEvent, Modifier, Mods, Runtime};
+use rune::{Key, KeyEvent, Modifier, Mods, Runtime};
 
 use super::{key_review_runtime, press_char, settle, tap, visible_texts};
 use crate::ui::fake_player::{self, Call};
 use crate::ui::{Detail, SettingsSection, Ui};
-use crate::view;
 
 fn keybinds_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
     let (cmd, rx) = crossbeam_channel::unbounded();
     let ui = Ui::live(Settings::default(), cmd);
-    let mut rt = Runtime::new(ui, view::root, (960.0, 2600.0), Env::new(true, 1.0));
-    rt.frame(0.0);
+    let mut rt = super::runtime_sized(ui, (960.0, 2600.0));
     rt.on_key = Some(Ui::on_key);
     rt.update(|ui, _| {
         ui.open_settings(SettingsSection::Keybinds);

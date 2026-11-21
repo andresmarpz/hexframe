@@ -12,11 +12,10 @@ use greyscreen_engine::{
     Engine, EngineCmd, EngineConfig, EngineStatus, FakeMediaSource, LeagueFactory, UiMsg,
 };
 use greyscreen_league::{LeagueMsg, UpdateError};
-use rune::{Env, Runtime};
+use rune::Runtime;
 
 use super::{settle, tap, visible_texts};
 use crate::ui::Ui;
-use crate::view;
 
 fn info(tag: &str) -> UpdateInfo {
     UpdateInfo::from_release(&release(tag))
@@ -38,8 +37,7 @@ fn release(tag: &str) -> Release {
 fn settings_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
     let (cmd, rx) = unbounded();
     let ui = Ui::live(Settings::default(), cmd);
-    let mut rt = Runtime::new(ui, view::root, (960.0, 2600.0), Env::new(true, 1.0));
-    rt.frame(0.0);
+    let mut rt = super::runtime_sized(ui, (960.0, 2600.0));
     tap(&mut rt, "nav-settings");
     tap(&mut rt, "settings-nav-about");
     (rt, rx)
@@ -256,8 +254,7 @@ fn the_card_walks_through_check_download_and_install_with_a_fake_source() {
         hotkeys: None,
     });
     let ui = Ui::live(Settings::default(), engine.cmd.clone());
-    let mut rt = Runtime::new(ui, view::root, (960.0, 2600.0), Env::new(true, 1.0));
-    rt.frame(0.0);
+    let mut rt = super::runtime_sized(ui, (960.0, 2600.0));
     tap(&mut rt, "nav-settings");
     tap(&mut rt, "settings-nav-about");
     tap(&mut rt, "check-updates-button");

@@ -1,16 +1,14 @@
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::EngineCmd;
-use rune::{Env, Runtime};
+use rune::Runtime;
 
 use super::{tap, visible_texts};
 use crate::ui::Ui;
-use crate::view;
 
 fn settings_runtime() -> (Runtime<Ui>, crossbeam_channel::Receiver<EngineCmd>) {
     let (cmd, rx) = crossbeam_channel::unbounded();
     let ui = Ui::live(Settings::default(), cmd);
-    let mut rt = Runtime::new(ui, view::root, (960.0, 2600.0), Env::new(true, 1.0));
-    rt.frame(0.0);
+    let mut rt = super::runtime_sized(ui, (960.0, 2600.0));
     tap(&mut rt, "nav-settings");
     tap(&mut rt, "settings-nav-storage");
     (rt, rx)

@@ -39,6 +39,7 @@ fn runtime_with(ui: Ui) -> Runtime<Ui> {
 }
 
 fn runtime_sized(ui: Ui, size: (f32, f32)) -> Runtime<Ui> {
+    view::champion::without_icons();
     let mut rt = Runtime::new(ui, view::root, size, Env::new(true, 1.0));
     rt.frame(0.0);
     rt

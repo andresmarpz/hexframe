@@ -14,11 +14,10 @@ use greyscreen_engine::{
     LeagueFactory, UiMsg,
 };
 use greyscreen_league::{FeedbackError, LeagueMsg};
-use rune::{Env, Key, KeyEvent, Mods, Runtime, TextEdit};
+use rune::{Key, KeyEvent, Mods, Runtime, TextEdit};
 
 use super::{live_runtime, settle, tap, visible_texts};
 use crate::ui::{FeedbackPhase, Ui};
-use crate::view;
 
 fn has_text(rt: &Runtime<Ui>, wanted: &str) -> bool {
     visible_texts(rt).iter().any(|t| t == wanted)
@@ -352,8 +351,7 @@ fn the_dialog_walks_through_failure_and_success_with_a_fake_transport() {
         hotkeys: None,
     });
     let ui = Ui::live(Settings::default(), engine.cmd.clone());
-    let mut rt = Runtime::new(ui, view::root, (960.0, 1400.0), Env::new(true, 1.0));
-    rt.frame(0.0);
+    let mut rt = super::runtime_sized(ui, (960.0, 1400.0));
     open(&mut rt);
     write(&mut rt, "It crashed");
 
