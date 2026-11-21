@@ -79,7 +79,7 @@ Upstream: no issue filed yet.
 Upstream: no issue filed yet.
 
 - Problem: the decoder presents each picture on the layer as soon as its time has passed, and nothing dropped late ones. A decoder that fell behind the clock (the clock follows the sound) replayed its backlog back to back until it caught up, so the picture ran fast for a moment and then went normal.
-- Change: on the layer, a picture more than `LAYER_LATE` (100 ms) past its time on the clock is decoded but not copied or presented, so the layer jumps to the clock. The layer still shows a picture at least every `LAYER_GAP` (250 ms), so a decoder slower than the clip still moves. A fast seek's first picture and a seek's own landing are never dropped (no clock runs for them yet).
+- Change: on the layer, a picture more than `LAYER_LATE` (50 ms) past its time on the clock is decoded but not copied or presented, so the layer jumps to the clock. The layer still shows a picture at least every `LAYER_GAP` (250 ms), so a decoder slower than the clip still moves. A fast seek's first picture and a seek's own landing are never dropped (no clock runs for them yet).
 - Files: `decoder.rs` (`late_for_layer`), test `a_decoder_that_fell_behind_on_the_layer_jumps_to_the_clock_instead_of_playing_fast` in `qa/tests.rs` (it holds the decoder's lock for 1.2 s, then counts the pictures shown per 100 ms; it needs a Windows run, with and without the change).
 
 ## Known gaps

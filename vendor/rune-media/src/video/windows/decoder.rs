@@ -37,7 +37,7 @@ const RING_POLL: Duration = Duration::from_millis(2);
 const LAYER_LEAD: Duration = Duration::from_millis(2);
 /// A picture this far past its time on the layer is dropped, not presented: a decoder that fell
 /// behind catches up in one jump instead of replaying what it missed fast.
-const LAYER_LATE: Duration = Duration::from_millis(100);
+const LAYER_LATE: Duration = Duration::from_millis(50);
 /// The layer shows a picture at least this often, however late the pictures are.
 const LAYER_GAP: Duration = Duration::from_millis(250);
 
