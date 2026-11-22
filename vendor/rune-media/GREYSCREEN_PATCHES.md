@@ -98,6 +98,18 @@ Upstream: none (Rune logs only to stderr under `RUNE_VIDEO_LOG`).
 - Change: `watch.rs` and a few calls log through `tracing`, a few lines per seek or pause and nothing per picture: each phase change with its time, each seek (from, to, generation, fast), each wedged-seek restart and decoder failure, a decoder wait over 500 ms for a texture or for room while the clock runs, a source seek or read over 500 ms, and one `picture frozen: clock advanced N s since the last presented picture` warning when the clock runs over 1 s with no new picture on the surface or the layer (and one line when it moves again).
 - Files: `Cargo.toml` (`tracing`), `watch.rs` (new), `mod.rs`, `decoder.rs`.
 
+## 9. Layer presents align to the display refresh with a high-resolution timer
+
+Upstream: none yet.
+
+- Problem: `Decoder::present_when_due` waited on `Condvar::wait_timeout` without `timeBeginPeriod`, so waits quantized to Windows' 15.6 ms timer tick, and did not snap layer presents to DWM's refresh grid. On a 144 Hz display a 60 fps clip showed uneven cadence and late presents.
+- Change:
+  - `vsync.rs`: added `nearest` to snap a picture's clock due time to the closest refresh on DWM's vblank grid (`DwmGetCompositionTimingInfo`).
+  - `decoder.rs`: replaced the layer present `Condvar::wait_timeout` with a `CREATE_WAITABLE_TIMER_HIGH_RESOLUTION` waitable timer plus a manual-reset Win32 wake event on `Pipe` so seeks, pauses, stops and unlayering still wake immediately, followed by a short sub-millisecond yield spin.
+  - `watch.rs`: added `PresentLateness` to record wake lateness per present and log one summary line (count, p50, p95, max) per play on pause, seek, unlayer, end or close.
+  - `qa.rs`, `qa/tests.rs`: exposed `Rig::present_lateness_ms` under `qa` and added a 60 fps layer present lateness check.
+- Files: `vsync.rs`, `watch.rs`, `decoder.rs`, `qa.rs`, `qa/tests.rs`.
+
 ## 9. A layer made again never takes the closed layer's surface handle
 
 Upstream: anomalyco/rune#1333. Rune's `window/win32/video_layer.rs` could also key its visual on more than the handle's value.

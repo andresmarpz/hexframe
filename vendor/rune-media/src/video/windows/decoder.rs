@@ -12,6 +12,8 @@ use super::gpu::{self, Ring};
 use super::layer::Layer;
 use super::machine::Anchor;
 use super::mf::{self, Decode, Picture, Sound};
+use super::vsync;
+use super::watch::PresentLateness;
 use super::super::{Kind, MediaSource, Meta};
 use crate::native_surface::ByteFrame;
 use crate::native_surface::windows::DecodedPlanes;
@@ -19,10 +21,15 @@ use rune_core::time::Instant;
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::Duration;
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Graphics::Direct3D11::{D3D11_BIND_DECODER, ID3D11Texture2D};
 use windows::Win32::Media::MediaFoundation::*;
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
-use windows::core::Interface;
+use windows::Win32::System::Threading::{
+    CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, CreateEventW, CreateWaitableTimerExW, INFINITE,
+    ResetEvent, SetEvent, SetWaitableTimer, WaitForMultipleObjects, WaitForSingleObject,
+};
+use windows::core::{Interface, PCWSTR};
 
 /// Pictures decoded ahead of the one on screen.
 const AHEAD: usize = 3;
@@ -35,6 +42,10 @@ const RING_POLL: Duration = Duration::from_millis(2);
 /// How long before a picture's time the decoder presents it on the clip's layer: the display
 /// shows it at the first refresh after.
 const LAYER_LEAD: Duration = Duration::from_millis(2);
+/// Final sub-millisecond yield window after the high-resolution waitable timer wakes.
+const PRESENT_SPIN: Duration = Duration::from_micros(500);
+/// `SYNCHRONIZE | TIMER_MODIFY_STATE` for `CreateWaitableTimerExW`.
+const TIMER_ACCESS: u32 = 0x0010_0002;
 /// A picture this far past its time on the layer is dropped, not presented: a decoder that fell
 /// behind catches up in one jump instead of replaying what it missed fast.
 const LAYER_LATE: Duration = Duration::from_millis(50);
@@ -77,6 +88,8 @@ pub(super) struct Inbox {
     /// The clip can't have a layer (a rotated clip, software pictures, no video processor): the
     /// UI keeps drawing it.
     pub layer_refused: bool,
+    #[cfg(feature = "qa")]
+    pub layer_lateness_us: Vec<u32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -123,9 +136,89 @@ pub(super) enum Pic {
     Cpu(ByteFrame),
 }
 
+struct WakeEvent(HANDLE);
+
+// SAFETY: a Win32 event handle can be signaled, reset and waited on from any thread.
+unsafe impl Send for WakeEvent {}
+// SAFETY: a Win32 event handle can be signaled, reset and waited on from any thread.
+unsafe impl Sync for WakeEvent {}
+
+impl WakeEvent {
+    fn new() -> Option<Self> {
+        // SAFETY: manual-reset unnamed event with default security.
+        unsafe { CreateEventW(None, true, false, PCWSTR::null()) }.ok().map(Self)
+    }
+
+    fn signal(&self) {
+        // SAFETY: `self.0` is a live event handle owned by `Pipe`.
+        let _ = unsafe { SetEvent(self.0) };
+    }
+
+    fn reset(&self) {
+        // SAFETY: `self.0` is a live event handle owned by `Pipe`.
+        let _ = unsafe { ResetEvent(self.0) };
+    }
+}
+
+impl Drop for WakeEvent {
+    fn drop(&mut self) {
+        // SAFETY: `self.0` is owned solely by this `WakeEvent`.
+        let _ = unsafe { CloseHandle(self.0) };
+    }
+}
+
+struct HighResTimer(HANDLE);
+
+// SAFETY: a Win32 waitable timer handle can move between threads.
+unsafe impl Send for HighResTimer {}
+
+impl HighResTimer {
+    fn new() -> Option<Self> {
+        // SAFETY: unnamed high-resolution waitable timer, falling back to a plain one on older Windows.
+        unsafe {
+            CreateWaitableTimerExW(None, PCWSTR::null(), CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ACCESS)
+                .or_else(|_| CreateWaitableTimerExW(None, PCWSTR::null(), 0, TIMER_ACCESS))
+        }
+        .ok()
+        .map(Self)
+    }
+
+    fn wait(&self, duration: Duration, wake: Option<&WakeEvent>) {
+        let sleep = duration.saturating_sub(PRESENT_SPIN);
+        if sleep.is_zero() {
+            return;
+        }
+        let due = -((sleep.as_nanos() / 100).max(1) as i64);
+        // SAFETY: `self.0` is a live waitable timer; `due` is a local relative 100 ns interval.
+        if unsafe { SetWaitableTimer(self.0, &due, 0, None, None, false) }.is_err() {
+            std::thread::sleep(sleep);
+            return;
+        }
+        // SAFETY: both handles remain live for the duration of the wait.
+        unsafe {
+            match wake {
+                Some(wake) => {
+                    let _ = WaitForMultipleObjects(&[self.0, wake.0], false, INFINITE);
+                }
+                None => {
+                    let _ = WaitForSingleObject(self.0, INFINITE);
+                }
+            }
+        }
+    }
+}
+
+impl Drop for HighResTimer {
+    fn drop(&mut self) {
+        // SAFETY: `self.0` is owned solely by this `HighResTimer`.
+        let _ = unsafe { CloseHandle(self.0) };
+    }
+}
+
 pub(super) struct Pipe {
     inbox: Mutex<Inbox>,
     wake: Condvar,
+    wake_event: Option<WakeEvent>,
 }
 
 impl Inbox {
@@ -150,6 +243,9 @@ impl Pipe {
     /// Tell the decoder something changed (a seek, a picture taken, a stop).
     pub(super) fn poke(&self) {
         self.wake.notify_all();
+        if let Some(ev) = &self.wake_event {
+            ev.signal();
+        }
     }
 }
 
@@ -175,6 +271,7 @@ pub(super) fn start(job: Job) -> Arc<Pipe> {
     let pipe = Arc::new(Pipe {
         inbox: Mutex::new(Inbox { looping: job.looping, sound: job.sound, touched: Some(Instant::now()), ..Inbox::default() }),
         wake: Condvar::new(),
+        wake_event: WakeEvent::new(),
     });
     let thread_pipe = pipe.clone();
     let spawned = std::thread::Builder::new().name("rune-video-decode".into()).spawn(move || {
@@ -300,9 +397,17 @@ struct Decoder {
     opened_us: u128,
     steps: String,
     layer: Option<Layer>,
+    timer: Option<HighResTimer>,
+    present_lateness: PresentLateness,
     /// Decoding on the CPU only because Rune had no GPU yet when the clip opened: once it has one,
     /// the clip opens again there (`decode`).
     awaiting_gpu: bool,
+}
+
+impl Drop for Decoder {
+    fn drop(&mut self) {
+        self.present_lateness.flush("closed");
+    }
 }
 
 impl Decoder {
@@ -343,7 +448,7 @@ impl Decoder {
         let facts = Facts { meta, picture, sound: opened.sound, hardware, gpu: ring.is_some() };
         let opened_us = us(t0);
         let steps = format!("Media Foundation at {t_mf}, D3D11 at {t_device}, source at {t_source}, reader at {t_reader}, ring at {opened_us}");
-        let mut d = Self { kind: job.kind, reader: opened.reader, facts, ring, output: None, video: opened.video, audio: opened.audio, video_open: picture.is_some(), audio_open: false, opened_us, steps, layer: None, awaiting_gpu };
+        let mut d = Self { kind: job.kind, reader: opened.reader, facts, ring, output: None, video: opened.video, audio: opened.audio, video_open: picture.is_some(), audio_open: false, opened_us, steps, layer: None, timer: HighResTimer::new(), present_lateness: PresentLateness::default(), awaiting_gpu };
         d.select_sound(job.sound.is_some() || job.kind == Kind::Audio, job, job.start);
         Ok(d)
     }
@@ -415,6 +520,7 @@ impl Decoder {
                         }
                     }
                     if let Some(seek) = s.seek.take() {
+                        self.present_lateness.flush("seek");
                         // The clip's end is its last picture's time, not the next loop's start.
                         let meta = self.facts.meta;
                         let to = if meta.duration > 0.0 { seek.to.min(meta.duration - meta.frame * 0.5).max(0.0) } else { seek.to };
@@ -618,6 +724,7 @@ impl Decoder {
                     mf::seek(&self.reader, 0.0)?;
                     self.reopen_streams();
                 } else {
+                    self.present_lateness.flush("ended");
                     pipe.lock().ended = Some(generation);
                     if let Some(o) = &self.output {
                         o.end(generation);
@@ -650,6 +757,7 @@ impl Decoder {
     fn follow_layer(&mut self, s: &mut Inbox) {
         let Some(size) = s.layer.filter(|_| !s.layer_refused) else {
             if s.layer.is_none() && self.layer.take().is_some() {
+                self.present_lateness.flush("unlayered");
                 s.layer_handle = None;
                 s.layer_shown = None;
             }
@@ -701,23 +809,56 @@ impl Decoder {
     /// the window. The wait ends early for a seek, a stop or the window taking the pictures back,
     /// and follows the clock where the sound moves it.
     fn present_when_due(&mut self, pipe: &Pipe, job: &Job, clock: Anchor, pts: f64, generation: u32) -> bool {
-        let Some(layer) = &self.layer else { return false };
+        if self.layer.is_none() {
+            return false;
+        }
         let mut s = pipe.lock();
-        loop {
+        let target_at = loop {
             if s.stop || s.seek.is_some() || s.layer.is_none() {
+                drop(s);
+                self.present_lateness.flush("stopped");
                 return false;
             }
             // Paused, or the rate changed, while it waited: the window decides again.
-            let Some(now_clock) = job.clock.get().filter(|c| c.rate == clock.rate) else { return false };
+            let Some(now_clock) = job.clock.get().filter(|c| c.rate == clock.rate) else {
+                drop(s);
+                self.present_lateness.flush("paused");
+                return false;
+            };
             let due = now_clock.when(pts);
-            let at = due.checked_sub(LAYER_LEAD).unwrap_or(due);
+            let refresh = vsync::nearest(due);
+            let at = refresh.checked_sub(LAYER_LEAD).unwrap_or(refresh);
             let now = Instant::now();
             if now >= at {
-                break;
+                break at;
             }
-            s = pipe.wake.wait_timeout(s, at - now).unwrap().0;
-        }
+            let remaining = at - now;
+            if remaining <= PRESENT_SPIN {
+                drop(s);
+                std::thread::yield_now();
+                s = pipe.lock();
+                continue;
+            }
+            if let Some(timer) = &self.timer {
+                if let Some(ev) = &pipe.wake_event {
+                    ev.reset();
+                }
+                drop(s);
+                timer.wait(remaining, pipe.wake_event.as_ref());
+                s = pipe.lock();
+            } else {
+                s = pipe.wake.wait_timeout(s, remaining).unwrap().0;
+            }
+        };
         drop(s);
+        let late = Instant::now().saturating_duration_since(target_at);
+        self.present_lateness.record(late);
+        #[cfg(feature = "qa")]
+        {
+            let us = u32::try_from(late.as_micros()).unwrap_or(u32::MAX);
+            pipe.lock().layer_lateness_us.push(us);
+        }
+        let Some(layer) = &self.layer else { return false };
         if let Err(e) = layer.present() {
             if logging() {
                 log!("{e}; the window draws the pictures");

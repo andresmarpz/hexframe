@@ -77,3 +77,42 @@ pub(super) fn snap(t: Instant) -> Instant {
     let k = since.div_ceil(period);
     g.vblank + Duration::from_nanos((k * period) as u64)
 }
+
+/// The display refresh nearest to `t` on DWM's vblank grid.
+pub(super) fn nearest(t: Instant) -> Instant {
+    let Some(g) = grid() else { return t };
+    nearest_on_grid(t, g.vblank, g.period)
+}
+
+fn nearest_on_grid(t: Instant, vblank: Instant, period: Duration) -> Instant {
+    let period_ns = period.as_nanos().max(1);
+    if t >= vblank {
+        let since = t.duration_since(vblank).as_nanos();
+        let k = (since + period_ns / 2) / period_ns;
+        vblank + Duration::from_nanos((k * period_ns) as u64)
+    } else {
+        let before = vblank.duration_since(t).as_nanos();
+        let k = (before + period_ns / 2) / period_ns;
+        vblank.checked_sub(Duration::from_nanos((k * period_ns) as u64)).unwrap_or(t)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nearest_snaps_60fps_to_a_144hz_2_3_cadence() {
+        let vblank = Instant::now();
+        let period = Duration::from_nanos(6_944_444);
+        let frame = Duration::from_nanos(16_666_667);
+        let slots: Vec<u128> = (0..6)
+            .map(|i| {
+                let snapped = nearest_on_grid(vblank + frame * i, vblank, period);
+                (snapped.duration_since(vblank).as_nanos() + period.as_nanos() / 2) / period.as_nanos()
+            })
+            .collect();
+        let diffs: Vec<u128> = slots.windows(2).map(|w| w[1] - w[0]).collect();
+        assert_eq!(diffs, vec![2, 3, 2, 3, 2]);
+    }
+}

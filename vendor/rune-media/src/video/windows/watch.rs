@@ -4,9 +4,67 @@
 
 use super::machine::{Anchor, Phase};
 use rune_core::time::Instant;
+use std::time::Duration;
 
 /// Clock seconds with no new picture before the picture counts as frozen.
 const FROZEN: f64 = 1.0;
+
+const LATENESS_BUCKETS: usize = 200;
+const LATENESS_BUCKET_US: u32 = 100;
+
+/// Per-play summary of how late layer presents woke relative to their target refresh.
+pub(super) struct PresentLateness {
+    buckets: [u32; LATENESS_BUCKETS],
+    count: u64,
+    max_us: u32,
+}
+
+impl Default for PresentLateness {
+    fn default() -> Self {
+        Self { buckets: [0; LATENESS_BUCKETS], count: 0, max_us: 0 }
+    }
+}
+
+impl PresentLateness {
+    pub(super) fn record(&mut self, late: Duration) {
+        let us = u32::try_from(late.as_micros()).unwrap_or(u32::MAX);
+        let index = ((us / LATENESS_BUCKET_US) as usize).min(LATENESS_BUCKETS - 1);
+        self.buckets[index] = self.buckets[index].saturating_add(1);
+        self.count += 1;
+        self.max_us = self.max_us.max(us);
+    }
+
+    pub(super) fn percentile_ms(&self, p: f64) -> f64 {
+        if self.count == 0 {
+            return 0.0;
+        }
+        let target = (self.count as f64 * p).ceil().max(1.0) as u64;
+        let mut seen = 0u64;
+        for (index, &n) in self.buckets.iter().enumerate() {
+            seen += u64::from(n);
+            if seen >= target {
+                let upper = (index as u32 + 1) * LATENESS_BUCKET_US;
+                return f64::from(upper.min(self.max_us.max(1))) / 1000.0;
+            }
+        }
+        f64::from(self.max_us) / 1000.0
+    }
+
+    pub(super) fn flush(&mut self, reason: &str) {
+        if self.count == 0 {
+            return;
+        }
+        tracing::info!(
+            presents = self.count,
+            p50_ms = (self.percentile_ms(0.50) * 100.0).round() / 100.0,
+            p95_ms = (self.percentile_ms(0.95) * 100.0).round() / 100.0,
+            max_ms = (f64::from(self.max_us) / 10.0).round() / 100.0,
+            reason,
+            "video layer present lateness"
+        );
+        *self = Self::default();
+    }
+}
 
 /// A phase with its time, for one log line.
 pub(super) fn phase(p: Phase) -> String {

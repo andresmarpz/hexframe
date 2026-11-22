@@ -179,6 +179,15 @@ fn the_layer_plays_with_sound_and_a_pause_there_holds_its_picture() {
     let heard = fake::take();
     let moved = rig.presented().zip(presented).map(|(now, then)| now - then);
     assert!(moved.is_some_and(|m| m > LAYER_RUN - 0.3), "the layer presented {moved:?} s of pictures in {LAYER_RUN} s with window {:?}; with none, nothing takes the layer's frames", window::mode());
+    let mut lateness = rig.take_present_lateness_ms();
+    lateness.sort_by(f64::total_cmp);
+    if !lateness.is_empty() {
+        let p50 = lateness[lateness.len() / 2];
+        let p95 = lateness[(lateness.len() * 95 / 100).min(lateness.len() - 1)];
+        let max = *lateness.last().unwrap();
+        eprintln!("layer present lateness ({} presents): p50={p50:.2} ms, p95={p95:.2} ms, max={max:.2} ms", lateness.len());
+        assert!(p95 < 5.0, "layer present p95 lateness too high: {p95:.2} ms");
+    }
     let level = rms(&heard, layered + secs(0.2), Instant::now());
     assert!(level > 0.05, "the sound was silent on the layer: rms {level:.4}");
     assert_in_sync(&rig, &heard, layered + secs(0.5), "on the layer");

@@ -207,6 +207,13 @@ impl Rig {
         Some(if duration > 0.0 { pts.rem_euclid(duration) } else { pts })
     }
 
+    /// Recorded layer present wake lateness samples in milliseconds since the last take.
+    pub(super) fn take_present_lateness_ms(&self) -> Vec<f64> {
+        let native = self.player.shared.native.lock().unwrap();
+        let Some(pipe) = native.pipe.as_ref() else { return Vec::new() };
+        std::mem::take(&mut pipe.lock().layer_lateness_us).into_iter().map(|us| f64::from(us) / 1000.0).collect()
+    }
+
     /// For each beat heard, how far the clock was past the beat's time when it was heard.
     pub(super) fn offsets(&self, heard: &[Heard], after: Instant) -> Vec<f64> {
         beats(heard)
