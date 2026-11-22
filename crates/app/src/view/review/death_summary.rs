@@ -252,7 +252,7 @@ fn footer(k: &Kit) -> El {
         .build(k)
         .key("death-again");
     let done = Button::new("Done")
-        .variant(ButtonVariant::Submit)
+        .variant(ButtonVariant::Contrast)
         .control_size(ControlSize::Regular)
         .shortcut("Esc")
         .on_press(|ui: &mut Ui| ui.death_close())

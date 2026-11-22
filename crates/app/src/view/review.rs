@@ -42,17 +42,7 @@ pub(super) fn tabular(style: TextStyle) -> TextStyle {
 }
 
 pub(super) fn tone_pill(k: &Kit, label: &str, colors: rune_kit::StateColors) -> El {
-    row()
-        .h(22.0)
-        .px(10.0)
-        .center()
-        .radius(11.0)
-        .fill(colors.bg)
-        .child(
-            text(label.to_owned())
-                .font(k.ty.small_medium)
-                .color(colors.fg),
-        )
+    crate::view::widgets::state_pill(k, label, colors, false)
 }
 
 pub(super) fn play_button(review: &ReviewState, k: &Kit, variant: IconButtonVariant) -> El {

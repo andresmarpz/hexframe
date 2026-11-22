@@ -25,10 +25,9 @@
     {
       "check": "testing",
       "has": [
-        "first-run-testing"
-      ],
-      "lacks": [
-        "first-run-test"
+        "first-run-testing",
+        "first-run-test",
+        "first-run-test-spinner"
       ]
     },
     {

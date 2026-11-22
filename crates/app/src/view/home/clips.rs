@@ -1,10 +1,10 @@
 use rune::{Cursor, El, el, row, text};
-use rune_kit::Kit;
+use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips};
-use crate::ui::{Ui, format_clock};
+use crate::ui::{Screen, Ui, format_clock};
 use crate::view::thumb::{self, ASPECT};
-use crate::view::{TABULAR, titled_card};
+use crate::view::{TABULAR, card, hairline};
 
 const LIMIT: usize = 4;
 const GAP: f32 = 12.0;
@@ -21,7 +21,32 @@ pub(super) fn section(s: &Ui, k: &Kit) -> Option<El> {
     for _ in clips.len()..LIMIT {
         strip = strip.child(el().w(0.0).grow(1.0).a11y_hidden());
     }
-    Some(titled_card(k, "recent-clips", "Recent clips").child(strip))
+    let header = row()
+        .w_full()
+        .h(44.0)
+        .px(16.0)
+        .center_y()
+        .justify_between()
+        .child(
+            text("Recent clips")
+                .font(k.ty.body_medium)
+                .color(k.c.text_base),
+        )
+        .child(
+            Button::new("View all")
+                .variant(ButtonVariant::Ghost)
+                .control_size(ControlSize::Small)
+                .on_press(|ui: &mut Ui| ui.go(Screen::Clips))
+                .build(k)
+                .key("home-view-all-clips"),
+        );
+    Some(
+        card(k)
+            .key("recent-clips")
+            .child(header)
+            .child(hairline(k))
+            .child(strip),
+    )
 }
 
 fn item(clip: &RecentClip, k: &Kit) -> El {

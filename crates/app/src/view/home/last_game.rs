@@ -1,12 +1,12 @@
 use greyscreen_core::game::GameResult;
 use greyscreen_engine::RecordingEntry;
-use rune::{Color, El, TextStyle, col, row, text};
+use rune::{Color, Cursor, El, TextStyle, col, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
-use super::feed::tinted_pill;
 use crate::ui::library::format::{Kda, death_total, kda, mode_label};
 use crate::ui::{Ui, format_clock};
 use crate::view::thumb;
+use crate::view::widgets::{state_pill, status_pill};
 use crate::view::{TABULAR, titled_card};
 
 const THUMB_WIDTH: f32 = 96.0;
@@ -29,11 +29,18 @@ pub(super) fn panel(entry: &RecordingEntry, k: &Kit) -> El {
         .build(k)
         .key("open-last-game");
     let summary = row()
+        .key("last-game-summary")
+        .role("button")
+        .label(format!("Open {champion} game"))
         .w_full()
         .px(16.0)
         .py(14.0)
         .gap(12.0)
         .center_y()
+        .cursor(Cursor::Pointer)
+        .hover(k.c.hover)
+        .hover_group()
+        .on_press(|ui: &mut Ui| ui.open_last_game())
         .child(thumb::game_thumb(k, entry, THUMB_WIDTH))
         .child(
             col()
@@ -72,12 +79,12 @@ fn deaths_button(entry: &RecordingEntry, k: &Kit) -> Option<El> {
 }
 
 fn result_pill(result: GameResult, k: &Kit) -> El {
-    let (label, ink) = match result {
-        GameResult::Win => ("VICTORY", k.c.success.icon),
-        GameResult::Loss => ("DEFEAT", k.c.danger.icon),
-        GameResult::Unknown => ("UNKNOWN", k.c.text_muted),
+    let pill = match result {
+        GameResult::Win => state_pill(k, "Victory", k.c.success, false),
+        GameResult::Loss => state_pill(k, "Defeat", k.c.danger, false),
+        GameResult::Unknown => status_pill(k, "Unknown", k.c.layer_02, k.c.text_muted, None),
     };
-    tinted_pill(k, label.to_owned(), ink).key("last-game-result")
+    pill.key("last-game-result")
 }
 
 fn kda_figures(kda: Kda, k: &Kit) -> El {

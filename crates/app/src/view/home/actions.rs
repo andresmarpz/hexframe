@@ -6,15 +6,14 @@ use rune::{El, Tx, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::{TEST_RECORDING_SECS, Ui};
-
-const STOP_WIDTH: f32 = 168.0;
+use crate::view::widgets::stable_label_content;
 
 pub(super) fn bar(s: &Ui, k: &Kit) -> El {
     match &s.status {
         EngineStatus::Recording { .. } => recording(s, k),
         EngineStatus::Error(message) => failed(Problem::from_error(message), k),
         _ if !s.settings.first_run_done => row().key("first-run-quiet"),
-        status => idle(status, k),
+        status => idle(status, !s.recordings.is_empty(), k),
     }
 }
 
@@ -72,23 +71,29 @@ fn failed(problem: Problem, k: &Kit) -> El {
     bar
 }
 
-fn idle(status: &EngineStatus, k: &Kit) -> El {
+fn idle(status: &EngineStatus, has_games: bool, k: &Kit) -> El {
     let reason = match status {
         EngineStatus::Idle | EngineStatus::GameRunning => None,
         EngineStatus::Finalizing => Some("Not available while the last game is saving."),
         _ => Some("Not available while League is starting."),
     };
-    let mut bar = row().gap(12.0).center_y().child(secondary(
-        k,
-        "Test recording (10 s)",
-        "test-recording",
-        reason.is_some(),
-        |ui, _| {
+    let variant = if has_games {
+        ButtonVariant::Ghost
+    } else {
+        ButtonVariant::Outline
+    };
+    let test = Button::new("Test recording (10 s)")
+        .variant(variant)
+        .control_size(ControlSize::Large)
+        .disabled(reason.is_some())
+        .on_press_tx(|ui: &mut Ui, _| {
             ui.send(EngineCmd::StartTestRecording {
                 secs: TEST_RECORDING_SECS,
             })
-        },
-    ));
+        })
+        .build(k)
+        .key("test-recording");
+    let mut bar = row().gap(12.0).center_y().child(test);
     if let Some(reason) = reason {
         bar = bar.child(
             text(reason)
@@ -106,15 +111,12 @@ fn primary(
     key: &'static str,
     on_press: impl Fn(&mut Ui, &mut Tx) + 'static,
 ) -> El {
-    let ink = k.c.text_accent;
     Button::new(label)
-        .variant(ButtonVariant::Neutral)
+        .variant(ButtonVariant::Contrast)
         .control_size(ControlSize::Large)
-        .label_with(move |font, _| text(label).font(font).color(ink))
         .on_press_tx(on_press)
         .build(k)
         .key(key)
-        .fill(k.alpha(ink, 0.16))
 }
 
 fn secondary(
@@ -134,20 +136,17 @@ fn secondary(
 }
 
 fn stop_button(confirming: bool, k: &Kit) -> El {
-    let label = if confirming {
-        "Click again to stop"
+    let label = if confirming { "Confirm?" } else { "Stop" };
+    let variant = if confirming {
+        ButtonVariant::Danger
     } else {
-        "Stop"
+        ButtonVariant::Outline
     };
-    let (rest, hover) = (k.c.text_muted, k.c.danger.fg);
-    let ink = if confirming { hover } else { rest };
     Button::new(label)
-        .variant(ButtonVariant::Outline)
+        .variant(variant)
         .control_size(ControlSize::Large)
-        .label_with(move |font, _| text(label).font(font).color(ink).group_color(hover))
+        .label_with(move |font, ink| stable_label_content("Confirm?", label, font, ink))
         .on_press_tx(|ui: &mut Ui, tx| ui.request_stop(tx))
         .build(k)
         .key("stop-recording")
-        .w(STOP_WIDTH)
-        .hover_group()
 }

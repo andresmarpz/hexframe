@@ -138,3 +138,20 @@ fn a_game_row_shows_how_many_deaths_are_reviewed() {
     settle(&mut rt);
     assert!(has(&rt, "1/7"));
 }
+
+#[test]
+fn home_links_open_all_clips_and_the_last_game() {
+    let mut rt = browsing();
+    on_home(&mut rt);
+    tap(&mut rt, "home-view-all-clips");
+    settle(&mut rt);
+    assert_eq!(rt.state.screen, Screen::Clips);
+
+    on_home(&mut rt);
+    let last_game = rt.state.recordings[0].clone();
+    rt.update(|ui, _| ui.last_game = Some(last_game));
+    settle(&mut rt);
+    tap(&mut rt, "last-game-summary");
+    settle(&mut rt);
+    assert_eq!(rt.state.detail(), Detail::Game);
+}

@@ -717,6 +717,10 @@ fn the_stop_button_keeps_its_width_while_asking_to_confirm() {
     });
     rt.frame(1.0 / 60.0);
     let before = nav_rect_of(&rt, "stop-recording")[2];
+    assert!(
+        before < 130.0,
+        "stop button width {before} should stay compact"
+    );
     tap(&mut rt, "stop-recording");
     settle(&mut rt);
     assert!(rt.state.stop_confirm_until.is_some());

@@ -4,9 +4,11 @@ use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::{TEST_RECORDING_SECS, TestRun, Ui, format_clock};
 use crate::view::settings::quality_control;
+use crate::view::widgets::busy_label_content;
 use crate::view::{card, thumb};
 
 const THUMB_WIDTH: f32 = 96.0;
+const TEST_BUTTON_LABEL: &str = "Test recording (10 s)";
 
 pub(super) fn card_for(s: &Ui, k: &Kit) -> El {
     card(k)
@@ -77,19 +79,38 @@ fn quality_step(s: &Ui, k: &Kit) -> El {
 fn test_step(s: &Ui, k: &Kit) -> El {
     match &s.first_test {
         TestRun::Passed(entry) => passed(entry, k),
-        TestRun::Running => step(
-            k,
-            3,
-            "Test recording",
-            text(format!("Recording for {TEST_RECORDING_SECS} seconds…"))
-                .key("first-run-testing")
-                .font(k.ty.small)
-                .color(k.c.text_muted),
-            None,
-        ),
+        TestRun::Running => {
+            let kit = k.clone();
+            let button = Button::new(TEST_BUTTON_LABEL)
+                .variant(ButtonVariant::Outline)
+                .control_size(ControlSize::Large)
+                .disabled(true)
+                .label_with(move |font, ink| {
+                    busy_label_content(
+                        &kit,
+                        TEST_BUTTON_LABEL,
+                        true,
+                        "first-run-test-spinner",
+                        font,
+                        ink,
+                    )
+                })
+                .build(k)
+                .key("first-run-test");
+            step(
+                k,
+                3,
+                "Test recording",
+                text(format!("Recording for {TEST_RECORDING_SECS} seconds…"))
+                    .key("first-run-testing")
+                    .font(k.ty.small)
+                    .color(k.c.text_muted),
+                Some(button),
+            )
+        }
         run => {
             let testable = matches!(s.status, EngineStatus::Idle | EngineStatus::GameRunning);
-            let button = Button::new(format!("Test recording ({TEST_RECORDING_SECS} s)"))
+            let button = Button::new(TEST_BUTTON_LABEL)
                 .variant(ButtonVariant::Outline)
                 .control_size(ControlSize::Large)
                 .disabled(!testable)

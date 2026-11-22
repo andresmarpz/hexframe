@@ -2,11 +2,11 @@ use std::borrow::Cow;
 
 use greyscreen_core::highlight::{Highlight, Tone, describe_label, dominant_label};
 use greyscreen_engine::FeedItem;
-use rune::{Color, El, GrowthSpec, ScrollSpec, TextStyle, col, el, row, text};
+use rune::{El, GrowthSpec, ScrollSpec, col, el, row, text};
 use rune_kit::Kit;
 
 use crate::ui::{Ui, format_clock};
-use crate::view::widgets::tone_color;
+use crate::view::widgets::tone_pill;
 use crate::view::{card, hairline};
 
 const ROW_HEIGHT: f32 = 36.0;
@@ -20,35 +20,10 @@ pub(super) fn badge_title(item: &FeedItem) -> (String, Tone) {
     match dominant_label(labels) {
         Some(label) => {
             let shown = describe_label(label);
-            (shown.title.to_uppercase(), shown.tone)
+            (shown.title.to_owned(), shown.tone)
         }
-        None => (NO_HIGHLIGHT_TITLE.to_uppercase(), Tone::Neutral),
+        None => (NO_HIGHLIGHT_TITLE.to_owned(), Tone::Neutral),
     }
-}
-
-pub(super) fn tone_ink(k: &Kit, tone: Tone) -> Color {
-    match tone {
-        Tone::Neutral => k.c.text_muted,
-        other => tone_color(k, other),
-    }
-}
-
-pub(super) fn tinted_pill(k: &Kit, label: String, ink: Color) -> El {
-    row()
-        .h(20.0)
-        .px(8.0)
-        .center_y()
-        .radius(10.0)
-        .fill(k.alpha(ink, 0.15))
-        .child(
-            text(label)
-                .font(TextStyle {
-                    size: 11.0,
-                    line_height: 14.0,
-                    ..k.ty.ui_medium
-                })
-                .color(ink),
-        )
 }
 
 pub(super) fn panel(s: &Ui, k: &Kit) -> El {
@@ -131,7 +106,7 @@ fn feed_row(item: &FeedItem, k: &Kit) -> El {
             row()
                 .w(BADGE_COLUMN)
                 .center_y()
-                .child(tinted_pill(k, title, tone_ink(k, tone))),
+                .child(tone_pill(k, title, tone)),
         )
         .child(
             text(item.text.clone())

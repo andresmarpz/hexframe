@@ -208,7 +208,7 @@ fn controls(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {
         .build(k)
         .key("death-next");
     let replay_variant = if state.finished {
-        ButtonVariant::Submit
+        ButtonVariant::Contrast
     } else {
         ButtonVariant::Neutral
     };

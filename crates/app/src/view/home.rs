@@ -7,11 +7,13 @@ mod last_game;
 mod week;
 
 use greyscreen_core::problem::Problem;
+use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::EngineStatus;
-use rune::{Color, El, col, el, row, text};
+use rune::{El, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
 
 use super::widgets::champion::champion_icon;
+use super::widgets::{state_pill, status_pill};
 use super::{card, title_style};
 use crate::ui::library::format::mode_label;
 use crate::ui::{Detail, Ui, format_clock};
@@ -37,7 +39,10 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     if let Some(recent) = clips::section(s, k) {
         page = page.child(recent);
     }
-    page.child(week::section(s, k, &now))
+    if !s.recordings.is_empty() {
+        page = page.child(week::section(s, k, &now));
+    }
+    page
 }
 
 struct Headline {
@@ -54,7 +59,7 @@ fn muted(k: &Kit, line: impl Into<String>) -> El {
 
 fn headline(s: &Ui, k: &Kit) -> Headline {
     let quiet = |label: &str, title: &str, detail: &str| Headline {
-        pill: pill(k, label, k.c.text_faint, k.c.layer_02, k.c.text_muted),
+        pill: status_pill(k, label, k.c.layer_02, k.c.text_muted, Some(k.c.text_faint)),
         title: title.to_owned(),
         detail: muted(k, detail),
         clock: None,
@@ -98,7 +103,7 @@ fn headline(s: &Ui, k: &Kit) -> Headline {
                 ),
             };
             Headline {
-                pill: pill_recording(k),
+                pill: state_pill(k, "Recording", k.c.danger, true),
                 title,
                 detail,
                 clock: Some(format_clock(s.elapsed_secs)),
@@ -108,7 +113,7 @@ fn headline(s: &Ui, k: &Kit) -> Headline {
         EngineStatus::Error(message) => {
             let problem = Problem::from_error(message);
             Headline {
-                pill: pill(k, "Error", k.c.danger.icon, k.c.danger.bg, k.c.danger.fg),
+                pill: state_pill(k, "Error", k.c.danger, true),
                 title: problem.title().to_owned(),
                 detail: problem_detail(problem, message, k),
                 clock: None,
@@ -139,16 +144,6 @@ fn problem_detail(problem: Problem, raw: &str, k: &Kit) -> El {
     lines
 }
 
-fn pill_recording(k: &Kit) -> El {
-    pill(
-        k,
-        "Recording",
-        k.c.danger.icon,
-        k.c.danger.bg,
-        k.c.danger.fg,
-    )
-}
-
 fn state_card(s: &Ui, k: &Kit) -> El {
     let h = headline(s, k);
     let title_color = if h.danger {
@@ -174,11 +169,20 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         )
         .child(el().h(2.0))
         .child(actions::bar(s, k));
-    let mut controls = row().gap(10.0).center_y().child(record_switch(s, k));
-    if h.danger {
-        controls = controls.child(dismiss_button(k));
+    let show_switch = s.settings.nav_style != NavStyle::Dock;
+    let has_controls = show_switch || h.danger;
+    let mut right = col().items_end().gap(14.0);
+    if has_controls {
+        let mut controls = row().gap(10.0).center_y();
+        if show_switch {
+            controls = controls.child(record_switch(s, k));
+        }
+        if h.danger {
+            controls = controls.child(dismiss_button(k));
+        }
+        right = right.child(controls);
     }
-    let mut right = col().items_end().gap(14.0).child(controls);
+    let has_clock = h.clock.is_some();
     if let Some(clock) = h.clock {
         right = right.child(
             col()
@@ -197,13 +201,15 @@ fn state_card(s: &Ui, k: &Kit) -> El {
                 .child(text("elapsed").font(k.ty.small).color(k.c.text_muted)),
         );
     }
-    let body = row()
+    let mut body = row()
         .w_full()
         .gap(16.0)
         .justify_between()
         .items_start()
-        .child(left)
-        .child(right);
+        .child(left);
+    if has_controls || has_clock {
+        body = body.child(right);
+    }
     let mut card = card(k).key("state-card").padding(20.0);
     if h.danger {
         card = card.border(1.0, k.c.danger.icon);
@@ -239,17 +245,4 @@ fn record_switch(s: &Ui, k: &Kit) -> El {
                 .build(k)
                 .key("record-games"),
         )
-}
-
-fn pill(k: &Kit, label: &str, dot: Color, fill: Color, ink: Color) -> El {
-    row()
-        .self_start()
-        .h(24.0)
-        .px(10.0)
-        .gap(6.0)
-        .center_y()
-        .radius(12.0)
-        .fill(fill)
-        .child(el().size(8.0, 8.0).radius(4.0).fill(dot).a11y_hidden())
-        .child(text(label).font(k.ty.ui_medium).color(ink))
 }

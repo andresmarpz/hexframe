@@ -28,6 +28,7 @@ fn the_card_shows_on_the_first_launch_and_names_its_three_steps() {
     assert!(rt.find("first-run-quality").is_some());
     assert!(rt.find("first-run-test").is_some());
     assert!(rt.find("test-recording").is_none());
+    assert!(rt.find("this-week").is_none());
 }
 
 #[test]
@@ -76,6 +77,8 @@ fn the_test_recording_runs_then_says_it_works_with_the_clip() {
     assert_eq!(rt.state.first_test, TestRun::Running);
     settle(&mut rt);
     assert!(rt.find("first-run-testing").is_some());
+    assert!(rt.find("first-run-test").is_some());
+    assert!(rt.find("first-run-test-spinner").is_some());
     let mut entry = Ui::preview().recordings.remove(0);
     entry.meta.duration_secs = 10.0;
     rt.update(move |ui, tx| ui.apply(UiMsg::RecordingSaved(entry), tx));

@@ -77,7 +77,7 @@ fn action(s: &SetupState, k: &Kit) -> El {
             )
             .child(
                 Button::new("Open Greyscreen")
-                    .variant(ButtonVariant::Submit)
+                    .variant(ButtonVariant::Contrast)
                     .control_size(ControlSize::Large)
                     .on_press(|s: &mut SetupState| s.open_installed())
                     .build(k)
@@ -119,7 +119,7 @@ fn options(s: &SetupState, k: &Kit) -> El {
 
 fn install_button(k: &Kit, label: &str) -> El {
     Button::new(label.to_owned())
-        .variant(ButtonVariant::Submit)
+        .variant(ButtonVariant::Contrast)
         .control_size(ControlSize::Large)
         .on_press(|s: &mut SetupState| s.install())
         .build(k)
