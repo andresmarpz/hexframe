@@ -8,7 +8,9 @@ use std::time::{Duration, Instant};
 
 use greyscreen_core::problem::DISK_FULL_NOTICE;
 use greyscreen_core::settings::Settings;
-use greyscreen_engine::{EngineCmd, FakeMediaSource, NoticeLevel, UiMsg, set_write_limit};
+use greyscreen_engine::{
+    EngineCmd, FakeMediaSource, NoticeAction, NoticeLevel, UiMsg, set_write_limit,
+};
 
 use common::{WAIT, assert_playable_from_key_frame, recording_since, start_idle, temp_dir};
 
@@ -35,8 +37,16 @@ fn a_full_disk_stops_the_game_video_at_once_and_clips_keep_saving() {
             .ui
             .recv_timeout(HEAR_WITHIN)
             .expect("disk full notice");
-        if let UiMsg::Notice { level, text } = msg {
+        if let UiMsg::NoticeWithAction {
+            level,
+            text,
+            action,
+        } = msg
+        {
             heard_at = (text == DISK_FULL_NOTICE).then(|| began.elapsed());
+            assert!(matches!(action, NoticeAction::Link(_)));
+            notices.push((level, text));
+        } else if let UiMsg::Notice { level, text } = msg {
             notices.push((level, text));
         }
     }

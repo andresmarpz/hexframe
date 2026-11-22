@@ -131,12 +131,17 @@ impl Ui {
         action: Option<NoticeAction>,
         tx: &mut Tx,
     ) {
+        let lasting = level == NoticeLevel::Error && action.is_some();
         let secs = if action.is_some() {
             NOTICE_ACTION_SECS
         } else {
             NOTICE_SECS
         };
-        let until = tx.clock() + secs;
+        let until = if lasting {
+            f64::INFINITY
+        } else {
+            tx.clock() + secs
+        };
         self.notice = Some((
             Notice {
                 level,
@@ -145,7 +150,9 @@ impl Ui {
             },
             until,
         ));
-        tx.wake_at(until);
+        if !lasting {
+            tx.wake_at(until);
+        }
     }
 
     pub(crate) fn poll(&mut self, clock: f64, tx: &mut Tx) -> bool {

@@ -144,12 +144,28 @@ fn a_notice_disappears_after_four_seconds() {
 }
 
 #[test]
-fn a_notice_with_an_action_stays_long_enough_to_press_it() {
+fn an_error_notice_with_an_action_stays_until_closed() {
     let mut ui = ui();
     let mut tx = Tx::default();
     ui.apply(
         UiMsg::NoticeWithAction {
             level: NoticeLevel::Error,
+            text: "Recording stopped.".into(),
+            action: NoticeAction::Link("https://example.com".into()),
+        },
+        &mut tx,
+    );
+    assert!(!ui.poll(1000.0, &mut tx));
+    assert!(ui.notice.is_some());
+}
+
+#[test]
+fn a_notice_with_an_action_stays_long_enough_to_press_it() {
+    let mut ui = ui();
+    let mut tx = Tx::default();
+    ui.apply(
+        UiMsg::NoticeWithAction {
+            level: NoticeLevel::Warn,
             text: "Not enough disk space to record (1.4 GB free).".into(),
             action: NoticeAction::Link("https://example.com".into()),
         },
