@@ -225,6 +225,7 @@ impl Control {
             Internal::MediaStopped(generation) => self.on_media_stopped(generation),
             Internal::ClipDone(result) => self.on_clip_done(result),
             Internal::StartFailed(reason) => self.feed(Input::MediaFailed(reason)),
+            Internal::WriterFailed(err) => self.on_writer_failed(&err),
             Internal::WriterDone(report) => {
                 if let Some(recording) = self.recording.as_mut() {
                     recording.report = Some(report);
@@ -314,6 +315,7 @@ impl Control {
             audio: started.audio,
             writer,
             report: None,
+            write_failed: false,
             result: None,
             media_stopped: false,
             dirty: false,
@@ -361,6 +363,10 @@ impl Control {
             folder,
             &started.video,
             started.audio.as_ref(),
+            {
+                let tx = tx.clone();
+                move |err| send_internal(&tx, Internal::WriterFailed(err))
+            },
             move |report| {
                 send_internal(&tx, Internal::WriterDone(report));
             },
@@ -393,10 +399,12 @@ impl Control {
             }
             Some(Err(err)) => {
                 tracing::error!(%err, "game video not finalized");
-                self.notice(
-                    NoticeLevel::Error,
-                    Problem::notice("The game video could not be saved", &err),
-                );
+                if !recording.write_failed {
+                    self.notice(
+                        NoticeLevel::Error,
+                        Problem::notice("The game video could not be saved", &err),
+                    );
+                }
                 recording.meta.video = String::new();
                 recording.meta.duration_secs = elapsed;
             }

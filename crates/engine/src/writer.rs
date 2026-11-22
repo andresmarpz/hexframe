@@ -1,3 +1,5 @@
+mod fault;
+
 use std::fs;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
@@ -36,9 +38,10 @@ impl GameWriter {
         folder: &Path,
         video: &VideoFormat,
         audio: Option<&AudioFormat>,
+        on_failed: impl FnOnce(String) + Send + 'static,
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
-        Self::spawn_with_queue(folder, video, audio, QUEUE, on_done)
+        Self::spawn_with_queue(folder, video, audio, QUEUE, on_failed, on_done)
     }
 
     pub(crate) fn spawn_with_queue(
@@ -46,11 +49,23 @@ impl GameWriter {
         video: &VideoFormat,
         audio: Option<&AudioFormat>,
         queue: usize,
+        on_failed: impl FnOnce(String) + Send + 'static,
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
         let part = folder.join(PART_FILE);
-        let writer = FragmentedWriter::create(&part, video, audio).map_err(|e| e.to_string())?;
-        Self::spawn_writer(writer, folder, queue, on_done)
+        match fault::limit() {
+            Some(limit) => {
+                let file = fault::LimitedFile::create(&part, limit).map_err(|e| e.to_string())?;
+                let writer =
+                    FragmentedWriter::with_sink(file, video, audio).map_err(|e| e.to_string())?;
+                Self::spawn_writer(writer, folder, queue, on_failed, on_done)
+            }
+            None => {
+                let writer =
+                    FragmentedWriter::create(&part, video, audio).map_err(|e| e.to_string())?;
+                Self::spawn_writer(writer, folder, queue, on_failed, on_done)
+            }
+        }
     }
 
     #[cfg(test)]
@@ -60,16 +75,18 @@ impl GameWriter {
         video: &VideoFormat,
         audio: Option<&AudioFormat>,
         queue: usize,
+        on_failed: impl FnOnce(String) + Send + 'static,
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
         let writer = FragmentedWriter::with_sink(sink, video, audio).map_err(|e| e.to_string())?;
-        Self::spawn_writer(writer, folder, queue, on_done)
+        Self::spawn_writer(writer, folder, queue, on_failed, on_done)
     }
 
     fn spawn_writer(
         writer: FragmentedWriter<impl Sink + Send + 'static>,
         folder: &Path,
         queue: usize,
+        on_failed: impl FnOnce(String) + Send + 'static,
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
         let part = folder.join(PART_FILE);
@@ -78,7 +95,9 @@ impl GameWriter {
         let thread = thread::Builder::new()
             .name("game-writer".into())
             .spawn(move || {
-                let outcome = catch_unwind(AssertUnwindSafe(|| drain(writer, &rx, &part, &target)));
+                let outcome = catch_unwind(AssertUnwindSafe(|| {
+                    drain(writer, &rx, &part, &target, on_failed)
+                }));
                 let report = outcome.unwrap_or_else(|_| {
                     tracing::error!("game writer thread panicked");
                     Err("game writer thread panicked".to_owned())
@@ -136,7 +155,9 @@ fn drain(
     rx: &Receiver<Arc<Packet>>,
     part: &Path,
     target: &Path,
+    on_failed: impl FnOnce(String),
 ) -> Report {
+    let mut on_failed = Some(on_failed);
     let mut failure: Option<String> = None;
     let mut seen_key = false;
     for packet in rx {
@@ -151,15 +172,25 @@ fn drain(
         }
         if let Err(err) = writer.push(&packet) {
             tracing::error!(%err, "game writer push failed");
-            failure = Some(err.to_string());
+            let text = err.to_string();
+            if let Some(notify) = on_failed.take() {
+                notify(text.clone());
+            }
+            failure = Some(text);
         }
     }
-    if let Some(err) = failure {
-        return Err(err);
+    let Some(first) = failure else {
+        let info = writer.finish().map_err(|e| e.to_string())?;
+        rename_with_retry(part, target)?;
+        return Ok(info);
+    };
+    match writer.finish() {
+        Ok(info) => rename_with_retry(part, target).map(|()| info),
+        Err(err) => {
+            tracing::warn!(%err, "cannot finish the game video after a write failure");
+            Err(first)
+        }
     }
-    let info = writer.finish().map_err(|e| e.to_string())?;
-    rename_with_retry(part, target)?;
-    Ok(info)
 }
 
 fn rename_with_retry(part: &Path, target: &Path) -> Result<(), String> {
@@ -178,6 +209,8 @@ fn rename_with_retry(part: &Path, target: &Path) -> Result<(), String> {
     }
     Err(last)
 }
+
+pub use fault::set_write_limit;
 
 #[cfg(test)]
 mod tests;

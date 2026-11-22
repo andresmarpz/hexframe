@@ -88,3 +88,19 @@ fn a_notice_is_plain_for_a_known_problem_and_raw_for_an_unknown_one() {
         "Capture failed: odd thing"
     );
 }
+
+#[test]
+fn a_full_disk_write_error_gets_its_own_text() {
+    assert_eq!(
+        Problem::write_failure_notice("io error: no storage space"),
+        DISK_FULL_NOTICE
+    );
+    assert_eq!(
+        Problem::write_failure_notice("io error: No space left on device (os error 28)"),
+        DISK_FULL_NOTICE
+    );
+    assert_eq!(
+        Problem::write_failure_notice("io error: broken pipe"),
+        WRITE_ERROR_NOTICE
+    );
+}

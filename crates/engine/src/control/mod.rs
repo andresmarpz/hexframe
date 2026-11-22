@@ -3,6 +3,7 @@ mod disk;
 mod effects;
 mod folder;
 mod meta;
+mod writer_failure;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
@@ -39,6 +40,7 @@ pub(crate) type Sink = Arc<dyn Fn(UiMsg) + Send + Sync>;
 
 pub(crate) enum Internal {
     MediaStopped(u64),
+    WriterFailed(String),
     WriterDone(Report),
     ClipDone(ClipResult),
     StartFailed(String),

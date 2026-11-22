@@ -363,3 +363,24 @@ fn gpu_usage_sums_per_engine_and_filters_by_adapter() {
     let all = gpu::summarize(samples, None, 20);
     assert_eq!(all.busy_3d_pct, 99.0);
 }
+
+#[test]
+fn a_write_failure_marks_the_video_stopped_once() {
+    let mut tracker = tracker();
+    for tick in 0..120 {
+        tracker.on_packet(&video(tick));
+    }
+    tracker.on_write_failure();
+    for tick in 120..240 {
+        tracker.on_packet(&video(tick));
+    }
+    tracker.on_write_failure();
+    let health = tracker.finish(None);
+    assert_eq!(health.video_stopped_secs, Some(2.0));
+    assert!(
+        health
+            .findings()
+            .iter()
+            .any(|f| f.area == Area::File && f.level == Level::Bad)
+    );
+}

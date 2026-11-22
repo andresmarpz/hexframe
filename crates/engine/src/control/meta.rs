@@ -32,6 +32,7 @@ pub(super) struct Recording {
     pub(super) ring: ClipRing,
     pub(super) writer: Option<GameWriter>,
     pub(super) report: Option<Report>,
+    pub(super) write_failed: bool,
     pub(super) result: Option<GameResult>,
     pub(super) media_stopped: bool,
     pub(super) dirty: bool,

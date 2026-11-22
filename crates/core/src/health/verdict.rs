@@ -149,6 +149,13 @@ pub(super) fn findings(health: &RecordingHealth) -> Vec<Finding> {
         )),
         None => out.push(finding(Area::Audio, Level::Ok, "no audio track".to_owned())),
     }
+    if let Some(secs) = health.video_stopped_secs {
+        out.push(finding(
+            Area::File,
+            Level::Bad,
+            format!("the game video stopped after {secs:.0} s: the disk write failed"),
+        ));
+    }
     if health.capture_errors > 0 || health.capture_soft_errors > 0 {
         let level = if health.capture_errors > 0 {
             Level::Bad

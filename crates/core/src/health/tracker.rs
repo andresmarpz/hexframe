@@ -96,6 +96,7 @@ pub struct HealthTracker {
     audio_gaps: u32,
     audio_longest_gap: i64,
     errors: u32,
+    video_stopped_secs: Option<f64>,
     last: Option<CaptureStats>,
     marks: Marks,
 }
@@ -116,6 +117,7 @@ impl HealthTracker {
             audio_gaps: 0,
             audio_longest_gap: 0,
             errors: 0,
+            video_stopped_secs: None,
             last: None,
             marks: Marks::default(),
         }
@@ -147,6 +149,15 @@ impl HealthTracker {
 
     pub fn on_failure(&mut self) {
         self.errors += 1;
+    }
+
+    pub fn on_write_failure(&mut self) {
+        if self.video_stopped_secs.is_none() {
+            let origin = self.video.first_dts.unwrap_or(0);
+            let ticks = self.video.span(origin);
+            self.video_stopped_secs =
+                Some(round2(ticks_to_ms(ticks, VideoFormat::TIMESCALE) / 1000.0));
+        }
     }
 
     pub fn on_stats(&mut self, stats: &CaptureStats, queues: Queues) -> DiagSample {
@@ -251,6 +262,7 @@ impl HealthTracker {
             frames_torn_dropped: stats.torn_dropped,
             copy_wait_slow: stats.copy_wait_slow,
             copy_wait_timeouts: stats.copy_wait_timeouts,
+            video_stopped_secs: self.video_stopped_secs,
         }
     }
 

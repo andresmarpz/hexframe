@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::io::SeekFrom;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -242,6 +243,7 @@ impl<S: Sink> FragmentedWriter<S> {
         for sample in self.video.queued.iter().chain(&self.audio.queued) {
             buf.extend_from_slice(&sample.data);
         }
+        self.file.seek(SeekFrom::Start(self.pos))?;
         self.file.write_all(&buf)?;
 
         let base = self.pos;

@@ -1,5 +1,9 @@
 pub const FAQ_URL: &str = "https://greyscreen-lake.vercel.app/faq";
 pub const NO_FRAMES: &str = "no frames from the game window";
+pub const DISK_FULL_NOTICE: &str =
+    "The disk is full, so the full game video stopped. Free some space to record the next game.";
+pub const WRITE_ERROR_NOTICE: &str =
+    "Writing the game video failed, so it stopped. Check the recordings drive.";
 pub const FOLDER_UNUSABLE: &str = "recordings folder is not usable";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +39,7 @@ impl Problem {
             "not enough space",
             "no space left",
             "disk is full",
+            "no storage space",
             "os error 112",
         ]) {
             Problem::LowDisk
@@ -150,6 +155,14 @@ impl Problem {
 
     pub fn offers_folder(self) -> bool {
         matches!(self, Problem::FolderUnusable | Problem::LowDisk)
+    }
+
+    pub fn write_failure_notice(raw: &str) -> &'static str {
+        if Problem::from_error(raw) == Problem::LowDisk {
+            DISK_FULL_NOTICE
+        } else {
+            WRITE_ERROR_NOTICE
+        }
     }
 
     pub fn notice(prefix: &str, raw: &str) -> String {
