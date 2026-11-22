@@ -18,7 +18,7 @@ pub mod install;
 pub mod instance;
 mod pacer;
 pub mod probe;
-mod procstats;
+pub mod procstats;
 pub mod recycle;
 pub mod selftest;
 mod session;

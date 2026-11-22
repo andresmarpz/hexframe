@@ -1,0 +1,401 @@
+mod check;
+mod meter;
+
+use std::path::PathBuf;
+use std::process::ExitCode;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use anyhow::{Context, Result, bail};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
+use greyscreen_core::media::MediaSource;
+use greyscreen_core::settings::Settings;
+use greyscreen_engine::{
+    Engine, EngineCmd, EngineConfig, EngineStatus, LeagueFactory, NoticeLevel, RecordingEntry,
+    UiMsg,
+};
+use greyscreen_league::LeagueMsg;
+use greyscreen_mp4::demux::Movie;
+use serde::Serialize;
+
+use check::{CycleResult, Limits, Run, Sample, Verdict, evaluate};
+use meter::Meter;
+
+const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
+const SAVE_GRACE: Duration = Duration::from_secs(90);
+const GAME_STOP_GRACE: Duration = Duration::from_secs(60);
+const MIN_GAME_VIDEO_SECS: f64 = 1.0;
+
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct Args {
+    #[arg(long, default_value_t = 3)]
+    pub(crate) cycles: u32,
+    #[arg(long, default_value_t = 30)]
+    pub(crate) seconds: u32,
+    #[arg(long, default_value_t = 3)]
+    pub(crate) gap_secs: u32,
+    #[arg(long, value_name = "MINUTES")]
+    pub(crate) game_minutes: Option<u32>,
+    #[arg(long, default_value = "greyscreen-soak.json")]
+    pub(crate) out: PathBuf,
+    #[arg(long)]
+    pub(crate) dir: Option<PathBuf>,
+    #[arg(long)]
+    pub(crate) keep: bool,
+    #[arg(long, default_value_t = 60.0)]
+    pub(crate) warmup_secs: f64,
+    #[arg(long, default_value_t = 2.0, value_name = "MB")]
+    pub(crate) max_mem_mb_per_min: f64,
+    #[arg(long, default_value_t = 2.0, value_name = "MB")]
+    pub(crate) max_gpu_mb_per_min: f64,
+    #[arg(long, default_value_t = 50)]
+    pub(crate) max_handle_growth: u32,
+    #[arg(long, default_value_t = 4)]
+    pub(crate) max_thread_growth: u32,
+}
+
+impl Args {
+    fn limits(&self) -> Limits {
+        Limits {
+            mem_mb_per_min: self.max_mem_mb_per_min,
+            gpu_mb_per_min: self.max_gpu_mb_per_min,
+            handle_growth: self.max_handle_growth,
+            thread_growth: self.max_thread_growth,
+            warmup_secs: self.warmup_secs,
+        }
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.game_minutes.is_none() && (self.cycles == 0 || self.seconds == 0) {
+            bail!("--cycles and --seconds must be at least 1");
+        }
+        if self.game_minutes == Some(0) {
+            bail!("--game-minutes must be at least 1");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize)]
+struct Report<'a> {
+    mode: String,
+    limits: Limits,
+    samples: &'a [Sample],
+    cycles: &'a [CycleResult],
+    engine_errors: &'a [String],
+    verdict: &'a Verdict,
+}
+
+pub(crate) fn run(args: &Args) -> ExitCode {
+    match start(args) {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(err) => {
+            eprintln!("error: {err:#}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn start(args: &Args) -> Result<bool> {
+    args.validate()?;
+    #[cfg(windows)]
+    crate::init_windows();
+    let verdict = run_with(args, default_media(), default_league(args))?;
+    Ok(verdict.passed)
+}
+
+#[cfg(windows)]
+fn default_media() -> Arc<dyn MediaSource> {
+    Arc::new(greyscreen_capture::WindowsMediaSource::new())
+}
+
+#[cfg(not(windows))]
+fn default_media() -> Arc<dyn MediaSource> {
+    Arc::new(greyscreen_engine::FakeMediaSource::new())
+}
+
+fn default_league(args: &Args) -> LeagueFactory {
+    if args.game_minutes.is_some() {
+        greyscreen_engine::league_factory_default()
+    } else {
+        Box::new(|_out: Sender<LeagueMsg>| Box::new(()))
+    }
+}
+
+fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> Result<Verdict> {
+    let game_mode = args.game_minutes.is_some();
+    let output_dir = args
+        .dir
+        .clone()
+        .unwrap_or_else(|| std::env::temp_dir().join("greyscreen-soak"));
+    std::fs::create_dir_all(&output_dir)
+        .with_context(|| format!("creating {}", output_dir.display()))?;
+    let settings = Settings {
+        output_dir,
+        auto_record: game_mode,
+        ..Settings::default()
+    };
+    let (tx, rx) = unbounded();
+    let engine = Engine::start_with(EngineConfig {
+        settings,
+        media,
+        league,
+        sink: Box::new(move |msg| {
+            tx.send(msg).ok();
+        }),
+        settings_path: None,
+        updates: None,
+        feedback: None,
+        hotkeys: None,
+        free_space: None,
+    });
+    let mut soak = Soak::new(args, rx);
+    let outcome = match args.game_minutes {
+        Some(minutes) => soak.run_games(&engine.cmd, minutes),
+        None => soak.run_cycles(&engine.cmd),
+    };
+    drop(engine);
+    soak.discard_saved();
+    outcome?;
+    soak.finish()
+}
+
+struct Soak<'a> {
+    args: &'a Args,
+    rx: Receiver<UiMsg>,
+    meter: Meter,
+    started: Instant,
+    next_sample: Instant,
+    samples: Vec<Sample>,
+    cycles: Vec<CycleResult>,
+    engine_errors: Vec<String>,
+    pending_folders: Vec<PathBuf>,
+    recording: bool,
+}
+
+impl<'a> Soak<'a> {
+    fn new(args: &'a Args, rx: Receiver<UiMsg>) -> Self {
+        let now = Instant::now();
+        Self {
+            args,
+            rx,
+            meter: Meter::new(),
+            started: now,
+            next_sample: now,
+            samples: Vec::new(),
+            cycles: Vec::new(),
+            engine_errors: Vec::new(),
+            pending_folders: Vec::new(),
+            recording: false,
+        }
+    }
+
+    fn run_cycles(&mut self, cmd: &Sender<EngineCmd>) -> Result<()> {
+        let secs = Duration::from_secs(u64::from(self.args.seconds));
+        for index in 1..=self.args.cycles {
+            println!("cycle {index} of {}", self.args.cycles);
+            cmd.send(EngineCmd::StartTestRecording {
+                secs: self.args.seconds,
+            })
+            .context("engine stopped")?;
+            if !self.pump(Instant::now() + secs + SAVE_GRACE, true)? {
+                self.cycles.push(missing_recording(index, secs));
+                cmd.send(EngineCmd::StopRecording).ok();
+                break;
+            }
+            let gap = Duration::from_secs(u64::from(self.args.gap_secs));
+            self.pump(Instant::now() + gap, false)?;
+            self.discard_saved();
+        }
+        Ok(())
+    }
+
+    fn run_games(&mut self, cmd: &Sender<EngineCmd>, minutes: u32) -> Result<()> {
+        println!("waiting for games for {minutes} minutes");
+        self.pump(
+            self.started + Duration::from_secs(u64::from(minutes) * 60),
+            false,
+        )?;
+        if self.recording {
+            cmd.send(EngineCmd::StopRecording)
+                .context("engine stopped")?;
+            self.pump(Instant::now() + GAME_STOP_GRACE, true)?;
+        }
+        Ok(())
+    }
+
+    fn pump(&mut self, until: Instant, stop_on_saved: bool) -> Result<bool> {
+        loop {
+            let now = Instant::now();
+            if now >= self.next_sample {
+                let t = now.duration_since(self.started).as_secs_f64();
+                self.samples.push(self.meter.sample(t));
+                self.next_sample = now + SAMPLE_PERIOD;
+            }
+            if now >= until {
+                return Ok(false);
+            }
+            let wake = until.min(self.next_sample);
+            match self.rx.recv_timeout(wake.saturating_duration_since(now)) {
+                Ok(msg) => {
+                    if self.on_message(msg) && stop_on_saved {
+                        return Ok(true);
+                    }
+                }
+                Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => bail!("engine stopped"),
+            }
+        }
+    }
+
+    fn on_message(&mut self, msg: UiMsg) -> bool {
+        match msg {
+            UiMsg::Status(status) => {
+                self.recording = matches!(status, EngineStatus::Recording { .. });
+                if let EngineStatus::Error(text) = status {
+                    self.engine_errors.push(text);
+                }
+                false
+            }
+            UiMsg::Notice {
+                level: NoticeLevel::Error,
+                text,
+            }
+            | UiMsg::NoticeWithAction {
+                level: NoticeLevel::Error,
+                text,
+                ..
+            } => {
+                self.engine_errors.push(text);
+                false
+            }
+            UiMsg::RecordingSaved(entry) => {
+                self.on_saved(&entry);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn on_saved(&mut self, entry: &RecordingEntry) {
+        let index = self.cycles.len() as u32 + 1;
+        let min_secs = match self.args.game_minutes {
+            Some(_) => MIN_GAME_VIDEO_SECS,
+            None => f64::from(self.args.seconds) * 0.5,
+        };
+        let result = judge_recording(index, entry, min_secs);
+        println!(
+            "recording {index}: {:.1} s{}",
+            result.video_secs,
+            result
+                .problem
+                .as_deref()
+                .map_or_else(String::new, |p| format!(", problem: {p}"))
+        );
+        self.pending_folders.push(entry.folder.clone());
+        self.cycles.push(result);
+    }
+
+    fn discard_saved(&mut self) {
+        for folder in self.pending_folders.drain(..) {
+            if !self.args.keep && std::fs::remove_dir_all(&folder).is_err() {
+                eprintln!("could not remove {}", folder.display());
+            }
+        }
+    }
+
+    fn finish(self) -> Result<Verdict> {
+        let min_saved = match self.args.game_minutes {
+            Some(_) => 1,
+            None => self.args.cycles,
+        };
+        let verdict = evaluate(
+            &Run {
+                samples: &self.samples,
+                cycles: &self.cycles,
+                engine_errors: &self.engine_errors,
+                min_saved,
+                require_usage: cfg!(windows),
+            },
+            &self.args.limits(),
+        );
+        let report = Report {
+            mode: match self.args.game_minutes {
+                Some(minutes) => format!("games {minutes} min"),
+                None => format!("{} cycles of {} s", self.args.cycles, self.args.seconds),
+            },
+            limits: self.args.limits(),
+            samples: &self.samples,
+            cycles: &self.cycles,
+            engine_errors: &self.engine_errors,
+            verdict: &verdict,
+        };
+        std::fs::write(&self.args.out, serde_json::to_vec_pretty(&report)?)
+            .with_context(|| format!("writing {}", self.args.out.display()))?;
+        print_verdict(&verdict, &self.args.out);
+        Ok(verdict)
+    }
+}
+
+fn print_verdict(verdict: &Verdict, out: &std::path::Path) {
+    for note in &verdict.notes {
+        println!("note: {note}");
+    }
+    if verdict.passed {
+        println!("PASS: report {}", out.display());
+    } else {
+        for failure in &verdict.failures {
+            println!("fail: {failure}");
+        }
+        println!("FAIL: report {}", out.display());
+    }
+}
+
+fn missing_recording(index: u32, waited: Duration) -> CycleResult {
+    CycleResult {
+        index,
+        folder: String::new(),
+        video_secs: 0.0,
+        dropped_pct: 0.0,
+        capture_errors: 0,
+        problem: Some(format!(
+            "no saved recording {} s after the start",
+            (waited + SAVE_GRACE).as_secs()
+        )),
+    }
+}
+
+fn judge_recording(index: u32, entry: &RecordingEntry, min_secs: f64) -> CycleResult {
+    let health = entry.meta.health.as_ref();
+    let (video_secs, problem) = match playable_secs(entry, min_secs) {
+        Ok(secs) => (secs, None),
+        Err(problem) => (0.0, Some(problem)),
+    };
+    CycleResult {
+        index,
+        folder: entry.folder.display().to_string(),
+        video_secs,
+        dropped_pct: health.map_or(0.0, |h| h.dropped_pct),
+        capture_errors: health.map_or(0, |h| h.capture_errors),
+        problem,
+    }
+}
+
+fn playable_secs(entry: &RecordingEntry, min_secs: f64) -> Result<f64, String> {
+    if entry.meta.video.is_empty() {
+        return Err("the recording has no video file".to_owned());
+    }
+    let path = entry.folder.join(&entry.meta.video);
+    let movie = Movie::open(&path).map_err(|e| format!("{} does not open: {e}", path.display()))?;
+    let secs = movie.video_secs();
+    if movie.video_samples.is_empty() || secs < min_secs {
+        return Err(format!(
+            "video is {secs:.1} s, expected at least {min_secs:.1} s"
+        ));
+    }
+    Ok(secs)
+}
+
+#[cfg(test)]
+mod tests;

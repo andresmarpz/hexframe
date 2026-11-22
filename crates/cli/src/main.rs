@@ -4,6 +4,7 @@ mod doctor;
 mod fake_league;
 mod record;
 mod recover;
+mod soak;
 mod storyboard;
 mod thumb;
 
@@ -70,6 +71,7 @@ enum Command {
     Recover {
         path: PathBuf,
     },
+    Soak(soak::Args),
     Storyboard {
         folder: PathBuf,
     },
@@ -120,6 +122,7 @@ fn main() -> ExitCode {
             bitrate_mbps: bitrate,
             peak_mbps: peak,
         }),
+        Command::Soak(args) => soak::run(&args),
         Command::Recover { path } => finish(recover::run(&path)),
         Command::Storyboard { folder } => finish(storyboard::run(&folder)),
         Command::Thumb { video, at, out } => finish(thumb::run(&video, at, &out)),
