@@ -37,7 +37,6 @@ fn settings_runtime() -> (Runtime<Ui>, Receiver<EngineCmd>) {
     let ui = Ui::live(Settings::default(), cmd);
     let mut rt = super::runtime_sized(ui, (960.0, 2600.0));
     tap(&mut rt, "nav-settings");
-    tap(&mut rt, "settings-nav-about");
     (rt, rx)
 }
 
@@ -255,7 +254,6 @@ fn the_card_walks_through_check_download_and_install_with_a_fake_source() {
     let ui = Ui::live(Settings::default(), engine.cmd.clone());
     let mut rt = super::runtime_sized(ui, (960.0, 2600.0));
     tap(&mut rt, "nav-settings");
-    tap(&mut rt, "settings-nav-about");
     tap(&mut rt, "check-updates-button");
     pump_until(&mut rt, &ui_rx, |s| matches!(s, UpdateState::Ready(_)));
     assert!(has_text(&rt, "Install and restart"));

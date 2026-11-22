@@ -83,18 +83,6 @@ fn the_rail_and_the_dock_have_a_feedback_button_with_a_tooltip() {
 }
 
 #[test]
-fn the_about_page_has_a_send_feedback_button_that_replaces_the_settings_sheet() {
-    let (mut rt, _rx) = live_runtime();
-    tap(&mut rt, "nav-settings");
-    tap(&mut rt, "settings-nav-about");
-    tap(&mut rt, "send-feedback");
-    settle(&mut rt);
-    assert!(rt.state.feedback.open);
-    assert!(!rt.state.settings_open);
-    assert!(rt.find("feedback-dialog").is_some());
-}
-
-#[test]
 fn the_action_has_no_default_key_and_opens_the_dialog_when_bound() {
     assert!(Action::SendFeedback.spec().defaults.is_empty());
     let (mut rt, _rx) = live_runtime();

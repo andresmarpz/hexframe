@@ -270,7 +270,7 @@ fn open_review_settings() -> Runtime<Ui> {
     let mut rt = recommended();
     tap(&mut rt, "nav-settings");
     settle(&mut rt);
-    tap(&mut rt, "settings-nav-review");
+    tap(&mut rt, "settings-nav-clips");
     rt
 }
 
@@ -349,8 +349,7 @@ fn searching_finds_the_review_rows() {
         assert!(rt.find("review-events-row").is_some(), "{word}");
     }
     type_search(&mut rt, "reset default");
-    assert!(rt.find("review-reset-row").is_some());
+    assert!(rt.find("review-events-row").is_some());
     type_search(&mut rt, "baron");
     assert!(rt.find("fps-row").is_none());
-    assert!(rt.find("review-reset-row").is_none());
 }

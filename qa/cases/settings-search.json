@@ -7,7 +7,7 @@
     {"type": "dock"},
     {"check": "dock", "has": ["nav-style-row"], "lacks": ["quality-row"]},
     {"press": "Escape"},
-    {"check": "cleared", "has": ["settings-sheet", "quality-row"], "snap": false},
+    {"check": "cleared", "has": ["settings-sheet", "nav-style-row"], "snap": false},
     {"press": "Escape"},
     {"check": "closed", "lacks": ["settings-sheet"], "snap": false}
   ]

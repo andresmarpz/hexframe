@@ -2,32 +2,20 @@ use greyscreen_core::categories::{CategorySet, EventCategory};
 use rune::{El, col, row};
 use rune_kit::{Button, ButtonVariant, Checkbox, ControlSize, Kit};
 
-use super::catalog::Row;
-use super::{setting_row, stacked_row};
+use super::stacked_row;
 use crate::ui::Ui;
 
 const EVENTS_NOTE: &str = "The events listed and marked on the timeline when you open a game. You can still change them for one game.";
-const RESET_NOTE: &str =
-    "Show the recommended events: everything about you, objectives and the end of the game.";
 const COLUMNS: usize = 2;
 
-pub(super) fn render(s: &Ui, k: &Kit, which: Row) -> El {
-    match which {
-        Row::ReviewEvents => stacked_row(
-            k,
-            "review-events-row",
-            "Events shown",
-            Some(EVENTS_NOTE),
-            categories(s, k),
-        ),
-        _ => setting_row(
-            k,
-            "review-reset-row",
-            "Reset to default",
-            Some(RESET_NOTE),
-            reset(s, k),
-        ),
-    }
+pub(super) fn render(s: &Ui, k: &Kit) -> El {
+    stacked_row(
+        k,
+        "review-events-row",
+        "Events shown",
+        Some(EVENTS_NOTE),
+        categories(s, k),
+    )
 }
 
 fn categories(s: &Ui, k: &Kit) -> El {
@@ -51,10 +39,10 @@ fn categories(s: &Ui, k: &Kit) -> El {
     grid
 }
 
-fn reset(s: &Ui, k: &Kit) -> El {
+pub(super) fn reset_button(s: &Ui, k: &Kit) -> El {
     Button::new("Reset to default")
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
+        .variant(ButtonVariant::Ghost)
+        .control_size(ControlSize::Small)
         .disabled(s.settings.review_events == CategorySet::recommended())
         .on_press(|ui: &mut Ui| ui.change(|s| s.review_events = CategorySet::recommended()))
         .build(k)

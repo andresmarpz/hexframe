@@ -23,7 +23,6 @@ pub(super) enum Row {
     ClipWindow,
     ClipHotkey,
     ReviewEvents,
-    ReviewReset,
     Folder,
     StorageLimit,
     Bind(Action),
@@ -31,7 +30,6 @@ pub(super) enum Row {
     Updates,
     AutoUpdates,
     Logs,
-    Feedback,
     StartWithWindows,
     RiotNotice,
 }
@@ -64,7 +62,6 @@ impl Row {
             Self::ClipWindow => "clip window before after seconds length duration pre post",
             Self::ClipHotkey => "save clip hotkey shortcut manual keybind",
             Self::ReviewEvents => return events_terms(),
-            Self::ReviewReset => "reset default review events filter restore recommended",
             Self::Folder => "recordings folder location path change open directory",
             Self::StorageLimit => "storage limit disk space gb usage used delete",
             Self::Bind(action) => return format!("{} keybind shortcut hotkey key", action.label()),
@@ -72,7 +69,6 @@ impl Row {
             Self::Updates => "updates update check install release",
             Self::AutoUpdates => "check for updates automatically auto update",
             Self::Logs => "logs folder report problem support",
-            Self::Feedback => "send feedback report bug idea suggestion contact support",
             Self::StartWithWindows => "start with windows startup login tray",
             Self::RiotNotice => "riot games notice legal trademark endorsed",
         };
@@ -93,51 +89,104 @@ fn events_terms() -> String {
         .map(|category| category.search_terms())
         .collect();
     format!(
-        "review events shown show hide filter timeline {}",
+        "review events shown show hide filter timeline reset default {}",
         names.join(" ")
     )
 }
 
-pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
+pub(super) struct SectionGroup {
+    pub id: &'static str,
+    pub title: Option<&'static str>,
+    pub rows: Vec<Row>,
+}
+
+pub(super) fn groups_in(section: SettingsSection) -> Vec<SectionGroup> {
     match section {
+        SettingsSection::General => {
+            let mut app_rows = Vec::new();
+            if platform::CAN_START_WITH_WINDOWS {
+                app_rows.push(Row::StartWithWindows);
+            }
+            app_rows.push(Row::NavStyle);
+            vec![
+                SectionGroup {
+                    id: "app",
+                    title: Some("App"),
+                    rows: app_rows,
+                },
+                SectionGroup {
+                    id: "sound",
+                    title: Some("Sound"),
+                    rows: vec![Row::SoundEffects, Row::SoundVolume],
+                },
+                SectionGroup {
+                    id: "updates",
+                    title: Some("Updates"),
+                    rows: vec![Row::Updates, Row::AutoUpdates],
+                },
+                SectionGroup {
+                    id: "diagnostics",
+                    title: Some("Diagnostics"),
+                    rows: vec![Row::Diagnostics, Row::Logs],
+                },
+                SectionGroup {
+                    id: "about",
+                    title: Some("About"),
+                    rows: vec![Row::Version, Row::RiotNotice],
+                },
+            ]
+        }
         SettingsSection::Recording => vec![
-            Row::RecordGames,
-            Row::FullGame,
-            Row::Quality,
-            Row::Resolution,
-            Row::FrameRate,
-            Row::Encoder,
-            Row::Audio,
-            Row::Cursor,
-            Row::NavStyle,
-            Row::SoundEffects,
-            Row::SoundVolume,
-            Row::Diagnostics,
+            SectionGroup {
+                id: "capture",
+                title: Some("Capture"),
+                rows: vec![Row::RecordGames, Row::FullGame],
+            },
+            SectionGroup {
+                id: "video",
+                title: Some("Video"),
+                rows: vec![Row::Quality, Row::Resolution, Row::FrameRate, Row::Encoder],
+            },
+            SectionGroup {
+                id: "audio",
+                title: Some("Audio & input"),
+                rows: vec![Row::Audio, Row::Cursor],
+            },
         ],
         SettingsSection::Clips => vec![
-            Row::ClipsEnabled,
-            Row::Moments,
-            Row::ClipWindow,
-            Row::ClipHotkey,
+            SectionGroup {
+                id: "clips",
+                title: Some("Highlight clips"),
+                rows: vec![
+                    Row::ClipsEnabled,
+                    Row::Moments,
+                    Row::ClipWindow,
+                    Row::ClipHotkey,
+                ],
+            },
+            SectionGroup {
+                id: "review",
+                title: Some("Review timeline"),
+                rows: vec![Row::ReviewEvents],
+            },
         ],
-        SettingsSection::Review => vec![Row::ReviewEvents, Row::ReviewReset],
-        SettingsSection::Storage => vec![Row::Folder, Row::StorageLimit],
-        SettingsSection::Keybinds => Action::ALL.iter().map(|a| Row::Bind(*a)).collect(),
-        SettingsSection::About => {
-            let mut rows = vec![
-                Row::Version,
-                Row::Updates,
-                Row::AutoUpdates,
-                Row::Logs,
-                Row::Feedback,
-            ];
-            if platform::CAN_START_WITH_WINDOWS {
-                rows.push(Row::StartWithWindows);
-            }
-            rows.push(Row::RiotNotice);
-            rows
-        }
+        SettingsSection::Storage => vec![SectionGroup {
+            id: "storage",
+            title: None,
+            rows: vec![Row::Folder, Row::StorageLimit],
+        }],
+        SettingsSection::Keybinds => Vec::new(),
     }
+}
+
+pub(super) fn rows_in(section: SettingsSection) -> Vec<Row> {
+    if section == SettingsSection::Keybinds {
+        return Action::ALL.iter().map(|a| Row::Bind(*a)).collect();
+    }
+    groups_in(section)
+        .into_iter()
+        .flat_map(|g| g.rows)
+        .collect()
 }
 
 pub(super) fn search(query: &str) -> Vec<(SettingsSection, Vec<Row>)> {

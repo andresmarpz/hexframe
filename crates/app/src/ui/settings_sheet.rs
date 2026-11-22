@@ -5,43 +5,39 @@ use super::{LibraryTotals, Ui};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum SettingsSection {
     #[default]
+    General,
     Recording,
     Clips,
-    Review,
     Storage,
     Keybinds,
-    About,
 }
 
 impl SettingsSection {
-    pub(crate) const ALL: [SettingsSection; 6] = [
+    pub(crate) const ALL: [SettingsSection; 5] = [
+        Self::General,
         Self::Recording,
         Self::Clips,
-        Self::Review,
         Self::Storage,
         Self::Keybinds,
-        Self::About,
     ];
 
     pub(crate) fn label(self) -> &'static str {
         match self {
+            Self::General => "General",
             Self::Recording => "Recording",
-            Self::Clips => "Clips",
-            Self::Review => "Review",
+            Self::Clips => "Clips & Review",
             Self::Storage => "Storage",
             Self::Keybinds => "Keybinds",
-            Self::About => "Updates & About",
         }
     }
 
     pub(crate) fn id(self) -> &'static str {
         match self {
+            Self::General => "general",
             Self::Recording => "recording",
             Self::Clips => "clips",
-            Self::Review => "review",
             Self::Storage => "storage",
             Self::Keybinds => "keybinds",
-            Self::About => "about",
         }
     }
 }

@@ -138,6 +138,7 @@ fn clicking_a_game_row_opens_its_review_in_place() {
 fn toggling_a_switch_applies_the_setting_through_the_engine() {
     let (mut rt, rx) = live_runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
     let before = rt.state.settings.audio;
     tap(&mut rt, "audio-switch");
     assert_eq!(rt.state.settings.audio, !before);
@@ -151,6 +152,7 @@ fn toggling_a_switch_applies_the_setting_through_the_engine() {
 fn cursor_switch_flips_the_setting_and_applies_it() {
     let (mut rt, rx) = live_runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
     let before = rt.state.settings.capture_cursor;
     tap(&mut rt, "capture-cursor-switch");
     assert_eq!(rt.state.settings.capture_cursor, !before);
@@ -164,6 +166,7 @@ fn cursor_switch_flips_the_setting_and_applies_it() {
 fn full_game_switch_changes_the_setting() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
     let before = rt.state.settings.record_full_game;
     tap(&mut rt, "full-game-switch");
     assert_eq!(rt.state.settings.record_full_game, !before);
@@ -173,6 +176,7 @@ fn full_game_switch_changes_the_setting() {
 fn picking_a_segment_changes_the_setting() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
     assert_eq!(rt.state.settings.fps, 60);
     let (x, y) = rt.find("fps").unwrap();
     rt.pointer_down(x - 30.0, y);
@@ -273,6 +277,7 @@ fn closing_the_game_drops_the_player() {
 fn the_resolution_menu_opens_under_its_trigger_and_picks_a_value() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
     tap(&mut rt, "resolution-trigger");
     for _ in 0..30 {
         rt.frame(1.0 / 60.0);
@@ -429,6 +434,7 @@ fn size_estimate_text(rt: &Runtime<Ui>) -> String {
 fn changing_quality_updates_the_size_estimate() {
     let mut rt = runtime();
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
     let before = size_estimate_text(&rt);
     let (x, y) = rt.find("quality").unwrap();
     rt.pointer_down(x + 60.0, y);
@@ -645,6 +651,7 @@ fn visible_texts(rt: &Runtime<Ui>) -> Vec<String> {
 
 fn open_resolution_menu(rt: &mut Runtime<Ui>) {
     tap(rt, "nav-settings");
+    tap(rt, "settings-nav-recording");
     tap(rt, "resolution-trigger");
     for _ in 0..30 {
         rt.frame(1.0 / 60.0);
@@ -696,6 +703,7 @@ fn the_quality_note_follows_the_injected_display() {
     ui.settings.resolution = Resolution::Native;
     let mut rt = runtime_with(ui);
     tap(&mut rt, "nav-settings");
+    tap(&mut rt, "settings-nav-recording");
 
     assert!(visible_texts(&rt).iter().any(|t| t.contains("(1440p)")));
 }

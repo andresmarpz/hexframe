@@ -128,6 +128,6 @@ fn switching_settings_sections_shows_the_new_section_on_the_next_frame() {
     rt.pointer_up(x, y);
     rt.frame(1.0 / 60.0);
     assert!(rt.find("clips-enabled").is_some());
-    assert!(rt.find("quality-row").is_none());
+    assert!(rt.find("nav-style-row").is_none());
     assert_eq!(visibly_animating(&mut rt), Vec::<String>::new());
 }

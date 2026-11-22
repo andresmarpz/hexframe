@@ -3,17 +3,15 @@
   "scene": "games-pick",
   "steps": [
     {"tap": "nav-settings"},
-    {"check": "recording", "has": ["settings-sheet", "settings-recording", "quality-row", "nav-style-row"]},
+    {"check": "general", "has": ["settings-sheet", "settings-general", "nav-style-row", "update-row"]},
+    {"tap": "settings-nav-recording"},
+    {"check": "recording", "has": ["settings-recording", "quality-row"]},
     {"tap": "settings-nav-clips"},
-    {"check": "clips", "has": ["settings-clips"]},
-    {"tap": "settings-nav-review"},
-    {"check": "review", "has": ["settings-review"]},
+    {"check": "clips", "has": ["settings-clips", "review-events-row"]},
     {"tap": "settings-nav-storage"},
     {"check": "storage", "has": ["settings-storage"]},
     {"tap": "settings-nav-keybinds"},
     {"check": "keybinds", "has": ["settings-keybinds"]},
-    {"tap": "settings-nav-about"},
-    {"check": "about", "has": ["settings-about"]},
     {"press": "Escape"},
     {"check": "closed", "lacks": ["settings-sheet"], "has": ["games-pick"], "snap": false}
   ]

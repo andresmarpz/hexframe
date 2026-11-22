@@ -7,6 +7,7 @@ use super::{Scene, encoder, sheet};
 use crate::ui::SettingsSection;
 
 pub(super) const SCENES: &[Scene] = &[
+    ("settings-general", |ui| sheet(ui, SettingsSection::General)),
     ("settings", |ui| sheet(ui, SettingsSection::Recording)),
     ("settings-resolution-open", |ui| {
         sheet(ui, SettingsSection::Recording);
@@ -30,7 +31,7 @@ pub(super) const SCENES: &[Scene] = &[
             .settings
             .review_events
             .with(greyscreen_core::categories::EventCategory::EnemyKills, true);
-        sheet(ui, SettingsSection::Review);
+        sheet(ui, SettingsSection::Clips);
     }),
     ("settings-review-search", |ui| {
         sheet(ui, SettingsSection::Recording);
@@ -53,7 +54,7 @@ pub(super) const SCENES: &[Scene] = &[
         sheet(ui, SettingsSection::Recording);
         ui.settings_search = TextEdit::new("fps");
     }),
-    ("settings-about", |ui| sheet(ui, SettingsSection::About)),
+    ("settings-about", |ui| sheet(ui, SettingsSection::General)),
     ("settings-keybinds", |ui| {
         sheet(ui, SettingsSection::Keybinds)
     }),

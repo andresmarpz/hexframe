@@ -33,8 +33,8 @@ fn recording() -> UiMsg {
     })
 }
 
-fn open_recording_settings(rt: &mut Runtime<Ui>) {
-    rt.update(|ui, _| ui.open_settings(SettingsSection::Recording));
+fn open_general_settings(rt: &mut Runtime<Ui>) {
+    rt.update(|ui, _| ui.open_settings(SettingsSection::General));
     settle(rt);
 }
 
@@ -78,7 +78,7 @@ fn only_a_manual_clip_plays_the_clip_sound() {
 #[test]
 fn turning_the_switch_off_silences_everything() {
     let (mut rt, played, rx) = rig(Settings::default());
-    open_recording_settings(&mut rt);
+    open_general_settings(&mut rt);
     tap(&mut rt, "sound-effects-switch");
     assert!(!rt.state.settings.sound_effects);
     assert!(matches!(
@@ -92,7 +92,7 @@ fn turning_the_switch_off_silences_everything() {
 #[test]
 fn the_volume_slider_sets_the_volume_and_previews_it_on_release() {
     let (mut rt, played, rx) = rig(Settings::default());
-    open_recording_settings(&mut rt);
+    open_general_settings(&mut rt);
     rt.update(|_, tx| tx.scroll_into_view("sound-volume-slider".to_owned()));
     settle(&mut rt);
     let [x, y, w, h] = rect(&rt, "sound-volume-slider");
@@ -125,7 +125,7 @@ fn the_slider_steps_and_ends_stay_in_range() {
 fn sound_rows_are_searchable() {
     let (mut rt, _played, _rx) = rig(Settings::default());
     rt.update(|ui, _| {
-        ui.open_settings(SettingsSection::About);
+        ui.open_settings(SettingsSection::Storage);
         ui.settings_search = rune::TextEdit::new("volume");
     });
     settle(&mut rt);

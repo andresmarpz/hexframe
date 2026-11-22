@@ -94,7 +94,7 @@ fn the_section_list_moves_between_recording_and_keybinds() {
     tap(&mut rt, "settings-nav-recording");
     assert_eq!(rt.state.settings_section, SettingsSection::Recording);
     assert!(rt.state.rebinding.is_none());
-    assert!(rt.find("recording-card").is_some());
+    assert!(rt.find("settings-recording").is_some());
     tap(&mut rt, "settings-nav-keybinds");
     assert_eq!(rt.state.settings_section, SettingsSection::Keybinds);
     assert!(rt.find("settings-keybinds").is_some());

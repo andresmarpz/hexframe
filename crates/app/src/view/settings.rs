@@ -20,7 +20,6 @@ pub(super) use recording::quality_control;
 const MIN_BODY_HEIGHT: f32 = 160.0;
 const DIALOG_CHROME: f32 = 108.0;
 const SCROLL_FADE: f32 = 20.0;
-const SUBTITLE: &str = "Changes are saved automatically.";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Tier {
@@ -95,23 +94,14 @@ pub(super) fn sheet(s: &Ui, k: &Kit, layer: &mut Vec<El>, window: Option<(f32, f
         search_content(s, k, &mut popups, &query)
     };
     let size = sheet_size(window);
-    let body = col()
+    let body = row()
         .key("settings-sheet")
         .w_full()
         .h(size.body_height)
-        .child(search_bar(s, k))
-        .child(hairline(k))
-        .child(
-            row()
-                .w_full()
-                .grow(1.0)
-                .min_h(0.0)
-                .child(nav(s, k, query.is_empty(), size.nav_width))
-                .child(el().w(1.0).h_full().fill(k.c.border_muted).a11y_hidden())
-                .child(scroller(content)),
-        );
+        .child(nav(s, k, query.is_empty(), size.nav_width))
+        .child(el().w(1.0).h_full().fill(k.c.border_muted).a11y_hidden())
+        .child(scroller(content));
     Dialog::new("settings", "Settings")
-        .description(SUBTITLE)
         .width(size.width)
         .fit()
         .open(true)
@@ -126,24 +116,18 @@ fn search_bar(s: &Ui, k: &Kit) -> El {
         .label("Search settings")
         .placeholder("Search settings…")
         .leading_icon(&glyphs::SEARCH);
-    let input = clear_when_filled(input, &s.settings_search.text, |ui| &mut ui.settings_search)
+    clear_when_filled(input, &s.settings_search.text, |ui| &mut ui.settings_search)
         .width(None)
         .on_edit(|ui: &mut Ui| &mut ui.settings_search)
         .on_key(|ui: &mut Ui, ev: &KeyEvent, _: &mut Tx| ui.clear_settings_search_on_escape(ev))
         .build(k)
-        .key("settings-search");
-    row().w_full().px(16.0).pb(12.0).child(input)
+        .key("settings-search")
 }
 
 fn nav(s: &Ui, k: &Kit, active: bool, width: f32) -> El {
-    let mut list = col()
-        .key("settings-nav")
-        .w(width)
-        .h_full()
-        .padding(8.0)
-        .gap(2.0);
+    let mut items = col().w_full().gap(2.0);
     for section in SettingsSection::ALL {
-        list = list.child(
+        items = items.child(
             SidebarRow::new(section.label())
                 .selected(active && s.settings_section == section)
                 .on_select(move |ui: &mut Ui, tx: &mut Tx| {
@@ -154,7 +138,14 @@ fn nav(s: &Ui, k: &Kit, active: bool, width: f32) -> El {
                 .key(format!("settings-nav-{}", section.id())),
         );
     }
-    list
+    col()
+        .key("settings-nav")
+        .w(width)
+        .h_full()
+        .padding(8.0)
+        .gap(6.0)
+        .child(search_bar(s, k))
+        .child(items)
 }
 
 fn scroller(content: El) -> El {
@@ -167,31 +158,53 @@ fn scroller(content: El) -> El {
             stick_bottom: false,
         })
         .scroll_edge_fade(SCROLL_FADE)
-        .child(col().w_full().padding(16.0).gap(12.0).child(content))
+        .child(
+            col()
+                .w_full()
+                .padding(16.0)
+                .gap(16.0)
+                .instant_changes()
+                .child(content),
+        )
 }
 
 fn section_content(s: &Ui, k: &Kit, layer: &mut Vec<El>, section: SettingsSection) -> El {
     let mut page = col()
         .key(format!("settings-{}", section.id()))
         .w_full()
-        .gap(12.0);
+        .gap(16.0);
     match section {
         SettingsSection::Recording => page = page.children(recording::notice(s, k)),
-        SettingsSection::Keybinds => page = page.child(keybinds::header(s, k)),
+        SettingsSection::Keybinds => {
+            let rows = catalog::rows_in(section);
+            return page
+                .child(keybinds::header(s, k))
+                .children(keybind_groups(s, k, layer, &rows));
+        }
         _ => {}
     }
-    let rows = catalog::rows_in(section);
-    if section == SettingsSection::Keybinds {
-        return page.children(keybind_groups(s, k, layer, &rows));
+    for g in catalog::groups_in(section) {
+        let rows: Vec<Row> = g.rows.into_iter().filter(|r| shown(s, *r)).collect();
+        if rows.is_empty() {
+            continue;
+        }
+        let card_el = group(s, k, layer, format!("{}-card", g.id), section, &rows);
+        if let Some(title) = g.title {
+            let mut header = row()
+                .w_full()
+                .center_y()
+                .justify_between()
+                .px(4.0)
+                .child(text(title).font(k.ty.ui_medium).color(k.c.text_muted));
+            if g.id == "review" {
+                header = header.child(review::reset_button(s, k));
+            }
+            page = page.child(col().w_full().gap(8.0).child(header).child(card_el));
+        } else {
+            page = page.child(card_el);
+        }
     }
-    page.child(group(
-        s,
-        k,
-        layer,
-        format!("{}-card", section.id()),
-        section,
-        &rows,
-    ))
+    page
 }
 
 fn keybind_groups(s: &Ui, k: &Kit, layer: &mut Vec<El>, rows: &[Row]) -> Vec<El> {
@@ -323,14 +336,13 @@ fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, row: Row) -> El {
         Row::ClipsEnabled | Row::Moments | Row::ClipWindow | Row::ClipHotkey => {
             clips::render(s, k, row)
         }
-        Row::ReviewEvents | Row::ReviewReset => review::render(s, k, row),
+        Row::ReviewEvents => review::render(s, k),
         Row::Folder | Row::StorageLimit => storage::render(s, k, layer, row),
         Row::Bind(action) => keybinds::bind_row(s, k, action),
         Row::Version
         | Row::Updates
         | Row::AutoUpdates
         | Row::Logs
-        | Row::Feedback
         | Row::StartWithWindows
         | Row::RiotNotice => about::render(s, k, row),
     }

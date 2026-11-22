@@ -56,24 +56,34 @@ fn folder(s: &Ui, k: &Kit) -> El {
 
 fn limit(s: &Ui, k: &Kit, layer: &mut Vec<El>) -> El {
     let used = s.storage_used_bytes();
-    let (summary, fraction) = match s.settings.storage_limit_gb {
-        Some(gb) => (
-            format!("{} of {gb} GB", format_size(used)),
-            (used as f64 / (f64::from(gb) * BYTES_PER_GB)).min(1.0) as f32,
-        ),
-        None => (format!("{} used, no limit", format_size(used)), 0.0),
-    };
-    let meter = col()
-        .key("storage-meter")
-        .w_full()
-        .gap(6.0)
-        .child(
-            text(summary)
-                .key("storage-summary")
-                .font(k.ty.body_medium)
-                .color(k.c.text_base),
-        )
-        .child(Progress::new(Some(fraction)).build(k));
+    let mut meter = col().key("storage-meter").w_full().gap(6.0);
+    match s.settings.storage_limit_gb {
+        Some(gb) => {
+            let summary = format!("{} of {gb} GB", format_size(used));
+            let fraction = (used as f64 / (f64::from(gb) * BYTES_PER_GB)).min(1.0) as f32;
+            meter = meter
+                .child(
+                    text(summary)
+                        .key("storage-summary")
+                        .font(k.ty.body_medium)
+                        .color(k.c.text_base),
+                )
+                .child(
+                    Progress::new(Some(fraction))
+                        .build(k)
+                        .key("storage-limit-progress"),
+                );
+        }
+        None => {
+            let summary = format!("{} used, no limit", format_size(used));
+            meter = meter.child(
+                text(summary)
+                    .key("storage-summary")
+                    .font(k.ty.body_medium)
+                    .color(k.c.text_base),
+            );
+        }
+    }
     let select = setting_row(
         k,
         "storage-limit-row",

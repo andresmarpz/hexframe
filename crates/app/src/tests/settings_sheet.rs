@@ -58,24 +58,38 @@ fn toggling_settings_closes_an_open_sheet() {
 #[test]
 fn each_section_shows_only_its_rows() {
     let mut rt = open_sheet();
-    assert!(rt.find("quality-row").is_some());
+    assert_eq!(rt.state.settings_section, SettingsSection::General);
+    assert!(rt.find("nav-style-row").is_some());
+    assert!(rt.find("sound-effects").is_some());
+    assert!(rt.find("update-row").is_some());
+    assert!(rt.find("recording-diagnostics").is_some());
+    assert!(rt.find("riot-notice").is_some());
+    assert!(rt.find("quality-row").is_none());
     assert!(rt.find("clips-enabled").is_none());
+    tap(&mut rt, "settings-nav-recording");
+    assert_eq!(rt.state.settings_section, SettingsSection::Recording);
+    assert!(rt.find("quality-row").is_some());
+    assert!(rt.find("fps-row").is_some());
+    assert!(rt.find("resolution-row").is_some());
+    assert!(rt.find("nav-style-row").is_none());
     tap(&mut rt, "settings-nav-clips");
     assert_eq!(rt.state.settings_section, SettingsSection::Clips);
     assert!(rt.find("clips-enabled").is_some());
     assert!(rt.find("moments").is_some());
+    assert!(rt.find("review-events-row").is_some());
+    assert!(rt.find("review-events-reset").is_some());
     assert!(rt.find("quality-row").is_none());
     tap(&mut rt, "settings-nav-storage");
     assert!(rt.find("folder-row").is_some());
     assert!(rt.find("storage-limit-row").is_some());
-    tap(&mut rt, "settings-nav-about");
-    assert!(rt.find("update-row").is_some());
-    assert!(rt.find("riot-notice").is_some());
+    tap(&mut rt, "settings-nav-keybinds");
+    assert!(rt.find("bind-save_clip").is_some());
 }
 
 #[test]
 fn the_quality_row_carries_the_size_estimate() {
-    let rt = open_sheet();
+    let mut rt = open_sheet();
+    tap(&mut rt, "settings-nav-recording");
     assert!(
         visible_texts(&rt)
             .iter()
@@ -115,7 +129,7 @@ fn clearing_the_search_returns_to_the_section() {
     let mut rt = open_sheet();
     type_search(&mut rt, "fps");
     type_search(&mut rt, "");
-    assert!(rt.find("quality-row").is_some());
+    assert!(rt.find("nav-style-row").is_some());
 }
 
 #[test]
@@ -177,6 +191,16 @@ fn the_storage_meter_without_a_limit_says_so() {
 }
 
 #[test]
+fn storage_progress_bar_only_shows_when_a_limit_is_set() {
+    let mut rt = open_sheet();
+    tap(&mut rt, "settings-nav-storage");
+    assert!(rt.find("storage-limit-progress").is_none());
+    rt.update(|ui, _| ui.settings.storage_limit_gb = Some(50));
+    settle(&mut rt);
+    assert!(rt.find("storage-limit-progress").is_some());
+}
+
+#[test]
 fn opening_a_game_closes_the_sheet() {
     let mut rt = open_sheet();
     rt.update(|ui, _| ui.open_review_entry(crate::ui::review_entry()));
@@ -186,7 +210,8 @@ fn opening_a_game_closes_the_sheet() {
 
 #[test]
 fn recording_shows_the_next_game_notice() {
-    let rt = open_sheet();
+    let mut rt = open_sheet();
+    tap(&mut rt, "settings-nav-recording");
     assert!(rt.find("settings-next-game").is_some());
 }
 
@@ -195,6 +220,7 @@ fn short_sheet(open_menu: bool) -> rune::Runtime<crate::ui::Ui> {
     rt.set_viewport((1000.0, 480.0), 1.0);
     settle(&mut rt);
     if open_menu {
+        tap(&mut rt, "settings-nav-recording");
         tap(&mut rt, "resolution-trigger");
         settle(&mut rt);
     }
@@ -256,7 +282,7 @@ fn escape_in_the_search_clears_the_text_and_keeps_the_sheet() {
     press_escape(&mut rt);
     assert!(rt.state.settings_search.text.is_empty());
     assert!(rt.state.settings_open);
-    assert!(rt.find("quality-row").is_some());
+    assert!(rt.find("nav-style-row").is_some());
 }
 
 #[test]
@@ -278,11 +304,12 @@ fn pick_nav_style(rt: &mut rune::Runtime<crate::ui::Ui>, dock: bool) {
 }
 
 #[test]
-fn the_navigation_style_row_is_the_last_row_of_recording() {
+fn the_navigation_style_row_lives_in_general() {
     let mut rt = open_sheet();
-    tap(&mut rt, "settings-nav-recording");
     assert!(rt.find("nav-style-row").is_some());
     assert!(rt.find("nav-style").is_some());
+    tap(&mut rt, "settings-nav-recording");
+    assert!(rt.find("nav-style-row").is_none());
 }
 
 #[test]
@@ -365,13 +392,16 @@ fn the_sheet_grows_with_the_window_in_steps() {
 
 #[test]
 fn the_wide_sheet_gives_the_nav_and_the_search_the_extra_room() {
-    let (dialog, _) = sheet_rects((1920.0, 1080.0));
     let mut rt = runtime_sized(crate::ui::Ui::preview(), (1920.0, 1080.0));
     tap(&mut rt, "nav-settings");
     settle(&mut rt);
-    assert_eq!(nav_rect_of(&rt, "settings-nav")[2], 224.0);
+    let nav = nav_rect_of(&rt, "settings-nav");
+    assert_eq!(nav[2], 224.0);
     let search = nav_rect_of(&rt, "settings-search");
-    assert!(search[2] > dialog[2] - 64.0, "search spans the sheet");
+    assert!(
+        search[2] > 0.0 && search[2] <= nav[2],
+        "search fits inside nav"
+    );
 }
 
 #[test]

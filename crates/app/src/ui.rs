@@ -156,7 +156,7 @@ impl Ui {
             resolution_open: false,
             storage_open: false,
             settings_open: false,
-            settings_section: SettingsSection::Recording,
+            settings_section: SettingsSection::default(),
             settings_search: TextEdit::default(),
             rebinding: None,
             bind_hint: None,
