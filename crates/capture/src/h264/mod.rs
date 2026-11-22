@@ -1,17 +1,18 @@
 pub(crate) mod colour;
 mod open_error;
 mod pump;
+pub(crate) use pump::DrainClock;
 mod rate;
 mod readback;
 mod setup;
 mod software;
 #[cfg(test)]
 mod tests;
-mod transform;
+pub(crate) mod transform;
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use greyscreen_core::encoder::{EncoderKind, label};
 use greyscreen_core::media::CaptureConfig;
@@ -26,6 +27,7 @@ use windows::core::Interface;
 
 use crate::d3d::GpuDevice;
 use crate::vproc::{Nv12Frame, SlotReleaser};
+use pump::SystemClock;
 use readback::Readback;
 use transform::Mft;
 
@@ -236,28 +238,36 @@ impl H264Encoder {
         Ok(())
     }
 
-    pub fn finish(mut self, out: &mut Vec<EncodedVideo>) -> Result<()> {
-        let result = self.drain_to_end(out);
+    pub fn finish(self, out: &mut Vec<EncodedVideo>) -> Result<()> {
+        self.finish_with(out, &SystemClock::start())
+    }
+
+    pub(crate) fn finish_with(
+        mut self,
+        out: &mut Vec<EncodedVideo>,
+        clock: &dyn DrainClock,
+    ) -> Result<()> {
+        let result = self.drain_to_end(out, clock);
         self.shutdown();
         result
     }
 
-    fn drain_to_end(&mut self, out: &mut Vec<EncodedVideo>) -> Result<()> {
+    fn drain_to_end(&mut self, out: &mut Vec<EncodedVideo>, clock: &dyn DrainClock) -> Result<()> {
         self.mft.process_message(MFT_MESSAGE_COMMAND_DRAIN)?;
         if matches!(self.mode, Mode::Sync { .. }) {
             return self.drain_output(out);
         }
-        let deadline = Instant::now() + DRAIN_TIMEOUT;
+        let started = clock.now();
         loop {
             self.drain_output(out)?;
             if self.drain_complete && self.pending_have_output == 0 {
                 return Ok(());
             }
-            if Instant::now() >= deadline {
+            if clock.now().saturating_sub(started) >= DRAIN_TIMEOUT {
                 tracing::warn!("encoder drain timed out");
                 return Ok(());
             }
-            std::thread::sleep(DRAIN_POLL);
+            clock.wait(DRAIN_POLL);
         }
     }
 

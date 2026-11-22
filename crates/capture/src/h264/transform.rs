@@ -10,7 +10,7 @@ use windows::core::{GUID, HRESULT, Interface};
 
 use crate::probe::string_attribute;
 
-pub(super) type MfResult<T> = windows::core::Result<T>;
+pub(crate) type MfResult<T> = windows::core::Result<T>;
 
 pub(super) trait Candidate {
     fn activate(&self) -> MfResult<Box<dyn Mft>>;
@@ -43,7 +43,7 @@ impl Candidate for RealCandidate {
     }
 }
 
-pub(super) trait Mft: std::fmt::Debug {
+pub(crate) trait Mft: std::fmt::Debug {
     fn attributes(&self) -> MfResult<IMFAttributes>;
     fn stream_ids(&self, inputs: &mut [u32], outputs: &mut [u32]) -> MfResult<()>;
     fn process_message(&self, message: MFT_MESSAGE_TYPE) -> MfResult<()>;

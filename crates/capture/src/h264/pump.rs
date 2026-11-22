@@ -1,4 +1,5 @@
 use std::mem::ManuallyDrop;
+use std::time::{Duration, Instant};
 
 use greyscreen_mp4::avc::{NAL_IDR, NAL_PREFIX, nal_type, split_annexb};
 use windows::Win32::Media::MediaFoundation::{
@@ -14,6 +15,33 @@ const START_CODE: [u8; 4] = [0, 0, 0, 1];
 const MIN_OUTPUT_BUFFER: u32 = 1 << 20;
 const MAX_OUTPUT_ATTEMPTS: u32 = 2;
 const MAX_OUTPUT_TYPES: u32 = 64;
+
+pub(crate) trait DrainClock {
+    fn now(&self) -> Duration;
+    fn wait(&self, duration: Duration);
+}
+
+pub(super) struct SystemClock {
+    origin: Instant,
+}
+
+impl SystemClock {
+    pub(super) fn start() -> Self {
+        Self {
+            origin: Instant::now(),
+        }
+    }
+}
+
+impl DrainClock for SystemClock {
+    fn now(&self) -> Duration {
+        self.origin.elapsed()
+    }
+
+    fn wait(&self, duration: Duration) {
+        std::thread::sleep(duration);
+    }
+}
 
 impl H264Encoder {
     pub(super) fn pump_events(&mut self) -> Result<()> {
