@@ -3,6 +3,7 @@ use std::time::Duration;
 use greyscreen_core::tear::{RING_SLOTS, Wait};
 use windows::Win32::Foundation::{E_FAIL, E_OUTOFMEMORY};
 use windows::Win32::Graphics::Direct3D11::D3D11_TEXTURE2D_DESC;
+use windows::core::Interface;
 
 use super::{FrameCopier, frame_desc, luma_rows, texture, whole};
 use crate::fault::{Armed, Point};
@@ -60,6 +61,37 @@ fn a_change_in_either_dimension_recreates_the_ring_and_the_region_stays_inside()
         assert_eq!(copier.size, size);
         assert_ring_matches(&copier, size);
     }
+}
+
+#[test]
+fn a_size_change_rebuilds_every_slot_and_a_held_old_slot_stays_whole_and_readable() {
+    let _armed = Armed::new();
+    let gpu = crate::testing::warp::device().unwrap();
+    let mut copier = FrameCopier::new(&gpu).unwrap();
+    copier.copy(&plain_texture(&gpu, SIZE), SIZE, 0).unwrap();
+    let held: Vec<_> = (0..RING_SLOTS)
+        .map(|slot| copier.texture(slot).unwrap())
+        .collect();
+
+    let new_size = (SIZE.0 + 2, SIZE.1 + 2);
+    copier
+        .copy(&plain_texture(&gpu, new_size), new_size, 0)
+        .unwrap();
+
+    for (slot, old) in held.iter().enumerate() {
+        let fresh = copier.texture(slot).unwrap();
+        assert_ne!(old.as_raw(), fresh.as_raw());
+        let desc = desc_of(old);
+        assert_eq!((desc.Width, desc.Height), SIZE);
+        let scratch = plain_texture(&gpu, SIZE);
+        let region = whole(SIZE);
+        // SAFETY: both textures are live, the region lies inside both, and the context is multithread protected.
+        unsafe {
+            gpu.context
+                .CopySubresourceRegion(&scratch, 0, 0, 0, 0, old, 0, Some(&region))
+        };
+    }
+    assert_ring_matches(&copier, new_size);
 }
 
 #[test]
