@@ -54,6 +54,8 @@ pub mod recycle;
 pub mod selftest;
 mod session;
 #[cfg(any(test, feature = "fault-injection"))]
+pub use session::live_sessions;
+#[cfg(any(test, feature = "fault-injection"))]
 pub mod testing;
 pub mod transcode;
 pub mod video_log;

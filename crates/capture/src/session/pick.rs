@@ -1,4 +1,3 @@
-use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use greyscreen_core::crop::CropRect;
@@ -6,7 +5,7 @@ use greyscreen_core::encoder::{self, Candidate, EncoderKind, OpenFailure};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, encode_size};
 use greyscreen_core::problem::NO_FRAMES;
 
-use super::{Flags, facts};
+use super::{Flags, STOPPED_DURING_SETUP, facts};
 use crate::adapters;
 use crate::client_area::ClientArea;
 use crate::clock::QpcMap;
@@ -68,7 +67,7 @@ pub(super) fn first_working(
             }
             Err(Failure::Encoders(errors)) => encoder_errors.extend(errors),
         }
-        if flags.stop.load(Ordering::Acquire) {
+        if flags.stopped() {
             break;
         }
     }
@@ -79,6 +78,14 @@ pub(super) fn first_working(
             "video encoder failed: {}",
             encoder_errors.join("; ")
         ))
+    }
+}
+
+fn check_stop(flags: &Flags) -> Result<(), Failure> {
+    if flags.stopped() {
+        Err(Failure::Setup(STOPPED_DURING_SETUP.into()))
+    } else {
+        Ok(())
     }
 }
 
@@ -108,11 +115,13 @@ fn build_on(
     flags: &Flags,
     hardware_failures: &mut Vec<(OpenFailure, u32)>,
 ) -> Result<Stage, Failure> {
+    check_stop(flags)?;
     let gpu = match adapter {
         Some(luid) => GpuDevice::for_luid(luid),
         None => GpuDevice::for_target(target),
     }
     .map_err(|e| Failure::Setup(format!("no usable GPU: {e}")))?;
+    check_stop(flags)?;
     tracing::info!(step = "graphics capture", adapter = %gpu.adapter_name, "capture setup");
     let wgc = WgcCapture::start(
         &gpu,
@@ -125,6 +134,10 @@ fn build_on(
         },
     )
     .map_err(|e| Failure::Setup(format!("screen capture failed to start: {e}")))?;
+    if let Err(failure) = check_stop(flags) {
+        wgc.stop();
+        return Err(failure);
+    }
     tracing::info!(step = "first frame", "capture setup");
     let frame = match first_frame_size(&wgc, flags) {
         Ok(frame) => frame,
@@ -137,12 +150,20 @@ fn build_on(
     let crop = client_area.crop(frame);
     let mut errors = Vec::new();
     for &kind in kinds {
+        if let Err(failure) = check_stop(flags) {
+            wgc.stop();
+            return Err(failure);
+        }
         let kind_cfg = match kind {
             EncoderKind::Hardware => cfg.clone(),
             EncoderKind::Software => encoder::software_config(cfg),
         };
         match open_encoder(&gpu, kind, &kind_cfg, crop.size()) {
             Ok((size, converter, encoder, video_cfg)) => {
+                if let Err(failure) = check_stop(flags) {
+                    wgc.stop();
+                    return Err(failure);
+                }
                 return Ok(Stage {
                     gpu,
                     wgc,
@@ -213,8 +234,8 @@ fn first_frame_size(wgc: &WgcCapture, flags: &Flags) -> Result<(u32, u32), Strin
         if wgc.is_closed() {
             return Err("the captured window closed during startup".into());
         }
-        if flags.stop.load(Ordering::Acquire) {
-            return Err("capture stopped during startup".into());
+        if flags.stopped() {
+            return Err(STOPPED_DURING_SETUP.into());
         }
         if Instant::now() >= deadline {
             return Err(NO_FRAMES.into());

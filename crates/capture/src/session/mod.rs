@@ -1,10 +1,14 @@
 mod audio;
 mod emit;
 mod facts;
+mod lifecycle;
 mod matching;
 mod pick;
 mod setup;
 mod video;
+
+#[cfg(any(test, feature = "fault-injection"))]
+pub use lifecycle::live_sessions;
 
 use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -26,6 +30,14 @@ pub(crate) struct Flags {
     pub(crate) keyframe: Arc<AtomicBool>,
 }
 
+impl Flags {
+    pub(crate) fn stopped(&self) -> bool {
+        self.stop.load(Ordering::Acquire)
+    }
+}
+
+pub(crate) const STOPPED_DURING_SETUP: &str = "capture stopped during startup";
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WindowsMediaSource;
 
@@ -45,7 +57,9 @@ impl MediaSource for WindowsMediaSource {
         if cfg.fps == 0 {
             return Err("capture fps must be above zero".into());
         }
+        lifecycle::wait_for_abandoned()?;
         let flags = Flags::default();
+        let live = lifecycle::LiveGuard::enter();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
         let (done_tx, done_rx) = crossbeam_channel::bounded::<()>(0);
         let thread_flags = flags.clone();
@@ -53,6 +67,7 @@ impl MediaSource for WindowsMediaSource {
             .name("greyscreen-video".into())
             .spawn(move || {
                 let _done = done_tx;
+                let _live = live;
                 thread_main(target, cfg, out, thread_flags, ready_tx);
             })
             .map_err(|e| format!("could not spawn the video thread: {e}"))?;
@@ -64,7 +79,11 @@ impl MediaSource for WindowsMediaSource {
         match ready_rx.recv_timeout(SETUP_TIMEOUT) {
             Ok(Ok(())) => Ok(Box::new(session)),
             Ok(Err(message)) => Err(message),
-            Err(_) => Err("capture setup timed out".into()),
+            Err(_) => {
+                session.flags.stop.store(true, Ordering::Release);
+                lifecycle::abandon(session.done.clone());
+                Err("capture setup timed out".into())
+            }
         }
     }
 
@@ -149,7 +168,9 @@ fn thread_main(
         match setup::build(&target, &cfg, out.clone(), flags) {
             Ok(video) => {
                 ready.report(Ok(()));
-                video.run();
+                if !video.flags.stopped() {
+                    video.run();
+                }
             }
             Err(message) => {
                 ready.report(Err(message));

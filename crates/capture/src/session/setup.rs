@@ -4,12 +4,12 @@ use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent};
 use greyscreen_core::time::mono_now;
 use greyscreen_mp4::avc::{NAL_PPS, NAL_SPS, nal_type, split_annexb};
 
-use super::Flags;
 use super::audio::AudioPipe;
 use super::emit::{Sink, StartInfo};
 use super::facts;
 use super::pick::{self, Stage};
 use super::video::Video;
+use super::{Flags, STOPPED_DURING_SETUP};
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::luid_u64;
@@ -28,10 +28,12 @@ pub(crate) fn build(
     out: Sender<MediaEvent>,
     flags: Flags,
 ) -> Result<Video, String> {
+    check_stop(&flags)?;
     tracing::info!(step = "com", "capture setup");
     let com = ComGuard::mta().map_err(|e| format!("COM init failed: {e}"))?;
     tracing::info!(step = "media foundation", "capture setup");
     let mf = MfGuard::start().map_err(|e| format!("Media Foundation start failed: {e}"))?;
+    check_stop(&flags)?;
     tracing::info!(step = "gpu", "capture setup");
     let qpc = QpcMap::now();
     let Stage {
@@ -47,6 +49,7 @@ pub(crate) fn build(
         video_cfg,
         fallback_warning,
     } = pick::first_working(target, cfg, qpc, &flags)?;
+    check_stop(&flags)?;
     log_capture_path(frame, client_area.client_size());
     tracing::info!(encoder = %encoder.encoder_name(), "video encoder chosen");
     let mut warnings: Vec<String> = fallback_warning.into_iter().collect();
@@ -130,6 +133,14 @@ pub(crate) fn build(
         soft_errors: 0,
         power,
     })
+}
+
+fn check_stop(flags: &Flags) -> Result<(), String> {
+    if flags.stopped() {
+        Err(STOPPED_DURING_SETUP.into())
+    } else {
+        Ok(())
+    }
 }
 
 fn log_capture_path(frame: (u32, u32), client: Option<(u32, u32)>) {
