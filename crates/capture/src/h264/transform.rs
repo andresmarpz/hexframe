@@ -1,18 +1,53 @@
 use windows::Win32::Foundation::E_NOTIMPL;
 use windows::Win32::Media::MediaFoundation::{
-    ICodecAPI, IMFActivate, IMFAttributes, IMFMediaEvent, IMFMediaEventGenerator, IMFMediaType,
-    IMFSample, IMFShutdown, IMFTransform, MF_EVENT_FLAG_NO_WAIT, MFT_MESSAGE_TYPE,
-    MFT_OUTPUT_DATA_BUFFER, MFT_OUTPUT_STREAM_INFO,
+    ICodecAPI, IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaEvent,
+    IMFMediaEventGenerator, IMFMediaType, IMFSample, IMFShutdown, IMFTransform,
+    MF_EVENT_FLAG_NO_WAIT, MFT_ENUM_HARDWARE_VENDOR_ID_Attribute, MFT_FRIENDLY_NAME_Attribute,
+    MFT_MESSAGE_SET_D3D_MANAGER, MFT_MESSAGE_TYPE, MFT_OUTPUT_DATA_BUFFER, MFT_OUTPUT_STREAM_INFO,
 };
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::{GUID, HRESULT, Interface};
 
+use crate::probe::string_attribute;
+
 pub(super) type MfResult<T> = windows::core::Result<T>;
+
+pub(super) trait Candidate {
+    fn activate(&self) -> MfResult<Box<dyn Mft>>;
+    fn shutdown_object(&self);
+    fn describe(&self) -> String;
+}
+
+pub(super) struct RealCandidate(pub(super) IMFActivate);
+
+impl Candidate for RealCandidate {
+    fn activate(&self) -> MfResult<Box<dyn Mft>> {
+        // SAFETY: the activate object is live.
+        let transform: IMFTransform = unsafe { self.0.ActivateObject() }?;
+        Ok(Box::new(RealMft::new(transform, Some(self.0.clone()))?))
+    }
+
+    fn shutdown_object(&self) {
+        // SAFETY: the activate object is live; shutting it down releases the failed transform.
+        if let Err(error) = unsafe { self.0.ShutdownObject() } {
+            tracing::debug!(%error, "candidate shutdown failed");
+        }
+    }
+
+    fn describe(&self) -> String {
+        format!(
+            "{} (vendor {})",
+            string_attribute(&self.0, &MFT_FRIENDLY_NAME_Attribute),
+            string_attribute(&self.0, &MFT_ENUM_HARDWARE_VENDOR_ID_Attribute)
+        )
+    }
+}
 
 pub(super) trait Mft: std::fmt::Debug {
     fn attributes(&self) -> MfResult<IMFAttributes>;
     fn stream_ids(&self, inputs: &mut [u32], outputs: &mut [u32]) -> MfResult<()>;
-    fn process_message(&self, message: MFT_MESSAGE_TYPE, param: usize) -> MfResult<()>;
+    fn process_message(&self, message: MFT_MESSAGE_TYPE) -> MfResult<()>;
+    fn set_d3d_manager(&self, manager: &IMFDXGIDeviceManager) -> MfResult<()>;
     fn process_input(&self, stream: u32, sample: &IMFSample) -> MfResult<()>;
     fn process_output(
         &self,
@@ -44,7 +79,10 @@ pub(super) struct RealMft {
 impl RealMft {
     pub(super) fn new(transform: IMFTransform, activate: Option<IMFActivate>) -> MfResult<Self> {
         let codec = transform.cast()?;
-        let events = activate.as_ref().and_then(|_| transform.cast().ok());
+        let events = match &activate {
+            Some(_) => Some(transform.cast()?),
+            None => None,
+        };
         Ok(Self {
             transform,
             codec,
@@ -65,9 +103,17 @@ impl Mft for RealMft {
         unsafe { self.transform.GetStreamIDs(inputs, outputs) }
     }
 
-    fn process_message(&self, message: MFT_MESSAGE_TYPE, param: usize) -> MfResult<()> {
-        // SAFETY: the transform is live; the caller keeps any pointer in `param` valid for the call.
-        unsafe { self.transform.ProcessMessage(message, param) }
+    fn process_message(&self, message: MFT_MESSAGE_TYPE) -> MfResult<()> {
+        // SAFETY: the transform is live and the message takes no parameter.
+        unsafe { self.transform.ProcessMessage(message, 0) }
+    }
+
+    fn set_d3d_manager(&self, manager: &IMFDXGIDeviceManager) -> MfResult<()> {
+        // SAFETY: the transform is live and the borrowed manager outlives the call.
+        unsafe {
+            self.transform
+                .ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize)
+        }
     }
 
     fn process_input(&self, stream: u32, sample: &IMFSample) -> MfResult<()> {

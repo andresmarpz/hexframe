@@ -6,26 +6,23 @@ use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, LUID, S_OK};
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncCommonQualityVsSpeed, CODECAPI_AVEncH264CABACEnable,
     CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncMPVGOPSize, CODECAPI_AVLowLatencyMode,
-    IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaType, IMFTransform, MF_LOW_LATENCY,
+    IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaType, MF_LOW_LATENCY,
     MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE,
     MF_MT_MPEG_SEQUENCE_HEADER, MF_MT_MPEG2_PROFILE, MF_MT_PIXEL_ASPECT_RATIO, MF_MT_SUBTYPE,
     MF_SA_D3D11_AWARE, MF_SA_D3D11_BINDFLAGS, MF_TRANSFORM_ASYNC, MF_TRANSFORM_ASYNC_UNLOCK,
     MFCreateAttributes, MFCreateDXGIDeviceManager, MFCreateMediaType, MFMediaType_Video,
     MFT_CATEGORY_VIDEO_ENCODER, MFT_ENUM_ADAPTER_LUID, MFT_ENUM_FLAG_HARDWARE,
-    MFT_ENUM_FLAG_SORTANDFILTER, MFT_ENUM_HARDWARE_VENDOR_ID_Attribute,
-    MFT_FRIENDLY_NAME_Attribute, MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
-    MFT_MESSAGE_NOTIFY_START_OF_STREAM, MFT_MESSAGE_SET_D3D_MANAGER, MFT_REGISTER_TYPE_INFO,
-    MFTEnum2, MFTEnumEx, MFVideoFormat_H264, MFVideoFormat_NV12, MFVideoInterlace_Progressive,
-    eAVEncH264VProfile_High,
+    MFT_ENUM_FLAG_SORTANDFILTER, MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
+    MFT_MESSAGE_NOTIFY_START_OF_STREAM, MFT_REGISTER_TYPE_INFO, MFTEnum2, MFTEnumEx,
+    MFVideoFormat_H264, MFVideoFormat_NV12, MFVideoInterlace_Progressive, eAVEncH264VProfile_High,
 };
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Variant::VARIANT;
-use windows::core::{GUID, Interface};
+use windows::core::GUID;
 
-use super::transform::{Mft, RealMft};
+use super::transform::{Candidate, Mft, RealCandidate};
 use super::{H264Error, Mode, Result};
 use crate::d3d::GpuDevice;
-use crate::probe::string_attribute;
 
 const MAX_LISTED_TYPES: u32 = 64;
 const HARDWARE_QUALITY_VS_SPEED: u32 = 100;
@@ -69,15 +66,24 @@ pub(super) struct Property {
 pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
     let manager = create_device_manager(gpu)?;
     let candidates = enumerate(gpu.adapter_luid)?;
+    open_candidates(candidates, manager, spec, gpu.vendor_id)
+}
+
+pub(super) fn open_candidates(
+    candidates: Vec<Box<dyn Candidate>>,
+    manager: IMFDXGIDeviceManager,
+    spec: &Spec,
+    vendor_id: u32,
+) -> Result<Opened> {
     if candidates.is_empty() {
         return Err(H264Error::NoHardwareEncoder(
             "enumeration returned no hardware H.264 encoder for this adapter".to_string(),
         ));
     }
     let mut failures = Vec::new();
-    for activate in candidates {
-        let name = describe(&activate);
-        match configure(&activate, &manager, spec, gpu.vendor_id) {
+    for candidate in candidates {
+        let name = candidate.describe();
+        match configure(candidate.as_ref(), &manager, spec, vendor_id) {
             Ok(configured) => {
                 tracing::info!(encoder = %name, "hardware H.264 encoder configured");
                 return Ok(Opened {
@@ -90,13 +96,10 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
                 });
             }
             Err(error) => {
-                let error = open_error::tag_untagged(error, gpu.vendor_id);
+                let error = open_error::tag_untagged(error, vendor_id);
                 tracing::warn!(encoder = %name, %error, "hardware H.264 encoder candidate rejected");
                 failures.push(format!("{name}: {error}"));
-                // SAFETY: the activate object is live; shutting it down releases the failed transform.
-                if let Err(error) = unsafe { activate.ShutdownObject() } {
-                    tracing::debug!(%error, "candidate shutdown failed");
-                }
+                candidate.shutdown_object();
             }
         }
     }
@@ -121,7 +124,7 @@ fn luid_bytes(luid: LUID) -> [u8; 8] {
     bytes
 }
 
-fn enumerate(luid: LUID) -> Result<Vec<IMFActivate>> {
+fn enumerate(luid: LUID) -> Result<Vec<Box<dyn Candidate>>> {
     let output_type = MFT_REGISTER_TYPE_INFO {
         guidMajorType: MFMediaType_Video,
         guidSubtype: MFVideoFormat_H264,
@@ -149,7 +152,7 @@ fn enumerate(luid: LUID) -> Result<Vec<IMFActivate>> {
         )
     };
     match result {
-        Ok(()) => Ok(take_activates(activates, count)),
+        Ok(()) => Ok(boxed(take_activates(activates, count))),
         Err(error) => {
             tracing::info!(%error, "MFTEnum2 failed, falling back to MFTEnumEx with an adapter filter");
             let mut activates: *mut Option<IMFActivate> = std::ptr::null_mut();
@@ -167,7 +170,7 @@ fn enumerate(luid: LUID) -> Result<Vec<IMFActivate>> {
             }
             let mut all = take_activates(activates, count);
             all.retain(|activate| matches_luid(activate, luid));
-            Ok(all)
+            Ok(boxed(all))
         }
     }
 }
@@ -193,12 +196,11 @@ fn take_activates(activates: *mut Option<IMFActivate>, count: u32) -> Vec<IMFAct
     taken
 }
 
-fn describe(activate: &IMFActivate) -> String {
-    format!(
-        "{} (vendor {})",
-        string_attribute(activate, &MFT_FRIENDLY_NAME_Attribute),
-        string_attribute(activate, &MFT_ENUM_HARDWARE_VENDOR_ID_Attribute)
-    )
+fn boxed(activates: Vec<IMFActivate>) -> Vec<Box<dyn Candidate>> {
+    activates
+        .into_iter()
+        .map(|activate| Box::new(RealCandidate(activate)) as Box<dyn Candidate>)
+        .collect()
 }
 
 fn rejected(reason: &str) -> H264Error {
@@ -206,16 +208,15 @@ fn rejected(reason: &str) -> H264Error {
 }
 
 fn configure(
-    activate: &IMFActivate,
+    candidate: &dyn Candidate,
     manager: &IMFDXGIDeviceManager,
     spec: &Spec,
     vendor_id: u32,
 ) -> Result<Configured> {
     fault!(MftActivation)?;
-    // SAFETY: the activate object is live.
-    let transform: IMFTransform = unsafe { activate.ActivateObject() }
+    let mft = candidate
+        .activate()
         .map_err(|e| open_error::at(OpenStep::Activate, vendor_id, &e))?;
-    let mft = RealMft::new(transform, Some(activate.clone()))?;
     let attributes = mft.attributes()?;
     // SAFETY: the attribute store is live.
     let is_async = unsafe { attributes.GetUINT32(&MF_TRANSFORM_ASYNC) }.unwrap_or(0);
@@ -233,8 +234,7 @@ fn configure(
     if d3d_aware != 1 {
         return Err(rejected("the encoder is not D3D11 aware"));
     }
-    let device_set = mft.process_message(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize);
-    if let Err(error) = device_set {
+    if let Err(error) = mft.set_d3d_manager(manager) {
         return Err(open_error::at(OpenStep::D3dManager, vendor_id, &error));
     }
     let (input_id, output_id) = stream_ids(&mft)?;
@@ -265,7 +265,7 @@ fn configure(
         other => other,
     })?;
     Ok(Configured {
-        mft: Box::new(mft),
+        mft,
         input_id,
         output_id,
         sequence_header,
@@ -346,7 +346,7 @@ pub(super) fn start_streaming(mft: &dyn Mft) -> Result<()> {
         MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
         MFT_MESSAGE_NOTIFY_START_OF_STREAM,
     ] {
-        mft.process_message(message, 0)?;
+        mft.process_message(message)?;
     }
     Ok(())
 }

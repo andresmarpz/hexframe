@@ -127,6 +127,16 @@ impl H264Encoder {
             label(kind, gpu.vendor_id, &gpu.adapter_name),
             opened.name
         );
+        Self::from_opened(opened, kind, name, width, height)
+    }
+
+    pub(crate) fn from_opened(
+        opened: setup::Opened,
+        kind: EncoderKind,
+        name: String,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
         let mut encoder = Self {
             scratch: None,
             mode: opened.mode,
@@ -233,7 +243,7 @@ impl H264Encoder {
     }
 
     fn drain_to_end(&mut self, out: &mut Vec<EncodedVideo>) -> Result<()> {
-        self.mft.process_message(MFT_MESSAGE_COMMAND_DRAIN, 0)?;
+        self.mft.process_message(MFT_MESSAGE_COMMAND_DRAIN)?;
         if matches!(self.mode, Mode::Sync { .. }) {
             return self.drain_output(out);
         }
@@ -289,7 +299,7 @@ impl H264Encoder {
             MFT_MESSAGE_NOTIFY_END_STREAMING,
             MFT_MESSAGE_COMMAND_FLUSH,
         ] {
-            if let Err(error) = self.mft.process_message(message, 0) {
+            if let Err(error) = self.mft.process_message(message) {
                 tracing::debug!(%error, "encoder shutdown message failed");
             }
         }
