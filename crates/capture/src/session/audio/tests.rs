@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
@@ -7,9 +8,12 @@ use greyscreen_core::media::MediaEvent;
 use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
 
 use super::{AudioPipe, spawn_worker};
-use crate::aac::OpenEncoder;
+use windows::Win32::Foundation::E_FAIL;
+
+use crate::aac::{OpenEncoder, PcmEncoder, Result as AacResult};
 use crate::audio::{OpenSource, PacketInfo, PcmBlock, SourceError};
 use crate::clock::QpcMap;
+use crate::fault::{Armed, Point};
 use crate::session::emit::{Sink, StartInfo};
 use crate::testing::client::{FakeClient, Step, failing_open as failing_source};
 use crate::testing::encoder::{FakeEncoder, failing_open as failing_encoder};
@@ -240,4 +244,247 @@ fn an_encoder_that_fails_to_open_fails_the_pipe_start() {
         panic!("start should fail");
     };
     assert!(error.contains("AAC encoder failed"));
+}
+
+struct Tracked {
+    inner: Option<Box<dyn PcmEncoder>>,
+    alive: Arc<AtomicBool>,
+}
+
+impl Drop for Tracked {
+    fn drop(&mut self) {
+        self.alive.store(false, Ordering::Release);
+    }
+}
+
+impl PcmEncoder for Tracked {
+    fn encode(&mut self, block: &PcmBlock, out: &mut Vec<Vec<u8>>) -> AacResult<()> {
+        self.inner
+            .as_mut()
+            .expect("inner encoder")
+            .encode(block, out)
+    }
+
+    fn finish(mut self: Box<Self>, out: &mut Vec<Vec<u8>>) -> AacResult<()> {
+        self.inner.take().expect("inner encoder").finish(out)
+    }
+
+    fn asc(&self) -> Vec<u8> {
+        self.inner.as_ref().expect("inner encoder").asc()
+    }
+}
+
+fn tracked(encoder: FakeEncoder) -> (OpenEncoder, Arc<AtomicBool>) {
+    let alive = Arc::new(AtomicBool::new(true));
+    let flag = Arc::clone(&alive);
+    let open = encoder.open();
+    let wrapped: OpenEncoder = Box::new(move || {
+        let inner = open()?;
+        Ok(Box::new(Tracked {
+            inner: Some(inner),
+            alive: flag,
+        }))
+    });
+    (wrapped, alive)
+}
+
+fn wait_until_gone(alive: &AtomicBool) {
+    let deadline = Instant::now() + PATIENCE;
+    while alive.load(Ordering::Acquire) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        !alive.load(Ordering::Acquire),
+        "the AAC thread did not exit"
+    );
+}
+
+fn blocks(count: usize) -> Vec<Step> {
+    (0..count)
+        .map(|index| Step::packet(sine(64, index as u64 * 64, 440.0)))
+        .collect()
+}
+
+#[test]
+fn a_start_that_fails_after_the_aac_thread_started_joins_it_and_a_second_start_works() {
+    let (encoder, alive) = tracked(FakeEncoder::new());
+    let Err(error) = start(failing_source(), encoder) else {
+        panic!("start should fail");
+    };
+    assert!(error.contains("audio capture failed"));
+    assert!(
+        !alive.load(Ordering::Acquire),
+        "the AAC thread was not joined"
+    );
+    let pipe = start(
+        FakeClient::new(sine_packets(1)).open(),
+        FakeEncoder::new().open(),
+    )
+    .expect("second start works");
+    let (mut sink, _rx) = sink();
+    pipe.begin(far_future_t0());
+    assert_eq!(drain_until(&pipe, &mut sink, 1), 1);
+    finish_within_patience(pipe, sink);
+}
+
+#[test]
+fn stopping_before_the_session_starts_returns_at_once_and_sends_nothing() {
+    let client = FakeClient::new(sine_packets(10));
+    let stopped = client.stopped();
+    let pipe = start(client.open(), FakeEncoder::new().open()).expect("pipe starts");
+    let (sink, rx) = sink();
+    let begun = Instant::now();
+    let (packets, _sink) = finish_within_patience(pipe, sink);
+    assert!(begun.elapsed() < Duration::from_secs(1));
+    assert_eq!(packets, 0);
+    assert!(stopped.load(Ordering::Acquire));
+    assert!(
+        rx.try_iter()
+            .all(|event| !matches!(event, MediaEvent::Packet(_)))
+    );
+}
+
+#[test]
+fn dropping_the_pipe_without_finish_stops_every_thread() {
+    let client = FakeClient::new(sine_packets(10));
+    let stopped = client.stopped();
+    let (encoder, alive) = tracked(FakeEncoder::new());
+    let pipe = start(client.open(), encoder).expect("pipe starts");
+    pipe.begin(far_future_t0());
+    drop(pipe);
+    assert!(stopped.load(Ordering::Acquire));
+    wait_until_gone(&alive);
+}
+
+#[test]
+fn a_source_that_cannot_open_gives_a_cause_the_session_can_show() {
+    let Err(error) = start(failing_source(), FakeEncoder::new().open()) else {
+        panic!("start should fail");
+    };
+    assert!(error.starts_with("audio capture failed: "));
+    assert!(error.len() > "audio capture failed: ".len());
+}
+
+#[test]
+fn two_hundred_fast_start_and_stop_cycles_do_not_hang() {
+    let begun = Instant::now();
+    for cycle in 0..200 {
+        let pipe = start(
+            FakeClient::new(sine_packets(2)).open(),
+            FakeEncoder::new().open(),
+        )
+        .expect("pipe starts");
+        if cycle % 2 == 0 {
+            pipe.begin(far_future_t0());
+        }
+        let (sink, _rx) = sink();
+        finish_within_patience(pipe, sink);
+    }
+    assert!(begun.elapsed() < Duration::from_secs(60));
+}
+
+#[test]
+fn an_encoder_failing_on_the_first_block_ends_the_audio_thread_within_a_second_of_stop() {
+    let client = FakeClient::new(blocks(300));
+    let stopped = client.stopped();
+    let (encoder, alive) = tracked(FakeEncoder::new().failing_at(0));
+    let pipe = start(client.open(), encoder).expect("pipe starts");
+    let (sink, rx) = sink();
+    pipe.begin(far_future_t0());
+    wait_until_gone(&alive);
+    let begun = Instant::now();
+    let (_, _sink) = finish_within_patience(pipe, sink);
+    assert!(begun.elapsed() < Duration::from_secs(2));
+    assert!(stopped.load(Ordering::Acquire));
+    assert_eq!(warnings(&rx).len(), 1);
+}
+
+#[test]
+fn an_encoder_failing_on_block_fifty_keeps_the_first_packets_warns_once_and_stops_fast() {
+    let client = FakeClient::new(blocks(300));
+    let pipe = start(client.open(), FakeEncoder::new().failing_at(50).open()).expect("pipe starts");
+    let (mut sink, rx) = sink();
+    pipe.begin(far_future_t0());
+    assert_eq!(drain_until(&pipe, &mut sink, 50), 50);
+    let begun = Instant::now();
+    let (extra, _sink) = finish_within_patience(pipe, sink);
+    assert!(begun.elapsed() < Duration::from_secs(2));
+    assert_eq!(extra, 0);
+    let texts = warnings(&rx);
+    assert_eq!(texts.len(), 1);
+    assert!(texts[0].contains("audio encoding stopped"));
+}
+
+#[test]
+fn a_stalled_encoder_keeps_the_queue_bounded_and_audio_resumes_in_order() {
+    let mut steps = blocks(700);
+    steps[400] = Step::flagged(
+        sine(64, 400 * 64, 440.0),
+        PacketInfo {
+            discontinuity: true,
+            ..PacketInfo::default()
+        },
+    );
+    let client = FakeClient::new(steps);
+    let encoder = FakeEncoder::new().stalling_at(0, Duration::from_secs(2));
+    let received = encoder.received();
+    let pipe = start(client.open(), encoder.open()).expect("pipe starts");
+    let (mut sink, _rx) = sink();
+    pipe.begin(far_future_t0());
+    let mut deepest = 0;
+    let until = Instant::now() + Duration::from_millis(1500);
+    while Instant::now() < until {
+        let mut stats = CaptureStats::default();
+        pipe.fill_stats(&mut stats);
+        deepest = deepest.max(stats.pcm_queue);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(deepest <= 256);
+    assert_eq!(drain_until(&pipe, &mut sink, 700), 700);
+    let mut stats = CaptureStats::default();
+    pipe.fill_stats(&mut stats);
+    assert_eq!(stats.audio_discontinuities, 1);
+    finish_within_patience(pipe, sink);
+    let blocks = received.lock().expect("received lock");
+    assert_eq!(blocks.len(), 700);
+    assert!(
+        blocks
+            .windows(2)
+            .all(|pair| pair[0].first_frame < pair[1].first_frame)
+    );
+}
+
+#[test]
+#[ignore = "lost device sends no warning: issue 80"]
+fn device_invalidated_sends_one_warning_to_the_session() {
+    let mut steps = sine_packets(3);
+    steps.push(Step::ReadFails(SourceError::DeviceInvalidated));
+    let pipe =
+        start(FakeClient::new(steps).open(), FakeEncoder::new().open()).expect("pipe starts");
+    let (mut sink, rx) = sink();
+    pipe.begin(far_future_t0());
+    drain_until(&pipe, &mut sink, 3);
+    let deadline = Instant::now() + PATIENCE;
+    let mut texts = Vec::new();
+    while texts.is_empty() && Instant::now() < deadline {
+        pipe.drain(&mut sink);
+        texts = warnings(&rx);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(texts.len(), 1);
+    finish_within_patience(pipe, sink);
+}
+
+#[test]
+fn a_failed_mmcss_registration_still_captures_audio() {
+    let _armed = Armed::new().fail(Point::Mmcss, E_FAIL);
+    let pipe = start(
+        FakeClient::new(sine_packets(5)).open(),
+        FakeEncoder::new().open(),
+    )
+    .expect("pipe starts");
+    let (mut sink, _rx) = sink();
+    pipe.begin(far_future_t0());
+    assert_eq!(drain_until(&pipe, &mut sink, 5), 5);
+    finish_within_patience(pipe, sink);
 }

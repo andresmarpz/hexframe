@@ -9,6 +9,7 @@ pub(crate) type Received = Arc<Mutex<Vec<PcmBlock>>>;
 pub(crate) struct FakeEncoder {
     fail_at: Option<usize>,
     delay: Duration,
+    stall: Option<(usize, Duration)>,
     flush_frames: usize,
     blocks: usize,
     received: Received,
@@ -19,6 +20,7 @@ impl FakeEncoder {
         Self {
             fail_at: None,
             delay: Duration::ZERO,
+            stall: None,
             flush_frames: 0,
             blocks: 0,
             received: Received::default(),
@@ -32,6 +34,11 @@ impl FakeEncoder {
 
     pub(crate) fn sleeping(mut self, delay: Duration) -> Self {
         self.delay = delay;
+        self
+    }
+
+    pub(crate) fn stalling_at(mut self, block: usize, duration: Duration) -> Self {
+        self.stall = Some((block, duration));
         self
     }
 
@@ -58,6 +65,9 @@ impl PcmEncoder for FakeEncoder {
         std::thread::sleep(self.delay);
         let index = self.blocks;
         self.blocks += 1;
+        if let Some((_, duration)) = self.stall.filter(|(at, _)| *at == index) {
+            std::thread::sleep(duration);
+        }
         if self.fail_at == Some(index) {
             return Err(AacError::Unsupported("scripted encode failure"));
         }
