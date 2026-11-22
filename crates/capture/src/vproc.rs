@@ -127,6 +127,7 @@ impl VideoConverter {
         src_size: (u32, u32),
         crop: CropRect,
     ) -> Result<Nv12Frame> {
+        fault!(ConverterConvert)?;
         let crop = fit_crop(crop, src_size);
         if src_size != self.input_size {
             self.crop = crop;
@@ -357,7 +358,7 @@ fn create_processor(
             DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709,
         )?
     };
-    if !supported.as_bool() {
+    if !supported.as_bool() || fault!(ConversionSupport).is_err() {
         return Err(VprocError::Unsupported);
     }
     // SAFETY: the video device and enumerator are live.

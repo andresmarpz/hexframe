@@ -78,6 +78,11 @@ fn a_texture_failing_mid_pool_fails_the_whole_pool() {
 }
 
 #[test]
-fn the_unsupported_conversion_reason_names_the_conversion() {
-    assert!(VprocError::Unsupported.to_string().contains("BGRA to NV12"));
+fn an_unsupported_conversion_is_the_unsupported_error() {
+    let _armed = Armed::new().fail(Point::ConversionSupport, E_FAIL);
+    let gpu = warp::device().unwrap();
+    assert!(matches!(
+        VideoConverter::new(&gpu, 64, 64, 30),
+        Err(VprocError::Unsupported)
+    ));
 }

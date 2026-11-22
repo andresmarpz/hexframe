@@ -183,6 +183,7 @@ impl H264Encoder {
     }
 
     pub fn submit(&mut self, frame: &Nv12Frame, pts_hns: i64, dur_hns: i64) -> Result<()> {
+        fault!(EncoderSubmit)?;
         if let Mode::Sync { readback } = &self.mode {
             let sample = readback.sample(&frame.texture, pts_hns, dur_hns)?;
             // SAFETY: the transform is live and the sample outlives the call.

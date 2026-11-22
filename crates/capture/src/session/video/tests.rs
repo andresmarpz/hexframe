@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crossbeam_channel::{Receiver, unbounded};
 use greyscreen_core::encoder::is_encoder_failure;
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent};
@@ -70,6 +72,85 @@ fn assert_ended_with_one_failure(events: &Receiver<MediaEvent>, prefix: &str) {
     );
 }
 
+fn packet_count(events: &[MediaEvent]) -> usize {
+    events
+        .iter()
+        .filter(|event| matches!(event, MediaEvent::Packet(_)))
+        .count()
+}
+
+fn lose_device_mid_recording(point: Point, code: HRESULT, prefix: &str) {
+    let armed = Armed::new();
+    let (tx, rx) = unbounded();
+    let flags = Flags::default();
+    let stop = flags.stop.clone();
+    let runner = std::thread::spawn(move || {
+        match build(&CaptureTarget::PrimaryMonitor, &config(), tx, flags) {
+            Ok(video) => video.run(),
+            Err(message) => panic!("setup failed: {message}"),
+        }
+    });
+    let mut seen = Vec::new();
+    loop {
+        match rx.recv_timeout(Duration::from_secs(20)) {
+            Ok(event @ MediaEvent::Packet(_)) => {
+                seen.push(event);
+                break;
+            }
+            Ok(event) => seen.push(event),
+            Err(_) => {
+                stop.store(true, std::sync::atomic::Ordering::Release);
+                panic!("no packet before the loss: {seen:?}");
+            }
+        }
+    }
+    let _armed = armed.fail(point, code);
+    runner.join().unwrap();
+    seen.extend(rx.try_iter());
+    assert!(packet_count(&seen) >= 1);
+    let failed: Vec<usize> = seen
+        .iter()
+        .enumerate()
+        .filter_map(|(index, event)| matches!(event, MediaEvent::Failed(_)).then_some(index))
+        .collect();
+    assert_eq!(failed.len(), 1, "{seen:?}");
+    let Some(MediaEvent::Failed(reason)) = seen.get(failed[0]) else {
+        unreachable!()
+    };
+    assert!(reason.starts_with(prefix), "{reason}");
+    assert!(is_encoder_failure(reason));
+    assert_eq!(failed[0], seen.len() - 1, "an event follows the loss");
+}
+
+#[test]
+fn a_device_loss_in_the_check_after_packets_ends_the_run_with_one_failure() {
+    for code in LOSSES {
+        lose_device_mid_recording(Point::DeviceRemovedCheck, code, "graphics device removed");
+    }
+}
+
+#[test]
+fn a_device_loss_inside_convert_after_packets_ends_the_run_with_one_failure() {
+    for code in LOSSES {
+        lose_device_mid_recording(
+            Point::ConverterConvert,
+            code,
+            "graphics device lost in convert",
+        );
+    }
+}
+
+#[test]
+fn a_device_loss_inside_submit_after_packets_ends_the_run_with_one_failure() {
+    for code in LOSSES {
+        lose_device_mid_recording(
+            Point::EncoderSubmit,
+            code,
+            "graphics device lost in encoder submit",
+        );
+    }
+}
+
 #[test]
 fn a_device_removed_or_reset_from_the_check_ends_the_run_with_the_lost_exit() {
     for code in LOSSES {
@@ -81,7 +162,7 @@ fn a_device_removed_or_reset_from_the_check_ends_the_run_with_the_lost_exit() {
 }
 
 #[test]
-fn a_device_loss_in_the_converter_ends_with_the_lost_exit() {
+fn the_converter_loss_classification_gives_the_lost_exit() {
     for code in LOSSES {
         let _armed = Armed::new();
         let (mut video, events) = video();
@@ -98,7 +179,7 @@ fn a_device_loss_in_the_converter_ends_with_the_lost_exit() {
 }
 
 #[test]
-fn a_device_loss_in_the_encoder_ends_with_the_lost_exit() {
+fn the_encoder_loss_classification_gives_the_lost_exit() {
     for code in LOSSES {
         let _armed = Armed::new();
         let (mut video, events) = video();
