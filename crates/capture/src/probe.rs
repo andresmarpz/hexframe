@@ -7,6 +7,9 @@ use windows::Win32::Media::MediaFoundation::{
     MFT_FRIENDLY_NAME_Attribute, MFT_REGISTER_TYPE_INFO, MFTEnumEx, MFVideoFormat_H264,
 };
 use windows::Win32::System::Com::CoTaskMemFree;
+use windows::Win32::System::Diagnostics::Debug::{
+    GetErrorMode, SEM_FAILCRITICALERRORS, SetErrorMode, THREAD_ERROR_MODE,
+};
 use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
 use windows::Win32::UI::HiDpi::{
     DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
@@ -17,8 +20,22 @@ use crate::com::{ComGuard, MfGuard};
 use crate::d3d::wide_to_string;
 
 pub fn init_process() -> windows::core::Result<()> {
+    set_fail_critical_errors();
     // SAFETY: no pointers are passed; the call only changes this process's DPI awareness.
     unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) }
+}
+
+fn set_fail_critical_errors() {
+    // SAFETY: the calls take no pointers; they only change this process's error mode.
+    unsafe {
+        let current = GetErrorMode();
+        SetErrorMode(THREAD_ERROR_MODE(current) | SEM_FAILCRITICALERRORS);
+    }
+}
+
+pub fn error_mode() -> u32 {
+    // SAFETY: GetErrorMode takes no arguments and only reads the process error mode.
+    unsafe { GetErrorMode() }
 }
 
 pub fn system_report() -> String {

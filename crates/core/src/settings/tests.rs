@@ -707,3 +707,24 @@ fn a_saved_window_size_stays_inside_the_allowed_range() {
     settings.validate();
     assert_eq!(settings.window_size, Some((1400, 800)));
 }
+
+#[test]
+fn an_empty_or_relative_output_folder_loads_as_the_default() {
+    for dir in ["", "recordings", "./recordings"] {
+        let path = scratch_dir().join("settings.json");
+        fs::write(&path, format!(r#"{{"output_dir": {dir:?}}}"#)).unwrap();
+        assert_eq!(
+            Settings::load(&path).output_dir,
+            paths::default_output_dir(),
+            "{dir}"
+        );
+    }
+}
+
+#[test]
+fn an_absolute_output_folder_loads_unchanged() {
+    let path = scratch_dir().join("settings.json");
+    let dir = scratch_dir();
+    fs::write(&path, serde_json::json!({ "output_dir": dir }).to_string()).unwrap();
+    assert_eq!(Settings::load(&path).output_dir, dir);
+}

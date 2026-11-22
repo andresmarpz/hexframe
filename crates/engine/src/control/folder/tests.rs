@@ -35,3 +35,11 @@ fn a_read_only_folder_is_an_unusable_folder() {
         assert_eq!(Problem::from_error(&err), Problem::FolderUnusable);
     }
 }
+
+#[test]
+fn an_empty_or_relative_folder_is_an_unusable_folder() {
+    for dir in ["", "recordings", "./recordings", "../up"] {
+        let err = check_writable(Path::new(dir)).expect_err("not absolute");
+        assert_eq!(Problem::from_error(&err), Problem::FolderUnusable, "{dir}");
+    }
+}

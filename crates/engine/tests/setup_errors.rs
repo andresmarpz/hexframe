@@ -56,3 +56,32 @@ fn a_test_recording_into_an_unusable_folder_says_so_and_does_not_retry() {
         "{notice}"
     );
 }
+
+#[test]
+fn a_test_recording_into_an_empty_folder_says_so() {
+    let (ui_tx, ui_rx) = unbounded();
+    let engine = Engine::start(
+        Settings {
+            output_dir: std::path::PathBuf::new(),
+            ..Settings::default()
+        },
+        Arc::new(FakeMediaSource::new()),
+        silent_league(),
+        Box::new(move |msg| {
+            ui_tx.send(msg).ok();
+        }),
+    );
+    engine
+        .cmd
+        .send(EngineCmd::StartTestRecording { secs: 1 })
+        .expect("send");
+    let mut error = None;
+    while let Ok(msg) = ui_rx.recv_timeout(WAIT) {
+        if let UiMsg::Status(EngineStatus::Error(text)) = msg {
+            error = Some(text);
+            break;
+        }
+    }
+    let error = error.expect("an error status");
+    assert_eq!(Problem::from_error(&error), Problem::FolderUnusable);
+}

@@ -214,6 +214,10 @@ impl Settings {
                     &mut settings.legacy_save_clip_hotkey,
                     &mut settings.keybinds,
                 );
+                if !settings.output_dir.is_absolute() {
+                    tracing::warn!(dir = %settings.output_dir.display(), "recordings folder is not an absolute path, using the default");
+                    settings.output_dir = paths::default_output_dir();
+                }
                 settings
             }
             Err(err) => {

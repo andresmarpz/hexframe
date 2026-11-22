@@ -7,6 +7,12 @@ const PROBE_FILE: &str = ".greyscreen-write-check";
 
 pub(super) fn check_writable(dir: &Path) -> Result<(), String> {
     let unusable = |err: std::io::Error| format!("{FOLDER_UNUSABLE}: {}: {err}", dir.display());
+    if !dir.is_absolute() {
+        return Err(format!(
+            "{FOLDER_UNUSABLE}: {}: the path is not absolute",
+            dir.display()
+        ));
+    }
     fs::create_dir_all(dir).map_err(unusable)?;
     let probe = dir.join(PROBE_FILE);
     fs::write(&probe, b"").map_err(unusable)?;
