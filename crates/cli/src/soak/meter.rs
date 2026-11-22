@@ -17,6 +17,7 @@ impl Meter {
             handles: usage.map(|u| u.handles),
             threads: usage.map(|u| u.threads),
             gpu_bytes: usage.and_then(|u| u.gpu_dedicated_bytes),
+            ..Sample::default()
         }
     }
 }
