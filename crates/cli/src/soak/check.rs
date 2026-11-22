@@ -185,10 +185,15 @@ fn av_failures(cycle: &CycleResult, av: &AvLimits) -> Vec<String> {
             cycle.index, av.max_skew_ms
         ));
     }
-    if let Some(audio) = cycle.health.as_ref().and_then(|h| h.audio.as_ref())
-        && cycle.video_secs >= MIN_DRIFT_SECS
+    let points: Vec<(f64, f64)> = cycle
+        .diag_seconds
+        .iter()
+        .filter_map(|v| Some((v["t"].as_f64()?, v["av_skew_ms"].as_f64()?)))
+        .collect();
+    if cycle.video_secs >= MIN_DRIFT_SECS
+        && let Some(slope) = slope_per_min(&points)
     {
-        let per_hour = audio.drift_ms.abs() / (cycle.video_secs / 3600.0);
+        let per_hour = slope.abs() * 60.0;
         if per_hour > av.max_drift_ms_per_hour {
             failures.push(format!(
                 "recording {}: clock drift {per_hour:.2} ms per hour, limit {:.2} ms per hour",
@@ -269,10 +274,9 @@ pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
         ));
     }
     if limits.av.is_some() {
-        judge.notes.push(
-            "A/V limits: noise bursts after minute 60 are not measured; read them under #75"
-                .to_owned(),
-        );
+        judge
+            .notes
+            .push("A/V limits: noise bursts after minute 60 are not measured".to_owned());
     }
     Verdict {
         passed: judge.failures.is_empty(),

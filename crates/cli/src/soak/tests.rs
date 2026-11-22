@@ -389,22 +389,20 @@ fn a_removed_device_fails_the_run_and_the_debug_layer_notes_its_reports() {
     assert!(gpu.notes()[0].contains(": 3 "));
 }
 
-fn av_cycle(skews: &[f64], video_secs: f64, drift_ms: f64) -> CycleResult {
+fn av_cycle(skews: &[f64], video_secs: f64) -> CycleResult {
     CycleResult {
         video_secs,
-        health: Some(greyscreen_core::health::RecordingHealth {
-            audio: Some(greyscreen_core::health::AudioHealth {
-                drift_ms,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
         diag_seconds: skews
             .iter()
-            .map(|s| serde_json::json!({"type": "second", "av_skew_ms": s}))
+            .enumerate()
+            .map(|(t, s)| serde_json::json!({"type": "second", "t": t as f64, "av_skew_ms": s}))
             .collect(),
         ..good_cycle(1)
     }
+}
+
+fn alternating(a: f64, b: f64) -> Vec<f64> {
+    (0..3600).map(|t| if t % 2 == 0 { a } else { b }).collect()
 }
 
 #[test]
@@ -428,18 +426,21 @@ fn av_limits_judge_skew_and_drift_per_hour() {
         };
         evaluate(&run, &strict).failures
     };
-    assert!(failures(av_cycle(&[5.0, -39.0], 7200.0, 1.5)).is_empty());
-    let skewed = failures(av_cycle(&[5.0, -41.0], 7200.0, 0.0));
+    assert!(failures(av_cycle(&alternating(5.0, -39.0), 7200.0)).is_empty());
+    let skewed = failures(av_cycle(&alternating(5.0, -41.0), 7200.0));
     assert!(
         skewed.iter().any(|f| f.contains("skew reached 41.0")),
         "{skewed:?}"
     );
-    let drifted = failures(av_cycle(&[], 3600.0, -2.0));
+    let steady_offset = vec![12.0; 3600];
+    assert!(failures(av_cycle(&steady_offset, 3600.0)).is_empty());
+    let sloped: Vec<f64> = (0..3600).map(|t| -f64::from(t) * 2.0 / 3600.0).collect();
+    let drifted = failures(av_cycle(&sloped, 3600.0));
     assert!(
         drifted.iter().any(|f| f.contains("2.00 ms per hour")),
         "{drifted:?}"
     );
-    assert!(failures(av_cycle(&[], 60.0, 50.0)).is_empty());
+    assert!(failures(av_cycle(&sloped, 60.0)).is_empty());
 }
 
 #[test]
@@ -469,5 +470,12 @@ fn random_cycles_cut_recordings_short_and_still_save_each_one() {
     .unwrap();
     assert!(verdict.passed, "{:?}", verdict.failures);
     assert!(verdict.notes.iter().any(|n| n.starts_with("random seed")));
+    let report: serde_json::Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+    let cycles = report["cycles"].as_array().unwrap();
+    assert_eq!(cycles.len(), 2);
+    for cycle in cycles {
+        let secs = cycle["video_secs"].as_f64().unwrap();
+        assert!(secs > 0.0 && secs < f64::from(args.seconds), "{secs}");
+    }
     std::fs::remove_dir_all(&dir).ok();
 }
