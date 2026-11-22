@@ -1,3 +1,4 @@
+mod publish;
 #[cfg(any(test, feature = "fault-injection"))]
 mod seams;
 mod setup;
@@ -10,8 +11,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use greyscreen_core::health::CaptureStats;
 use greyscreen_core::log_once::LogOnce;
 use greyscreen_core::media::CaptureTarget;
-use greyscreen_core::tear::{Arrival, CopyWaits, HoldBack, Wait};
-use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
+use greyscreen_core::tear::{CopyWaits, Wait};
+use greyscreen_core::time::{HNS_PER_SEC, Hns};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
     Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession,
@@ -24,6 +25,7 @@ use windows::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
 use windows::Win32::UI::WindowsAndMessaging::IsWindow;
 use windows::core::{IInspectable, Interface};
 
+use self::publish::Published;
 use self::setup::{configure_session, create_item};
 use crate::clock::QpcMap;
 use crate::d3d::GpuDevice;
@@ -43,21 +45,6 @@ pub enum WgcError {
 }
 
 pub type Result<T> = std::result::Result<T, WgcError>;
-
-struct Latest {
-    texture: ID3D11Texture2D,
-    size: (u32, u32),
-    at: Hns,
-    seq: u64,
-}
-
-#[derive(Default)]
-struct Published {
-    current: Option<Latest>,
-    pending: Option<Latest>,
-    holdback: HoldBack,
-    seq: u64,
-}
 
 struct Worker {
     copier: Option<FrameCopier>,
@@ -104,6 +91,14 @@ pub struct WgcCapture {
 }
 
 pub struct PublishProbe(Arc<Shared>);
+
+impl std::fmt::Debug for PublishProbe {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PublishProbe")
+            .field("has_frame", &self.has_frame())
+            .finish()
+    }
+}
 
 impl PublishProbe {
     pub fn has_frame(&self) -> bool {
@@ -233,27 +228,12 @@ impl WgcCapture {
         session.StartCapture()
     }
 
-    pub fn latest(&self) -> Option<(ID3D11Texture2D, (u32, u32), u64)> {
-        let mut published = lock(&self.shared.published);
-        let stale = published
-            .pending
-            .as_ref()
-            .is_some_and(|pending| mono_now() - pending.at >= self.shared.promote_after);
-        if stale {
-            published.holdback.promote();
-            published.current = published.pending.take();
-        }
-        let latest = published
-            .current
-            .as_ref()
-            .map(|latest| (latest.texture.clone(), latest.size, latest.seq))?;
-        published.holdback.start_reading();
-        Some(latest)
+    pub fn latest(&self) -> Option<(ID3D11Texture2D, (u32, u32), u64, u64)> {
+        lock(&self.shared.published).latest(self.shared.promote_after)
     }
 
     pub fn has_frame(&self) -> bool {
-        let published = lock(&self.shared.published);
-        published.current.is_some() || published.pending.is_some()
+        lock(&self.shared.published).has_frame()
     }
 
     pub fn done_reading(&self) {
@@ -406,41 +386,14 @@ impl Shared {
                     .ok()
             });
         let checked = width.is_some();
-        let mut guard = lock(&self.published);
-        let published = &mut *guard;
-        let holdback = &mut published.holdback;
+        let mut published = lock(&self.published);
         if let Some(width) = width {
-            holdback.store_thumb(copy.slot, thumb, width);
+            published.holdback.store_thumb(copy.slot, thumb, width);
         }
-        published.seq += 1;
-        let entry = Latest {
-            texture,
-            size: copy.size,
-            at,
-            seq: published.seq,
-        };
-        if !checked {
-            holdback.publish_now(copy.slot);
-            published.pending = None;
-            published.current = Some(entry);
-            return;
+        if published.arrive(copy.slot, texture, copy.size, at, checked) {
+            let torn = self.torn.fetch_add(1, Ordering::Relaxed) + 1;
+            tracing::debug!(torn, "torn capture frame dropped, next frame published");
         }
-        match holdback.arrive(copy.slot) {
-            Arrival::Held => {}
-            Arrival::Published(_) => {
-                if let Some(pending) = published.pending.take() {
-                    published.current = Some(pending);
-                }
-            }
-            Arrival::Dropped(_) => {
-                published.current = Some(entry);
-                published.pending = None;
-                let torn = self.torn.fetch_add(1, Ordering::Relaxed) + 1;
-                tracing::debug!(torn, "torn capture frame dropped, next frame published");
-                return;
-            }
-        }
-        published.pending = Some(entry);
     }
 
     fn resize_pool_if_needed(

@@ -21,6 +21,8 @@ pub struct DiagSample {
     pub encoded: u64,
     pub dropped: u64,
     pub repeated: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub unchanged: u64,
     pub encode_ms_max: f64,
     pub step_ms_max: f64,
     pub wake_late_p99_us: u32,
@@ -97,6 +99,7 @@ struct Marks {
     encoded: u64,
     dropped: u64,
     repeated: u64,
+    unchanged: u64,
     torn: u64,
 }
 
@@ -199,6 +202,7 @@ impl HealthTracker {
             encoded: self.video.packets,
             dropped,
             repeated: stats.repeated,
+            unchanged: stats.unchanged,
             torn: stats.torn_dropped,
         };
         self.last = Some(stats.clone());
@@ -211,6 +215,7 @@ impl HealthTracker {
             encoded: self.video.packets.saturating_sub(marks.encoded),
             dropped: dropped.saturating_sub(marks.dropped),
             repeated: stats.repeated.saturating_sub(marks.repeated),
+            unchanged: stats.unchanged.saturating_sub(marks.unchanged),
             encode_ms_max: round1(f64::from(stats.window_encode_max_us) / 1000.0),
             step_ms_max: round1(f64::from(stats.window_step_max_us) / 1000.0),
             wake_late_p99_us: stats.wake_lateness.0.percentile_us(0.99),

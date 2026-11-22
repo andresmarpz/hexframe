@@ -569,3 +569,23 @@ fn a_very_long_stall_grades_bad() {
     tracker.on_stats(&stall_stats(200, 1, 9000), Queues::default());
     assert_eq!(tracker.finish(None).worst(), Level::Bad);
 }
+
+#[test]
+fn unchanged_submits_appear_in_diagnostics_only_when_non_zero() {
+    let mut tracker = tracker();
+    let zero = tracker.on_stats(&CaptureStats::default(), Queues::default());
+    assert_eq!(zero.unchanged, 0);
+    assert!(!serde_json::to_string(&zero).unwrap().contains("unchanged"));
+
+    let stats = CaptureStats {
+        unchanged: 7,
+        ..CaptureStats::default()
+    };
+    let sample = tracker.on_stats(&stats, Queues::default());
+    assert_eq!(sample.unchanged, 7);
+    assert!(
+        serde_json::to_string(&sample)
+            .unwrap()
+            .contains("\"unchanged\":7")
+    );
+}

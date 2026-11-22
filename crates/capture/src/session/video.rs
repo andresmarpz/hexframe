@@ -50,6 +50,7 @@ pub(crate) struct Video {
     pub(super) sampler: Option<ProcessSampler>,
     pub(super) seq: u64,
     pub(super) last_seq: u64,
+    pub(super) last_content_seq: u64,
     pub(super) soft_errors: u32,
     pub(super) drain_errors: u32,
     pub(super) power: SystemPowerGuard,
@@ -87,7 +88,7 @@ impl Video {
     }
 
     fn step(&mut self) -> Result<(), Exit> {
-        let _ = fault!(VideoLoopStep);
+        fault!(VideoLoopStep).ok();
         if let Err(error) = fault!(DeviceRemovedCheck)
             // SAFETY: the device is live and the call only reads its state.
             .and_then(|()| unsafe { self.gpu.device.GetDeviceRemovedReason() })
@@ -150,7 +151,7 @@ impl Video {
             }
             Err(error) => return self.encoder_error("encoder poll", &error).map(|()| true),
         }
-        let Some((texture, size, seq)) = self.wgc.latest() else {
+        let Some((texture, size, seq, content_seq)) = self.wgc.latest() else {
             return Ok(false);
         };
         self.seq = seq;
@@ -180,8 +181,11 @@ impl Video {
         self.stats.note_submit();
         if seq == self.last_seq {
             self.stats.c.repeated += 1;
+        } else if self.last_content_seq != 0 && content_seq == self.last_content_seq {
+            self.stats.c.unchanged += 1;
         }
         self.last_seq = seq;
+        self.last_content_seq = content_seq;
         self.soft_errors = 0;
         Ok(true)
     }

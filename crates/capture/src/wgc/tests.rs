@@ -8,6 +8,7 @@ use windows::Win32::Graphics::Direct3D11::{
 };
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC};
 
+use super::publish::Published;
 use super::{WgcCapture, WgcError, WgcOptions, Worker};
 use crate::clock::QpcMap;
 use crate::com::MfGuard;
@@ -96,4 +97,41 @@ fn a_content_size_smaller_than_the_surface_is_published_as_the_content() {
     let (published, ring) = copy_size((1280, 720), (1920, 1080));
     assert_eq!(published, (1280, 720));
     assert_eq!(ring, (1280, 720));
+}
+
+#[test]
+fn unchanged_and_cursor_only_frames_merge_without_bumping_content_seq() {
+    let _armed = Armed::new();
+    let gpu = crate::testing::warp::device().unwrap();
+    let frame_a = surface(&gpu, 320, 180);
+    let frame_b = surface(&gpu, 320, 180);
+    let mut published = Published::default();
+    let base: Vec<u8> = (0..96 * 54).map(|i| (i % 199) as u8).collect();
+    let mut cursor = base.clone();
+    for i in [100, 101, 200, 201] {
+        cursor[i] = cursor[i].wrapping_add(120);
+    }
+
+    let slot0 = published.holdback.write_slot();
+    let mut t0 = base.clone();
+    published.holdback.store_thumb(slot0, &mut t0, 96);
+    published.arrive(slot0, frame_a.clone(), (320, 180), 0, true);
+
+    let slot1 = published.holdback.write_slot();
+    let mut t1 = cursor.clone();
+    published.holdback.store_thumb(slot1, &mut t1, 96);
+    published.arrive(slot1, frame_b.clone(), (320, 180), 166_667, true);
+    let (_, _, seq1, content1) = published.latest(1_000_000).unwrap();
+    published.holdback.done_reading();
+
+    let slot2 = published.holdback.write_slot();
+    let mut t2 = cursor;
+    published.holdback.store_thumb(slot2, &mut t2, 96);
+    published.arrive(slot2, frame_a, (320, 180), 333_334, true);
+    let (_, _, seq2, content2) = published.latest(1_000_000).unwrap();
+    published.holdback.done_reading();
+
+    assert!(seq2 > seq1);
+    assert_eq!(content2, content1);
+    assert!(published.pending.is_none());
 }

@@ -114,6 +114,7 @@ pub struct CaptureStats {
     pub ticks: u64,
     pub captured: u64,
     pub repeated: u64,
+    pub unchanged: u64,
     pub dropped: u64,
     pub skipped: u64,
     pub resyncs: u64,

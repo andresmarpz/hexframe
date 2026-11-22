@@ -4,7 +4,7 @@ use super::*;
 
 #[derive(Debug, Clone, Copy)]
 enum Step {
-    Arrive { torn: bool },
+    Arrive { torn: bool, same: bool },
     Promote,
     StartReading,
     DoneReading,
@@ -14,7 +14,7 @@ enum Step {
 
 fn step() -> impl Strategy<Value = Step> {
     prop_oneof![
-        any::<bool>().prop_map(|torn| Step::Arrive { torn }),
+        (any::<bool>(), any::<bool>()).prop_map(|(torn, same)| Step::Arrive { torn, same }),
         Just(Step::Promote),
         Just(Step::StartReading),
         Just(Step::DoneReading),
@@ -45,10 +45,12 @@ fn run(steps: &[Step]) -> Result<(), TestCaseError> {
         let reading_before = guard.reading();
         let read_before = reading_before.map(|r| guard.thumbs[r].clone());
         match *step {
-            Step::Arrive { torn } => {
-                tag = tag.wrapping_add(1);
+            Step::Arrive { torn, same } => {
+                if !same {
+                    tag = tag.wrapping_add(1);
+                }
                 let base = tagged(tag, width * 27);
-                let mut thumb = if torn {
+                let mut thumb = if torn && !same {
                     torn_from(&base, width * 10)
                 } else {
                     base

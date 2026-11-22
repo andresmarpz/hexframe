@@ -43,7 +43,7 @@ fn a_frame_is_published_once_its_successor_arrives() {
     let (first, arrival) = arrive(&mut guard, scene(10));
     assert_eq!(arrival, Arrival::Held);
     assert_eq!(guard.published(), None);
-    let (_, arrival) = arrive(&mut guard, scene(10));
+    let (_, arrival) = arrive(&mut guard, scene(40));
     assert_eq!(arrival, Arrival::Published(first));
     assert_eq!(guard.published(), Some(first));
 }
@@ -52,11 +52,11 @@ fn a_frame_is_published_once_its_successor_arrives() {
 fn a_frame_unlike_both_matching_neighbours_is_dropped() {
     let mut guard = HoldBack::default();
     let clean = scene(30);
-    arrive(&mut guard, clean.clone());
+    arrive(&mut guard, scene(10));
     let (good, _) = arrive(&mut guard, clean.clone());
     let (torn, arrival) = arrive(&mut guard, torn_from(&clean, 300));
     assert_eq!(arrival, Arrival::Published(good));
-    let (next, arrival) = arrive(&mut guard, clean.clone());
+    let (next, arrival) = arrive(&mut guard, clean);
     assert_eq!(arrival, Arrival::Dropped(torn));
     assert_eq!(guard.published(), Some(next));
     assert_eq!(guard.pending(), None);
@@ -67,27 +67,83 @@ fn a_frame_unlike_both_matching_neighbours_is_dropped() {
 fn the_frame_after_a_dropped_one_is_published_at_once() {
     let mut guard = HoldBack::default();
     let clean = scene(30);
-    arrive(&mut guard, clean.clone());
+    arrive(&mut guard, scene(10));
     arrive(&mut guard, clean.clone());
     let (torn, _) = arrive(&mut guard, torn_from(&clean, 300));
-    let (next, arrival) = arrive(&mut guard, clean.clone());
+    let (next, arrival) = arrive(&mut guard, clean);
     assert_eq!(arrival, Arrival::Dropped(torn));
     assert_eq!(guard.published(), Some(next));
     assert_eq!(guard.promote(), None);
-    let (following, arrival) = arrive(&mut guard, clean.clone());
+    let (following, arrival) = arrive(&mut guard, scene(60));
     assert_eq!(arrival, Arrival::Held);
-    let (_, arrival) = arrive(&mut guard, clean);
+    let (_, arrival) = arrive(&mut guard, scene(90));
     assert_eq!(arrival, Arrival::Published(following));
 }
 
 #[test]
 fn a_scene_cut_is_kept_because_the_next_frame_matches_it() {
     let mut guard = HoldBack::default();
+    arrive(&mut guard, scene(10));
     arrive(&mut guard, scene(30));
-    arrive(&mut guard, scene(30));
-    let (cut, _) = arrive(&mut guard, scene(200));
-    let (_, arrival) = arrive(&mut guard, scene(200));
-    assert_eq!(arrival, Arrival::Published(cut));
+    arrive(&mut guard, scene(200));
+    let (second, arrival) = arrive(&mut guard, scene(200));
+    assert_eq!(
+        arrival,
+        Arrival::Merged {
+            content_changed: true
+        }
+    );
+    assert_eq!(guard.published(), Some(second));
+    assert_eq!(guard.pending(), None);
+}
+
+#[test]
+fn unchanged_and_cursor_only_frames_merge_without_taking_an_extra_slot() {
+    let mut guard = HoldBack::default();
+    let frame_a = world(0);
+    let frame_b = world(3);
+    let mut frame_b_cursor = frame_b.clone();
+    // Move a 2x2 cursor spot on a 96x54 thumbnail (4 cells total).
+    for i in [100, 101, 200, 201] {
+        frame_b_cursor[i] = frame_b_cursor[i].wrapping_add(120);
+    }
+    let frame_c = world(6);
+
+    let feed_one = |guard: &mut HoldBack, mut thumb: Vec<u8>| {
+        let slot = guard.write_slot();
+        guard.store_thumb(slot, &mut thumb, GAME_WIDTH);
+        (slot, guard.arrive(slot))
+    };
+
+    let (a, arr) = feed_one(&mut guard, frame_a);
+    assert_eq!(arr, Arrival::Held);
+    let (_, arr) = feed_one(&mut guard, frame_b);
+    assert_eq!(arr, Arrival::Published(a));
+    let (b_cursor, arr) = feed_one(&mut guard, frame_b_cursor.clone());
+    assert_eq!(
+        arr,
+        Arrival::Merged {
+            content_changed: true
+        }
+    );
+    assert_eq!(guard.published(), Some(b_cursor));
+    assert_eq!(guard.pending(), None);
+
+    // A second cursor-only frame updates published in place without changing content.
+    let (b_cursor2, arr) = feed_one(&mut guard, frame_b_cursor);
+    assert_eq!(
+        arr,
+        Arrival::Merged {
+            content_changed: false
+        }
+    );
+    assert_eq!(guard.published(), Some(b_cursor2));
+    assert_eq!(guard.pending(), None);
+
+    // The next real frame enters pending immediately without being delayed behind a duplicate.
+    let (c, arr) = feed_one(&mut guard, frame_c);
+    assert_eq!(arr, Arrival::Held);
+    assert_eq!(guard.pending(), Some(c));
 }
 
 #[test]
@@ -195,7 +251,7 @@ fn promote_publishes_the_held_frame() {
     assert_eq!(guard.published(), Some(first));
     assert_eq!(guard.pending(), None);
     assert_eq!(guard.promote(), None);
-    let (_, arrival) = arrive(&mut guard, scene(5));
+    let (_, arrival) = arrive(&mut guard, scene(30));
     assert_eq!(arrival, Arrival::Held);
 }
 

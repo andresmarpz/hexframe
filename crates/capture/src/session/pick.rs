@@ -228,7 +228,7 @@ fn first_frame_size(wgc: &WgcCapture, flags: &Flags) -> Result<(u32, u32), Strin
     fault!(FirstFrameWait).map_err(|error| error.to_string())?;
     let deadline = Instant::now() + FIRST_FRAME_TIMEOUT;
     loop {
-        if let Some((_, size, _)) = wgc.latest() {
+        if let Some((_, size, _, _)) = wgc.latest() {
             return Ok(size);
         }
         if wgc.is_closed() {

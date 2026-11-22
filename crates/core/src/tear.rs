@@ -6,6 +6,9 @@ pub const COPY_WAIT_BUDGET: Duration = Duration::from_millis(12);
 pub const COPY_WAIT_SLOW: Duration = Duration::from_millis(4);
 
 const CELL_DELTA: u8 = 40;
+const CONTENT_DELTA: u8 = 4;
+const UNCHANGED_CELL_SHARE: usize = 300;
+const UNCHANGED_MAX_CELLS: usize = 16;
 const MIN_CELL_SHARE: usize = 64;
 const MIN_CELLS: usize = 4;
 const NEIGHBOUR_RATIO: usize = 4;
@@ -24,6 +27,7 @@ pub enum Arrival {
     Held,
     Published(usize),
     Dropped(usize),
+    Merged { content_changed: bool },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -69,9 +73,27 @@ impl HoldBack {
     }
 
     pub fn arrive(&mut self, slot: usize) -> Arrival {
-        let Some(candidate) = self.pending.replace(slot) else {
+        let Some(candidate) = self.pending else {
+            if self
+                .published
+                .is_some_and(|prev| is_same_content(&self.thumbs[prev], &self.thumbs[slot]))
+            {
+                self.published = Some(slot);
+                return Arrival::Merged {
+                    content_changed: false,
+                };
+            }
+            self.pending = Some(slot);
             return Arrival::Held;
         };
+        if is_same_content(&self.thumbs[candidate], &self.thumbs[slot]) {
+            self.published = Some(slot);
+            self.pending = None;
+            return Arrival::Merged {
+                content_changed: true,
+            };
+        }
+        self.pending = Some(slot);
         let torn = self.published.is_some_and(|prev| {
             let width = self.widths[slot];
             let same_width = self.widths[prev] == width && self.widths[candidate] == width;
@@ -110,6 +132,23 @@ impl HoldBack {
         self.pending = None;
         self.reading = None;
     }
+}
+
+pub fn is_same_content(a: &[u8], b: &[u8]) -> bool {
+    if a.is_empty() || a.len() != b.len() {
+        return false;
+    }
+    let max_cells = (a.len() / UNCHANGED_CELL_SHARE).min(UNCHANGED_MAX_CELLS);
+    let mut changed = 0usize;
+    for (x, y) in a.iter().zip(b) {
+        if x.abs_diff(*y) >= CONTENT_DELTA {
+            changed += 1;
+            if changed > max_cells {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 pub fn changed_cells(a: &[u8], b: &[u8]) -> Option<usize> {
