@@ -2,10 +2,13 @@ use std::time::Duration;
 
 use greyscreen_core::tear::{RING_SLOTS, Wait};
 use windows::Win32::Foundation::{E_FAIL, E_OUTOFMEMORY};
-use windows::Win32::Graphics::Direct3D11::D3D11_TEXTURE2D_DESC;
+use windows::Win32::Graphics::Direct3D11::{
+    D3D11_CPU_ACCESS_READ, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_TEXTURE2D_DESC,
+    D3D11_USAGE_STAGING, ID3D11Texture2D,
+};
 use windows::core::Interface;
 
-use super::{FrameCopier, frame_desc, luma_rows, texture, whole};
+use super::{FrameCopier, frame_desc, luma_rows, plain_desc, texture, whole};
 use crate::fault::{Armed, Point};
 
 const SIZE: (u32, u32) = (64, 64);
@@ -63,34 +66,84 @@ fn a_change_in_either_dimension_recreates_the_ring_and_the_region_stays_inside()
     }
 }
 
+const RED: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
+const BLUE: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
+const RED_PIXEL: [u8; 4] = [0, 0, 255, 255];
+
+fn filled_texture(
+    gpu: &crate::d3d::GpuDevice,
+    size: (u32, u32),
+    colour: [f32; 4],
+) -> ID3D11Texture2D {
+    let source = plain_texture(gpu, size);
+    let mut view = None;
+    // SAFETY: the device and texture are live and the out pointer outlives the call.
+    unsafe {
+        gpu.device
+            .CreateRenderTargetView(&source, None, Some(&mut view))
+            .unwrap()
+    };
+    // SAFETY: the view is live and the colour is four floats.
+    unsafe { gpu.context.ClearRenderTargetView(&view.unwrap(), &colour) };
+    source
+}
+
+fn pixels_of(gpu: &crate::d3d::GpuDevice, source: &ID3D11Texture2D, size: (u32, u32)) -> Vec<u8> {
+    let staging_desc = D3D11_TEXTURE2D_DESC {
+        CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+        ..plain_desc(size, D3D11_USAGE_STAGING)
+    };
+    let staging = texture(gpu, staging_desc).unwrap();
+    let region = whole(size);
+    let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+    // SAFETY: both textures are live, the region lies inside both, the staging texture is CPU readable and the mapping is released before return.
+    unsafe {
+        gpu.context
+            .CopySubresourceRegion(&staging, 0, 0, 0, 0, source, 0, Some(&region));
+        gpu.context
+            .Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+            .unwrap();
+    }
+    let pitch = mapped.RowPitch as usize;
+    let mut out = Vec::new();
+    for row in 0..size.1 as usize {
+        // SAFETY: the mapping holds `size.1` rows of `RowPitch` bytes, each at least `size.0` pixels.
+        let line = unsafe {
+            std::slice::from_raw_parts(
+                mapped.pData.cast::<u8>().cast_const().add(row * pitch),
+                size.0 as usize * 4,
+            )
+        };
+        out.extend_from_slice(line);
+    }
+    // SAFETY: the texture was mapped above and `out` no longer borrows the mapping.
+    unsafe { gpu.context.Unmap(&staging, 0) };
+    out
+}
+
 #[test]
-fn a_size_change_rebuilds_every_slot_and_a_held_old_slot_stays_whole_and_readable() {
+fn a_size_change_rebuilds_every_slot_and_a_held_old_slot_keeps_its_pixels() {
     let _armed = Armed::new();
     let gpu = crate::testing::warp::device().unwrap();
     let mut copier = FrameCopier::new(&gpu).unwrap();
-    copier.copy(&plain_texture(&gpu, SIZE), SIZE, 0).unwrap();
+    copier
+        .copy(&filled_texture(&gpu, SIZE, RED), SIZE, 0)
+        .unwrap();
     let held: Vec<_> = (0..RING_SLOTS)
         .map(|slot| copier.texture(slot).unwrap())
         .collect();
 
     let new_size = (SIZE.0 + 2, SIZE.1 + 2);
     copier
-        .copy(&plain_texture(&gpu, new_size), new_size, 0)
+        .copy(&filled_texture(&gpu, new_size, BLUE), new_size, 0)
         .unwrap();
 
     for (slot, old) in held.iter().enumerate() {
-        let fresh = copier.texture(slot).unwrap();
-        assert_ne!(old.as_raw(), fresh.as_raw());
-        let desc = desc_of(old);
-        assert_eq!((desc.Width, desc.Height), SIZE);
-        let scratch = plain_texture(&gpu, SIZE);
-        let region = whole(SIZE);
-        // SAFETY: both textures are live, the region lies inside both, and the context is multithread protected.
-        unsafe {
-            gpu.context
-                .CopySubresourceRegion(&scratch, 0, 0, 0, 0, old, 0, Some(&region))
-        };
+        assert_ne!(old.as_raw(), copier.texture(slot).unwrap().as_raw());
     }
+    let pixels = pixels_of(&gpu, &held[0], SIZE);
+    assert_eq!(pixels.len(), (SIZE.0 * SIZE.1 * 4) as usize);
+    assert!(pixels.chunks(4).all(|pixel| pixel == RED_PIXEL));
     assert_ring_matches(&copier, new_size);
 }
 
