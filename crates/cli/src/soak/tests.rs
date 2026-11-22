@@ -505,3 +505,35 @@ fn failed_clip_saves_are_counted_and_the_run_still_saves_each_recording() {
     assert_eq!(report["cycles"].as_array().unwrap().len(), 2);
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn a_recording_saved_while_waiting_for_the_clip_failure_keeps_every_cycle() {
+    let dir = std::env::temp_dir().join(format!("greyscreen-soak-early-{}", std::process::id()));
+    let out = dir.join("report.json");
+    let mut args = args(2, out.clone(), Some(dir.join("rec")));
+    args.seconds = 1;
+    args.failed_clip_saves = true;
+    std::fs::create_dir_all(&dir).unwrap();
+    let verdict = run_with(
+        &args,
+        Arc::new(greyscreen_engine::FakeMediaSource::new()),
+        default_league(&args),
+    )
+    .unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+    assert_eq!(
+        report["cycles"].as_array().unwrap().len(),
+        2,
+        "{:?}",
+        verdict.failures
+    );
+    assert!(
+        verdict
+            .failures
+            .iter()
+            .all(|f| !f.contains("no saved recording")),
+        "{:?}",
+        verdict.failures
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

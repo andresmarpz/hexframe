@@ -216,14 +216,18 @@ impl<'a> Soak<'a> {
                 secs: self.args.seconds,
             };
             let mut started = self.send(cmd, start);
+            let saved_before = self.cycles.len();
             if started && self.args.failed_clip_saves {
                 self.fail_a_clip(cmd);
             }
-            if started && self.args.random_secs.is_some() {
+            let saved_early = self.cycles.len() > saved_before;
+            if started && !saved_early && self.args.random_secs.is_some() {
                 self.pump(Instant::now() + secs, false);
                 started = self.send(cmd, EngineCmd::StopRecording);
             }
-            if !started || !self.pump(Instant::now() + secs + SAVE_GRACE, true) {
+            let saved =
+                saved_early || (started && self.pump(Instant::now() + secs + SAVE_GRACE, true));
+            if !saved {
                 if !self.stopped {
                     self.cycles.push(missing_recording(index, secs));
                     cmd.send(EngineCmd::StopRecording).ok();
