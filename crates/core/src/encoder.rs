@@ -34,6 +34,9 @@ pub struct Adapter {
     pub luid: u64,
     pub name: String,
     pub vendor_id: u32,
+    pub device_id: u32,
+    pub subsystem_id: u32,
+    pub revision: u32,
     pub driver_version: String,
     pub display: bool,
     pub high_performance: bool,
@@ -104,7 +107,12 @@ fn game_gpu<'a>(hardware: &[&'a Adapter], display: Option<&Adapter>) -> Option<&
 pub fn fingerprint(adapters: &[Adapter]) -> String {
     adapters
         .iter()
-        .map(|a| format!("{} {:#06x} {}", a.name, a.vendor_id, a.driver_version))
+        .map(|a| {
+            format!(
+                "{} {:#06x} {:#06x} {:#010x} rev {} {}",
+                a.name, a.vendor_id, a.device_id, a.subsystem_id, a.revision, a.driver_version
+            )
+        })
         .collect::<Vec<_>>()
         .join("; ")
 }

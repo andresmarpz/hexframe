@@ -170,6 +170,11 @@ pub fn driver_version_text(version: i64, vendor_id: u32) -> String {
 pub struct CaptureSetup {
     pub adapter: String,
     pub driver_version: String,
+    pub device_id: u32,
+    pub subsystem_id: u32,
+    pub revision: u32,
+    pub hags: String,
+    pub hags_support: String,
     pub display_width: u32,
     pub display_height: u32,
     pub display_hz: u32,

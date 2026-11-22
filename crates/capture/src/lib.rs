@@ -43,6 +43,7 @@ pub mod fault;
 mod frame_copy;
 mod gpu_usage;
 pub mod h264;
+mod hags;
 pub mod hotkey;
 pub mod install;
 pub mod instance;

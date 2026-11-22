@@ -241,7 +241,7 @@ fn health_and_diagnostics_join_the_verdicts() {
         ..RecordingHealth::default()
     };
     let diag = diag::summarize(
-        r#"{"type":"setup","adapter":"GPU","driver_version":"1.2"}
+        r#"{"type":"setup","adapter":"GPU","driver_version":"1.2","device_id":9988,"subsystem_id":4660,"revision":3,"hags":"on","hags_support":"stable"}
 {"type":"second","t":1.0,"encoded":60,"dropped":0,"repeated":1,"encode_ms_max":3.0,"step_ms_max":2.0,"queue_writer":2,"queue_media":0,"queue_encoder":1,"av_skew_ms":-5.0,"cpu_pct":8.5,"mem_mb":300}
 {"type":"second","t":2.0,"encoded":55,"dropped":5,"repeated":0,"encode_ms_max":9.0,"step_ms_max":4.0,"queue_writer":9,"queue_media":1,"queue_encoder":2,"av_skew_ms":12.0,"cpu_pct":11.5,"mem_mb":320}
 not json
@@ -261,7 +261,7 @@ not json
     assert_eq!(diagnostics.mem_mb_max, Some(320));
     assert_eq!(diagnostics.bad_lines, 1);
     let text = render::text(&report);
-    assert!(text.contains("GPU GPU (driver 1.2)"), "{text}");
+    assert!(text.contains("GPU GPU (device 0x2704, subsystem 0x00001234, revision 3, driver 1.2, hags on, scheduler support stable)"), "{text}");
 }
 
 #[test]

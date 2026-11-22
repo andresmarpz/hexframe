@@ -144,9 +144,14 @@ fn diagnostics(out: &mut String, diag: &DiagReport) {
         let number = |key: &str| setup[key].as_u64().unwrap_or(0);
         line!(
             out,
-            "  GPU {} (driver {}), display {}x{} at {} Hz, window {}x{}, encode {}x{}",
+            "  GPU {} (device {:#06x}, subsystem {:#010x}, revision {}, driver {}, hags {}, scheduler support {}), display {}x{} at {} Hz, window {}x{}, encode {}x{}",
             text("adapter"),
+            number("device_id"),
+            number("subsystem_id"),
+            number("revision"),
             text("driver_version"),
+            text("hags"),
+            text("hags_support"),
             number("display_width"),
             number("display_height"),
             number("display_hz"),

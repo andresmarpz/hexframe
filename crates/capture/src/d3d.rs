@@ -1,6 +1,7 @@
 use std::sync::Once;
 
 use greyscreen_core::health::driver_version_text;
+use greyscreen_core::health::gpu::{GpuScheduling, hags_label, support_label};
 use greyscreen_core::media::CaptureTarget;
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
 use windows::Wdk::Graphics::Direct3D::{
@@ -32,7 +33,11 @@ pub struct GpuDevice {
     pub adapter_luid: LUID,
     pub adapter_name: String,
     pub vendor_id: u32,
+    pub device_id: u32,
+    pub subsystem_id: u32,
+    pub revision: u32,
     pub driver_version: String,
+    pub scheduling: Option<GpuScheduling>,
 }
 
 impl GpuDevice {
@@ -129,29 +134,50 @@ impl GpuDevice {
         let multithread: ID3D11Multithread = context.cast()?;
         // SAFETY: the interface was just obtained from the live immediate context.
         let _previous = unsafe { multithread.SetMultithreadProtected(true) };
-        raise_gpu_priority(&device);
+        let scheduling = crate::hags::query(desc.AdapterLuid);
+        tracing::info!(
+            adapter = %adapter_name,
+            hags = hags_label(scheduling),
+            hags_support = support_label(scheduling),
+            device_id = format_args!("{:#06x}", desc.DeviceId),
+            subsystem_id = format_args!("{:#010x}", desc.SubSysId),
+            revision = desc.Revision,
+            "gpu scheduling"
+        );
+        raise_gpu_priority(&device, scheduling);
         Ok(Self {
             device,
             context,
             adapter_luid: desc.AdapterLuid,
             adapter_name,
             vendor_id: desc.VendorId,
+            device_id: desc.DeviceId,
+            subsystem_id: desc.SubSysId,
+            revision: desc.Revision,
             driver_version,
+            scheduling,
         })
     }
 }
 
 const GPU_THREAD_PRIORITY: i32 = 7;
 
-fn raise_gpu_priority(device: &ID3D11Device) {
+fn raise_gpu_priority(device: &ID3D11Device, scheduling: Option<GpuScheduling>) {
+    let hags = hags_label(scheduling);
     match device.cast::<IDXGIDevice>() {
         Ok(dxgi) => {
             // SAFETY: `dxgi` is a live DXGI device and the call only takes an integer.
             let result = fault!(GpuPriority)
                 .and_then(|()| unsafe { dxgi.SetGPUThreadPriority(GPU_THREAD_PRIORITY) });
             match result {
-                Ok(()) => tracing::info!(priority = GPU_THREAD_PRIORITY, "gpu thread priority set"),
-                Err(error) => tracing::warn!(%error, "set gpu thread priority failed"),
+                Ok(()) => {
+                    tracing::info!(
+                        priority = GPU_THREAD_PRIORITY,
+                        hags,
+                        "gpu thread priority set"
+                    );
+                }
+                Err(error) => tracing::warn!(%error, hags, "set gpu thread priority failed"),
             }
         }
         Err(error) => tracing::warn!(%error, "gpu thread priority needs a dxgi device"),
@@ -166,9 +192,13 @@ fn raise_gpu_priority(device: &ID3D11Device) {
             )
         };
         if status.is_ok() {
-            tracing::info!("gpu process scheduling class set to high");
+            tracing::info!(hags, "gpu process scheduling class set to high");
         } else {
-            tracing::warn!(status = status.0, "set gpu process scheduling class failed");
+            tracing::warn!(
+                status = status.0,
+                hags,
+                "set gpu process scheduling class failed"
+            );
         }
     });
 }

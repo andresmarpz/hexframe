@@ -16,6 +16,8 @@ use windows::Win32::UI::HiDpi::{
 };
 use windows::core::{GUID, PWSTR};
 
+use greyscreen_core::health::gpu::mib;
+
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::wide_to_string;
 
@@ -101,8 +103,8 @@ fn push_adapters(out: &mut String) {
                     desc.DeviceId,
                     desc.AdapterLuid.HighPart,
                     desc.AdapterLuid.LowPart,
-                    desc.DedicatedVideoMemory / (1024 * 1024),
-                    desc.SharedSystemMemory / (1024 * 1024),
+                    mib(desc.DedicatedVideoMemory as u64),
+                    mib(desc.SharedSystemMemory as u64),
                 ),
             ),
             Err(e) => push_line(out, format!("  #{index} description unavailable ({e})")),

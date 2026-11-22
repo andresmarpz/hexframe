@@ -2,6 +2,7 @@ use std::mem::size_of;
 
 use greyscreen_core::crop::CropRect;
 use greyscreen_core::health::CaptureSetup;
+use greyscreen_core::health::gpu::{hags_label, support_label};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Gdi::{
@@ -38,6 +39,11 @@ pub(super) fn describe(inputs: Inputs) -> CaptureSetup {
     CaptureSetup {
         adapter: inputs.gpu.adapter_name.clone(),
         driver_version: inputs.gpu.driver_version.clone(),
+        device_id: inputs.gpu.device_id,
+        subsystem_id: inputs.gpu.subsystem_id,
+        revision: inputs.gpu.revision,
+        hags: hags_label(inputs.gpu.scheduling).to_owned(),
+        hags_support: support_label(inputs.gpu.scheduling).to_owned(),
         display_width: display.width,
         display_height: display.height,
         display_hz: display.hz,

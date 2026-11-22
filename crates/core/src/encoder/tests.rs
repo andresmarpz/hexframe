@@ -226,8 +226,30 @@ fn the_check_key_changes_with_drivers_settings_and_version() {
 fn the_fingerprint_names_every_driver() {
     assert_eq!(
         fingerprint(&[nvidia(), intel()]),
-        "NVIDIA GeForce RTX 3070 0x10de 1.0; Intel UHD Graphics 0x8086 1.0"
+        "NVIDIA GeForce RTX 3070 0x10de 0x0000 0x00000000 rev 0 1.0; Intel UHD Graphics 0x8086 0x0000 0x00000000 rev 0 1.0"
     );
+}
+
+#[test]
+fn the_fingerprint_changes_when_only_the_hardware_ids_differ() {
+    let base = nvidia();
+    let first = fingerprint(std::slice::from_ref(&base));
+    for changed in [
+        Adapter {
+            device_id: 0x2484,
+            ..base.clone()
+        },
+        Adapter {
+            subsystem_id: 0x1234_10de,
+            ..base.clone()
+        },
+        Adapter {
+            revision: 2,
+            ..base.clone()
+        },
+    ] {
+        assert_ne!(first, fingerprint(&[changed]));
+    }
 }
 
 #[test]
