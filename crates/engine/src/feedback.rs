@@ -159,9 +159,9 @@ fn command_output(program: &str, args: &[&str]) -> Option<String> {
 
 #[cfg(any(windows, test))]
 fn windows_build(ver_output: &str) -> Option<String> {
-    let after = ver_output.split("Version").nth(1)?;
-    let build = after.trim().trim_end_matches(']').trim();
-    (!build.is_empty()).then(|| build.to_owned())
+    let inside = ver_output.split_once('[')?.1.split_once(']')?.0;
+    let build = inside.split_whitespace().next_back()?;
+    Some(build.to_owned())
 }
 
 #[cfg(test)]
