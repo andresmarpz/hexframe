@@ -1,17 +1,19 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, unbounded};
 use greyscreen_core::encoder::is_encoder_failure;
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent};
 use windows::Win32::Foundation::E_FAIL;
 use windows::Win32::Graphics::Dxgi::{DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET};
+use windows::Win32::Media::MediaFoundation::MF_E_NOTACCEPTING;
 use windows::core::{Error, HRESULT};
 
 use super::{Exit, MAX_SOFT_ERRORS, Video, lost_h264, lost_vproc};
 use crate::fault::{Armed, Point};
-use crate::h264::H264Error;
+use crate::h264::{H264Encoder, H264Error};
 use crate::session::Flags;
 use crate::session::setup::build;
+use crate::testing::fake_transform::FakeTransform;
 use crate::vproc::VprocError;
 
 const LOSSES: [HRESULT; 2] = [DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET];
@@ -231,4 +233,99 @@ fn an_implicit_drop_releases_the_encoder_before_capture_converter_device_and_med
     let at = |name: &str| fields.find(&format!("pub(super) {name}:")).unwrap();
     let order = ["encoder", "wgc", "converter", "gpu", "mf", "com"].map(at);
     assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "{order:?}");
+}
+
+#[test]
+fn encoder_input_errors_that_repeat_end_the_run_with_the_stopped_reason() {
+    let errors = [
+        H264Error::NotAccepting,
+        H264Error::Windows(Error::from(MF_E_NOTACCEPTING)),
+        H264Error::Windows(Error::from(E_FAIL)),
+    ];
+    for error in errors {
+        let _armed = Armed::new();
+        let (mut video, events) = video();
+        for _ in 1..MAX_SOFT_ERRORS {
+            assert!(video.encoder_error("encoder submit", &error).is_ok());
+        }
+        let Err(Exit::Failed(reason)) = video.encoder_error("encoder submit", &error) else {
+            panic!("expected the failed exit after {MAX_SOFT_ERRORS} errors in a row");
+        };
+        video.shutdown(Exit::Failed(reason));
+        assert_ended_with_one_failure(&events, "the video encoder stopped");
+    }
+}
+
+#[test]
+fn encoder_output_errors_that_repeat_end_the_run_with_the_stopped_reason() {
+    let _armed = Armed::new();
+    let (mut video, events) = video();
+    let error = H264Error::Windows(Error::from(E_FAIL));
+    for _ in 1..MAX_SOFT_ERRORS {
+        assert!(video.encoder_error("encoder drain", &error).is_ok());
+    }
+    let Err(Exit::Failed(reason)) = video.encoder_error("encoder drain", &error) else {
+        panic!("expected the failed exit");
+    };
+    video.shutdown(Exit::Failed(reason));
+    assert_ended_with_one_failure(&events, "the video encoder stopped");
+}
+
+#[test]
+fn an_encoder_that_never_asks_for_input_ends_the_run_at_the_watchdog_limit() {
+    let armed = Armed::new();
+    let (tx, rx) = unbounded();
+    let started = Instant::now();
+    std::thread::spawn(move || {
+        let mut video = match build(
+            &CaptureTarget::PrimaryMonitor,
+            &config(),
+            tx,
+            Flags::default(),
+        ) {
+            Ok(video) => video,
+            Err(message) => panic!("setup failed: {message}"),
+        };
+        video.encoder =
+            H264Encoder::on_fake(FakeTransform::new().never_needing_input(), 64, 64).unwrap();
+        video.run();
+    })
+    .join()
+    .unwrap();
+    drop(armed);
+    assert!(started.elapsed() < Duration::from_secs(20));
+    assert_ended_with_one_failure(&rx, "the video encoder stopped");
+}
+
+#[test]
+#[ignore = "waits for the game-session encoder measurements in issue 61"]
+fn an_encoder_that_opens_and_never_outputs_moves_on_before_the_watchdog_limit() {
+    let armed = Armed::new();
+    let (tx, rx) = unbounded();
+    let flags = Flags::default();
+    let stop = flags.stop.clone();
+    let runner = std::thread::spawn(move || {
+        let mut video = match build(&CaptureTarget::PrimaryMonitor, &config(), tx, flags) {
+            Ok(video) => video,
+            Err(message) => panic!("setup failed: {message}"),
+        };
+        video.encoder =
+            H264Encoder::on_fake(FakeTransform::new().never_outputting(), 64, 64).unwrap();
+        video.run();
+    });
+    let deadline = Instant::now() + Duration::from_secs(7);
+    let mut failed = false;
+    while let Some(left) = deadline.checked_duration_since(Instant::now()) {
+        if let Ok(MediaEvent::Failed(_)) = rx.recv_timeout(left) {
+            failed = true;
+            break;
+        }
+    }
+    stop.store(true, std::sync::atomic::Ordering::Release);
+    runner.join().unwrap();
+    drop(armed);
+    assert!(
+        !failed,
+        "the session ended instead of moving to the next candidate"
+    );
 }

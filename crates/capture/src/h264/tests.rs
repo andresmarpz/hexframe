@@ -79,8 +79,8 @@ mod on_fake {
     };
     use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_NV12, DXGI_SAMPLE_DESC};
 
-    use super::super::setup::{Opened, Spec, open_candidates};
-    use super::super::{DRAIN_TIMEOUT, H264Encoder, H264Error, Mode};
+    use super::super::setup::{Spec, open_candidates};
+    use super::super::{DRAIN_TIMEOUT, H264Encoder, H264Error};
     use crate::com::MfGuard;
     use crate::fault::Armed;
     use crate::testing::fake_transform::{
@@ -127,20 +127,7 @@ mod on_fake {
                 .unwrap()
         };
         let calls = fake.calls();
-        let opened = Opened {
-            mode: Mode::Async {
-                _manager: device_manager().unwrap(),
-            },
-            mft: Box::new(fake),
-            input_id: 0,
-            output_id: 0,
-            name: "fake".to_string(),
-            sequence_header: Vec::new(),
-            warnings: Vec::new(),
-        };
-        let encoder =
-            H264Encoder::from_opened(opened, EncoderKind::Hardware, "fake".into(), SIZE, SIZE)
-                .unwrap();
+        let encoder = H264Encoder::on_fake(fake, SIZE, SIZE).unwrap();
         Rig {
             _mf: mf,
             encoder,
@@ -296,5 +283,68 @@ mod on_fake {
         let error = rig.encoder.submit(&frame, 0, FRAME_HNS).unwrap_err();
         assert!(matches!(error, H264Error::NotAccepting));
         assert!(!rig.encoder.need_input().unwrap());
+    }
+
+    #[test]
+    fn a_flush_that_blocks_still_returns_the_packets_that_arrived() {
+        let block = Duration::from_millis(300);
+        let mut rig = rig(FakeTransform::new().blocking_flush(block));
+        let mut packets = Vec::new();
+        for index in 0..2 {
+            let frame = frame(&rig, index);
+            rig.encoder
+                .submit(&frame, index as i64 * FRAME_HNS, FRAME_HNS)
+                .unwrap();
+        }
+        let started = Instant::now();
+        rig.encoder
+            .finish_with(&mut packets, &SimulatedClock::default())
+            .unwrap();
+        assert!(started.elapsed() >= block);
+        assert!(started.elapsed() < block + Duration::from_secs(2));
+        assert_eq!(packets.len(), 2);
+        assert!(packets[0].key);
+    }
+
+    #[test]
+    fn a_scripted_output_failure_surfaces_and_the_encoder_shuts_down() {
+        let mut rig = rig(FakeTransform::new().failing_at(Step::ProcessOutput, 0, E_FAIL));
+        let frame = frame(&rig, 0);
+        rig.encoder.submit(&frame, 0, FRAME_HNS).unwrap();
+        let mut packets = Vec::new();
+        let error = rig.encoder.drain_output(&mut packets).unwrap_err();
+        assert!(matches!(error, H264Error::Windows(_)));
+        assert!(packets.is_empty());
+        let calls = rig.calls.clone();
+        drop(rig);
+        assert_eq!(kinds(&calls).last(), Some(&CallKind::Shutdown));
+    }
+
+    #[test]
+    fn an_error_event_is_a_stopped_error_from_every_poll() {
+        let mut first = rig(FakeTransform::new().failing_at(Step::NextEvent, 0, E_FAIL));
+        assert!(matches!(
+            first.encoder.need_input().unwrap_err(),
+            H264Error::Stopped(_)
+        ));
+        let mut second = rig(FakeTransform::new().failing_at(Step::NextEvent, 0, E_FAIL));
+        let mut packets = Vec::new();
+        assert!(matches!(
+            second.encoder.drain_output(&mut packets).unwrap_err(),
+            H264Error::Stopped(_)
+        ));
+    }
+
+    #[test]
+    fn an_encoder_that_refuses_input_keeps_its_input_credit() {
+        let mut rig = rig(FakeTransform::new().not_accepting());
+        let frame = frame(&rig, 0);
+        for _ in 0..3 {
+            assert!(rig.encoder.submit(&frame, 0, FRAME_HNS).is_err());
+        }
+        assert!(rig.encoder.need_input().unwrap());
+        let mut packets = Vec::new();
+        rig.encoder.drain_output(&mut packets).unwrap();
+        assert!(packets.is_empty());
     }
 }

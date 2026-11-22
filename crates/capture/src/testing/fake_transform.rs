@@ -79,6 +79,7 @@ struct Script {
     fail: Option<(Step, usize, HRESULT)>,
     never_need_input: bool,
     never_drain_complete: bool,
+    never_output: bool,
     flush_block: Duration,
     not_accepting: bool,
     refused: Vec<(GUID, HRESULT)>,
@@ -128,6 +129,11 @@ impl FakeTransform {
 
     pub(crate) fn never_draining(mut self) -> Self {
         self.script.never_drain_complete = true;
+        self
+    }
+
+    pub(crate) fn never_outputting(mut self) -> Self {
+        self.script.never_output = true;
         self
     }
 
@@ -273,8 +279,10 @@ impl Mft for FakeTransform {
         }
         // SAFETY: the sample is live.
         let pts = unsafe { sample.GetSampleTime()? };
-        self.state().pending_pts.push_back(pts);
-        self.queue(METransformHaveOutput.0);
+        if !self.script.never_output {
+            self.state().pending_pts.push_back(pts);
+            self.queue(METransformHaveOutput.0);
+        }
         if !self.script.never_need_input {
             self.queue(METransformNeedInput.0);
         }

@@ -7,6 +7,9 @@ mod pick;
 mod setup;
 mod video;
 
+#[cfg(test)]
+mod tests;
+
 #[cfg(any(test, feature = "fault-injection"))]
 pub use lifecycle::live_sessions;
 
@@ -75,6 +78,7 @@ impl MediaSource for WindowsMediaSource {
             thread: Some(thread),
             flags,
             done: done_rx,
+            stop_timeout: STOP_TIMEOUT,
         };
         match ready_rx.recv_timeout(SETUP_TIMEOUT) {
             Ok(Ok(())) => Ok(Box::new(session)),
@@ -108,6 +112,7 @@ struct Session {
     thread: Option<JoinHandle<()>>,
     flags: Flags,
     done: Receiver<()>,
+    stop_timeout: Duration,
 }
 
 impl MediaSession for Session {
@@ -117,9 +122,9 @@ impl MediaSession for Session {
 
     fn stop(mut self: Box<Self>) {
         self.flags.stop.store(true, Ordering::Release);
-        match self.done.recv_timeout(STOP_TIMEOUT) {
+        match self.done.recv_timeout(self.stop_timeout) {
             Err(RecvTimeoutError::Timeout) => {
-                tracing::warn!("video thread did not stop within {STOP_TIMEOUT:?}");
+                tracing::warn!("video thread did not stop within {:?}", self.stop_timeout);
             }
             _ => {
                 if let Some(thread) = self.thread.take()

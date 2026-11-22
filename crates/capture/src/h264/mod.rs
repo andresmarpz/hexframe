@@ -177,6 +177,26 @@ impl H264Encoder {
         Ok(encoder)
     }
 
+    #[cfg(test)]
+    pub(crate) fn on_fake(
+        fake: crate::testing::fake_transform::FakeTransform,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
+        let opened = setup::Opened {
+            mode: Mode::Async {
+                _manager: crate::testing::fake_transform::device_manager()?,
+            },
+            mft: Box::new(fake),
+            input_id: 0,
+            output_id: 0,
+            name: "fake".to_string(),
+            sequence_header: Vec::new(),
+            warnings: Vec::new(),
+        };
+        Self::from_opened(opened, EncoderKind::Hardware, "fake".into(), width, height)
+    }
+
     pub fn kind(&self) -> EncoderKind {
         self.kind
     }
