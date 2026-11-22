@@ -1,6 +1,8 @@
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 use greyscreen_capture::install::{self, InstallError};
 use greyscreen_capture::instance::{self, Claim, InstanceSignal};
@@ -13,6 +15,11 @@ use crate::logging::video_log_requested;
 use crate::ui::Ui;
 
 const SINGLE_INSTANCE_ID: &str = "dev.greyscreen.app";
+const RELAUNCH_ENV: &str = "GREYSCREEN_RELAUNCH";
+const RELAUNCH_WAIT: Duration = Duration::from_secs(40);
+const RELAUNCH_POLL: Duration = Duration::from_millis(100);
+
+static LAUNCH_DURING_QUIT: AtomicBool = AtomicBool::new(false);
 
 pub(crate) const TRASH_NAME: &str = "Recycle Bin";
 pub(crate) const CAN_START_WITH_WINDOWS: bool = true;
@@ -37,7 +44,14 @@ pub(crate) fn begin(headless: bool) -> Option<Launch> {
     let install_error = install_step();
     install::set_process_app_id();
     // Rune's single_instance makes live resize lag on Windows, so the app keeps its own.
-    match instance::claim(SINGLE_INSTANCE_ID) {
+    let claim = match instance::claim(SINGLE_INSTANCE_ID) {
+        Claim::AlreadyRunning if std::env::var_os(RELAUNCH_ENV).is_some() => {
+            wait_for_old_copy_to_exit();
+            instance::claim(SINGLE_INSTANCE_ID)
+        }
+        claim => claim,
+    };
+    match claim {
         Claim::First(signal) => Some(Launch {
             headless,
             video_log,
@@ -45,6 +59,24 @@ pub(crate) fn begin(headless: bool) -> Option<Launch> {
             instance: Some(signal),
         }),
         Claim::AlreadyRunning => None,
+    }
+}
+
+fn wait_for_old_copy_to_exit() {
+    let started = Instant::now();
+    while instance::is_running(SINGLE_INSTANCE_ID) && started.elapsed() < RELAUNCH_WAIT {
+        std::thread::sleep(RELAUNCH_POLL);
+    }
+}
+
+pub(crate) fn relaunch_if_requested() {
+    if !LAUNCH_DURING_QUIT.load(Ordering::SeqCst) {
+        return;
+    }
+    let spawned = std::env::current_exe()
+        .and_then(|exe| std::process::Command::new(exe).env(RELAUNCH_ENV, "1").spawn());
+    if let Err(err) = spawned {
+        tracing::warn!(%err, "cannot start the copy launched during quit");
     }
 }
 
@@ -104,6 +136,10 @@ impl Launch {
         let quitting = handle.clone();
         signal.on_signal(
             move || {
+                if rune::quitting() {
+                    LAUNCH_DURING_QUIT.store(true, Ordering::SeqCst);
+                    return;
+                }
                 shown.show();
                 shown.focus();
             },

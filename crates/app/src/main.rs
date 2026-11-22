@@ -5,6 +5,7 @@ mod logging;
 mod logo;
 mod platform;
 mod qa;
+mod quit;
 mod setup;
 mod sfx;
 mod tray;
@@ -150,11 +151,8 @@ fn main() {
     rune::orderly_exit();
     let result = app.try_run();
     rune::exit_deadline(ENGINE_SHUTDOWN_DEADLINE);
-    if let Some(tray) = tray {
-        tray.close();
-    }
-    drop(engine);
-    greyscreen_engine::abandon_encoder_check(&paths::encoder_check_file());
+    quit::finish(tray, engine, &paths::encoder_check_file());
+    platform::relaunch_if_requested();
     if let Err(err) = result {
         eprintln!("{err}");
         std::process::exit(1);

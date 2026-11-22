@@ -24,6 +24,8 @@ impl Launch {
     pub(crate) fn serve_second_launch(&mut self, _handle: &AppHandle<Ui>) {}
 }
 
+pub(crate) fn relaunch_if_requested() {}
+
 pub(crate) fn init_dpi() {}
 
 pub(crate) fn media_source() -> Arc<dyn MediaSource> {

@@ -27,6 +27,7 @@ mod nav_status;
 mod panes;
 mod playback;
 mod qa_cases;
+mod quit;
 mod review_filter;
 mod review_flow;
 mod review_health;
