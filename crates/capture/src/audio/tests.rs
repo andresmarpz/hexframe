@@ -132,3 +132,41 @@ fn one_hour_forward_jump_is_sent_in_blocks_of_at_most_one_second() {
     assert_eq!(next, timeline.frames_out());
     assert!(next >= 3600 * u64::from(RATE));
 }
+
+#[test]
+fn sample_conversion_saturates_and_never_wraps() {
+    use super::f32_to_i16;
+    let max = i16::MAX;
+    assert_eq!(f32_to_i16(2.0), max);
+    assert_eq!(f32_to_i16(-2.0), -max);
+    assert_eq!(f32_to_i16(1.0), max);
+    assert_eq!(f32_to_i16(-1.0), -max);
+    assert_eq!(f32_to_i16(f32::INFINITY), max);
+    assert_eq!(f32_to_i16(f32::NEG_INFINITY), -max);
+    assert_eq!(f32_to_i16(f32::NAN), 0);
+    assert_eq!(f32_to_i16(f32::MAX), max);
+    assert_eq!(f32_to_i16(f32::MIN), -max);
+    assert_eq!(f32_to_i16(0.0), 0);
+}
+
+#[test]
+fn rendered_samples_keep_the_left_and_right_order() {
+    use super::{Span, render};
+    let frames: [[f32; 2]; 4] = [
+        [0.5, -0.5],
+        [2.0, -2.0],
+        [f32::NAN, 1.0],
+        [-1.0, f32::INFINITY],
+    ];
+    let bytes: Vec<u8> = frames
+        .iter()
+        .flatten()
+        .flat_map(|sample| sample.to_le_bytes())
+        .collect();
+    let out = render(&Span::Data { skip: 0, take: 4 }, &bytes);
+    let max = i16::MAX;
+    let half = (0.5 * f32::from(max)).round() as i16;
+    assert_eq!(out, [half, -half, max, -max, 0, max, -max, max]);
+    let tail = render(&Span::Data { skip: 2, take: 2 }, &bytes);
+    assert_eq!(tail, [0, max, -max, max]);
+}

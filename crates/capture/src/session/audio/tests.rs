@@ -508,3 +508,213 @@ fn a_failed_mmcss_registration_still_captures_audio() {
     assert_eq!(drain_until(&pipe, &mut sink, 5), 5);
     finish_within_patience(pipe, sink);
 }
+
+fn timestamp_of(frame: u64, t0: Hns) -> u64 {
+    (t0 + (frame * HNS_PER_SEC as u64 / 48_000) as Hns) as u64
+}
+
+fn stamped(index: u64, t0: Hns, mut info: PacketInfo, pcm: Vec<f32>) -> Step {
+    if !info.timestamp_error {
+        info.timestamp = timestamp_of(index * FRAMES as u64, t0);
+    }
+    Step::flagged(pcm, info)
+}
+
+fn cold_sink(t0: Hns) -> (Sink, Receiver<MediaEvent>) {
+    let (tx, rx) = crossbeam_channel::unbounded();
+    let sink = Sink::new(
+        tx,
+        StartInfo {
+            t0,
+            width: 16,
+            height: 16,
+            fps: 60,
+            audio: None,
+            encoder: "fake".into(),
+        },
+    );
+    (sink, rx)
+}
+
+#[test]
+fn a_timestamp_jump_mid_run_is_counted_measured_and_filled_with_silence_in_one_second_chunks() {
+    const JUMP_SECS: u64 = 30;
+    let t0 = mono_now();
+    let jump_frames = JUMP_SECS * 48_000;
+    let info = |frame: u64| PacketInfo {
+        timestamp: timestamp_of(frame, t0),
+        ..PacketInfo::default()
+    };
+    let steps = vec![
+        Step::flagged(sine(FRAMES, 0, 440.0), info(0)),
+        Step::flagged(
+            sine(FRAMES, FRAMES as u64, 440.0),
+            info(FRAMES as u64 + jump_frames),
+        ),
+    ];
+    let encoder = FakeEncoder::new();
+    let received = encoder.received();
+    let pipe = start(FakeClient::new(steps).open(), encoder.open()).expect("pipe starts");
+    let (mut sink, rx) = sink();
+    pipe.begin(t0);
+    assert_eq!(drain_until(&pipe, &mut sink, 2 + JUMP_SECS), 2 + JUMP_SECS);
+    let mut stats = CaptureStats::default();
+    pipe.fill_stats(&mut stats);
+    assert_eq!(stats.audio_timestamp_gaps_over_5s, 1);
+    assert!(
+        stats
+            .audio_largest_timestamp_gap_ms
+            .abs_diff(JUMP_SECS * 1000)
+            <= 100
+    );
+    assert_eq!(stats.audio_gaps, 1);
+    assert!(stats.audio_gap_total_ms.abs_diff(JUMP_SECS * 1000) <= 100);
+    finish_within_patience(pipe, sink);
+    let blocks = received.lock().expect("received lock");
+    assert!(blocks.iter().all(|block| block.samples.len() <= 48_000 * 2));
+    let full_seconds = blocks
+        .iter()
+        .filter(|block| block.samples.len() == 48_000 * 2)
+        .count();
+    assert_eq!(full_seconds as u64, JUMP_SECS);
+    assert!(warnings(&rx).is_empty());
+}
+
+#[test]
+fn audio_before_the_first_video_frame_is_held_until_started_and_nothing_is_lost() {
+    let t0 = mono_now();
+    let steps: Vec<Step> = (0..4u64)
+        .map(|index| {
+            let first = index * FRAMES as u64;
+            stamped(index, t0, PacketInfo::default(), sine(FRAMES, first, 440.0))
+        })
+        .collect();
+    let encoder = FakeEncoder::new();
+    let received = encoder.received();
+    let pipe = start(FakeClient::new(steps).open(), encoder.open()).expect("pipe starts");
+    let (mut sink, rx) = cold_sink(t0);
+    pipe.begin(t0);
+    assert_eq!(drain_until(&pipe, &mut sink, 4), 4);
+    assert!(rx.try_recv().is_err());
+    sink.start(Vec::new(), Vec::new());
+    let (extra, _sink) = finish_within_patience(pipe, sink);
+    assert_eq!(extra, 0);
+    let events: Vec<MediaEvent> = rx.try_iter().collect();
+    assert!(matches!(events.first(), Some(MediaEvent::Started { .. })));
+    let audio_packets = events
+        .iter()
+        .filter(|event| matches!(event, MediaEvent::Packet(_)))
+        .count();
+    assert_eq!(audio_packets, 4);
+    assert_eq!(received.lock().expect("received lock").len(), 4);
+}
+
+#[test]
+fn error_silent_and_discontinuity_flags_follow_the_buffer_flag_policy_and_never_reset_the_stream() {
+    let t0 = mono_now();
+    let plain = PacketInfo::default();
+    let errored = PacketInfo {
+        timestamp_error: true,
+        timestamp: (t0 + 3600 * HNS_PER_SEC) as u64,
+        ..plain
+    };
+    let silent = PacketInfo {
+        silent: true,
+        ..plain
+    };
+    let discontinuous = PacketInfo {
+        discontinuity: true,
+        ..plain
+    };
+    let infos = [plain, errored, silent, discontinuous, plain];
+    let steps: Vec<Step> = infos
+        .iter()
+        .enumerate()
+        .map(|(index, info)| {
+            let first = index as u64 * FRAMES as u64;
+            stamped(index as u64, t0, *info, sine(FRAMES, first, 440.0))
+        })
+        .collect();
+    let encoder = FakeEncoder::new();
+    let received = encoder.received();
+    let pipe = start(FakeClient::new(steps).open(), encoder.open()).expect("pipe starts");
+    let (mut sink, _rx) = sink();
+    pipe.begin(t0);
+    assert_eq!(drain_until(&pipe, &mut sink, 5), 5);
+    let mut stats = CaptureStats::default();
+    pipe.fill_stats(&mut stats);
+    assert_eq!(stats.audio_discontinuities, 1);
+    assert_eq!(stats.audio_gaps, 0);
+    assert_eq!(stats.audio_timestamp_gaps_over_5s, 0);
+    finish_within_patience(pipe, sink);
+    let blocks = received.lock().expect("received lock");
+    assert_eq!(blocks.len(), 5);
+    for (index, block) in blocks.iter().enumerate() {
+        assert_eq!(block.first_frame, (index * FRAMES) as u64);
+        assert_eq!(block.samples.len(), FRAMES * 2);
+        let zeroed = block.samples.iter().all(|sample| *sample == 0);
+        assert_eq!(zeroed, index == 2, "block {index}");
+    }
+}
+
+#[test]
+fn ten_seconds_through_the_real_aac_encoder_and_the_muxer_keep_the_encoders_rate() {
+    use greyscreen_core::media::{Packet, Track, VideoFormat};
+    use greyscreen_mp4::fragmented::FragmentedWriter;
+    use greyscreen_mp4::inspect::{inspect, sample_secs};
+
+    const PACKETS: usize = 10 * 48_000 / FRAMES + 1;
+    const SAMPLING_INDEX_48K: u8 = 3;
+    let encoder = crate::aac::open_aac(48_000, 2, 128_000);
+    let source = FakeClient::new(sine_packets(PACKETS)).open();
+    let pipe = start(source, encoder).expect("pipe starts");
+    let format = pipe.format.clone();
+    let (mut sink, rx) = sink();
+    pipe.begin(mono_now());
+    let wanted = (9 * 48_000 / FRAMES) as u64;
+    assert!(drain_until(&pipe, &mut sink, wanted) >= wanted);
+    finish_within_patience(pipe, sink);
+    let audio: Vec<Packet> = rx
+        .try_iter()
+        .filter_map(|event| match event {
+            MediaEvent::Packet(packet) => Some(packet),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(format.sample_rate, 48_000);
+    let asc = &format.asc;
+    assert_eq!(((asc[0] & 7) << 1) | (asc[1] >> 7), SAMPLING_INDEX_48K);
+
+    let path = std::env::temp_dir().join(format!("greyscreen-aac-rate-{}.mp4", std::process::id()));
+    let video = VideoFormat {
+        width: 640,
+        height: 360,
+        fps: 60,
+        sps: vec![0x67, 0x42, 0x00, 0x1f],
+        pps: vec![0x68, 0xce, 0x3c, 0x80],
+    };
+    let mut writer = FragmentedWriter::create(&path, &video, Some(&format)).expect("writer");
+    for (index, key) in [(0i64, true), (1, false)] {
+        writer
+            .push(&Packet {
+                track: Track::Video,
+                dts: index * 1500,
+                pts: index * 1500,
+                duration: 1500,
+                key,
+                data: Arc::from(vec![7u8; 100]),
+            })
+            .expect("video packet");
+    }
+    for packet in &audio {
+        writer.push(packet).expect("audio packet");
+    }
+    writer.finish().expect("finish");
+    let inspected = inspect(&path).expect("inspect");
+    std::fs::remove_file(&path).ok();
+    let track = inspected.audio.expect("audio track");
+    assert_eq!(track.sample_rate, format.sample_rate);
+    assert_eq!(&track.asc, asc);
+    let secs = sample_secs(&inspected.tables.audio, track.sample_rate);
+    assert!((9.0..=10.1).contains(&secs), "{secs}");
+}
