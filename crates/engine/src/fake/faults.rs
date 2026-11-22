@@ -22,12 +22,17 @@ pub struct Faults {
 #[derive(Debug, Default)]
 pub struct FakeProbe {
     live: AtomicUsize,
+    peak: AtomicUsize,
     max_send_wait_nanos: AtomicU64,
 }
 
 impl FakeProbe {
     pub fn live_sessions(&self) -> usize {
         self.live.load(Ordering::SeqCst)
+    }
+
+    pub fn peak_live_sessions(&self) -> usize {
+        self.peak.load(Ordering::SeqCst)
     }
 
     pub fn max_send_wait(&self) -> Duration {
@@ -40,7 +45,8 @@ impl FakeProbe {
     }
 
     pub(super) fn session_started(self: &Arc<Self>) -> LiveGuard {
-        self.live.fetch_add(1, Ordering::SeqCst);
+        let live = self.live.fetch_add(1, Ordering::SeqCst) + 1;
+        self.peak.fetch_max(live, Ordering::SeqCst);
         LiveGuard(self.clone())
     }
 }

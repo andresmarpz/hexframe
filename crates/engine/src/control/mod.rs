@@ -2,6 +2,7 @@ mod clips;
 mod disk;
 mod effects;
 mod folder;
+mod media_start;
 mod meta;
 mod writer_failure;
 
@@ -44,6 +45,12 @@ pub(crate) enum Internal {
     WriterDone(Report),
     ClipDone(ClipResult),
     StartFailed(String),
+    UnwantedStopped,
+    MediaStart {
+        id: u64,
+        result: Result<Box<dyn MediaSession>, String>,
+        rx: Receiver<MediaEvent>,
+    },
 }
 
 pub(crate) struct Spec {
@@ -75,6 +82,11 @@ struct Control {
     media_rx: Receiver<MediaEvent>,
     media_session: Option<Box<dyn MediaSession>>,
     media_gen: u64,
+    start: Option<media_start::PendingStart>,
+    queued_start: Option<greyscreen_core::media::CaptureTarget>,
+    start_ids: u64,
+    unwanted_stops: usize,
+    start_deadline: Duration,
     stopping: bool,
     started: Option<StartedMedia>,
     recording: Option<Recording>,
@@ -165,6 +177,11 @@ impl Control {
             test_stop_at: None,
             session: Session::with_timing(settings.auto_record, timing.session()),
             shutdown_grace: timing.shutdown_grace,
+            start_deadline: timing.media_start_deadline,
+            start: None,
+            queued_start: None,
+            start_ids: 0,
+            unwanted_stops: 0,
             settings,
             media,
             sink,
@@ -307,6 +324,7 @@ impl Control {
     fn on_tick(&mut self) {
         let now = mono_now();
         self.feed(Input::Tick(now));
+        self.check_start_deadline();
         self.stop_test_recording(now);
         self.run_due_clips(now);
         self.check_disk_while_recording();
@@ -344,6 +362,7 @@ impl Control {
     }
 
     fn stop_active(&mut self) {
+        self.abandon_start();
         match self.session.state() {
             SessionState::Recording { .. } => self.feed(Input::UserStop),
             SessionState::Tail { .. }
@@ -351,6 +370,9 @@ impl Control {
                 target: greyscreen_core::media::CaptureTarget::GameWindow { .. },
                 ..
             } => self.feed(Input::Gone),
+            SessionState::Starting { .. } if self.start.is_some() => {
+                self.feed(Input::MediaFailed("Greyscreen is closing".to_owned()));
+            }
             _ => {}
         }
     }
@@ -360,6 +382,8 @@ impl Control {
             self.session.state(),
             SessionState::Idle | SessionState::Armed { .. } | SessionState::Cooldown
         ) && self.recording.is_none()
+            && self.start.is_none()
+            && self.unwanted_stops == 0
             && !self.stopping
     }
 
@@ -374,6 +398,8 @@ impl Control {
             self.session.state(),
             SessionState::Idle | SessionState::Cooldown
         ) || self.recording.is_some()
+            || self.start.is_some()
+            || self.unwanted_stops > 0
             || self.stopping
     }
 

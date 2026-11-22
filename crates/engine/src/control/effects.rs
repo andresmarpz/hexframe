@@ -1,7 +1,7 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::thread;
 
-use crossbeam_channel::{bounded, never};
+use crossbeam_channel::never;
 use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
 use greyscreen_core::encoder;
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
@@ -9,14 +9,12 @@ use greyscreen_core::gamedata;
 use greyscreen_core::health::HealthTracker;
 use greyscreen_core::highlight::classify;
 use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
-use greyscreen_core::media::{CaptureTarget, MediaEvent};
+use greyscreen_core::media::MediaEvent;
 use greyscreen_core::problem::Problem;
 use greyscreen_core::session::{Effect, Input, SessionState, Status};
-use greyscreen_core::settings::NATIVE_HEIGHT_CEILING;
 use greyscreen_core::time::{Hns, hns_to_secs, mono_now, secs_to_hns};
 use jiff::Zoned;
 
-use super::folder;
 use super::meta::{self, Recording};
 use super::{Control, Internal, StartedMedia};
 use crate::api::{FeedItem, NoticeLevel, RecordingEntry, UiMsg};
@@ -26,7 +24,6 @@ use crate::ring::ClipRing;
 use crate::storage;
 use crate::writer::{GameWriter, VIDEO_FILE};
 
-const MEDIA_QUEUE: usize = 1024;
 const RING_MARGIN_SECS: u32 = 5;
 const DISK_TOO_SLOW: &str = "Disk too slow: the full game recording stopped";
 const ENCODER_STOPPED: &str = "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point.";
@@ -71,33 +68,8 @@ impl Control {
         }
     }
 
-    fn start_media(&mut self, target: CaptureTarget) {
-        let cfg = self.settings.capture_config(NATIVE_HEIGHT_CEILING);
-        if !self.disk_allows_start(&cfg) {
-            return;
-        }
-        let (tx, rx) = bounded(MEDIA_QUEUE);
-        let started = folder::check_writable(&self.settings.output_dir)
-            .and_then(|()| self.media.start(target, cfg, tx));
-        match started {
-            Ok(session) => {
-                self.media_gen += 1;
-                self.media_session = Some(session);
-                self.media_rx = rx;
-                self.stopping = false;
-            }
-            Err(err) => {
-                tracing::error!(%err, "media start failed");
-                self.notice(
-                    NoticeLevel::Error,
-                    Problem::notice("Capture failed to start", &err),
-                );
-                send_internal(&self.internal_tx, Internal::StartFailed(err));
-            }
-        }
-    }
-
     fn stop_media(&mut self) {
+        self.abandon_start();
         self.stopping = true;
         let generation = self.media_gen;
         let tx = self.internal_tx.clone();
@@ -224,6 +196,8 @@ impl Control {
         match msg {
             Internal::MediaStopped(generation) => self.on_media_stopped(generation),
             Internal::ClipDone(result) => self.on_clip_done(result),
+            Internal::MediaStart { id, result, rx } => self.on_media_start(id, result, rx),
+            Internal::UnwantedStopped => self.on_unwanted_stopped(),
             Internal::StartFailed(reason) => self.feed(Input::MediaFailed(reason)),
             Internal::WriterFailed(err) => self.on_writer_failed(&err),
             Internal::WriterDone(report) => {

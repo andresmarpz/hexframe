@@ -141,6 +141,7 @@ fn default_locator() -> Box<dyn GameLocator> {
 pub struct EngineTiming {
     pub shutdown_grace: Duration,
     pub start_timeout: Duration,
+    pub media_start_deadline: Duration,
     pub retry_delay: Duration,
 }
 
@@ -150,6 +151,7 @@ impl Default for EngineTiming {
         Self {
             shutdown_grace: Duration::from_secs(15),
             start_timeout: hns_to_duration(session.start_timeout),
+            media_start_deadline: hns_to_duration(session.start_timeout),
             retry_delay: hns_to_duration(session.retry_delay),
         }
     }
