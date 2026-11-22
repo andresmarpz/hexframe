@@ -51,6 +51,12 @@ pub fn hit(point: Point) -> windows::core::Result<()> {
     }
 }
 
+pub fn pending(point: Point) -> bool {
+    armed()
+        .iter()
+        .any(|(armed, action)| *armed == point && matches!(action, Action::Stall(_)))
+}
+
 pub struct Armed {
     _serial: MutexGuard<'static, ()>,
 }

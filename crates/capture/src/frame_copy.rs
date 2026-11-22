@@ -15,6 +15,9 @@ use windows::core::BOOL;
 
 use crate::d3d::GpuDevice;
 
+#[cfg(test)]
+mod tests;
+
 pub(crate) struct Copied {
     pub(crate) wait: Wait,
     pub(crate) thumbed: bool,
@@ -86,7 +89,13 @@ impl FrameCopier {
         let wait = tear::wait_bounded(
             COPY_WAIT_BUDGET,
             || started.elapsed(),
-            || self.signaled(),
+            || {
+                if fault_pending!(GpuCopyWait) {
+                    Ok(false)
+                } else {
+                    self.signaled()
+                }
+            },
             pause,
         )?;
         Ok(Copied { wait, thumbed })

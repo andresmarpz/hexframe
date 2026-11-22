@@ -14,6 +14,20 @@ macro_rules! fault {
     };
 }
 
+#[cfg(any(test, feature = "fault-injection"))]
+macro_rules! fault_pending {
+    ($point:ident) => {
+        $crate::fault::pending($crate::fault::Point::$point)
+    };
+}
+
+#[cfg(not(any(test, feature = "fault-injection")))]
+macro_rules! fault_pending {
+    ($point:ident) => {
+        false
+    };
+}
+
 pub mod aac;
 pub mod adapters;
 pub mod audio;
