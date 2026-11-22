@@ -86,3 +86,42 @@ fn an_unsupported_conversion_is_the_unsupported_error() {
         Err(VprocError::Unsupported)
     ));
 }
+
+#[test]
+fn two_threads_never_hold_the_same_slot_at_once() {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    use super::SlotReleaser;
+
+    let releaser = SlotReleaser::default();
+    let held: Vec<AtomicBool> = (0..POOL_SIZE).map(|_| AtomicBool::new(false)).collect();
+    let double_grants = AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        for _ in 0..2 {
+            scope.spawn(|| {
+                for _ in 0..20_000 {
+                    if let Some(slot) = releaser.acquire() {
+                        if held[slot].swap(true, Ordering::SeqCst) {
+                            double_grants.fetch_add(1, Ordering::SeqCst);
+                        }
+                        held[slot].store(false, Ordering::SeqCst);
+                        releaser.release(slot);
+                    }
+                }
+            });
+        }
+    });
+    assert_eq!(double_grants.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_full_pool_hands_out_every_slot_once_then_none() {
+    use super::SlotReleaser;
+
+    let releaser = SlotReleaser::default();
+    let slots: Vec<usize> = std::iter::from_fn(|| releaser.acquire()).collect();
+    assert_eq!(slots, (0..POOL_SIZE).collect::<Vec<_>>());
+    assert_eq!(releaser.acquire(), None);
+    releaser.release(3);
+    assert_eq!(releaser.acquire(), Some(3));
+}

@@ -105,3 +105,9 @@ fn a_row_pitch_above_the_width_keeps_every_row_of_both_planes() {
         }
     }
 }
+
+#[test]
+fn a_readback_the_device_cannot_create_is_an_error_not_a_panic() {
+    let gpu = warp::device().unwrap();
+    assert!(Readback::new(&gpu, 0, 0).is_err());
+}

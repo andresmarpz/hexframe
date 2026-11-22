@@ -1456,6 +1456,7 @@ dependencies = [
  "greyscreen-mp4",
  "thiserror 2.0.21",
  "tracing",
+ "tracing-subscriber",
  "wasapi",
  "windows",
 ]

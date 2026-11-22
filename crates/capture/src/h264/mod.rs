@@ -1,5 +1,7 @@
 pub(crate) mod colour;
 mod open_error;
+#[cfg(test)]
+mod open_tests;
 mod pump;
 pub(crate) use pump::DrainClock;
 pub use readback::PlaneMeans;

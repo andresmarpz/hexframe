@@ -33,10 +33,10 @@ enum Exit {
 }
 
 pub(crate) struct Video {
+    pub(super) encoder: H264Encoder,
     pub(super) wgc: WgcCapture,
     pub(super) converter: VideoConverter,
     pub(super) client_area: ClientArea,
-    pub(super) encoder: H264Encoder,
     pub(super) audio: Option<AudioPipe>,
     pub(super) sink: Sink,
     pub(super) pacer: Pacer,

@@ -219,3 +219,16 @@ fn an_ordinary_step_error_is_soft_until_it_keeps_repeating() {
         Err(Exit::Failed(_))
     ));
 }
+
+#[test]
+fn an_implicit_drop_releases_the_encoder_before_capture_converter_device_and_media_foundation() {
+    let source = include_str!("../video.rs");
+    let fields = source
+        .split("pub(crate) struct Video {")
+        .nth(1)
+        .and_then(|rest| rest.split("\n}").next())
+        .unwrap();
+    let at = |name: &str| fields.find(&format!("pub(super) {name}:")).unwrap();
+    let order = ["encoder", "wgc", "converter", "gpu", "mf", "com"].map(at);
+    assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "{order:?}");
+}

@@ -1,5 +1,5 @@
 use std::cell::Cell;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -68,6 +68,8 @@ pub(crate) enum CallKind {
 pub(crate) struct Call {
     pub(crate) kind: CallKind,
     pub(crate) thread: ThreadId,
+    pub(crate) property: Option<GUID>,
+    pub(crate) value: Option<u32>,
 }
 
 pub(crate) type Calls = Arc<Mutex<Vec<Call>>>;
@@ -79,10 +81,14 @@ struct Script {
     never_drain_complete: bool,
     flush_block: Duration,
     not_accepting: bool,
+    refused: Vec<(GUID, HRESULT)>,
+    echo_values: bool,
+    read_back: Vec<(GUID, u32)>,
 }
 
 #[derive(Debug, Default)]
 struct State {
+    values: HashMap<GUID, u32>,
     events: VecDeque<i32>,
     pending_pts: VecDeque<i64>,
     counts: [usize; STEP_COUNT],
@@ -135,6 +141,21 @@ impl FakeTransform {
         self
     }
 
+    pub(crate) fn refusing(mut self, property: GUID, code: HRESULT) -> Self {
+        self.script.refused.push((property, code));
+        self
+    }
+
+    pub(crate) fn echoing_values(mut self) -> Self {
+        self.script.echo_values = true;
+        self
+    }
+
+    pub(crate) fn reading_back(mut self, property: GUID, value: u32) -> Self {
+        self.script.read_back.push((property, value));
+        self
+    }
+
     pub(crate) fn calls(&self) -> Calls {
         Arc::clone(&self.calls)
     }
@@ -144,9 +165,15 @@ impl FakeTransform {
     }
 
     fn record(&self, kind: CallKind) {
+        self.record_property(kind, None, None);
+    }
+
+    fn record_property(&self, kind: CallKind, property: Option<GUID>, value: Option<u32>) {
         self.calls.lock().expect("calls lock").push(Call {
             kind,
             thread: std::thread::current().id(),
+            property,
+            value,
         });
     }
 
@@ -329,19 +356,36 @@ impl Mft for FakeTransform {
         media_event(kind, S_OK)
     }
 
-    fn is_supported(&self, _property: &GUID) -> HRESULT {
-        self.record(CallKind::IsSupported);
+    fn is_supported(&self, property: &GUID) -> HRESULT {
+        self.record_property(CallKind::IsSupported, Some(*property), None);
         S_OK
     }
 
-    fn set_value(&self, _property: &GUID, _value: &VARIANT) -> MfResult<()> {
-        self.record(CallKind::SetValue);
-        self.scripted_failure(Step::SetValue)
+    fn set_value(&self, property: &GUID, value: &VARIANT) -> MfResult<()> {
+        let number = u32::try_from(value)
+            .ok()
+            .or_else(|| bool::try_from(value).ok().map(u32::from));
+        self.record_property(CallKind::SetValue, Some(*property), number);
+        self.scripted_failure(Step::SetValue)?;
+        if let Some((_, code)) = self.script.refused.iter().find(|(id, _)| id == property) {
+            return Err((*code).into());
+        }
+        if let Some(number) = number {
+            self.state().values.insert(*property, number);
+        }
+        Ok(())
     }
 
-    fn get_value(&self, _property: &GUID) -> MfResult<VARIANT> {
-        self.record(CallKind::GetValue);
-        Err(E_NOTIMPL.into())
+    fn get_value(&self, property: &GUID) -> MfResult<VARIANT> {
+        self.record_property(CallKind::GetValue, Some(*property), None);
+        if let Some((_, value)) = self.script.read_back.iter().find(|(id, _)| id == property) {
+            return Ok(VARIANT::from(*value));
+        }
+        let stored = self.state().values.get(property).copied();
+        match stored {
+            Some(value) if self.script.echo_values => Ok(VARIANT::from(value)),
+            _ => Err(E_NOTIMPL.into()),
+        }
     }
 
     fn shutdown(&self) {
@@ -365,6 +409,11 @@ impl FakeCandidate {
             shutdown_objects: Arc::default(),
             name: "fake encoder".to_string(),
         }
+    }
+
+    pub(crate) fn named(mut self, name: &str) -> Self {
+        self.name = name.to_string();
+        self
     }
 
     pub(crate) fn failing_activation(mut self, code: HRESULT) -> Self {
