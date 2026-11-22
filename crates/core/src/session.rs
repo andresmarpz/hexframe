@@ -490,4 +490,6 @@ fn finalize(result: GameResult, manual: bool, gone: bool) -> (SessionState, Vec<
 }
 
 #[cfg(test)]
+mod properties;
+#[cfg(test)]
 mod tests;
