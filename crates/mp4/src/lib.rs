@@ -12,6 +12,7 @@ pub mod moov;
 pub mod reader;
 pub mod recover;
 pub mod sink;
+pub mod sps;
 pub mod trim;
 
 #[derive(Debug, thiserror::Error)]

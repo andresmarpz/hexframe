@@ -1,5 +1,9 @@
 use greyscreen_core::encoder::{Nv12Means, Nv12Report, nv12_report};
 use greyscreen_core::frame_timing::OrderGuard;
+use greyscreen_mp4::avc::{annexb_to_avcc, avcc_record};
+use greyscreen_mp4::sps::{
+    Expected, check_avcc_matches_idr, check_sps, first_idr_sps, parse_sps_info,
+};
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +63,16 @@ pub(crate) struct AdapterReport {
     pub(crate) fps: u32,
     pub(crate) properties: Vec<String>,
     pub nv12: Nv12Report,
+    pub(crate) header: Option<HeaderReport>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct HeaderReport {
+    pub(crate) profile: u8,
+    pub(crate) level: u8,
+    pub(crate) size: String,
+    pub(crate) fps: Option<f64>,
+    pub(crate) display_aspect: f64,
 }
 
 pub(crate) fn build(observations: &[Observation], greyscreen: &str, os: &str) -> Report {
@@ -85,6 +99,7 @@ fn judge(observation: &Observation) -> AdapterReport {
     let rising = step_backs == 0;
     let mut failures = Vec::new();
     let mut notes = Vec::new();
+    let mut header = None;
     if let Some(error) = &observation.error {
         failures.push(format!("encode failed: {error}"));
     } else {
@@ -106,6 +121,7 @@ fn judge(observation: &Observation) -> AdapterReport {
         if observation.hardware && !observation.is_capture_adapter {
             notes.push("this encoder is not on the capture adapter".to_owned());
         }
+        header = check_headers(observation, &mut failures, &mut notes);
         if (packets.len() as i64) < observation.frames_in {
             notes.push(format!(
                 "{} packets for {} frames",
@@ -139,7 +155,44 @@ fn judge(observation: &Observation) -> AdapterReport {
         fps: observation.fps,
         properties: observation.properties.clone(),
         nv12: nv12_report(observation.nv12),
+        header,
     }
+}
+
+fn check_headers(
+    observation: &Observation,
+    failures: &mut Vec<String>,
+    notes: &mut Vec<String>,
+) -> Option<HeaderReport> {
+    let first_key = observation.packets.iter().find(|p| p.key)?;
+    let Some(sps) = first_idr_sps(&first_key.annexb) else {
+        failures.push("the first key frame carries no SPS".to_owned());
+        return None;
+    };
+    let expected = Expected {
+        width: observation.size.0,
+        height: observation.size.1,
+        fps: observation.fps,
+    };
+    let check = check_sps(sps, expected);
+    failures.extend(check.failures);
+    notes.extend(check.notes);
+    let (_, info) = annexb_to_avcc(&first_key.annexb);
+    let record = avcc_record(sps, info.pps.as_deref().unwrap_or_default());
+    let mismatch = observation
+        .packets
+        .iter()
+        .filter(|p| p.key)
+        .find_map(|p| check_avcc_matches_idr(&record, &p.annexb));
+    failures.extend(mismatch);
+    let parsed = parse_sps_info(sps)?;
+    Some(HeaderReport {
+        profile: parsed.profile,
+        level: parsed.level,
+        size: format!("{}x{}", parsed.width, parsed.height),
+        fps: parsed.fps(),
+        display_aspect: parsed.display_aspect(),
+    })
 }
 
 pub(crate) fn count_b_pictures(annexb: &[u8]) -> u32 {

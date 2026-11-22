@@ -1,6 +1,10 @@
 use super::deep::{Observation, Packet, build, count_b_pictures};
 use greyscreen_core::encoder::{Nv12Means, nv12_report};
 
+const SPS_1080P60: [u8; 21] = [
+    0x67, 0x64, 0x00, 0x28, 0xAC, 0xE8, 0x07, 0x80, 0x22, 0x7E, 0x58, 0x40, 0x00, 0x00, 0x03, 0x00,
+    0x40, 0x00, 0x00, 0x1E, 0x30,
+];
 const IDR: [u8; 7] = [0, 0, 0, 1, 0x65, 0x88, 0x00];
 const P_SLICE: [u8; 7] = [0, 0, 0, 1, 0x41, 0xC0, 0x00];
 const B_SLICE: [u8; 7] = [0, 0, 0, 1, 0x01, 0xA0, 0x00];
@@ -20,9 +24,17 @@ fn packet(nal: &[u8], pts_hns: i64, key: bool) -> Packet {
     }
 }
 
+fn idr_with_headers(sps: &[u8]) -> Vec<u8> {
+    let mut stream = vec![0, 0, 0, 1];
+    stream.extend_from_slice(sps);
+    stream.extend_from_slice(&[0, 0, 0, 1, 0x68, 0xCE, 0x3C, 0x80]);
+    stream.extend_from_slice(&IDR);
+    stream
+}
+
 fn clean_packets() -> Vec<Packet> {
     vec![
-        packet(&IDR, 0, true),
+        packet(&idr_with_headers(&SPS_1080P60), 0, true),
         packet(&P_SLICE, 166_666, false),
         packet(&P_SLICE, 333_333, false),
     ]
@@ -158,4 +170,52 @@ fn the_report_serialises_with_stable_keys() {
     assert_eq!(json["adapters"][0]["kind"], "hardware");
     assert_eq!(json["adapters"][0]["nv12"]["status"], "ok");
     assert_eq!(json["adapters"][0]["b_frames"], 0);
+}
+
+#[test]
+fn matching_headers_pass_and_are_reported() {
+    let report = build(&[observation(clean_packets())], "0.1", "windows x86_64");
+    let header = report.adapters[0].header.as_ref().unwrap();
+    assert_eq!((header.profile, header.level), (100, 40));
+    assert_eq!(header.size, "1920x1080");
+    assert_eq!(header.fps, Some(60.0));
+}
+
+#[test]
+fn a_30_fps_setting_against_a_60_fps_header_fails() {
+    let mut slow = observation(clean_packets());
+    slow.fps = 30;
+    let report = build(&[slow], "0.1", "windows x86_64");
+    assert!(!report.pass);
+    assert!(
+        report.adapters[0]
+            .failures
+            .iter()
+            .any(|f| f.contains("fps"))
+    );
+}
+
+#[test]
+fn a_key_frame_without_an_sps_fails() {
+    let mut bare = clean_packets();
+    bare[0].annexb = IDR.to_vec();
+    let report = build(&[observation(bare)], "0.1", "windows x86_64");
+    assert!(!report.pass);
+    assert!(report.adapters[0].header.is_none());
+}
+
+#[test]
+fn a_later_key_frame_with_another_sps_fails() {
+    let mut other_sps = SPS_1080P60;
+    other_sps[3] = 0x29;
+    let mut packets = clean_packets();
+    packets.push(packet(&idr_with_headers(&other_sps), 500_000, true));
+    let report = build(&[observation(packets)], "0.1", "windows x86_64");
+    assert!(!report.pass);
+    assert!(
+        report.adapters[0]
+            .failures
+            .iter()
+            .any(|f| f.contains("avcC"))
+    );
 }

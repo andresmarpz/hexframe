@@ -77,15 +77,14 @@ pub fn annexb_to_avcc(data: &[u8]) -> (Vec<u8>, AvcInfo) {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SpsFields {
-    profile: u8,
-    level: u8,
-    width: u32,
-    height: u32,
-    chroma_format: u32,
-    bit_depth_luma: u32,
-    bit_depth_chroma: u32,
-    colour: Option<VuiColour>,
+pub(crate) struct SpsFields {
+    pub(crate) profile: u8,
+    pub(crate) level: u8,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) chroma_format: u32,
+    pub(crate) bit_depth_luma: u32,
+    pub(crate) bit_depth_chroma: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,13 +95,13 @@ pub struct VuiColour {
     pub full_range: bool,
 }
 
-struct BitReader {
+pub(crate) struct BitReader {
     data: Vec<u8>,
     pos: usize,
 }
 
 impl BitReader {
-    fn new(rbsp_with_escapes: &[u8]) -> Self {
+    pub(crate) fn new(rbsp_with_escapes: &[u8]) -> Self {
         let mut data = Vec::with_capacity(rbsp_with_escapes.len());
         let mut zeros = 0;
         for &b in rbsp_with_escapes {
@@ -116,14 +115,14 @@ impl BitReader {
         Self { data, pos: 0 }
     }
 
-    fn bit(&mut self) -> Option<u32> {
+    pub(crate) fn bit(&mut self) -> Option<u32> {
         let byte = *self.data.get(self.pos / 8)?;
         let bit = (byte >> (7 - self.pos % 8)) & 1;
         self.pos += 1;
         Some(u32::from(bit))
     }
 
-    fn bits(&mut self, count: u32) -> Option<u32> {
+    pub(crate) fn bits(&mut self, count: u32) -> Option<u32> {
         let mut value = 0u32;
         for _ in 0..count {
             value = (value << 1) | self.bit()?;
@@ -131,7 +130,7 @@ impl BitReader {
         Some(value)
     }
 
-    fn unsigned_exp(&mut self) -> Option<u32> {
+    pub(crate) fn unsigned_exp(&mut self) -> Option<u32> {
         let mut zeros = 0;
         while self.bit()? == 0 {
             zeros += 1;
@@ -173,7 +172,7 @@ fn has_chroma_fields(profile: u8) -> bool {
     )
 }
 
-fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
+pub(crate) fn parse_sps_head(sps: &[u8]) -> Option<(SpsFields, BitReader)> {
     let (&profile, &level) = (sps.get(1)?, sps.get(3)?);
     let mut r = BitReader::new(sps.get(4..)?);
     r.unsigned_exp()?;
@@ -226,7 +225,6 @@ fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
         top = r.unsigned_exp()?;
         bottom = r.unsigned_exp()?;
     }
-    let colour = read_vui_colour(&mut r);
     let chroma_array_type = if separate_planes { 0 } else { chroma_format };
     let (sub_w, sub_h) = match chroma_array_type {
         1 => (2, 2),
@@ -238,7 +236,7 @@ fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
     let width = (width_mbs * 16).checked_sub(unit_x * (left + right))?;
     let height =
         (height_map_units * 16 * (2 - frame_mbs_only)).checked_sub(unit_y * (top + bottom))?;
-    Some(SpsFields {
+    let fields = SpsFields {
         profile,
         level,
         width,
@@ -246,8 +244,12 @@ fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
         chroma_format,
         bit_depth_luma,
         bit_depth_chroma,
-        colour,
-    })
+    };
+    Some((fields, r))
+}
+
+fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
+    parse_sps_head(sps).map(|(fields, _)| fields)
 }
 
 fn read_vui_colour(r: &mut BitReader) -> Option<VuiColour> {
@@ -277,7 +279,8 @@ fn read_vui_colour(r: &mut BitReader) -> Option<VuiColour> {
 }
 
 pub fn parse_sps_colour(sps: &[u8]) -> Option<VuiColour> {
-    parse_sps(sps)?.colour
+    let (_, mut reader) = parse_sps_head(sps)?;
+    read_vui_colour(&mut reader)
 }
 
 pub fn parse_sps_dims(sps: &[u8]) -> Option<(u32, u32, u8, u8)> {
@@ -285,31 +288,39 @@ pub fn parse_sps_dims(sps: &[u8]) -> Option<(u32, u32, u8, u8)> {
 }
 
 pub(crate) fn write_avcc_box(w: &mut BoxWriter, sps: &[u8], pps: &[u8]) {
+    w.boxed(b"avcC", |w| write_avcc_record(w, sps, pps));
+}
+
+pub fn avcc_record(sps: &[u8], pps: &[u8]) -> Vec<u8> {
+    let mut w = BoxWriter::new();
+    write_avcc_record(&mut w, sps, pps);
+    w.into_inner()
+}
+
+fn write_avcc_record(w: &mut BoxWriter, sps: &[u8], pps: &[u8]) {
     let byte = |i: usize| sps.get(i).copied().unwrap_or(0);
     let profile = byte(1);
-    w.boxed(b"avcC", |w| {
-        w.u8(1);
-        w.u8(profile);
-        w.u8(byte(2));
-        w.u8(byte(3));
-        w.u8(0xFF);
-        w.u8(0xE1);
-        w.u16(sps.len() as u16);
-        w.bytes(sps);
-        w.u8(1);
-        w.u16(pps.len() as u16);
-        w.bytes(pps);
-        if matches!(profile, 100 | 110 | 122 | 144 | 244) {
-            let fields = parse_sps(sps);
-            let chroma = fields.map_or(1, |f| f.chroma_format);
-            let luma = fields.map_or(8, |f| f.bit_depth_luma);
-            let chroma_depth = fields.map_or(8, |f| f.bit_depth_chroma);
-            w.u8(0xFC | (chroma & 3) as u8);
-            w.u8(0xF8 | (luma.saturating_sub(8) & 7) as u8);
-            w.u8(0xF8 | (chroma_depth.saturating_sub(8) & 7) as u8);
-            w.u8(0);
-        }
-    });
+    w.u8(1);
+    w.u8(profile);
+    w.u8(byte(2));
+    w.u8(byte(3));
+    w.u8(0xFF);
+    w.u8(0xE1);
+    w.u16(sps.len() as u16);
+    w.bytes(sps);
+    w.u8(1);
+    w.u16(pps.len() as u16);
+    w.bytes(pps);
+    if matches!(profile, 100 | 110 | 122 | 144 | 244) {
+        let fields = parse_sps(sps);
+        let chroma = fields.map_or(1, |f| f.chroma_format);
+        let luma = fields.map_or(8, |f| f.bit_depth_luma);
+        let chroma_depth = fields.map_or(8, |f| f.bit_depth_chroma);
+        w.u8(0xFC | (chroma & 3) as u8);
+        w.u8(0xF8 | (luma.saturating_sub(8) & 7) as u8);
+        w.u8(0xF8 | (chroma_depth.saturating_sub(8) & 7) as u8);
+        w.u8(0);
+    }
 }
 
 #[cfg(test)]
