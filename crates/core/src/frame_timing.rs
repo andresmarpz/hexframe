@@ -29,6 +29,10 @@ impl Pacer {
         self.t0 + self.offset(self.tick)
     }
 
+    pub fn remaining(&self, now: Hns) -> Hns {
+        self.deadline() - now
+    }
+
     pub fn tick(&self) -> u64 {
         self.tick
     }

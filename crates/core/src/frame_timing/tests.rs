@@ -289,8 +289,11 @@ mod properties {
         ) {
             let mut pacer = Pacer::new(0, fps);
             pacer.tick = ticks;
-            let remaining = pacer.deadline() - now;
-            prop_assert_eq!(remaining <= 0, now >= pacer.deadline());
+            let deadline = pacer.deadline();
+            prop_assert_eq!(pacer.remaining(now) <= 0, now >= deadline);
+            if now < deadline {
+                prop_assert_eq!(pacer.remaining(now), deadline - now);
+            }
         }
 
         #[test]

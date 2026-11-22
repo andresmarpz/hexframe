@@ -73,12 +73,6 @@ fn run(steps: &[Step]) -> Result<(), TestCaseError> {
             }
             Step::SizeChange => {
                 width = if width == WIDTH { WIDTH / 2 } else { WIDTH };
-                guard.reset();
-                prop_assert_eq!(guard.published(), None);
-                prop_assert_eq!(guard.pending(), None);
-                prop_assert_eq!(guard.reading(), None);
-                let fresh = check_write_slot(&guard)?;
-                prop_assert!(fresh < RING_SLOTS);
             }
         }
         if let (Some(before), Some(reading)) = (

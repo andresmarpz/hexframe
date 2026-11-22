@@ -116,14 +116,13 @@ impl Stats {
 }
 
 pub(crate) fn wait_for(pacer: &Pacer, stop: &AtomicBool, stats: &mut Stats) -> bool {
-    let deadline = pacer.deadline();
     let started = Instant::now();
     let mut spin_started: Option<Instant> = None;
     loop {
         if stop.load(Ordering::Acquire) {
             return false;
         }
-        let remaining = deadline - mono_now();
+        let remaining = pacer.remaining(mono_now());
         if remaining <= 0 {
             stats.note_wake(started, spin_started, -remaining);
             return true;

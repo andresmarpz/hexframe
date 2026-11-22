@@ -10,9 +10,9 @@ use std::time::Duration;
 use greyscreen_core::export::{ExportEvent, ExportJob, ExportPreset, ExportRange};
 use greyscreen_core::library::VideoInfo;
 use greyscreen_core::settings::Settings;
-use greyscreen_engine::updater::UpdateConfig;
 #[cfg(windows)]
 use greyscreen_engine::NoticeLevel;
+use greyscreen_engine::updater::UpdateConfig;
 use greyscreen_engine::{EngineCmd, FakeMediaSource, UiMsg};
 
 use common::{

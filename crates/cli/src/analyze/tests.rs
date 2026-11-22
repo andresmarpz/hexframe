@@ -372,7 +372,11 @@ fn rows_with_a_burst() -> Vec<greyscreen_mp4::moov::SampleRow> {
     (0..120)
         .map(|index| greyscreen_mp4::moov::SampleRow {
             offset: 0,
-            size: if (30..90).contains(&index) { 5_000 } else { 1_000 },
+            size: if (30..90).contains(&index) {
+                5_000
+            } else {
+                1_000
+            },
             duration: VIDEO_STEP as u32,
             sync: index % 60 == 0,
         })

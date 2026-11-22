@@ -676,9 +676,10 @@ fn bad_dts_kinds_are_refused_and_the_part_file_still_recovers() {
         let mut writer =
             FragmentedWriter::create(&part, &media.video_format, Some(&media.audio_format))
                 .unwrap_or_else(|e| panic!("create: {e}"));
-        for (index, packet) in all.iter().enumerate().take(200) {
+        let mut refused = 0;
+        for (index, packet) in all.iter().enumerate() {
             writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
-            if index == 150 {
+            if index == 90 {
                 let mut bad = packet.clone();
                 bad.dts = if shift == i64::MIN {
                     0
@@ -686,8 +687,10 @@ fn bad_dts_kinds_are_refused_and_the_part_file_still_recovers() {
                     packet.dts + shift
                 };
                 assert!(writer.push(&bad).is_err(), "{name} accepted");
+                refused += 1;
             }
         }
+        assert_eq!(refused, 1, "{name}");
         drop(writer);
         let out = greyscreen_mp4::recover::recover(&part).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(out.exists());
