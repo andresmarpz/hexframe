@@ -214,8 +214,11 @@ impl Video {
             self.sink.video(&mut self.scratch);
             return self.encoder_error("encoder drain", &error);
         }
+        let produced = !self.scratch.is_empty();
         self.sink.video(&mut self.scratch);
-        self.drain_errors = 0;
+        if produced {
+            self.drain_errors = 0;
+        }
         Ok(())
     }
 
