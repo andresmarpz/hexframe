@@ -12,10 +12,22 @@ use windows::Win32::Graphics::Dxgi::Common::{
 
 use super::{Nv12Frame, VideoConverter};
 use crate::d3d::GpuDevice;
+use crate::fault::Armed;
 use crate::testing::warp;
 
 const TOLERANCE: i16 = 2;
 const FPS: u32 = 30;
+
+fn rig() -> (GpuDevice, Armed) {
+    let armed = Armed::new();
+    let hardware = std::env::var("GREYSCREEN_GPU_TESTS").is_ok_and(|mode| mode == "hardware");
+    let gpu = if hardware {
+        GpuDevice::for_primary_monitor().unwrap()
+    } else {
+        warp::device().unwrap()
+    };
+    (gpu, armed)
+}
 
 struct Plane {
     luma: Vec<u8>,
@@ -159,7 +171,7 @@ fn convert(
 }
 
 fn solid_through_converter(red: u8, green: u8, blue: u8, alpha: u8) -> Plane {
-    let gpu = warp::device().unwrap();
+    let (gpu, _armed) = rig();
     let mut converter = VideoConverter::new(&gpu, 64, 64, FPS).unwrap();
     let pixels = filled(64, 64, bgra(red, green, blue, alpha));
     let src = upload(&gpu, (64, 64), &pixels);
@@ -195,11 +207,11 @@ fn black_lands_on_luma_16_and_white_on_luma_235() {
 
 #[test]
 fn a_hard_red_blue_edge_keeps_chroma_on_the_left_sited_column() {
-    let gpu = warp::device().unwrap();
+    let (gpu, _armed) = rig();
     let mut converter = VideoConverter::new(&gpu, 64, 64, FPS).unwrap();
     let mut pixels = filled(64, 64, bgra(255, 0, 0, 255));
     for row in 0..64 {
-        for column in 32..64 {
+        for column in 33..64 {
             let at = (row * 64 + column) * 4;
             pixels[at..at + 4].copy_from_slice(&bgra(0, 0, 255, 255));
         }
@@ -208,18 +220,31 @@ fn a_hard_red_blue_edge_keeps_chroma_on_the_left_sited_column() {
     let plane = convert(&mut converter, &gpu, &src, (64, 64), (64, 64));
     let red = colour::bt709_studio(255, 0, 0);
     let blue = colour::bt709_studio(0, 0, 255);
-    assert_near(plane.at(30, 32), red, "last red chroma column");
-    assert_near(plane.at(32, 32), blue, "first blue chroma column");
-    assert!(close(plane.luma_at(31, 32), red.y), "red luma at the edge");
+    assert_near(plane.at(30, 32), red, "pure red chroma pair");
+    assert_near(plane.at(34, 32), blue, "pure blue chroma pair");
+    let edge = plane.at(32, 32);
+    let midpoint_cb = (i16::from(red.cb) + i16::from(blue.cb)) / 2;
+    let midpoint_cr = (i16::from(red.cr) + i16::from(blue.cr)) / 2;
+    let lean = |actual: u8, from: i16, towards: u8| {
+        (i16::from(actual) - from) * (i16::from(towards) - from).signum()
+    };
     assert!(
-        close(plane.luma_at(32, 32), blue.y),
+        lean(edge.cb, midpoint_cb, red.cb)
+            >= (i16::from(red.cb) - midpoint_cb).abs() * 3 / 4 - TOLERANCE
+            && lean(edge.cr, midpoint_cr, red.cr)
+                >= (i16::from(red.cr) - midpoint_cr).abs() * 3 / 4 - TOLERANCE,
+        "left-sited chroma sample must lean to red: got {edge:?}"
+    );
+    assert!(close(plane.luma_at(32, 32), red.y), "red luma at the edge");
+    assert!(
+        close(plane.luma_at(33, 32), blue.y),
         "blue luma at the edge"
     );
 }
 
 #[test]
 fn downscaling_keeps_the_same_grey() {
-    let gpu = warp::device().unwrap();
+    let (gpu, _armed) = rig();
     let mut converter = VideoConverter::new(&gpu, 1280, 720, FPS).unwrap();
     let pixels = filled(2560, 1440, bgra(128, 128, 128, 255));
     let src = upload(&gpu, (2560, 1440), &pixels);
@@ -256,7 +281,7 @@ fn zero_alpha_with_a_known_colour_converts_to_that_colour() {
 
 #[test]
 fn a_source_of_a_new_size_rebuilds_the_converter_and_letterboxes() {
-    let gpu = warp::device().unwrap();
+    let (gpu, _armed) = rig();
     let mut converter = VideoConverter::new(&gpu, 64, 64, FPS).unwrap();
     let first = upload(&gpu, (64, 64), &filled(64, 64, bgra(255, 255, 255, 255)));
     convert(&mut converter, &gpu, &first, (64, 64), (64, 64));
@@ -276,7 +301,7 @@ fn a_source_of_a_new_size_rebuilds_the_converter_and_letterboxes() {
 
 #[test]
 fn a_small_source_in_a_slot_that_held_a_bright_frame_leaves_black_borders() {
-    let gpu = warp::device().unwrap();
+    let (gpu, _armed) = rig();
     let mut converter = VideoConverter::new(&gpu, 64, 64, FPS).unwrap();
     let bright = upload(&gpu, (64, 64), &filled(64, 64, bgra(255, 255, 255, 255)));
     let first = converter
@@ -284,9 +309,9 @@ fn a_small_source_in_a_slot_that_held_a_bright_frame_leaves_black_borders() {
         .unwrap();
     let slot = first.slot;
     converter.release(slot);
-    let small = upload(&gpu, (32, 32), &filled(32, 32, bgra(255, 255, 255, 255)));
+    let small = upload(&gpu, (32, 16), &filled(32, 16, bgra(255, 255, 255, 255)));
     let frame = converter
-        .convert(&small, (32, 32), CropRect::full((32, 32)))
+        .convert(&small, (32, 16), CropRect::full((32, 16)))
         .unwrap();
     assert_eq!(frame.slot, slot);
     let plane = read(&gpu, &frame, (64, 64));
@@ -301,7 +326,7 @@ fn a_small_source_in_a_slot_that_held_a_bright_frame_leaves_black_borders() {
 
 #[test]
 fn recreating_the_copy_ring_at_the_same_size_reads_the_new_texture() {
-    let gpu = warp::device().unwrap();
+    let (gpu, _armed) = rig();
     let mut converter = VideoConverter::new(&gpu, 64, 64, FPS).unwrap();
     for round in 0..8 {
         let (red, green, blue) = if round % 2 == 0 {
