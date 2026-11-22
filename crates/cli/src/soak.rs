@@ -167,6 +167,8 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
         .unwrap_or_else(|| std::env::temp_dir().join("greyscreen-soak"));
     std::fs::create_dir_all(&output_dir)
         .with_context(|| format!("creating {}", output_dir.display()))?;
+    let output_dir = std::path::absolute(&output_dir)
+        .with_context(|| format!("resolving {}", output_dir.display()))?;
     let settings = Settings {
         output_dir,
         auto_record: game_mode,
