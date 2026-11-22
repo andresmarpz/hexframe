@@ -23,6 +23,8 @@ const FIRST_FRAME_WAIT: Duration = Duration::from_secs(10);
 const STRESS_FOR: Duration = Duration::from_secs(60);
 const WATCHDOG: Duration = Duration::from_secs(90);
 const FAILING_FOR: Duration = Duration::from_secs(2);
+const STALL_IN_COPY: Duration = Duration::from_millis(600);
+const AFTER_STOP: Duration = Duration::from_millis(200);
 const FRAME_FAILED: &str = "capture frame failed";
 
 static SERIAL: Mutex<()> = Mutex::new(());
@@ -257,6 +259,33 @@ fn a_failing_frame_callback_logs_once_and_capture_goes_on() {
     drop(armed);
     assert!(wait_for_frame(&capture), "capture did not recover");
     capture.stop();
+    assert!(window.close());
+}
+
+#[test]
+#[ignore = "needs the PC: opens a cloaked window and captures it"]
+fn a_callback_inside_the_copy_cannot_publish_after_stop() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
+    let _com = ComGuard::mta().expect("COM");
+    log();
+    let window = CloakedWindow::open(640, 360, Reveal::ShownCloaked).expect("cloaked window");
+    let target = window.target();
+    let gpu = GpuDevice::for_target(&target).expect("GPU for the window");
+    let armed = Armed::new().stall(Point::FrameCopyTexture, STALL_IN_COPY);
+    let capture = WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("capture starts");
+    let probe = capture.probe();
+    std::thread::sleep(STALL_IN_COPY / 4);
+    assert!(
+        !probe.has_frame(),
+        "the stalled callback had already published"
+    );
+    capture.stop();
+    std::thread::sleep(AFTER_STOP);
+    assert!(
+        !probe.has_frame(),
+        "a callback published a frame after stop"
+    );
+    drop(armed);
     assert!(window.close());
 }
 

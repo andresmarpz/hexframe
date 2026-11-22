@@ -98,6 +98,15 @@ pub struct WgcCapture {
     border_hidden: bool,
 }
 
+pub struct PublishProbe(Arc<Shared>);
+
+impl PublishProbe {
+    pub fn has_frame(&self) -> bool {
+        let published = lock(&self.0.published);
+        published.current.is_some() || published.pending.is_some()
+    }
+}
+
 impl std::fmt::Debug for WgcCapture {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WgcCapture")
@@ -248,6 +257,10 @@ impl WgcCapture {
         self.shared.closed.load(Ordering::Acquire)
     }
 
+    pub fn probe(&self) -> PublishProbe {
+        PublishProbe(Arc::clone(&self.shared))
+    }
+
     pub fn border_hidden(&self) -> bool {
         self.border_hidden
     }
@@ -280,8 +293,8 @@ impl WgcCapture {
         {
             tracing::warn!(%error, "close frame pool failed");
         }
-        *lock(&self.shared.published) = Published::default();
         let mut worker = lock(&self.shared.worker);
+        *lock(&self.shared.published) = Published::default();
         if let Some(copier) = &mut worker.copier {
             copier.release();
         }
