@@ -1,24 +1,26 @@
 use std::cell::Cell;
 use std::collections::VecDeque;
 use std::mem::ManuallyDrop;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::ThreadId;
 use std::time::Duration;
 
-use windows::Win32::Foundation::{E_NOTIMPL, S_OK};
+use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, S_OK};
 use windows::Win32::Media::MediaFoundation::{
     IMFAttributes, IMFDXGIDeviceManager, IMFMediaEvent, IMFMediaType, IMFSample, MEError,
     METransformDrainComplete, METransformHaveOutput, METransformNeedInput,
-    MF_E_NO_EVENTS_AVAILABLE, MF_E_NOTACCEPTING, MF_E_TRANSFORM_NEED_MORE_INPUT,
-    MFCreateDXGIDeviceManager, MFCreateMediaEvent, MFCreateMemoryBuffer, MFCreateSample,
-    MFT_MESSAGE_COMMAND_DRAIN, MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_TYPE, MFT_OUTPUT_DATA_BUFFER,
-    MFT_OUTPUT_STREAM_INFO, MFT_OUTPUT_STREAM_PROVIDES_SAMPLES,
+    MF_E_NO_EVENTS_AVAILABLE, MF_E_NOTACCEPTING, MF_E_TRANSFORM_NEED_MORE_INPUT, MF_SA_D3D11_AWARE,
+    MF_TRANSFORM_ASYNC, MFCreateAttributes, MFCreateDXGIDeviceManager, MFCreateMediaEvent,
+    MFCreateMemoryBuffer, MFCreateSample, MFT_MESSAGE_COMMAND_DRAIN, MFT_MESSAGE_COMMAND_FLUSH,
+    MFT_MESSAGE_TYPE, MFT_OUTPUT_DATA_BUFFER, MFT_OUTPUT_STREAM_INFO,
+    MFT_OUTPUT_STREAM_PROVIDES_SAMPLES,
 };
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::{GUID, HRESULT};
 
 use crate::h264::DrainClock;
-use crate::h264::transform::{MfResult, Mft};
+use crate::h264::transform::{Candidate, MfResult, Mft};
 
 const IDR_PACKET: [u8; 7] = [0, 0, 0, 1, 0x65, 0x88, 0x84];
 const SLICE_PACKET: [u8; 7] = [0, 0, 0, 1, 0x41, 0x9a, 0x01];
@@ -26,30 +28,40 @@ const INITIAL_NEED_INPUT: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Step {
+    Attributes,
+    SetD3dManager,
+    SetOutputType,
+    SetInputType,
+    ProcessMessage,
+    OutputStreamInfo,
     ProcessInput,
     ProcessOutput,
     NextEvent,
     SetValue,
 }
 
-impl Step {
-    fn index(self) -> usize {
-        match self {
-            Step::ProcessInput => 0,
-            Step::ProcessOutput => 1,
-            Step::NextEvent => 2,
-            Step::SetValue => 3,
-        }
-    }
-}
+const STEP_COUNT: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CallKind {
+    Attributes,
+    StreamIds,
+    SetD3dManager,
     ProcessInput,
     ProcessOutput,
     Message(i32),
+    OutputStreamInfo,
+    InputStreamAttributes,
+    InputAvailableType,
+    OutputAvailableType,
+    OutputCurrentType,
+    SetInputType,
+    SetOutputType,
     NextEvent,
+    IsSupported,
     SetValue,
+    GetValue,
+    Shutdown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,7 +85,7 @@ struct Script {
 struct State {
     events: VecDeque<i32>,
     pending_pts: VecDeque<i64>,
-    counts: [usize; 4],
+    counts: [usize; STEP_COUNT],
     outputs: usize,
 }
 
@@ -140,8 +152,8 @@ impl FakeTransform {
 
     fn scripted_failure(&self, step: Step) -> MfResult<()> {
         let mut state = self.state();
-        let nth = state.counts[step.index()];
-        state.counts[step.index()] += 1;
+        let nth = state.counts[step as usize];
+        state.counts[step as usize] += 1;
         match self.script.fail {
             Some((at, when, code)) if at == step && when == nth => Err(code.into()),
             _ => Ok(()),
@@ -190,15 +202,28 @@ fn media_event(kind: i32, status: HRESULT) -> MfResult<IMFMediaEvent> {
 
 impl Mft for FakeTransform {
     fn attributes(&self) -> MfResult<IMFAttributes> {
-        Err(E_NOTIMPL.into())
+        self.record(CallKind::Attributes);
+        self.scripted_failure(Step::Attributes)?;
+        let mut store = None;
+        // SAFETY: the out pointer refers to a live local.
+        unsafe { MFCreateAttributes(&mut store, 2)? };
+        let store: IMFAttributes = store.ok_or_else(|| windows::core::Error::from(E_POINTER))?;
+        // SAFETY: the attribute store is live.
+        unsafe {
+            store.SetUINT32(&MF_TRANSFORM_ASYNC, 1)?;
+            store.SetUINT32(&MF_SA_D3D11_AWARE, 1)?;
+        }
+        Ok(store)
     }
 
     fn stream_ids(&self, _inputs: &mut [u32], _outputs: &mut [u32]) -> MfResult<()> {
+        self.record(CallKind::StreamIds);
         Err(E_NOTIMPL.into())
     }
 
     fn process_message(&self, message: MFT_MESSAGE_TYPE) -> MfResult<()> {
         self.record(CallKind::Message(message.0));
+        self.scripted_failure(Step::ProcessMessage)?;
         if message == MFT_MESSAGE_COMMAND_FLUSH {
             std::thread::sleep(self.script.flush_block);
         }
@@ -209,7 +234,8 @@ impl Mft for FakeTransform {
     }
 
     fn set_d3d_manager(&self, _manager: &IMFDXGIDeviceManager) -> MfResult<()> {
-        Ok(())
+        self.record(CallKind::SetD3dManager);
+        self.scripted_failure(Step::SetD3dManager)
     }
 
     fn process_input(&self, _stream: u32, sample: &IMFSample) -> MfResult<()> {
@@ -253,6 +279,8 @@ impl Mft for FakeTransform {
     }
 
     fn output_stream_info(&self, _stream: u32) -> MfResult<MFT_OUTPUT_STREAM_INFO> {
+        self.record(CallKind::OutputStreamInfo);
+        self.scripted_failure(Step::OutputStreamInfo)?;
         Ok(MFT_OUTPUT_STREAM_INFO {
             dwFlags: MFT_OUTPUT_STREAM_PROVIDES_SAMPLES.0 as u32,
             cbSize: 0,
@@ -261,27 +289,33 @@ impl Mft for FakeTransform {
     }
 
     fn input_stream_attributes(&self, _stream: u32) -> MfResult<IMFAttributes> {
+        self.record(CallKind::InputStreamAttributes);
         Err(E_NOTIMPL.into())
     }
 
     fn input_available_type(&self, _stream: u32, _index: u32) -> MfResult<IMFMediaType> {
+        self.record(CallKind::InputAvailableType);
         Err(E_NOTIMPL.into())
     }
 
     fn output_available_type(&self, _stream: u32, _index: u32) -> MfResult<IMFMediaType> {
+        self.record(CallKind::OutputAvailableType);
         Err(E_NOTIMPL.into())
     }
 
     fn output_current_type(&self, _stream: u32) -> MfResult<IMFMediaType> {
+        self.record(CallKind::OutputCurrentType);
         Err(E_NOTIMPL.into())
     }
 
     fn set_input_type(&self, _stream: u32, _media_type: &IMFMediaType) -> MfResult<()> {
-        Ok(())
+        self.record(CallKind::SetInputType);
+        self.scripted_failure(Step::SetInputType)
     }
 
     fn set_output_type(&self, _stream: u32, _media_type: &IMFMediaType) -> MfResult<()> {
-        Ok(())
+        self.record(CallKind::SetOutputType);
+        self.scripted_failure(Step::SetOutputType)
     }
 
     fn next_event(&self) -> MfResult<IMFMediaEvent> {
@@ -296,6 +330,7 @@ impl Mft for FakeTransform {
     }
 
     fn is_supported(&self, _property: &GUID) -> HRESULT {
+        self.record(CallKind::IsSupported);
         S_OK
     }
 
@@ -305,10 +340,61 @@ impl Mft for FakeTransform {
     }
 
     fn get_value(&self, _property: &GUID) -> MfResult<VARIANT> {
+        self.record(CallKind::GetValue);
         Err(E_NOTIMPL.into())
     }
 
-    fn shutdown(&self) {}
+    fn shutdown(&self) {
+        self.record(CallKind::Shutdown);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct FakeCandidate {
+    transform: Mutex<Option<FakeTransform>>,
+    activation_failure: Option<HRESULT>,
+    shutdown_objects: Arc<AtomicUsize>,
+    name: String,
+}
+
+impl FakeCandidate {
+    pub(crate) fn new(transform: FakeTransform) -> Self {
+        Self {
+            transform: Mutex::new(Some(transform)),
+            activation_failure: None,
+            shutdown_objects: Arc::default(),
+            name: "fake encoder".to_string(),
+        }
+    }
+
+    pub(crate) fn failing_activation(mut self, code: HRESULT) -> Self {
+        self.activation_failure = Some(code);
+        self
+    }
+
+    pub(crate) fn shutdown_objects(&self) -> Arc<AtomicUsize> {
+        Arc::clone(&self.shutdown_objects)
+    }
+}
+
+impl Candidate for FakeCandidate {
+    fn activate(&self) -> MfResult<Box<dyn Mft>> {
+        if let Some(code) = self.activation_failure {
+            return Err(code.into());
+        }
+        let taken = self.transform.lock().expect("transform lock").take();
+        taken
+            .map(|transform| Box::new(transform) as Box<dyn Mft>)
+            .ok_or_else(|| E_NOTIMPL.into())
+    }
+
+    fn shutdown_object(&self) {
+        self.shutdown_objects.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn describe(&self) -> String {
+        self.name.clone()
+    }
 }
 
 #[derive(Debug, Default)]

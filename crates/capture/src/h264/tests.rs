@@ -79,11 +79,12 @@ mod on_fake {
     };
     use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_NV12, DXGI_SAMPLE_DESC};
 
-    use super::super::setup::Opened;
+    use super::super::setup::{Opened, Spec, open_candidates};
     use super::super::{DRAIN_TIMEOUT, H264Encoder, H264Error, Mode};
     use crate::com::MfGuard;
+    use crate::fault::Armed;
     use crate::testing::fake_transform::{
-        CallKind, Calls, FakeTransform, SimulatedClock, Step, device_manager,
+        CallKind, Calls, FakeCandidate, FakeTransform, SimulatedClock, Step, device_manager,
     };
     use crate::testing::warp;
     use crate::vproc::Nv12Frame;
@@ -96,9 +97,11 @@ mod on_fake {
         encoder: H264Encoder,
         calls: Calls,
         texture: ID3D11Texture2D,
+        _armed: Armed,
     }
 
     fn rig(fake: FakeTransform) -> Rig {
+        let armed = Armed::new();
         let mf = MfGuard::start().unwrap();
         let gpu = warp::device().unwrap();
         let desc = D3D11_TEXTURE2D_DESC {
@@ -133,6 +136,7 @@ mod on_fake {
             output_id: 0,
             name: "fake".to_string(),
             sequence_header: Vec::new(),
+            warnings: Vec::new(),
         };
         let encoder =
             H264Encoder::from_opened(opened, EncoderKind::Hardware, "fake".into(), SIZE, SIZE)
@@ -142,7 +146,72 @@ mod on_fake {
             encoder,
             calls,
             texture: texture.unwrap(),
+            _armed: armed,
         }
+    }
+
+    fn spec() -> Spec {
+        Spec {
+            width: SIZE,
+            height: SIZE,
+            fps: 60,
+            mean_bitrate: 8_000_000,
+            peak_bitrate: 12_000_000,
+            quality: None,
+            gop_frames: 120,
+        }
+    }
+
+    fn kinds(calls: &Calls) -> Vec<CallKind> {
+        calls.lock().unwrap().iter().map(|call| call.kind).collect()
+    }
+
+    #[test]
+    fn opening_through_the_candidate_path_gives_an_encoder() {
+        let _armed = Armed::new();
+        let _mf = MfGuard::start().unwrap();
+        let fake = FakeTransform::new();
+        let calls = fake.calls();
+        let opened = open_candidates(
+            vec![Box::new(FakeCandidate::new(fake))],
+            device_manager().unwrap(),
+            &spec(),
+            0x10de,
+        )
+        .unwrap();
+        assert!(opened.name.starts_with("fake encoder"));
+        let encoder =
+            H264Encoder::from_opened(opened, EncoderKind::Hardware, "fake".into(), SIZE, SIZE)
+                .unwrap();
+        let opened_calls = kinds(&calls);
+        for expected in [
+            CallKind::Attributes,
+            CallKind::SetD3dManager,
+            CallKind::SetOutputType,
+            CallKind::SetInputType,
+        ] {
+            assert!(opened_calls.contains(&expected), "{expected:?} missing");
+        }
+        drop(encoder);
+        assert_eq!(kinds(&calls).last(), Some(&CallKind::Shutdown));
+    }
+
+    #[test]
+    fn a_scripted_open_step_failure_rejects_the_candidate() {
+        let _armed = Armed::new();
+        let _mf = MfGuard::start().unwrap();
+        let candidate =
+            FakeCandidate::new(FakeTransform::new().failing_at(Step::SetOutputType, 0, E_FAIL));
+        let shutdowns = candidate.shutdown_objects();
+        let error = open_candidates(
+            vec![Box::new(candidate)],
+            device_manager().unwrap(),
+            &spec(),
+            0x10de,
+        )
+        .unwrap_err();
+        assert!(matches!(error, H264Error::NoHardwareEncoder(_)));
+        assert_eq!(shutdowns.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     fn frame(rig: &Rig, index: usize) -> Nv12Frame {

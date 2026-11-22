@@ -12,7 +12,7 @@ use crate::probe::string_attribute;
 
 pub(crate) type MfResult<T> = windows::core::Result<T>;
 
-pub(super) trait Candidate {
+pub(crate) trait Candidate {
     fn activate(&self) -> MfResult<Box<dyn Mft>>;
     fn shutdown_object(&self);
     fn describe(&self) -> String;
