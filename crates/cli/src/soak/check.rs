@@ -3,7 +3,10 @@ use serde::Serialize;
 const BYTES_PER_MB: f64 = 1024.0 * 1024.0;
 const MIN_POINTS: usize = 6;
 const MAX_WINDOW: usize = 10;
-const MIN_DRIFT_SECS: f64 = 600.0;
+const MIN_DRIFT_SECS: f64 = 7200.0;
+const DRIFT_SKIP_SECS: f64 = 120.0;
+const DRIFT_BLOCK_SECS: f64 = 60.0;
+const MAX_SPIKE_SECS: usize = 5;
 const NOISE_AFTER_SECS: f64 = 3600.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -172,35 +175,70 @@ impl Judge {
     }
 }
 
+pub(crate) fn theil_sen_per_hour(points: &[(f64, f64)]) -> Option<f64> {
+    let mut blocks: std::collections::BTreeMap<i64, Vec<(f64, f64)>> = Default::default();
+    for &(t, v) in points.iter().filter(|p| p.0 >= DRIFT_SKIP_SECS) {
+        let index = ((t - DRIFT_SKIP_SECS) / DRIFT_BLOCK_SECS).floor() as i64;
+        blocks.entry(index).or_default().push((t, v));
+    }
+    let medians: Vec<(f64, f64)> = blocks
+        .values()
+        .map(|block| {
+            let t = block.iter().map(|p| p.0).sum::<f64>() / block.len() as f64;
+            let v = median(&block.iter().map(|p| p.1).collect::<Vec<_>>());
+            (t, v)
+        })
+        .collect();
+    let mut slopes = Vec::new();
+    for (i, a) in medians.iter().enumerate() {
+        for b in &medians[i + 1..] {
+            if b.0 > a.0 {
+                slopes.push((b.1 - a.1) / (b.0 - a.0));
+            }
+        }
+    }
+    (!slopes.is_empty()).then(|| median(&slopes) * 3600.0)
+}
+
+fn longest_spike_secs(points: &[(f64, f64)], centre: f64, limit: f64) -> usize {
+    let mut longest = 0;
+    let mut run = 0;
+    for p in points {
+        if (p.1 - centre).abs() > limit {
+            run += 1;
+            longest = longest.max(run);
+        } else {
+            run = 0;
+        }
+    }
+    longest
+}
+
 fn av_failures(cycle: &CycleResult, av: &AvLimits) -> Vec<String> {
     let mut failures = Vec::new();
-    let worst_skew = cycle
-        .diag_seconds
-        .iter()
-        .filter_map(|v| v["av_skew_ms"].as_f64())
-        .map(f64::abs)
-        .fold(0.0, f64::max);
-    if worst_skew > av.max_skew_ms {
-        failures.push(format!(
-            "recording {}: A/V skew reached {worst_skew:.1} ms, limit {:.1} ms",
-            cycle.index, av.max_skew_ms
-        ));
-    }
     let points: Vec<(f64, f64)> = cycle
         .diag_seconds
         .iter()
         .filter_map(|v| Some((v["t"].as_f64()?, v["av_skew_ms"].as_f64()?)))
         .collect();
-    if cycle.video_secs >= MIN_DRIFT_SECS
-        && let Some(slope) = slope_per_min(&points)
-    {
-        let per_hour = slope.abs() * 60.0;
-        if per_hour > av.max_drift_ms_per_hour {
+    if !points.is_empty() {
+        let centre = median(&points.iter().map(|p| p.1).collect::<Vec<_>>());
+        let spike = longest_spike_secs(&points, centre, av.max_skew_ms);
+        if spike > MAX_SPIKE_SECS {
             failures.push(format!(
-                "recording {}: clock drift {per_hour:.2} ms per hour, limit {:.2} ms per hour",
-                cycle.index, av.max_drift_ms_per_hour
+                "recording {}: A/V skew stayed more than {:.1} ms from its median ({centre:.1} ms) for {spike} s",
+                cycle.index, av.max_skew_ms
             ));
         }
+    }
+    if cycle.video_secs >= MIN_DRIFT_SECS
+        && let Some(per_hour) = theil_sen_per_hour(&points).map(f64::abs)
+        && per_hour > av.max_drift_ms_per_hour
+    {
+        failures.push(format!(
+            "recording {}: clock drift {per_hour:.2} ms per hour, limit {:.2} ms per hour",
+            cycle.index, av.max_drift_ms_per_hour
+        ));
     }
     failures.extend(noise_failure(cycle));
     failures

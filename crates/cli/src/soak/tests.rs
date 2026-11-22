@@ -413,46 +413,68 @@ fn av_cycle(skews: &[f64], video_secs: f64) -> CycleResult {
     }
 }
 
-fn alternating(a: f64, b: f64) -> Vec<f64> {
-    (0..3600).map(|t| if t % 2 == 0 { a } else { b }).collect()
-}
-
-#[test]
-fn av_limits_judge_skew_and_drift_per_hour() {
+fn av_failures_of(cycle: CycleResult) -> Vec<String> {
     let mut strict = limits();
     strict.av = Some(check::AvLimits {
         max_skew_ms: 40.0,
         max_drift_ms_per_hour: 1.0,
     });
     let samples = samples(60, |_| 100 * MB, |_| 200);
-    let failures = |cycle: CycleResult| {
-        let cycles = [cycle, good_cycle(2)];
-        let run = Run {
-            samples: &samples,
-            cycles: &cycles,
-            engine_errors: &[],
-            min_saved: 2,
-            require_usage: true,
-            by_checkpoint: false,
-            device_removed: 0,
-        };
-        evaluate(&run, &strict).failures
+    let cycles = [cycle, good_cycle(2)];
+    let run = Run {
+        samples: &samples,
+        cycles: &cycles,
+        engine_errors: &[],
+        min_saved: 2,
+        require_usage: true,
+        by_checkpoint: false,
+        device_removed: 0,
     };
-    assert!(failures(av_cycle(&alternating(5.0, -39.0), 7200.0)).is_empty());
-    let skewed = failures(av_cycle(&alternating(5.0, -41.0), 7200.0));
+    evaluate(&run, &strict).failures
+}
+
+fn noisy(base: f64, len: u32) -> Vec<f64> {
+    (0..len)
+        .map(|t| base + [0.0, 7.0, -5.0, 3.0, -9.0][t as usize % 5])
+        .collect()
+}
+
+#[test]
+fn a_constant_pipeline_offset_passes_and_a_sustained_deviation_fails() {
+    assert!(av_failures_of(av_cycle(&noisy(-80.0, 1200), 1200.0)).is_empty());
+    let mut spiky = noisy(-80.0, 1200);
+    for skew in &mut spiky[300..303] {
+        *skew = 225.0;
+    }
+    assert!(av_failures_of(av_cycle(&spiky, 1200.0)).is_empty());
+    for skew in &mut spiky[600..620] {
+        *skew = -20.0;
+    }
+    let failures = av_failures_of(av_cycle(&spiky, 1200.0));
     assert!(
-        skewed.iter().any(|f| f.contains("skew reached 41.0")),
-        "{skewed:?}"
+        failures
+            .iter()
+            .any(|f| f.contains("from its median (-80.0 ms) for 20 s")),
+        "{failures:?}"
     );
-    let steady_offset = vec![12.0; 3600];
-    assert!(failures(av_cycle(&steady_offset, 3600.0)).is_empty());
-    let sloped: Vec<f64> = (0..3600).map(|t| -f64::from(t) * 2.0 / 3600.0).collect();
-    let drifted = failures(av_cycle(&sloped, 3600.0));
+}
+
+#[test]
+fn drift_is_judged_by_a_robust_fit_on_runs_of_two_hours_or_more() {
+    let drifting = |per_hour: f64, secs: u32| -> Vec<f64> {
+        noisy(-80.0, secs)
+            .iter()
+            .enumerate()
+            .map(|(t, v)| v + t as f64 * per_hour / 3600.0)
+            .collect()
+    };
+    let drifted = av_failures_of(av_cycle(&drifting(60.0, 10_800), 10_800.0));
     assert!(
-        drifted.iter().any(|f| f.contains("2.00 ms per hour")),
+        drifted.iter().any(|f| f.contains("clock drift 60.")),
         "{drifted:?}"
     );
-    assert!(failures(av_cycle(&sloped, 60.0)).is_empty());
+    assert!(av_failures_of(av_cycle(&drifting(0.0, 10_800), 10_800.0)).is_empty());
+    assert!(av_failures_of(av_cycle(&drifting(60.0, 3600), 3600.0)).is_empty());
 }
 
 #[test]
