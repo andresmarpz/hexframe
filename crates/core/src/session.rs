@@ -8,7 +8,7 @@ pub use timing::SessionTiming;
 
 const TAIL: Hns = 5 * HNS_PER_SEC;
 const MAX_START_RETRIES: u32 = 5;
-const MAX_RECORDING: Hns = 3 * 3600 * HNS_PER_SEC;
+pub const MAX_RECORDING: Hns = 3 * 3600 * HNS_PER_SEC;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Input {

@@ -1,4 +1,6 @@
 use greyscreen_core::media::{AudioFormat, VideoFormat};
+use greyscreen_core::session::MAX_RECORDING;
+use greyscreen_core::time::HNS_PER_SEC;
 
 use crate::aac::write_esds;
 use crate::avc::write_avcc_box;
@@ -6,8 +8,9 @@ use crate::bytes::BoxWriter;
 use crate::{Mp4Error, Result};
 
 const MOVIE_TIMESCALE: u32 = 1000;
-const MAX_RECORDING_SECS: u64 = 3 * 3600;
-const _: () = assert!(MAX_RECORDING_SECS * VideoFormat::TIMESCALE as u64 <= u32::MAX as u64);
+const _: () = assert!(
+    (MAX_RECORDING / HNS_PER_SEC) as u64 * VideoFormat::TIMESCALE as u64 <= u32::MAX as u64
+);
 pub(crate) const VIDEO_TRACK_ID: u32 = 1;
 pub(crate) const AUDIO_TRACK_ID: u32 = 2;
 const MINOR_VERSION: u32 = 0x200;
