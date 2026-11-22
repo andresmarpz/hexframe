@@ -79,7 +79,8 @@ fn source_clip() -> Vec<u8> {
             .collect(),
         audio: Vec::new(),
     };
-    let moov = write_full_moov(&format, None, &tables, &chunking);
+    let moov =
+        write_full_moov(&format, None, &tables, &chunking).unwrap_or_else(|e| panic!("moov: {e}"));
     let mut mdat = ((payload.len() + 8) as u32).to_be_bytes().to_vec();
     mdat.extend_from_slice(b"mdat");
     [head, mdat, payload, moov].concat()

@@ -165,6 +165,7 @@ fn moov_for(media: &Media, layout: &Layout, per_sample: bool) -> Vec<u8> {
         &layout.tables,
         &chunking,
     )
+    .unwrap_or_else(|e| panic!("moov: {e}"))
 }
 
 fn ftyp() -> Vec<u8> {
@@ -302,7 +303,8 @@ fn init_moov_alone_is_a_valid_empty_file() {
     let media = media();
     let bytes = [
         ftyp(),
-        write_init_moov(&media.video_format, Some(&media.audio_format)),
+        write_init_moov(&media.video_format, Some(&media.audio_format))
+            .unwrap_or_else(|e| panic!("moov: {e}")),
     ]
     .concat();
     let file = TempFile::new("init", &bytes);
@@ -331,12 +333,10 @@ fn video_only_file_plays() {
         video: layout.video_chunks.clone(),
         audio: Vec::new(),
     };
-    file.extend_from_slice(&write_full_moov(
-        &media.video_format,
-        None,
-        &tables,
-        &chunking,
-    ));
+    file.extend_from_slice(
+        &write_full_moov(&media.video_format, None, &tables, &chunking)
+            .unwrap_or_else(|e| panic!("moov: {e}")),
+    );
     let temp = TempFile::new("video-only", &file);
     let streams = ffprobe(
         temp.path(),

@@ -125,3 +125,45 @@ fn ten_thousand_packets_leave_the_ring_at_a_steady_size() {
     assert!(largest <= 6 * 60, "{largest}");
     assert_eq!(settled.last(), settled.first());
 }
+
+#[test]
+fn an_empty_ring_prunes_and_ranges_without_a_panic() {
+    let mut ring = ClipRing::new(1_000, HNS_PER_SEC, RATE);
+    ring.prune();
+    assert!(ring.range(0, HNS_PER_SEC).is_empty());
+    assert!(ring.range(i64::MIN / 2, i64::MAX / 2).is_empty());
+    assert!(ring.packets.is_empty());
+}
+
+#[test]
+fn a_ring_with_no_idr_keeps_everything_and_ranges_empty() {
+    let mut ring = ClipRing::new(0, HNS_PER_SEC, RATE);
+    for n in 0..600 {
+        ring.push(video(n, false));
+    }
+    for n in 0..100 {
+        ring.push(audio(n));
+    }
+    ring.prune();
+    assert_eq!(ring.packets.len(), 700);
+    assert!(ring.range(0, 10 * HNS_PER_SEC).is_empty());
+}
+
+#[test]
+fn an_audio_only_ring_prunes_nothing_and_ranges_empty() {
+    let mut ring = ClipRing::new(0, HNS_PER_SEC, RATE);
+    for n in 0..500 {
+        ring.push(audio(n));
+    }
+    ring.prune();
+    assert_eq!(ring.packets.len(), 500);
+    assert!(ring.range(0, HNS_PER_SEC).is_empty());
+}
+
+#[test]
+fn a_range_after_the_newest_packet_starts_at_the_last_idr() {
+    let ring = filled(10);
+    let packets = ring.range(at(&ring, 20.0), at(&ring, 30.0));
+    let first_video = packets.iter().find(|p| p.track == Track::Video);
+    assert_eq!(first_video.map(|p| p.dts), Some(9 * 90_000));
+}

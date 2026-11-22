@@ -78,7 +78,7 @@ fn ftyp_lists_brands() {
 
 #[test]
 fn init_moov_has_empty_tables_and_mvex() {
-    let out = write_init_moov(&video(), Some(&audio()));
+    let out = write_init_moov(&video(), Some(&audio())).unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     assert_eq!(&moov.fourcc, b"moov");
     assert!(moov.complete && moov.end() == out.len());
@@ -112,7 +112,7 @@ fn init_moov_has_empty_tables_and_mvex() {
 fn init_moov_sample_entries_carry_codec_config() {
     let v = video();
     let a = audio();
-    let out = write_init_moov(&v, Some(&a));
+    let out = write_init_moov(&v, Some(&a)).unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     let tracks = traks(&out, &moov);
 
@@ -157,7 +157,7 @@ fn first_after(data: &[u8], parent: &BoxRef, skip: usize) -> BoxRef {
 
 #[test]
 fn init_moov_without_audio_has_one_track() {
-    let out = write_init_moov(&video(), None);
+    let out = write_init_moov(&video(), None).unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     assert_eq!(traks(&out, &moov).len(), 1);
     assert_eq!(
@@ -240,7 +240,8 @@ fn sample_tables() -> (SampleTables, Chunking) {
 #[test]
 fn full_moov_describes_samples_and_chunks() {
     let (tables, chunking) = sample_tables();
-    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking);
+    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking)
+        .unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     assert!(moov.find(&out, b"mvex").is_none());
 
@@ -270,7 +271,8 @@ fn full_moov_describes_samples_and_chunks() {
 #[test]
 fn full_moov_track_durations_use_their_own_timescales() {
     let (tables, chunking) = sample_tables();
-    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking);
+    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking)
+        .unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     let tracks = traks(&out, &moov);
 
@@ -288,7 +290,8 @@ fn full_moov_track_durations_use_their_own_timescales() {
 #[test]
 fn full_moov_size_does_not_depend_on_offsets() {
     let (tables, chunking) = sample_tables();
-    let a = write_full_moov(&video(), Some(&audio()), &tables, &chunking);
+    let a = write_full_moov(&video(), Some(&audio()), &tables, &chunking)
+        .unwrap_or_else(|e| panic!("moov: {e}"));
 
     let shift = |rows: &[SampleRow]| -> Vec<SampleRow> {
         rows.iter()
@@ -317,7 +320,8 @@ fn full_moov_size_does_not_depend_on_offsets() {
             video: shifted_chunks(&chunking.video),
             audio: shifted_chunks(&chunking.audio),
         },
-    );
+    )
+    .unwrap_or_else(|e| panic!("moov: {e}"));
     assert_eq!(a.len(), b.len());
     assert_ne!(a, b);
 }
@@ -344,7 +348,8 @@ fn per_sample_chunks_follow_row_offsets() {
             video: chunks,
             audio: Vec::new(),
         },
-    );
+    )
+    .unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     let v = stbl(&out, &traks(&out, &moov)[0]);
     assert_eq!(table(&out, &v, b"stsc"), [1, 1, 1, 1]);
@@ -357,7 +362,8 @@ fn audio_delay_becomes_a_leading_empty_edit() {
         delay_ms: 3000,
         skip_samples: 0,
     };
-    let out = write_full_moov_with_start(&video(), Some(&audio()), &tables, &chunking, start);
+    let out = write_full_moov_with_start(&video(), Some(&audio()), &tables, &chunking, start)
+        .unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     let tracks = traks(&out, &moov);
 
@@ -387,7 +393,8 @@ fn audio_delay_becomes_a_leading_empty_edit() {
 #[test]
 fn no_audio_delay_writes_no_edit_list() {
     let (tables, chunking) = sample_tables();
-    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking);
+    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking)
+        .unwrap_or_else(|e| panic!("moov: {e}"));
     let moov = root(&out);
     for trak in traks(&out, &moov) {
         assert!(trak.find(&out, b"edts").is_none());

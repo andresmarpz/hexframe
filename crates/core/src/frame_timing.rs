@@ -115,5 +115,38 @@ pub fn next_tick(
     matched.map_or(fallback, |tick| tick.max(fallback))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepBack {
+    pub previous: Hns,
+    pub pts: Hns,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct OrderGuard {
+    last: Option<Hns>,
+    step_backs: u64,
+}
+
+impl OrderGuard {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn check(&mut self, pts: Hns) -> Result<(), StepBack> {
+        let previous = self.last.replace(pts);
+        match previous {
+            Some(previous) if pts <= previous => {
+                self.step_backs += 1;
+                Err(StepBack { previous, pts })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    pub fn step_backs(&self) -> u64 {
+        self.step_backs
+    }
+}
+
 #[cfg(test)]
 mod tests;

@@ -54,7 +54,9 @@ impl TrackState {
                     packet.dts, prev.dts
                 )));
             }
-            let duration = u32::try_from(delta).unwrap_or(u32::MAX);
+            let duration = u32::try_from(delta).map_err(|_| {
+                Mp4Error::Invalid(format!("sample duration {delta} does not fit in 32 bits"))
+            })?;
             self.queue_pending(duration);
         }
         Ok(())
@@ -131,7 +133,7 @@ impl<S: Sink> FragmentedWriter<S> {
         placeholder.bytes(b"free");
         placeholder.zeros(8);
         head.extend_from_slice(&placeholder.into_inner());
-        head.extend_from_slice(&write_init_moov(video, audio));
+        head.extend_from_slice(&write_init_moov(video, audio)?);
 
         file.write_all(&head)?;
         Ok(Self {

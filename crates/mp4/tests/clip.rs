@@ -9,7 +9,10 @@ use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 use greyscreen_mp4::aac::asc_lc;
 use greyscreen_mp4::avc::{annexb_to_avcc, nal_type, split_annexb};
 use greyscreen_mp4::clip::write_clip;
+use greyscreen_mp4::demux::Movie;
 use greyscreen_mp4::reader::boxes;
+
+use common::tables::tracks;
 
 const VIDEO: &[u8] = include_bytes!("fixtures/v.h264");
 const AUDIO: &[u8] = include_bytes!("fixtures/a.adts");
@@ -437,4 +440,88 @@ fn audio_skip(path: &Path) -> u32 {
     let count = u32::from_be_bytes(payload[4..8].try_into().unwrap_or_default()) as usize;
     let last = 8 + (count - 1) * 12;
     u32::from_be_bytes(payload[last + 4..last + 8].try_into().unwrap_or_default())
+}
+
+fn clipped(media: &Media, part: &[Arc<Packet>], dir: &TempDir) -> (PathBuf, Vec<u8>) {
+    let path = dir.join("clip.mp4");
+    write_clip(&path, &media.video_format, Some(&media.audio_format), part)
+        .unwrap_or_else(|e| panic!("write_clip: {e}"));
+    let bytes = std::fs::read(&path).unwrap_or_default();
+    (path, bytes)
+}
+
+#[test]
+fn a_clip_cut_at_the_idr_at_tick_90000_starts_at_zero_with_every_sample() {
+    let media = media();
+    let all = arrival(&media, 4, true);
+    let part = slice(&all, 60, 180, 0);
+    assert_eq!(part[0].dts, 90_000);
+    let dir = TempDir::new("clip-tick-90000");
+    let (path, bytes) = clipped(&media, &part, &dir);
+    let video = &tracks(&bytes)[0];
+
+    assert!(!video.trak_children.iter().any(|n| n == "edts"));
+    assert!(!video.stbl_children.iter().any(|n| n == "ctts"));
+    assert_eq!(video.sample_count, 120);
+    assert!(video.durations.iter().all(|&d| d == 1500));
+    let seen = Movie::open(&path).unwrap_or_else(|e| panic!("open: {e}"));
+    let last = part.iter().rev().find(|p| p.track == Track::Video);
+    assert_eq!(
+        seen.video_samples.last().map(|r| r.size as usize),
+        last.map(|p| p.data.len())
+    );
+    assert!(seen.video_samples[0].key);
+    assert_eq!(seen.video_samples[0].dts, 0);
+}
+
+#[test]
+fn a_clip_cut_at_a_mid_stream_idr_carries_the_parameter_sets_and_opens() {
+    let media = media();
+    let all = arrival(&media, 4, true);
+    let part = slice(&all, 180, 300, 3);
+    let dir = TempDir::new("clip-mid-idr");
+    let (path, _) = clipped(&media, &part, &dir);
+    let seen = Movie::open(&path).unwrap_or_else(|e| panic!("open: {e}"));
+
+    assert_eq!(seen.video.sps, media.video_format.sps);
+    assert_eq!(seen.video.pps, media.video_format.pps);
+    assert!(!seen.video.sps.is_empty() && !seen.video.pps.is_empty());
+    assert_eq!(seen.video_samples.len(), 120);
+    assert!(seen.video_samples[0].key);
+}
+
+#[test]
+fn a_first_packet_with_an_empty_header_and_in_band_sets_gives_a_valid_avcc() {
+    let media = media();
+    let first = access_units(VIDEO).remove(0);
+    let (_, info) = annexb_to_avcc(&first);
+    let sps = info.sps.unwrap_or_default();
+    let pps = info.pps.unwrap_or_default();
+    let format = VideoFormat {
+        sps: sps.clone(),
+        pps: pps.clone(),
+        ..media.video_format.clone()
+    };
+    let all = arrival(&media, 2, false);
+    let part = slice(&all, 0, 60, 0);
+    let dir = TempDir::new("clip-in-band");
+    let path = dir.join("clip.mp4");
+    write_clip(&path, &format, None, &part).unwrap_or_else(|e| panic!("write_clip: {e}"));
+    let bytes = std::fs::read(&path).unwrap_or_default();
+
+    let avcc = bytes
+        .windows(4)
+        .position(|w| w == b"avcC")
+        .map(|at| &bytes[at + 4..])
+        .unwrap_or_default();
+    assert_eq!(avcc[0], 1);
+    assert_eq!(&avcc[1..4], &sps[1..4]);
+    assert_eq!(avcc[5] & 0x1f, 1);
+    assert_eq!(
+        usize::from(u16::from_be_bytes([avcc[6], avcc[7]])),
+        sps.len()
+    );
+    assert_eq!(&avcc[8..8 + sps.len()], sps.as_slice());
+    let seen = Movie::open(&path).unwrap_or_else(|e| panic!("open: {e}"));
+    assert_eq!((seen.video.sps, seen.video.pps), (sps, pps));
 }

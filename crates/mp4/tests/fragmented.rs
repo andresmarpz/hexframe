@@ -14,9 +14,11 @@ use greyscreen_mp4::avc::{annexb_to_avcc, nal_type, split_annexb};
 use greyscreen_mp4::finalize::placeholder_bytes;
 use greyscreen_mp4::fragmented::FragmentedWriter;
 use greyscreen_mp4::inspect::inspect;
+use greyscreen_mp4::moov::{Chunking, SampleRow, SampleTables, write_full_moov};
 use greyscreen_mp4::reader::boxes;
 
 use common::faulty::FaultySink;
+use common::tables::tracks;
 
 const VIDEO: &[u8] = include_bytes!("fixtures/v.h264");
 const AUDIO: &[u8] = include_bytes!("fixtures/a.adts");
@@ -659,4 +661,129 @@ fn a_non_increasing_dts_is_refused_while_the_other_track_keeps_writing() {
     }
     writer.finish().unwrap_or_else(|e| panic!("finish: {e}"));
     assert_decodes_cleanly(file.path());
+}
+
+fn finished_bytes(media: &Media, packets: &[Packet], name: &str) -> (Vec<u8>, usize, usize) {
+    let file = TempPath::new(name);
+    write_file(file.path(), media, packets, true, true);
+    let video = packets.iter().filter(|p| p.track == Track::Video).count();
+    let audio = packets.len() - video;
+    (std::fs::read(file.path()).unwrap_or_default(), video, audio)
+}
+
+#[test]
+fn finish_keeps_the_last_packets_and_writes_exact_durations() {
+    let media = media();
+    let all = packets(&media, 2, true);
+    let (bytes, video_count, audio_count) = finished_bytes(&media, &all, "exact");
+    let found = tracks(&bytes);
+    let (video, audio) = (&found[0], &found[1]);
+
+    assert_eq!(video.sample_count as usize, video_count);
+    assert_eq!(audio.sample_count as usize, audio_count);
+    assert_eq!(video.durations.len(), video_count);
+    assert!(video.durations.iter().all(|&d| d == 1500));
+    assert_eq!(audio.durations.len(), audio_count);
+    assert_eq!(
+        audio.durations.iter().map(|&d| u64::from(d)).sum::<u64>(),
+        audio_count as u64 * 1024
+    );
+    for track in [video, audio] {
+        assert!(track.chunk_counts.iter().all(|&c| c > 0));
+        assert_eq!(track.chunk_counts.iter().sum::<u32>(), track.sample_count);
+    }
+}
+
+#[test]
+fn the_last_video_and_audio_samples_are_the_last_packets_pushed() {
+    let media = media();
+    let all = packets(&media, 2, true);
+    let file = TempPath::new("last-sample");
+    write_file(file.path(), &media, &all, true, true);
+    let seen = inspect(file.path()).unwrap_or_else(|e| panic!("inspect: {e}"));
+    for (track, rows) in [
+        (Track::Video, &seen.tables.video),
+        (Track::Audio, &seen.tables.audio),
+    ] {
+        let last = all.iter().rev().find(|p| p.track == track);
+        let size = last.map_or(0, |p| p.data.len());
+        assert_eq!(rows.last().map(|r| r.size as usize), Some(size));
+    }
+}
+
+#[test]
+fn an_empty_audio_track_still_writes() {
+    let media = media();
+    let video_only = packets(&media, 1, false);
+    let file = TempPath::new("empty-audio");
+    write_file(file.path(), &media, &video_only, true, true);
+    let bytes = std::fs::read(file.path()).unwrap_or_default();
+    let found = tracks(&bytes);
+
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[1].handler, "soun");
+    assert_eq!(found[1].sample_count, 0);
+    assert!(found[1].chunk_counts.is_empty());
+    assert_eq!(found[0].sample_count as usize, video_only.len());
+    assert!(inspect(file.path()).is_ok());
+}
+
+#[test]
+fn finish_without_video_errors_and_keeps_the_part_file() {
+    let media = media();
+    let audio_only: Vec<Packet> = packets(&media, 1, true)
+        .into_iter()
+        .filter(|p| p.track == Track::Audio)
+        .collect();
+    let file = TempPath::new("no-video");
+    let mut writer =
+        FragmentedWriter::create(file.path(), &media.video_format, Some(&media.audio_format))
+            .unwrap_or_else(|e| panic!("create: {e}"));
+    for packet in &audio_only {
+        writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
+    }
+    assert!(matches!(writer.finish(), Err(Mp4Error::Invalid(_))));
+
+    let bytes = std::fs::read(file.path()).unwrap_or_default();
+    assert_eq!(fourccs(&bytes), ["ftyp", "free", "moov"]);
+}
+
+fn long_row(duration: u32) -> SampleRow {
+    SampleRow {
+        offset: 0,
+        size: 1,
+        duration,
+        sync: true,
+    }
+}
+
+fn moov_for(rows: Vec<SampleRow>) -> Result<Vec<u8>, Mp4Error> {
+    let media = media();
+    let tables = SampleTables {
+        video: rows,
+        audio: Vec::new(),
+    };
+    write_full_moov(&media.video_format, None, &tables, &Chunking::default())
+}
+
+#[test]
+fn three_hours_of_ticks_fit_and_rows_past_32_bits_fail_loudly() {
+    let three_hours = 3 * 3600 * 90_000;
+    assert!(moov_for(vec![long_row(three_hours)]).is_ok());
+    assert!(moov_for(vec![long_row(u32::MAX)]).is_ok());
+    assert!(moov_for(vec![long_row(u32::MAX), long_row(1)]).is_err());
+}
+
+#[test]
+fn a_dts_gap_past_32_bits_is_refused_not_clamped() {
+    let media = media();
+    let file = TempPath::new("huge-gap");
+    let mut writer = FragmentedWriter::create(file.path(), &media.video_format, None)
+        .unwrap_or_else(|e| panic!("create: {e}"));
+    let mut all = packets(&media, 1, false);
+    let first = all.remove(0);
+    let mut second = all.remove(0);
+    second.dts = i64::from(u32::MAX) + 1;
+    writer.push(&first).unwrap_or_else(|e| panic!("push: {e}"));
+    assert!(writer.push(&second).is_err());
 }

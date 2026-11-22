@@ -114,3 +114,79 @@ pub mod faulty {
         }
     }
 }
+
+#[allow(dead_code)]
+pub mod tables {
+    use greyscreen_mp4::reader::{BoxRef, find_box};
+
+    pub struct TrackView {
+        pub handler: String,
+        pub trak_children: Vec<String>,
+        pub stbl_children: Vec<String>,
+        pub sample_count: u32,
+        pub durations: Vec<u32>,
+        pub chunk_counts: Vec<u32>,
+    }
+
+    fn u32_at(bytes: &[u8], at: usize) -> u32 {
+        u32::from_be_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]])
+    }
+
+    fn names(data: &[u8], parent: &BoxRef) -> Vec<String> {
+        parent
+            .children(data)
+            .map(|b| String::from_utf8_lossy(&b.fourcc).into_owned())
+            .collect()
+    }
+
+    fn payload<'a>(data: &'a [u8], parent: &BoxRef, fourcc: &[u8; 4]) -> Option<&'a [u8]> {
+        parent
+            .find(data, fourcc)
+            .map(|b| &b.payload_bytes(data)[4..])
+    }
+
+    pub fn tracks(file: &[u8]) -> Vec<TrackView> {
+        let moov = find_box(file, b"moov").unwrap_or_else(|| panic!("no moov"));
+        moov.children(file)
+            .filter(|b| &b.fourcc == b"trak")
+            .map(|trak| view(file, &trak))
+            .collect()
+    }
+
+    fn view(file: &[u8], trak: &BoxRef) -> TrackView {
+        let mdia = trak
+            .find(file, b"mdia")
+            .unwrap_or_else(|| panic!("no mdia"));
+        let minf = mdia
+            .find(file, b"minf")
+            .unwrap_or_else(|| panic!("no minf"));
+        let stbl = minf
+            .find(file, b"stbl")
+            .unwrap_or_else(|| panic!("no stbl"));
+        let hdlr = payload(file, &mdia, b"hdlr").unwrap_or_default();
+        let stsz = payload(file, &stbl, b"stsz").unwrap_or_default();
+        let stts = payload(file, &stbl, b"stts").unwrap_or_default();
+        let stsc = payload(file, &stbl, b"stsc").unwrap_or_default();
+        let co64 = payload(file, &stbl, b"co64").unwrap_or_default();
+        let mut durations = Vec::new();
+        for entry in 0..u32_at(stts, 0) as usize {
+            let (count, delta) = (u32_at(stts, 4 + entry * 8), u32_at(stts, 8 + entry * 8));
+            durations.extend(std::iter::repeat_n(delta, count as usize));
+        }
+        let chunks = u32_at(co64, 0) as usize;
+        let runs: Vec<(u32, u32)> = (0..u32_at(stsc, 0) as usize)
+            .map(|e| (u32_at(stsc, 4 + e * 12), u32_at(stsc, 8 + e * 12)))
+            .collect();
+        let chunk_counts = (1..=chunks as u32)
+            .map(|chunk| runs.iter().rev().find(|r| r.0 <= chunk).map_or(0, |r| r.1))
+            .collect();
+        TrackView {
+            handler: String::from_utf8_lossy(&hdlr[4..8]).into_owned(),
+            trak_children: names(file, trak),
+            stbl_children: names(file, &stbl),
+            sample_count: u32_at(stsz, 4),
+            durations,
+            chunk_counts,
+        }
+    }
+}

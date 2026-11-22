@@ -158,3 +158,66 @@ mod properties {
         }
     }
 }
+
+fn decode_order_pts(frame_hns: Hns, b_frames: u64, groups: u64) -> Vec<Hns> {
+    let mut order = vec![0u64];
+    for group in 0..groups {
+        let anchor = (group + 1) * (b_frames + 1);
+        order.push(anchor);
+        order.extend(anchor - b_frames..anchor);
+    }
+    order.into_iter().map(|n| n as Hns * frame_hns).collect()
+}
+
+fn frame_hns_at(fps_num: i64, fps_den: i64) -> Hns {
+    HNS_PER_SEC * fps_den / fps_num
+}
+
+#[test]
+fn strictly_rising_pts_pass_at_both_frame_rates() {
+    for (num, den) in [(60, 1), (60_000, 1001)] {
+        let step = frame_hns_at(num, den);
+        let mut guard = OrderGuard::new();
+        for n in 0..600 {
+            assert_eq!(guard.check(n * step), Ok(()));
+        }
+        assert_eq!(guard.step_backs(), 0);
+    }
+}
+
+#[test]
+fn reordered_output_reports_a_step_back_for_one_to_three_b_frames() {
+    for (num, den) in [(60, 1), (60_000, 1001)] {
+        let step = frame_hns_at(num, den);
+        for b_frames in 1..=3u64 {
+            let pts = decode_order_pts(step, b_frames, 4);
+            let mut guard = OrderGuard::new();
+            let first_error = pts.iter().map(|&p| guard.check(p)).find_map(Result::err);
+            let mut guard = OrderGuard::new();
+            pts.iter().for_each(|&p| drop(guard.check(p)));
+            let anchor = (b_frames + 1) as Hns * step;
+            assert_eq!(
+                first_error,
+                Some(StepBack {
+                    previous: anchor,
+                    pts: anchor - b_frames as Hns * step,
+                }),
+                "{b_frames} B-frames at {num}/{den}"
+            );
+            assert_eq!(guard.step_backs(), 4, "{b_frames} B-frames");
+        }
+    }
+}
+
+#[test]
+fn a_repeated_pts_is_a_step_back() {
+    let mut guard = OrderGuard::new();
+    assert_eq!(guard.check(100), Ok(()));
+    assert_eq!(
+        guard.check(100),
+        Err(StepBack {
+            previous: 100,
+            pts: 100
+        })
+    );
+}

@@ -60,7 +60,7 @@ pub fn finalize(
     chunking: &Chunking,
     audio_start: AudioStart,
 ) -> Result<FinishedInfo> {
-    let moov = write_full_moov_with_start(video, audio, tables, chunking, audio_start);
+    let moov = write_full_moov_with_start(video, audio, tables, chunking, audio_start)?;
     let moov_offset = file.seek(SeekFrom::End(0))?;
     let placeholder = placeholder_bytes(placeholder_offset, moov_offset)?;
     file.write_all(&moov)?;

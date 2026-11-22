@@ -3,8 +3,11 @@ use greyscreen_core::media::{AudioFormat, VideoFormat};
 use crate::aac::write_esds;
 use crate::avc::write_avcc_box;
 use crate::bytes::BoxWriter;
+use crate::{Mp4Error, Result};
 
 const MOVIE_TIMESCALE: u32 = 1000;
+const MAX_RECORDING_SECS: u64 = 3 * 3600;
+const _: () = assert!(MAX_RECORDING_SECS * VideoFormat::TIMESCALE as u64 <= u32::MAX as u64);
 pub(crate) const VIDEO_TRACK_ID: u32 = 1;
 pub(crate) const AUDIO_TRACK_ID: u32 = 2;
 const MINOR_VERSION: u32 = 0x200;
@@ -89,7 +92,7 @@ pub fn write_ftyp(major: &[u8; 4], compatible: &[[u8; 4]]) -> Vec<u8> {
     w.into_inner()
 }
 
-pub fn write_init_moov(video: &VideoFormat, audio: Option<&AudioFormat>) -> Vec<u8> {
+pub fn write_init_moov(video: &VideoFormat, audio: Option<&AudioFormat>) -> Result<Vec<u8>> {
     build_moov(video, audio, None, AudioStart::default())
 }
 
@@ -98,7 +101,7 @@ pub fn write_full_moov(
     audio: Option<&AudioFormat>,
     tables: &SampleTables,
     chunking: &Chunking,
-) -> Vec<u8> {
+) -> Result<Vec<u8>> {
     write_full_moov_with_start(video, audio, tables, chunking, AudioStart::default())
 }
 
@@ -108,7 +111,7 @@ pub fn write_full_moov_with_start(
     tables: &SampleTables,
     chunking: &Chunking,
     audio_start: AudioStart,
-) -> Vec<u8> {
+) -> Result<Vec<u8>> {
     build_moov(video, audio, Some((tables, chunking)), audio_start)
 }
 
@@ -142,6 +145,16 @@ impl Track<'_> {
     fn movie_duration(&self) -> u64 {
         self.delay_ms + self.media_movie_duration()
     }
+
+    fn check_fits(&self) -> Result<()> {
+        fit32("track duration", self.duration_ticks())?;
+        fit32("track movie duration", self.movie_duration())?;
+        fit32("sample count", self.samples.len() as u64)?;
+        fit32("chunk count", self.chunks.len() as u64)?;
+        i32::try_from(self.skip_samples)
+            .map_err(|_| Mp4Error::Invalid("audio skip does not fit in 31 bits".into()))?;
+        Ok(())
+    }
 }
 
 fn build_moov(
@@ -149,7 +162,7 @@ fn build_moov(
     audio: Option<&AudioFormat>,
     full: Option<(&SampleTables, &Chunking)>,
     audio_start: AudioStart,
-) -> Vec<u8> {
+) -> Result<Vec<u8>> {
     let empty = (&SampleTables::default(), &Chunking::default());
     let (tables, chunking) = full.unwrap_or(empty);
     let mut tracks = vec![Track {
@@ -172,7 +185,11 @@ fn build_moov(
             skip_samples: audio_start.skip_samples,
         });
     }
+    for track in &tracks {
+        track.check_fits()?;
+    }
     let movie_duration = tracks.iter().map(Track::movie_duration).max().unwrap_or(0);
+    fit32("movie duration", movie_duration)?;
 
     let mut w = BoxWriter::new();
     w.boxed(b"moov", |w| {
@@ -184,11 +201,16 @@ fn build_moov(
             write_mvex(w, audio.is_some());
         }
     });
-    w.into_inner()
+    Ok(w.into_inner())
 }
 
-fn clamp32(v: u64) -> u32 {
-    u32::try_from(v).unwrap_or(u32::MAX)
+fn fit32(what: &str, value: u64) -> Result<u32> {
+    u32::try_from(value)
+        .map_err(|_| Mp4Error::Invalid(format!("{what} {value} does not fit in 32 bits")))
+}
+
+fn narrow(value: u64) -> u32 {
+    u32::try_from(value).unwrap_or(u32::MAX)
 }
 
 fn write_mvhd(w: &mut BoxWriter, duration: u64) {
@@ -196,7 +218,7 @@ fn write_mvhd(w: &mut BoxWriter, duration: u64) {
         w.u32(0);
         w.u32(0);
         w.u32(MOVIE_TIMESCALE);
-        w.u32(clamp32(duration));
+        w.u32(narrow(duration));
         w.fixed16_16(1.0);
         w.fixed8_8(1.0);
         w.zeros(10);
@@ -237,7 +259,7 @@ fn write_trak(w: &mut BoxWriter, track: &Track, full: bool) {
                 w.u32(0);
                 w.u32(0);
                 w.u32(track.timescale);
-                w.u32(clamp32(track.duration_ticks()));
+                w.u32(narrow(track.duration_ticks()));
                 w.u16(0x55C4);
                 w.u16(0);
             });
@@ -265,12 +287,12 @@ fn write_delay_edits(w: &mut BoxWriter, track: &Track) {
             let delayed = track.delay_ms > 0;
             w.u32(if delayed { 2 } else { 1 });
             if delayed {
-                w.u32(clamp32(track.delay_ms));
+                w.u32(narrow(track.delay_ms));
                 w.i32(-1);
                 w.u16(1);
                 w.u16(0);
             }
-            w.u32(clamp32(track.media_movie_duration()));
+            w.u32(narrow(track.media_movie_duration()));
             w.i32(i32::try_from(track.skip_samples).unwrap_or(i32::MAX));
             w.u16(1);
             w.u16(0);
@@ -284,7 +306,7 @@ fn write_tkhd(w: &mut BoxWriter, track: &Track, duration: u64) {
         w.u32(0);
         w.u32(track.id);
         w.u32(0);
-        w.u32(clamp32(duration));
+        w.u32(narrow(duration));
         w.zeros(8);
         w.u16(0);
         w.u16(0);

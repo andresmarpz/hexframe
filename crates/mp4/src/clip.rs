@@ -69,10 +69,11 @@ pub(crate) fn write_laid_out(
     };
 
     let start = layout.audio_start;
-    let moov_len = write_full_moov_with_start(video, audio, &layout.tables, &layout.chunking, start)
-        .len() as u64;
+    let moov_len =
+        write_full_moov_with_start(video, audio, &layout.tables, &layout.chunking, start)?.len()
+            as u64;
     shift_offsets(&mut layout, ftyp.len() as u64 + moov_len + mdat_header_len);
-    let moov = write_full_moov_with_start(video, audio, &layout.tables, &layout.chunking, start);
+    let moov = write_full_moov_with_start(video, audio, &layout.tables, &layout.chunking, start)?;
     if moov.len() as u64 != moov_len {
         return Err(Mp4Error::Invalid("moov size changed with offsets".into()));
     }
@@ -247,7 +248,9 @@ fn durations(slots: &[Slot], kept: &[usize], track: Track) -> Result<Vec<u32>> {
                 pair[1].dts, pair[0].dts
             )));
         }
-        out.push(u32::try_from(delta).unwrap_or(u32::MAX));
+        out.push(u32::try_from(delta).map_err(|_| {
+            Mp4Error::Invalid(format!("sample duration {delta} does not fit in 32 bits"))
+        })?);
     }
     if let Some(last) = of_track.last() {
         let fallback = out.last().copied().unwrap_or(0);
