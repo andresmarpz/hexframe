@@ -3,18 +3,26 @@
 mod common;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use crossbeam_channel::Sender;
 
 use greyscreen_core::library;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{FakeMediaSource, NoticeAction, NoticeLevel, RecordingEntry, UiMsg};
+use greyscreen_league::LeagueMsg;
+use greyscreen_mp4::inspect::{inspect, sample_secs};
 
 use common::{
-    Harness, assert_playable_from_key_frame, leftover_part, library_message, media, start_idle,
-    temp_dir, wait_for,
+    Harness, assert_playable_from_key_frame, info, leftover_part, library_message, media,
+    start_engine, start_idle, temp_dir, wait_for,
 };
+
+const CHILD_OUTPUT: &str = "GREYSCREEN_KILL_TEST_OUTPUT";
+const MIN_FRAGMENTS: u32 = 2;
 
 const RECOVERED: &str = "Recovered 1 recording that was cut off.";
 
@@ -171,4 +179,103 @@ fn nothing_is_said_when_every_recording_was_finished() {
 
     assert!(first_library(&harness).is_empty());
     assert!(notices(&harness).is_empty());
+}
+
+#[test]
+fn recording_child() {
+    let Ok(output) = std::env::var(CHILD_OUTPUT) else {
+        return;
+    };
+    let league = Box::new(|out: Sender<LeagueMsg>| {
+        out.send(LeagueMsg::WindowFound { hwnd: 7, pid: 42 }).ok();
+        out.send(LeagueMsg::Ready(info())).ok();
+        Box::new(out) as Box<dyn Send>
+    });
+    let _harness = start_engine(
+        Settings {
+            output_dir: PathBuf::from(output),
+            ..Settings::default()
+        },
+        Arc::new(FakeMediaSource::new().with_speed(20)),
+        league,
+        None,
+    );
+    std::thread::sleep(Duration::from_secs(120));
+}
+
+struct KillOnDrop(Child);
+
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        self.0.kill().ok();
+        self.0.wait().ok();
+    }
+}
+
+fn spawn_recording_child(output: &Path) -> KillOnDrop {
+    Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "recording_child",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(CHILD_OUTPUT, output)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(KillOnDrop)
+        .expect("spawn child")
+}
+
+fn recorded_secs(output: &Path) -> Option<f64> {
+    let folder = fs::read_dir(output).ok()?.flatten().next()?.path();
+    let inspected = inspect(&folder.join("game.mp4.part")).ok()?;
+    let greyscreen_mp4::inspect::Layout::Unfinalized { fragments, .. } = inspected.layout else {
+        return None;
+    };
+    (fragments >= MIN_FRAGMENTS).then(|| sample_secs(&inspected.tables.video, 90_000))
+}
+
+fn wait_for_fragments(output: &Path) -> f64 {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while Instant::now() < deadline {
+        if let Some(secs) = recorded_secs(output) {
+            return secs;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    panic!("the child never wrote {MIN_FRAGMENTS} fragments");
+}
+
+#[test]
+fn a_recording_process_killed_mid_game_comes_back_playable_on_the_next_start() {
+    if std::env::var_os(CHILD_OUTPUT).is_some() {
+        return;
+    }
+    let output = temp_dir("recover-killed");
+    let child = spawn_recording_child(&output);
+    let flushed_secs = wait_for_fragments(&output);
+    drop(child);
+    assert!(flushed_secs > 0.0);
+
+    let harness = launch(&output);
+    let entries = first_library(&harness);
+
+    assert_eq!(entries.len(), 1);
+    let entry = &entries[0];
+    assert!(entry.meta.recovered);
+    assert!(
+        entry.meta.duration_secs + 0.5 >= flushed_secs,
+        "{} < {flushed_secs}",
+        entry.meta.duration_secs
+    );
+    assert!(!entry.folder.join("game.mp4.part").exists());
+    assert_playable_from_key_frame(&entry.folder.join("game.mp4"));
+    let notice = wait_for(&harness.ui, |msg| match msg {
+        UiMsg::Notice { level, text } => Some((*level, text.clone())),
+        _ => None,
+    })
+    .expect("recovered notice");
+    assert_eq!(notice, (NoticeLevel::Info, RECOVERED.to_owned()));
 }

@@ -9,6 +9,7 @@ use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 use greyscreen_mp4::aac::asc_lc;
 use greyscreen_mp4::avc::{annexb_to_avcc, nal_type, split_annexb};
 use greyscreen_mp4::fragmented::FragmentedWriter;
+use greyscreen_mp4::inspect::{Layout, inspect};
 use greyscreen_mp4::reader::boxes;
 use greyscreen_mp4::recover::recover;
 
@@ -361,4 +362,139 @@ fn finalized_part_is_only_renamed() {
     assert_eq!(std::fs::read(&out).unwrap_or_default(), before);
     assert_streams(&out, true);
     assert_decodes_cleanly(&out);
+}
+
+fn tiny_media(real: &Media) -> Media {
+    let video = (0..25usize)
+        .map(|i| {
+            let key = i % 5 == 0;
+            let mut nal = vec![if key { 0x65 } else { 0x41 }];
+            nal.extend(std::iter::repeat_n(i as u8, 3 + i % 7));
+            let mut data = (nal.len() as u32).to_be_bytes().to_vec();
+            data.extend(nal);
+            (data, key)
+        })
+        .collect();
+    let audio = (0..40usize).map(|i| vec![0x21; 4 + i % 5]).collect();
+    Media {
+        video_format: real.video_format.clone(),
+        audio_format: real.audio_format.clone(),
+        video,
+        audio,
+    }
+}
+
+fn mdat_ends(bytes: &[u8]) -> Vec<usize> {
+    boxes(bytes)
+        .filter(|b| &b.fourcc == b"mdat")
+        .map(|b| b.end())
+        .collect()
+}
+
+fn counts_at(dir: &TempDir, bytes: &[u8], cut: usize) -> (usize, usize) {
+    let path = dir.join("probe.part");
+    std::fs::write(&path, &bytes[..cut]).unwrap_or_else(|e| panic!("write: {e}"));
+    let inspected = inspect(&path).unwrap_or_else(|e| panic!("inspect at {cut}: {e}"));
+    (inspected.tables.video.len(), inspected.tables.audio.len())
+}
+
+fn clear_outputs(dir: &TempDir) {
+    for name in ["game.mp4", "game.mp4.part", "game.mp4.recovered-fmp4"] {
+        std::fs::remove_file(dir.join(name)).ok();
+    }
+}
+
+fn assert_recovers_to(dir: &TempDir, bytes: &[u8], cut: usize, expected: Option<(usize, usize)>) {
+    clear_outputs(dir);
+    let part = dir.join("game.mp4.part");
+    std::fs::write(&part, &bytes[..cut]).unwrap_or_else(|e| panic!("write: {e}"));
+    let result = recover(&part);
+    let Some((video, audio)) = expected else {
+        assert!(result.is_err(), "cut {cut} should not recover");
+        assert!(dir.join("game.mp4.recovered-fmp4").exists(), "cut {cut}");
+        return;
+    };
+    let out = result.unwrap_or_else(|e| panic!("recover at {cut}: {e}"));
+    let inspected = inspect(&out).unwrap_or_else(|e| panic!("inspect recovered at {cut}: {e}"));
+    assert_eq!(inspected.layout, Layout::Finalized, "cut {cut}");
+    assert_eq!(
+        (inspected.tables.video.len(), inspected.tables.audio.len()),
+        (video, audio),
+        "cut {cut}"
+    );
+    assert!(!part.exists(), "cut {cut}");
+}
+
+#[test]
+fn cutting_the_part_file_at_every_byte_recovers_every_complete_fragment() {
+    let media = tiny_media(&media());
+    let dir = TempDir::new("recover-every-byte");
+    let part = write_part(&dir, &media, 1, true);
+    let bytes = std::fs::read(&part).unwrap_or_default();
+    let ends = mdat_ends(&bytes);
+    assert!(ends.len() >= 4, "{} fragments", ends.len());
+    let totals: Vec<(usize, usize)> = ends.iter().map(|&e| counts_at(&dir, &bytes, e)).collect();
+    assert!(totals.windows(2).all(|w| w[0].0 < w[1].0));
+    for cut in 0..=bytes.len() {
+        let complete = ends.iter().take_while(|&&e| e <= cut).count();
+        let expected = complete.checked_sub(1).map(|i| totals[i]);
+        assert_recovers_to(&dir, &bytes, cut, expected);
+    }
+}
+
+#[test]
+fn a_crash_between_the_index_append_and_the_placeholder_patch_recovers_everything() {
+    let media = tiny_media(&media());
+    let dir = TempDir::new("recover-unpatched");
+    let part = write_part(&dir, &media, 1, true);
+    let bytes = std::fs::read(&part).unwrap_or_default();
+    let total = counts_at(&dir, &bytes, bytes.len());
+    let finished = recover(&part).unwrap_or_else(|e| panic!("recover: {e}"));
+    let finished_bytes = std::fs::read(&finished).unwrap_or_default();
+    let moov = boxes(&finished_bytes)
+        .find(|b| &b.fourcc == b"moov")
+        .unwrap_or_else(|| panic!("no moov"));
+    let unpatched = [&bytes[..], &finished_bytes[moov.start..moov.end()]].concat();
+    let edge = 32;
+    for cut in bytes.len()..=unpatched.len() {
+        let inside = cut - bytes.len();
+        let near_edge = inside < edge || unpatched.len() - cut < edge;
+        if !near_edge && inside % 13 != 0 {
+            continue;
+        }
+        assert_recovers_to(&dir, &unpatched, cut, Some(total));
+    }
+}
+
+#[test]
+fn real_media_cut_around_each_fragment_edge_recovers_a_playable_file() {
+    require_ffmpeg!();
+    let media = media();
+    let dir = TempDir::new("recover-edges");
+    let part = write_part(&dir, &media, 3, true);
+    let bytes = std::fs::read(&part).unwrap_or_default();
+    let ends = mdat_ends(&bytes);
+    let moofs: Vec<usize> = boxes(&bytes)
+        .filter(|b| &b.fourcc == b"moof")
+        .map(|b| b.start)
+        .collect();
+    assert!(ends.len() >= 3);
+    for (index, &end) in ends.iter().enumerate() {
+        let (frames, _) = counts_at(&dir, &bytes, end);
+        let mut cuts = vec![end, end + 1, end + 40, end + 600];
+        cuts.extend(moofs.get(index + 2).map(|m| m - 1));
+        cuts.retain(|&c| c <= bytes.len());
+        for cut in cuts {
+            let complete = ends.iter().take_while(|&&e| e <= cut).count();
+            assert_eq!(complete, index + 1);
+            clear_outputs(&dir);
+            std::fs::write(dir.join("game.mp4.part"), &bytes[..cut])
+                .unwrap_or_else(|e| panic!("write: {e}"));
+            let out = recover(&dir.join("game.mp4.part"))
+                .unwrap_or_else(|e| panic!("recover at {cut}: {e}"));
+            assert_streams(&out, true);
+            assert_decodes_cleanly(&out);
+            assert_eq!(video_packets(&out).0, frames, "cut {cut}");
+        }
+    }
 }
