@@ -19,8 +19,14 @@ const PCM_QUEUE: usize = 256;
 
 type Ready = Sender<Result<Vec<u8>, String>>;
 
-fn pcm_queue() -> (Sender<PcmBlock>, Receiver<PcmBlock>) {
-    crossbeam_channel::bounded(PCM_QUEUE)
+fn spawn_worker(
+    body: impl FnOnce(Receiver<PcmBlock>) + Send + 'static,
+) -> std::io::Result<(Sender<PcmBlock>, JoinHandle<()>)> {
+    let (tx, rx) = crossbeam_channel::bounded(PCM_QUEUE);
+    let worker = std::thread::Builder::new()
+        .name("greyscreen-aac".into())
+        .spawn(move || body(rx))?;
+    Ok((tx, worker))
 }
 
 enum AudioMsg {
@@ -53,12 +59,9 @@ impl AudioPipe {
         qpc: QpcMap,
         bitrate: u32,
     ) -> Result<Self, String> {
-        let (pcm_tx, pcm_rx) = pcm_queue();
         let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
-        let worker = std::thread::Builder::new()
-            .name("greyscreen-aac".into())
-            .spawn(move || aac_main(encoder, pcm_rx, msg_tx, ready_tx))
+        let (pcm_tx, worker) = spawn_worker(move |pcm| aac_main(encoder, pcm, msg_tx, ready_tx))
             .map_err(|e| format!("could not spawn the AAC thread: {e}"))?;
         let asc = match ready_rx.recv() {
             Ok(Ok(asc)) => asc,

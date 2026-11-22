@@ -6,7 +6,7 @@ use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::MediaEvent;
 use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
 
-use super::{AudioPipe, pcm_queue};
+use super::{AudioPipe, spawn_worker};
 use crate::aac::OpenEncoder;
 use crate::audio::{OpenSource, PacketInfo, PcmBlock, SourceError};
 use crate::clock::QpcMap;
@@ -79,8 +79,8 @@ fn warnings(rx: &Receiver<MediaEvent>) -> Vec<String> {
 
 #[test]
 fn queue_disconnects_when_the_worker_receiver_drops() {
-    let (tx, rx) = pcm_queue();
-    drop(rx);
+    let (tx, worker) = spawn_worker(|_| {}).expect("worker spawns");
+    worker.join().expect("worker ends");
     let block = PcmBlock {
         first_frame: 0,
         samples: vec![0; 4],
