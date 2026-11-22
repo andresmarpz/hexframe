@@ -38,4 +38,4 @@ pub use feedback::{FeedbackConfig, FeedbackTransport};
 pub use hotkey::HotkeyBackend;
 pub use library::entries as library_entries;
 pub use storyboard::build_storyboard;
-pub use writer::set_write_limit;
+pub use writer::{set_write_delay, set_write_limit};

@@ -53,7 +53,7 @@ impl GameWriter {
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
         let part = folder.join(PART_FILE);
-        match fault::limit() {
+        match fault::active().then(|| fault::limit().unwrap_or(u64::MAX)) {
             Some(limit) => {
                 let file = fault::LimitedFile::create(&part, limit).map_err(|e| e.to_string())?;
                 let writer =
@@ -210,7 +210,7 @@ fn rename_with_retry(part: &Path, target: &Path) -> Result<(), String> {
     Err(last)
 }
 
-pub use fault::set_write_limit;
+pub use fault::{set_write_delay, set_write_limit};
 
 #[cfg(test)]
 mod tests;

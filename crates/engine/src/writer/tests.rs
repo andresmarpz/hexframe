@@ -140,6 +140,14 @@ fn start_on(
     sink: impl Sink + Send + 'static,
     failures: &Arc<AtomicU32>,
 ) -> (GameWriter, mpsc::Receiver<Report>, PathBuf) {
+    start_on_queue(sink, failures, 20_000)
+}
+
+fn start_on_queue(
+    sink: impl Sink + Send + 'static,
+    failures: &Arc<AtomicU32>,
+    queue: usize,
+) -> (GameWriter, mpsc::Receiver<Report>, PathBuf) {
     let dir = test_dir("sink");
     fs::write(dir.join(PART_FILE), b"").unwrap();
     let (done_tx, done_rx) = mpsc::channel();
@@ -149,7 +157,7 @@ fn start_on(
         &dir,
         &video_format(),
         None,
-        20_000,
+        queue,
         move |_| {
             failures.fetch_add(1, Ordering::SeqCst);
         },
@@ -315,5 +323,204 @@ fn ten_thousand_failing_packets_finish_and_report_one_failure() {
     );
     assert_eq!(failures.load(Ordering::SeqCst), 1);
     drop(writer);
+    fs::remove_dir_all(dir).ok();
+}
+
+struct ScriptedSink {
+    bytes: std::io::Cursor<Vec<u8>>,
+    stalled: Arc<AtomicBool>,
+    panics: Arc<AtomicBool>,
+}
+
+impl std::io::Write for ScriptedSink {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        assert!(!self.panics.load(Ordering::SeqCst), "the disk panicked");
+        while self.stalled.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(5));
+        }
+        self.bytes.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl std::io::Seek for ScriptedSink {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.bytes.seek(pos)
+    }
+}
+
+impl Sink for ScriptedSink {
+    fn sync(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+struct Scripted {
+    writer: GameWriter,
+    done: mpsc::Receiver<Report>,
+    dir: PathBuf,
+    stalled: Arc<AtomicBool>,
+    panics: Arc<AtomicBool>,
+    failures: Arc<AtomicU32>,
+}
+
+fn scripted(queue: usize) -> Scripted {
+    let stalled = Arc::new(AtomicBool::new(false));
+    let panics = Arc::new(AtomicBool::new(false));
+    let failures = Arc::new(AtomicU32::new(0));
+    let sink = ScriptedSink {
+        bytes: std::io::Cursor::new(Vec::new()),
+        stalled: Arc::clone(&stalled),
+        panics: Arc::clone(&panics),
+    };
+    let (writer, done, dir) = start_on_queue(sink, &failures, queue);
+    Scripted {
+        writer,
+        done,
+        dir,
+        stalled,
+        panics,
+        failures,
+    }
+}
+
+fn drop_within_timeout(writer: GameWriter) {
+    let (gone_tx, gone_rx) = mpsc::channel();
+    thread::spawn(move || {
+        drop(writer);
+        gone_tx.send(()).ok();
+    });
+    gone_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("the writer thread joins");
+}
+
+fn report_once(done: &mpsc::Receiver<Report>) -> Report {
+    let report = done.recv_timeout(Duration::from_secs(1)).expect("a report");
+    assert!(done.try_recv().is_err(), "a second report arrived");
+    report
+}
+
+#[test]
+fn a_stalled_disk_never_blocks_the_sender_and_the_queued_prefix_is_finished() {
+    let mut game = scripted(8);
+    game.stalled.store(true, Ordering::SeqCst);
+    let started = Instant::now();
+    let sent: Vec<Sent> = (0..200)
+        .map(|i| game.writer.send(key_packet(i * 1500)))
+        .collect();
+    assert!(started.elapsed() < Duration::from_secs(1));
+    let queued = sent.iter().filter(|s| **s == Sent::Queued).count();
+    assert!((8..=10).contains(&queued), "{queued}");
+    assert_eq!(sent.iter().filter(|s| **s == Sent::Full).count(), 1);
+    assert!(sent[queued + 1..].iter().all(|s| *s == Sent::Stopped));
+    game.stalled.store(false, Ordering::SeqCst);
+    let info = report_once(&game.done).expect("finished prefix");
+    assert!(info.duration_secs > 0.0);
+    assert!(game.dir.join(VIDEO_FILE).is_file());
+    assert_eq!(game.failures.load(Ordering::SeqCst), 0);
+    drop_within_timeout(game.writer);
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn the_queue_never_holds_more_than_its_cap_over_ten_thousand_arrivals() {
+    let mut game = scripted(16);
+    game.stalled.store(true, Ordering::SeqCst);
+    for i in 0..10_000 {
+        game.writer.send(key_packet(i * 1500));
+        assert!(game.writer.queued() <= 16);
+    }
+    game.stalled.store(false, Ordering::SeqCst);
+    drop_within_timeout(game.writer);
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn dropping_after_close_joins_and_reports_once() {
+    let mut game = scripted(64);
+    for i in 0..3 {
+        game.writer.send(key_packet(i * 1500));
+    }
+    game.writer.close();
+    drop_within_timeout(game.writer);
+    assert!(report_once(&game.done).is_ok());
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn dropping_an_idle_writer_joins_and_reports_once() {
+    let game = scripted(64);
+    drop_within_timeout(game.writer);
+    assert!(report_once(&game.done).is_err());
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn dropping_with_a_full_queue_joins_and_reports_once() {
+    let mut game = scripted(4);
+    game.stalled.store(true, Ordering::SeqCst);
+    let mut index = 0;
+    while game.writer.send(key_packet(index * 1500)) == Sent::Queued {
+        index += 1;
+    }
+    game.stalled.store(false, Ordering::SeqCst);
+    drop_within_timeout(game.writer);
+    assert!(report_once(&game.done).is_ok());
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn dropping_in_the_middle_of_a_write_waits_for_it_and_reports_once() {
+    let mut game = scripted(64);
+    game.stalled.store(true, Ordering::SeqCst);
+    for i in 0..3 {
+        game.writer.send(key_packet(i * 1500));
+    }
+    thread::sleep(Duration::from_millis(100));
+    let stalled = Arc::clone(&game.stalled);
+    let release = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(200));
+        stalled.store(false, Ordering::SeqCst);
+    });
+    drop_within_timeout(game.writer);
+    release.join().unwrap();
+    assert!(report_once(&game.done).is_ok());
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn a_disk_that_panics_still_reports_once_and_drop_joins() {
+    let mut game = scripted(64);
+    game.panics.store(true, Ordering::SeqCst);
+    for i in 0..3 {
+        game.writer.send(key_packet(i * 1500));
+    }
+    drop_within_timeout(game.writer);
+    let report = report_once(&game.done);
+    assert!(report.unwrap_err().contains("panicked"));
+    fs::remove_dir_all(game.dir).ok();
+}
+
+#[test]
+fn a_failed_spawn_leaves_no_thread_and_no_report() {
+    let dir = test_dir("failed-spawn");
+    let (done_tx, done_rx) = mpsc::channel();
+    let spawned = GameWriter::spawn_on(
+        full_after(0),
+        &dir,
+        &video_format(),
+        None,
+        8,
+        |_| {},
+        move |report| {
+            done_tx.send(report).ok();
+        },
+    );
+    assert!(spawned.is_err());
+    assert!(done_rx.recv_timeout(Duration::from_millis(200)).is_err());
     fs::remove_dir_all(dir).ok();
 }

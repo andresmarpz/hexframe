@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
@@ -326,4 +327,35 @@ pub(crate) fn wait_saved(harness: &Harness) -> RecordingEntry {
 
 pub(crate) fn inspect_video(entry: &RecordingEntry) -> greyscreen_mp4::inspect::Inspected {
     greyscreen_mp4::inspect::inspect(&entry.folder.join(&entry.meta.video)).expect("inspect")
+}
+
+pub(crate) struct BlockingFreeSpace {
+    armed: AtomicBool,
+    stall: Duration,
+}
+
+impl BlockingFreeSpace {
+    pub(crate) fn new(stall: Duration) -> Arc<Self> {
+        Arc::new(Self {
+            armed: AtomicBool::new(false),
+            stall,
+        })
+    }
+
+    pub(crate) fn arm(&self) {
+        self.armed.store(true, Ordering::SeqCst);
+    }
+}
+
+impl FreeSpace for BlockingFreeSpace {
+    fn free_bytes(&self, _dir: &Path) -> Option<u64> {
+        if self.armed.swap(false, Ordering::SeqCst) {
+            std::thread::sleep(self.stall);
+        }
+        Some(u64::MAX / 2)
+    }
+
+    fn check_every(&self) -> Duration {
+        Duration::from_millis(50)
+    }
 }
