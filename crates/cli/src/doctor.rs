@@ -204,13 +204,7 @@ fn deep_checks(out: &Path) -> bool {
                             key: p.key,
                         })
                         .collect(),
-                    nv12: run.nv12.map(|m| deep::Nv12Means {
-                        luma: m.luma,
-                        luma_left: m.luma_left,
-                        luma_right: m.luma_right,
-                        chroma_u: m.chroma_u,
-                        chroma_v: m.chroma_v,
-                    }),
+                    nv12: run.nv12.map(Into::into),
                     ..blank
                 },
             }

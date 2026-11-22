@@ -1,7 +1,9 @@
 use std::time::{Duration, Instant};
 
 use greyscreen_core::crop::CropRect;
-use greyscreen_core::encoder::{self, Attempt, Candidate, EncoderKind, Probe, Reason};
+use greyscreen_core::encoder::{
+    self, Attempt, Candidate, EncoderKind, Probe, Reason, nv12_report,
+};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, encode_size};
 use greyscreen_core::time::HNS_PER_SEC;
 use windows::Win32::Foundation::E_POINTER;
@@ -120,8 +122,9 @@ fn encode_test_frames(
             run.packets.len()
         ));
     }
+    let nv12 = nv12_report(run.nv12.map(Into::into)).summary();
     Ok(format!(
-        "{}, {} of {FRAMES} frames at {}x{} {} fps in {} ms",
+        "{}, {} of {FRAMES} frames at {}x{} {} fps in {} ms, {nv12}",
         run.encoder,
         run.packets.len(),
         run.size.0,
@@ -157,10 +160,16 @@ fn encode_frames(
     let mut packets = Vec::new();
     for index in 0..frames {
         wait_for_input(&mut encoder, &mut packets)?;
+        let busy_deadline = Instant::now() + INPUT_WAIT;
         let frame = loop {
             match converter.convert(&source, size, CropRect::full(size)) {
                 Ok(frame) => break frame,
                 Err(VprocError::Busy) => {
+                    if Instant::now() >= busy_deadline {
+                        return Err(format!(
+                            "the converter stayed busy: the encoder holds {index} frames without output"
+                        ));
+                    }
                     encoder
                         .drain_output(&mut packets)
                         .map_err(|e| e.to_string())?;

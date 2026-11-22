@@ -27,6 +27,18 @@ pub struct PlaneMeans {
     pub chroma_v: f64,
 }
 
+impl From<PlaneMeans> for greyscreen_core::encoder::Nv12Means {
+    fn from(m: PlaneMeans) -> Self {
+        Self {
+            luma: m.luma,
+            luma_left: m.luma_left,
+            luma_right: m.luma_right,
+            chroma_u: m.chroma_u,
+            chroma_v: m.chroma_v,
+        }
+    }
+}
+
 fn mean(values: impl Iterator<Item = u8>) -> f64 {
     let (sum, count) = values.fold((0u64, 0u64), |(sum, count), v| {
         (sum + u64::from(v), count + 1)

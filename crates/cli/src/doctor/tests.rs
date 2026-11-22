@@ -1,4 +1,5 @@
-use super::deep::{Nv12Means, Observation, Packet, build, count_b_pictures, nv12_report};
+use super::deep::{Observation, Packet, build, count_b_pictures};
+use greyscreen_core::encoder::{Nv12Means, nv12_report};
 
 const IDR: [u8; 7] = [0, 0, 0, 1, 0x65, 0x88, 0x00];
 const P_SLICE: [u8; 7] = [0, 0, 0, 1, 0x41, 0xC0, 0x00];
@@ -61,7 +62,7 @@ fn counts_b_pictures_and_ignores_p_and_idr() {
 #[test]
 fn a_continuation_slice_of_a_b_picture_is_not_counted_twice() {
     let mut stream = B_SLICE.to_vec();
-    stream.extend_from_slice(&[0, 0, 1, 0x01, 0x5A, 0x00]);
+    stream.extend_from_slice(&[0, 0, 1, 0x01, 0x48, 0x00]);
     assert_eq!(count_b_pictures(&stream), 1);
 }
 

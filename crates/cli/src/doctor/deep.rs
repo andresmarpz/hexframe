@@ -1,19 +1,6 @@
+use greyscreen_core::encoder::{Nv12Means, Nv12Report, nv12_report};
+use greyscreen_core::frame_timing::OrderGuard;
 use serde::Serialize;
-
-const EXPECTED_LUMA_MEAN: f64 = 125.5;
-const LUMA_TOLERANCE: f64 = 12.0;
-const CHROMA_NEUTRAL: f64 = 128.0;
-const CHROMA_TOLERANCE: f64 = 6.0;
-const MIN_RAMP_SPAN: f64 = 120.0;
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub(crate) struct Nv12Means {
-    pub(crate) luma: f64,
-    pub(crate) luma_left: f64,
-    pub(crate) luma_right: f64,
-    pub(crate) chroma_u: f64,
-    pub(crate) chroma_v: f64,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Packet {
@@ -65,19 +52,13 @@ pub(crate) struct AdapterReport {
     pub(crate) packets_out: usize,
     pub(crate) b_frames: u32,
     pub(crate) pts_strictly_rising: bool,
+    pub(crate) step_backs: u64,
     pub(crate) encodes_on_capture_adapter: bool,
     pub(crate) cpu_readback: bool,
     pub(crate) size: String,
     pub(crate) fps: u32,
     pub(crate) properties: Vec<String>,
     pub nv12: Nv12Report,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct Nv12Report {
-    pub(crate) status: &'static str,
-    pub(crate) detail: String,
-    pub(crate) means: Option<Nv12Means>,
 }
 
 pub(crate) fn build(observations: &[Observation], greyscreen: &str, os: &str) -> Report {
@@ -96,7 +77,12 @@ pub(crate) fn build(observations: &[Observation], greyscreen: &str, os: &str) ->
 fn judge(observation: &Observation) -> AdapterReport {
     let packets = &observation.packets;
     let b_frames = packets.iter().map(|p| count_b_pictures(&p.annexb)).sum();
-    let rising = packets.windows(2).all(|w| w[1].pts_hns > w[0].pts_hns);
+    let mut order = OrderGuard::new();
+    for packet in packets {
+        let _stepped_back = order.check(packet.pts_hns).is_err();
+    }
+    let step_backs = order.step_backs();
+    let rising = step_backs == 0;
     let mut failures = Vec::new();
     let mut notes = Vec::new();
     if let Some(error) = &observation.error {
@@ -112,7 +98,7 @@ fn judge(observation: &Observation) -> AdapterReport {
             failures.push(format!("{b_frames} B-frames read back with B-frames off"));
         }
         if !rising {
-            failures.push("output timestamps do not rise strictly".to_owned());
+            failures.push(format!("output timestamps stepped back {step_backs} times"));
         }
         if observation.hardware && observation.cpu_readback {
             failures.push("the hardware path made a CPU readback".to_owned());
@@ -146,45 +132,13 @@ fn judge(observation: &Observation) -> AdapterReport {
         packets_out: packets.len(),
         b_frames,
         pts_strictly_rising: rising,
+        step_backs,
         encodes_on_capture_adapter: observation.is_capture_adapter,
         cpu_readback: observation.cpu_readback,
         size: format!("{}x{}", observation.size.0, observation.size.1),
         fps: observation.fps,
         properties: observation.properties.clone(),
         nv12: nv12_report(observation.nv12),
-    }
-}
-
-pub(crate) fn nv12_report(means: Option<Nv12Means>) -> Nv12Report {
-    let Some(m) = means else {
-        return Nv12Report {
-            status: "unavailable",
-            detail: "the frame could not be read back".to_owned(),
-            means: None,
-        };
-    };
-    let mut problems = Vec::new();
-    if (m.luma - EXPECTED_LUMA_MEAN).abs() > LUMA_TOLERANCE {
-        problems.push(format!(
-            "luma mean {:.1}, expected about {EXPECTED_LUMA_MEAN}",
-            m.luma
-        ));
-    }
-    if m.luma_right - m.luma_left < MIN_RAMP_SPAN {
-        problems.push(format!(
-            "luma ramp spans {:.1}, expected over {MIN_RAMP_SPAN}",
-            m.luma_right - m.luma_left
-        ));
-    }
-    for (name, value) in [("U", m.chroma_u), ("V", m.chroma_v)] {
-        if (value - CHROMA_NEUTRAL).abs() > CHROMA_TOLERANCE {
-            problems.push(format!("{name} mean {value:.1}, expected {CHROMA_NEUTRAL}"));
-        }
-    }
-    Nv12Report {
-        status: if problems.is_empty() { "ok" } else { "suspect" },
-        detail: problems.join("; "),
-        means,
     }
 }
 

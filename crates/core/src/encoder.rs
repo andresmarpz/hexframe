@@ -4,6 +4,8 @@ use crate::media::CaptureConfig;
 
 mod check;
 pub use check::{Attempt, CheckOutcome, EncoderCheck};
+mod nv12;
+pub use nv12::{Nv12Means, Nv12Report, nv12_report};
 
 pub const SOFTWARE_MAX_HEIGHT: u32 = 1080;
 pub const SOFTWARE_MAX_FPS: u32 = 30;
