@@ -83,7 +83,10 @@ impl Launch {
         if let Some(err) = &self.install_error {
             tracing::warn!(%err, "cannot install, running from this folder");
         }
-        greyscreen_capture::crash::install(Some(paths::logs_dir().join("crash.txt")));
+        greyscreen_capture::crash::install(
+            Some(paths::logs_dir().join("crash.txt")),
+            env!("GREYSCREEN_BUILD"),
+        );
         if !self.headless {
             init_dpi();
         }

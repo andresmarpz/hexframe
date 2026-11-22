@@ -29,6 +29,11 @@ use rune::{App, AppSpec, Chrome};
 use sfx::Sfx;
 use ui::Ui;
 
+#[cfg(windows)]
+#[global_allocator]
+static ALLOCATOR: greyscreen_capture::crash::ReportOutOfMemory<std::alloc::System> =
+    greyscreen_capture::crash::ReportOutOfMemory(std::alloc::System);
+
 const ENCODER_CHECK_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
 fn main() {

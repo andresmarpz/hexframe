@@ -82,6 +82,11 @@ enum Command {
         #[arg(long, default_value = "thumb.jpg")]
         out: PathBuf,
     },
+    #[command(hide = true)]
+    CrashTest {
+        #[arg(long)]
+        dir: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -130,6 +135,7 @@ fn main() -> ExitCode {
         Command::Recover { path } => finish(recover::run(&path)),
         Command::Storyboard { folder } => finish(storyboard::run(&folder)),
         Command::Thumb { video, at, out } => finish(thumb::run(&video, at, &out)),
+        Command::CrashTest { dir } => crash_test(&dir),
     }
 }
 
@@ -139,6 +145,18 @@ fn run_fake_league(port: u16, speed: f64, script: Option<PathBuf>) -> anyhow::Re
         None => fake_league::Script::builtin()?,
     };
     fake_league::run(port, speed, script)
+}
+
+#[cfg(windows)]
+fn crash_test(dir: &std::path::Path) -> ExitCode {
+    greyscreen_capture::crash::install(Some(dir.join("crash.txt")), env!("GREYSCREEN_BUILD"));
+    greyscreen_capture::crash::fault_in_worker_thread()
+}
+
+#[cfg(not(windows))]
+fn crash_test(_dir: &std::path::Path) -> ExitCode {
+    eprintln!("error: crash-test needs Windows");
+    ExitCode::FAILURE
 }
 
 fn finish(result: anyhow::Result<()>) -> ExitCode {
@@ -173,7 +191,10 @@ pub(crate) fn init_windows() {
         .with_ansi(false)
         .with_env_filter(filter)
         .init();
-    greyscreen_capture::crash::install(Some(greyscreen_core::paths::logs_dir().join("crash.txt")));
+    greyscreen_capture::crash::install(
+        Some(greyscreen_core::paths::logs_dir().join("crash.txt")),
+        env!("GREYSCREEN_BUILD"),
+    );
     if let Err(err) = greyscreen_capture::probe::init_process() {
         eprintln!("dpi awareness: {err}");
     }
