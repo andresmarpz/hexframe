@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub(crate) mod client;
+pub mod cloaked_window;
 #[cfg(test)]
 pub(crate) mod encoder;
 #[cfg(test)]

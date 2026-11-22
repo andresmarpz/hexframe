@@ -24,6 +24,10 @@ fault-injection = []
 name = "start_timeout"
 required-features = ["fault-injection"]
 
+[[test]]
+name = "cloaked_window"
+required-features = ["fault-injection"]
+
 [target.'cfg(windows)'.dependencies]
 wasapi.workspace = true
 windows = { workspace = true, features = [
