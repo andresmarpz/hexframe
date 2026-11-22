@@ -14,6 +14,7 @@ use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::luid_u64;
 use crate::pacer::Stats;
+use crate::power::SystemPowerGuard;
 use crate::procstats::ProcessSampler;
 
 const BORDER_SHOWN: &str = "Windows shows a yellow border around the captured window while Greyscreen records. It is not in the video.";
@@ -94,6 +95,8 @@ pub(crate) fn build(
     if let Some((sps, pps)) = parameter_sets(encoder.sequence_header()) {
         sink.set_fallback(sps, pps);
     }
+    let mut power = SystemPowerGuard::system();
+    power.hold();
     Ok(Video {
         wgc,
         converter,
@@ -121,6 +124,7 @@ pub(crate) fn build(
         seq: 0,
         last_seq: 0,
         soft_errors: 0,
+        power,
     })
 }
 

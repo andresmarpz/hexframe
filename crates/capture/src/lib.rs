@@ -33,6 +33,7 @@ pub mod hotkey;
 pub mod install;
 pub mod instance;
 mod pacer;
+mod power;
 pub mod probe;
 pub mod procstats;
 pub mod recycle;

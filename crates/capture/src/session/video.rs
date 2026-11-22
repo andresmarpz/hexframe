@@ -15,6 +15,7 @@ use crate::com::{ComGuard, MfGuard};
 use crate::d3d::GpuDevice;
 use crate::h264::{EncodedVideo, H264Encoder, H264Error};
 use crate::pacer::{Stats, wait_for};
+use crate::power::SystemPowerGuard;
 use crate::procstats::ProcessSampler;
 use crate::vproc::{VideoConverter, VprocError};
 use crate::wgc::WgcCapture;
@@ -47,6 +48,7 @@ pub(crate) struct Video {
     pub(super) seq: u64,
     pub(super) last_seq: u64,
     pub(super) soft_errors: u32,
+    pub(super) power: SystemPowerGuard,
 }
 
 impl Video {
@@ -248,6 +250,7 @@ impl Video {
             gpu,
             mf,
             com,
+            mut power,
             ..
         } = self;
         let (finish, failure) = match exit {
@@ -271,6 +274,7 @@ impl Video {
         drop(gpu);
         drop(mf);
         drop(com);
+        power.release();
         if let Some(reason) = failure {
             sink.failed(reason);
         }
