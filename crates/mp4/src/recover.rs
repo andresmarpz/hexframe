@@ -3,6 +3,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::finalize::finalize;
+use crate::fragmented::{START_MARKER_LEN, START_MARKER_TAG};
+use crate::moov::AudioStart;
 use crate::{Mp4Error, Result};
 
 pub(crate) mod cursor;
@@ -27,6 +29,7 @@ pub(crate) struct Scan {
     pub(crate) runs: Vec<Run>,
     pub(crate) fragments: u32,
     pub(crate) good_end: u64,
+    pub(crate) audio_start: AudioStart,
 }
 
 pub fn recover(part: &Path) -> Result<PathBuf> {
@@ -88,7 +91,7 @@ fn rebuild(part: &Path) -> Result<()> {
         audio.as_ref(),
         &tables,
         &chunking,
-        0,
+        scan.audio_start,
     )?;
     Ok(())
 }
@@ -155,7 +158,16 @@ pub(crate) fn scan(file: &mut File) -> Result<Scan> {
     let mut runs = Vec::new();
     let mut good_end = pos;
     let mut fragments = 0u32;
+    let mut audio_start = AudioStart::default();
+    let mut pending_start = None;
     while let Some(moof) = header_at(file, pos, len)? {
+        if &moof.fourcc == b"free" && moof.size == START_MARKER_LEN as u64 && pos + moof.size <= len
+        {
+            let bytes = read_exact_at(file, pos, moof.size)?;
+            pending_start = start_from_marker(&bytes);
+            pos += moof.size;
+            continue;
+        }
         if &moof.fourcc != b"moof" || pos + moof.size > len {
             break;
         }
@@ -173,6 +185,9 @@ pub(crate) fn scan(file: &mut File) -> Result<Scan> {
         };
         runs.append(&mut fragment);
         fragments += 1;
+        if let Some(start) = pending_start.take() {
+            audio_start = start;
+        }
         pos = mdat_pos + mdat.size;
         good_end = pos;
     }
@@ -182,5 +197,18 @@ pub(crate) fn scan(file: &mut File) -> Result<Scan> {
         runs,
         fragments,
         good_end,
+        audio_start,
+    })
+}
+
+fn start_from_marker(bytes: &[u8]) -> Option<AudioStart> {
+    if bytes.get(8..12)? != START_MARKER_TAG {
+        return None;
+    }
+    let delay = u32::from_be_bytes(bytes.get(12..16)?.try_into().ok()?);
+    let skip = u32::from_be_bytes(bytes.get(16..20)?.try_into().ok()?);
+    Some(AudioStart {
+        delay_ms: u64::from(delay),
+        skip_samples: skip,
     })
 }

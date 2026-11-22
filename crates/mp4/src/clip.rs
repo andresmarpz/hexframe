@@ -6,7 +6,9 @@ use std::sync::Arc;
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 
 use crate::fragmented::BRANDS;
-use crate::moov::{Chunk, Chunking, SampleRow, SampleTables, write_ftyp, write_full_moov};
+use crate::moov::{
+    AudioStart, Chunk, Chunking, SampleRow, SampleTables, write_ftyp, write_full_moov_with_start,
+};
 use crate::{Mp4Error, Result};
 
 const MDAT_SMALL_HEADER: u64 = 8;
@@ -25,6 +27,7 @@ pub(crate) struct Layout {
     pub tables: SampleTables,
     pub chunking: Chunking,
     pub payload_len: u64,
+    pub audio_start: AudioStart,
 }
 
 pub(crate) type Fill<'a> = dyn FnMut(usize, &mut dyn Write) -> Result<()> + 'a;
@@ -65,9 +68,11 @@ pub(crate) fn write_laid_out(
         MDAT_SMALL_HEADER
     };
 
-    let moov_len = write_full_moov(video, audio, &layout.tables, &layout.chunking).len() as u64;
+    let start = layout.audio_start;
+    let moov_len = write_full_moov_with_start(video, audio, &layout.tables, &layout.chunking, start)
+        .len() as u64;
     shift_offsets(&mut layout, ftyp.len() as u64 + moov_len + mdat_header_len);
-    let moov = write_full_moov(video, audio, &layout.tables, &layout.chunking);
+    let moov = write_full_moov_with_start(video, audio, &layout.tables, &layout.chunking, start);
     if moov.len() as u64 != moov_len {
         return Err(Mp4Error::Invalid("moov size changed with offsets".into()));
     }
@@ -202,11 +207,22 @@ pub(crate) fn plan(audio: Option<&AudioFormat>, slots: &[Slot]) -> Result<Layout
         position += slot.len as u64;
     }
 
+    let audio_start = audio
+        .zip(
+            kept.iter()
+                .map(|&i| &slots[i])
+                .find(|s| s.track == Track::Audio),
+        )
+        .map_or_else(AudioStart::default, |(format, first)| {
+            AudioStart::from_first_packet(first.dts, format.sample_rate, idr.dts)
+        });
+
     Ok(Layout {
         kept,
         tables,
         chunking,
         payload_len: position,
+        audio_start,
     })
 }
 

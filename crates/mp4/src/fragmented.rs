@@ -8,8 +8,8 @@ use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 use crate::bytes::BoxWriter;
 use crate::clip::ends_before;
 use crate::moov::{
-    AUDIO_TRACK_ID, Chunk, Chunking, NON_SYNC_SAMPLE_FLAGS, SYNC_SAMPLE_FLAGS, SampleRow,
-    SampleTables, VIDEO_TRACK_ID, write_ftyp, write_init_moov,
+    AUDIO_TRACK_ID, AudioStart, Chunk, Chunking, NON_SYNC_SAMPLE_FLAGS, SYNC_SAMPLE_FLAGS,
+    SampleRow, SampleTables, VIDEO_TRACK_ID, write_ftyp, write_init_moov,
 };
 use crate::sink::Sink;
 use crate::{Mp4Error, Result};
@@ -19,6 +19,8 @@ use crate::finalize::finalize;
 
 pub(crate) const BRANDS: [[u8; 4]; 4] = [*b"isom", *b"iso6", *b"avc1", *b"mp41"];
 const PLACEHOLDER_LEN: u64 = 16;
+pub(crate) const START_MARKER_LEN: usize = 20;
+pub(crate) const START_MARKER_TAG: &[u8; 4] = b"hxas";
 const SYNC_INTERVAL_SECS: u64 = 5;
 const TFHD_DEFAULT_BASE_IS_MOOF: u32 = 0x02_0000;
 const TFHD_DEFAULT_SAMPLE_FLAGS: u32 = 0x20;
@@ -105,7 +107,8 @@ pub struct FragmentedWriter<S: Sink = File> {
     synced_video_ticks: u64,
     origin: Option<i64>,
     audio_started: bool,
-    audio_delay_ms: u64,
+    audio_start: AudioStart,
+    audio_marked: bool,
     audio_backlog: Vec<Packet>,
 }
 
@@ -143,7 +146,8 @@ impl<S: Sink> FragmentedWriter<S> {
             synced_video_ticks: 0,
             origin: None,
             audio_started: false,
-            audio_delay_ms: 0,
+            audio_start: AudioStart::default(),
+            audio_marked: false,
             audio_backlog: Vec::new(),
         })
     }
@@ -175,7 +179,7 @@ impl<S: Sink> FragmentedWriter<S> {
                 return Ok(());
             }
             self.audio_started = true;
-            self.audio_delay_ms = delay_ms(packet.dts, rate, origin);
+            self.audio_start = AudioStart::from_first_packet(packet.dts, rate, origin);
         }
         self.audio.accept(packet)?;
         self.audio.pending = Some(packet.clone());
@@ -224,7 +228,7 @@ impl<S: Sink> FragmentedWriter<S> {
             self.audio_format.as_ref(),
             &tables,
             &chunking,
-            self.audio_delay_ms,
+            self.audio_start,
         )
     }
 
@@ -240,7 +244,15 @@ impl<S: Sink> FragmentedWriter<S> {
         let moof = self.moof(video_offset as i32, audio_offset as i32);
 
         let mdat_len = 8 + video_bytes + self.audio.queued_bytes();
-        let mut buf = Vec::with_capacity(moof.len() + mdat_len);
+        let mut buf = Vec::with_capacity(moof.len() + mdat_len + START_MARKER_LEN);
+        let mut marker_len = 0;
+        if !self.audio_marked && !self.audio.queued.is_empty() {
+            self.audio_marked = true;
+            if self.audio_start != AudioStart::default() {
+                buf.extend_from_slice(&start_marker(self.audio_start));
+                marker_len = START_MARKER_LEN;
+            }
+        }
         buf.extend_from_slice(&moof);
         buf.extend_from_slice(&u32::try_from(mdat_len).unwrap_or(u32::MAX).to_be_bytes());
         buf.extend_from_slice(b"mdat");
@@ -250,7 +262,7 @@ impl<S: Sink> FragmentedWriter<S> {
         self.file.seek(SeekFrom::Start(self.pos))?;
         self.file.write_all(&buf)?;
 
-        let base = self.pos;
+        let base = self.pos + marker_len as u64;
         record(&mut self.video, base + video_offset as u64);
         record(&mut self.audio, base + audio_offset as u64);
         self.pos += buf.len() as u64;
@@ -293,12 +305,14 @@ impl<S: Sink> FragmentedWriter<S> {
     }
 }
 
-fn delay_ms(audio_dts: i64, sample_rate: u32, origin: i64) -> u64 {
-    let rate = i128::from(sample_rate);
-    let ticks =
-        i128::from(audio_dts) * i128::from(VideoFormat::TIMESCALE) - i128::from(origin) * rate;
-    let ms = ticks * 1000 / (i128::from(VideoFormat::TIMESCALE) * rate);
-    u64::try_from(ms).unwrap_or(0)
+fn start_marker(start: AudioStart) -> Vec<u8> {
+    let mut w = BoxWriter::new();
+    w.u32(START_MARKER_LEN as u32);
+    w.bytes(b"free");
+    w.bytes(START_MARKER_TAG);
+    w.u32(u32::try_from(start.delay_ms).unwrap_or(u32::MAX));
+    w.u32(start.skip_samples);
+    w.into_inner()
 }
 
 fn record(track: &mut TrackState, mut offset: u64) {

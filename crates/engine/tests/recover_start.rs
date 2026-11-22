@@ -266,7 +266,7 @@ fn a_recording_process_killed_mid_game_comes_back_playable_on_the_next_start() {
         .path();
     let inspected = inspect(&folder.join("game.mp4.part")).expect("inspect part");
     let expected =
-        greyscreen_mp4::finalize::duration_secs(inspected.audio.as_ref(), &inspected.tables);
+        greyscreen_mp4::finalize::duration_secs(inspected.audio.as_ref(), &inspected.tables, inspected.audio_start);
     assert!(expected >= flushed_secs, "{expected} < {flushed_secs}");
 
     let harness = launch(&output);

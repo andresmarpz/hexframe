@@ -498,3 +498,67 @@ fn real_media_cut_around_each_fragment_edge_recovers_a_playable_file() {
         }
     }
 }
+
+#[test]
+fn recovery_rebuilds_the_audio_edit_list() {
+    require_ffmpeg!();
+    let media = media();
+    let dir = TempDir::new("recover-edit-list");
+    let path = dir.join("game.mp4.part");
+    let mut all = packets(&media, 2, true);
+    for packet in &mut all {
+        let by = if packet.track == Track::Video {
+            90_000
+        } else {
+            48_000 - 700
+        };
+        packet.dts += by;
+        packet.pts += by;
+    }
+    all.sort_by(|a, b| {
+        let secs = |p: &Packet| {
+            p.dts as f64
+                / if p.track == Track::Video {
+                    90_000.0
+                } else {
+                    48_000.0
+                }
+        };
+        secs(a).total_cmp(&secs(b))
+    });
+    let mut writer =
+        FragmentedWriter::create(&path, &media.video_format, Some(&media.audio_format))
+            .unwrap_or_else(|e| panic!("create: {e}"));
+    for packet in &all {
+        writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
+    }
+    drop(writer);
+
+    let out = recover(&path).unwrap_or_else(|e| panic!("recover: {e}"));
+
+    let start = inspect(&out)
+        .unwrap_or_else(|e| panic!("inspect: {e}"))
+        .audio_start;
+    assert!(
+        start.skip_samples > 0 && start.skip_samples < 1024,
+        "{start:?}"
+    );
+    let probe = ffprobe(
+        &out,
+        &[
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "packet_side_data=skip_samples",
+            "-read_intervals",
+            "%+#1",
+        ],
+    );
+    assert_eq!(
+        field(
+            &probe,
+            "packets.packet.0.side_data_list.side_data.0.skip_samples"
+        ),
+        start.skip_samples.to_string()
+    );
+}

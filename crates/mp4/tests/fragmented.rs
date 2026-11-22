@@ -13,6 +13,7 @@ use greyscreen_mp4::aac::asc_lc;
 use greyscreen_mp4::avc::{annexb_to_avcc, nal_type, split_annexb};
 use greyscreen_mp4::finalize::placeholder_bytes;
 use greyscreen_mp4::fragmented::FragmentedWriter;
+use greyscreen_mp4::inspect::inspect;
 use greyscreen_mp4::reader::boxes;
 
 use common::faulty::FaultySink;
@@ -408,7 +409,29 @@ fn file_is_rebased_to_the_first_video_key_frame() {
     let audio = first_pts("a");
     eprintln!("first video {video}, first audio {audio}");
     assert!(video.abs() < 1e-6);
-    assert!(audio.abs() <= 0.021);
+    let skip = 576.0 / 48_000.0;
+    assert!(
+        (audio + skip).abs() <= 1e-6,
+        "first packet starts at {audio}"
+    );
+    let skips = ffprobe(
+        file.path(),
+        &[
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "packet_side_data=skip_samples",
+            "-read_intervals",
+            "%+#1",
+        ],
+    );
+    assert_eq!(
+        field(
+            &skips,
+            "packets.packet.0.side_data_list.side_data.0.skip_samples"
+        ),
+        "576"
+    );
     assert_decodes_cleanly(file.path());
 }
 
@@ -542,4 +565,98 @@ fn healthy_sink_writes_the_same_bytes_as_a_real_file() {
     let in_memory = contents.lock().expect("lock").get_ref().clone();
     assert!(!on_disk.is_empty());
     assert!(on_disk == in_memory, "sink bytes differ from the file");
+}
+
+fn by_time(packets: &mut [Packet]) {
+    let secs = |p: &Packet| {
+        let rate = if p.track == Track::Video {
+            90_000.0
+        } else {
+            48_000.0
+        };
+        p.dts as f64 / rate
+    };
+    packets.sort_by(|a, b| secs(a).total_cmp(&secs(b)));
+}
+
+#[test]
+fn first_played_audio_sample_matches_the_video_origin_for_every_phase() {
+    let media = media();
+    let base = packets(&media, 2, true);
+    for video_shift in 0..=7i64 {
+        for phase in (0..1024i64).step_by(61).chain([1023]) {
+            let origin = 90_000 + video_shift;
+            let audio_shift = 48_000 - 1023 + phase;
+            let mut all = shifted(&base, origin, audio_shift);
+            by_time(&mut all);
+            let file = TempPath::new(&format!("phase-{video_shift}-{phase}"));
+            write_file(file.path(), &media, &all, true, true);
+            let first = all
+                .iter()
+                .filter(|p| p.track == Track::Audio)
+                .find(|p| (p.dts + i64::from(p.duration)) * 90_000 > origin * 48_000)
+                .unwrap_or_else(|| panic!("no audio kept"));
+            let start = inspect(file.path())
+                .unwrap_or_else(|e| panic!("inspect: {e}"))
+                .audio_start;
+            let offset = first.dts as f64 / 48_000.0 - origin as f64 / 90_000.0;
+            let played = if start.skip_samples > 0 {
+                offset + f64::from(start.skip_samples) / 48_000.0
+            } else {
+                offset
+            };
+            assert!(played >= -1e-9, "plays before video: {played}");
+            assert!(played <= 0.0011, "starts late by {played}");
+            if start.skip_samples == 0 {
+                assert!((start.delay_ms as f64 / 1000.0 - offset).abs() <= 0.0006);
+            } else {
+                assert_eq!(start.delay_ms, 0);
+                assert!(start.skip_samples <= AUDIO_STEP as u32);
+            }
+        }
+    }
+}
+
+#[test]
+fn recovery_keeps_the_audio_start_of_the_unfinished_file() {
+    let media = media();
+    let mut all = shifted(&packets(&media, 2, true), 90_000, 48_000 - 700);
+    by_time(&mut all);
+    let finished = TempPath::new("start-finished");
+    write_file(finished.path(), &media, &all, true, true);
+    let unfinished = TempPath::new("start-unfinished");
+    write_file(unfinished.path(), &media, &all, true, false);
+    let expected = inspect(finished.path())
+        .unwrap_or_else(|e| panic!("inspect: {e}"))
+        .audio_start;
+    assert!(expected.skip_samples > 0);
+
+    let seen = inspect(unfinished.path()).unwrap_or_else(|e| panic!("inspect: {e}"));
+
+    assert_eq!(seen.audio_start, expected);
+}
+
+#[test]
+fn a_non_increasing_dts_is_refused_while_the_other_track_keeps_writing() {
+    let media = media();
+    let mut all = packets(&media, 1, true);
+    by_time(&mut all);
+    let file = TempPath::new("bad-dts");
+    let mut writer =
+        FragmentedWriter::create(file.path(), &media.video_format, Some(&media.audio_format))
+            .unwrap_or_else(|e| panic!("create: {e}"));
+    let mut audio_seen = 0;
+    for packet in &all {
+        if packet.track == Track::Audio {
+            audio_seen += 1;
+            if audio_seen == 5 {
+                let mut again = packet.clone();
+                again.dts -= i64::from(AUDIO_STEP);
+                assert!(writer.push(&again).is_err());
+            }
+        }
+        writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
+    }
+    writer.finish().unwrap_or_else(|e| panic!("finish: {e}"));
+    assert_decodes_cleanly(file.path());
 }

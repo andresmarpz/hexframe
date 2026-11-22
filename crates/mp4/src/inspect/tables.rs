@@ -1,4 +1,4 @@
-use crate::moov::SampleRow;
+use crate::moov::{AudioStart, SampleRow};
 use crate::reader::{BoxRef, boxes};
 use crate::recover::cursor::Cursor;
 use crate::{Mp4Error, Result};
@@ -6,17 +6,17 @@ use crate::{Mp4Error, Result};
 pub(super) struct Track {
     pub(super) track_id: u32,
     pub(super) rows: Vec<SampleRow>,
-    pub(super) delay_ms: u64,
+    pub(super) start: AudioStart,
 }
 
 pub(super) struct Tracks(Vec<Track>);
 
 impl Tracks {
-    pub(super) fn delay_ms(&self, track_id: u32) -> u64 {
+    pub(super) fn start(&self, track_id: u32) -> AudioStart {
         self.0
             .iter()
             .find(|t| t.track_id == track_id)
-            .map_or(0, |t| t.delay_ms)
+            .map_or_else(AudioStart::default, |t| t.start)
     }
 
     pub(super) fn rows(&self, track_id: u32) -> Vec<SampleRow> {
@@ -46,33 +46,42 @@ pub(super) fn parse_tracks(moov: &[u8]) -> Result<Tracks> {
     for trak in root.children(moov).filter(|b| &b.fourcc == b"trak") {
         let tkhd = trak.find(moov, b"tkhd").ok_or_else(|| invalid("no tkhd"))?;
         let track_id = track_id(tkhd.payload_bytes(moov)).ok_or_else(|| invalid("short tkhd"))?;
-        let delay_ms = trak
+        let start = trak
             .find(moov, b"edts")
             .and_then(|edts| edts.find(moov, b"elst"))
-            .and_then(|elst| leading_empty_edit(elst.payload_bytes(moov)))
-            .unwrap_or(0);
+            .and_then(|elst| edit_start(elst.payload_bytes(moov)))
+            .unwrap_or_default();
         let stbl =
             path(moov, trak, &[b"mdia", b"minf", b"stbl"]).ok_or_else(|| invalid("no stbl"))?;
         tracks.push(Track {
             track_id,
             rows: rows(moov, &stbl)?,
-            delay_ms,
+            start,
         });
     }
     Ok(Tracks(tracks))
 }
 
-fn leading_empty_edit(payload: &[u8]) -> Option<u64> {
+fn edit_start(payload: &[u8]) -> Option<AudioStart> {
     let mut cur = Cursor::new(payload);
     if cur.u8()? != 0 {
         return None;
     }
     cur.take(3)?;
-    if cur.u32()? == 0 {
-        return None;
+    let count = cur.u32()?;
+    let mut start = AudioStart::default();
+    for _ in 0..count {
+        let duration = cur.u32()?;
+        let media_time = cur.u32()? as i32;
+        cur.u32()?;
+        if media_time < 0 {
+            start.delay_ms += u64::from(duration);
+        } else {
+            start.skip_samples = media_time.unsigned_abs();
+            break;
+        }
     }
-    let duration = cur.u32()?;
-    (cur.u32()? == u32::MAX).then_some(u64::from(duration))
+    Some(start)
 }
 
 fn track_id(payload: &[u8]) -> Option<u32> {

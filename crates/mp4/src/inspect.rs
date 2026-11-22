@@ -3,7 +3,7 @@ use std::path::Path;
 
 use greyscreen_core::media::{AudioFormat, VideoFormat};
 
-use crate::moov::{AUDIO_TRACK_ID, SampleRow, SampleTables, VIDEO_TRACK_ID};
+use crate::moov::{AUDIO_TRACK_ID, AudioStart, SampleRow, SampleTables, VIDEO_TRACK_ID};
 use crate::recover::formats::read_formats;
 use crate::recover::fragments::{build_tables, first_video_duration};
 use crate::recover::{already_finalized, header_at, read_exact_at, scan};
@@ -24,7 +24,7 @@ pub struct Inspected {
     pub video: VideoFormat,
     pub audio: Option<AudioFormat>,
     pub tables: SampleTables,
-    pub audio_delay_ms: u64,
+    pub audio_start: AudioStart,
 }
 
 pub fn inspect(path: &Path) -> Result<Inspected> {
@@ -41,7 +41,7 @@ pub fn inspect(path: &Path) -> Result<Inspected> {
             bytes,
             video,
             audio,
-            audio_delay_ms: tracks.delay_ms(AUDIO_TRACK_ID),
+            audio_start: tracks.start(AUDIO_TRACK_ID),
             tables: SampleTables {
                 video: video_rows,
                 audio: tracks.rows(AUDIO_TRACK_ID),
@@ -60,7 +60,7 @@ pub fn inspect(path: &Path) -> Result<Inspected> {
         video,
         audio,
         tables,
-        audio_delay_ms: 0,
+        audio_start: scanned.audio_start,
     })
 }
 

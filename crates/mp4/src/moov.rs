@@ -12,6 +12,33 @@ pub(crate) const SYNC_SAMPLE_FLAGS: u32 = 0x0200_0000;
 pub(crate) const NON_SYNC_SAMPLE_FLAGS: u32 = 0x0101_0000;
 const IDENTITY_MATRIX: [u32; 9] = [0x0001_0000, 0, 0, 0, 0x0001_0000, 0, 0, 0, 0x4000_0000];
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AudioStart {
+    pub delay_ms: u64,
+    pub skip_samples: u32,
+}
+
+impl AudioStart {
+    pub fn from_first_packet(audio_dts: i64, sample_rate: u32, origin: i64) -> Self {
+        let rate = i128::from(sample_rate.max(1));
+        let scale = i128::from(VideoFormat::TIMESCALE);
+        let diff = i128::from(audio_dts) * scale - i128::from(origin) * rate;
+        if diff >= 0 {
+            let unit = scale * rate;
+            let ms = (diff * 1000 + unit / 2) / unit;
+            return Self {
+                delay_ms: u64::try_from(ms).unwrap_or(0),
+                skip_samples: 0,
+            };
+        }
+        let samples = (-diff + scale - 1) / scale;
+        Self {
+            delay_ms: 0,
+            skip_samples: u32::try_from(samples).unwrap_or(0),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleRow {
     pub offset: u64,
@@ -63,7 +90,7 @@ pub fn write_ftyp(major: &[u8; 4], compatible: &[[u8; 4]]) -> Vec<u8> {
 }
 
 pub fn write_init_moov(video: &VideoFormat, audio: Option<&AudioFormat>) -> Vec<u8> {
-    build_moov(video, audio, None, 0)
+    build_moov(video, audio, None, AudioStart::default())
 }
 
 pub fn write_full_moov(
@@ -72,17 +99,17 @@ pub fn write_full_moov(
     tables: &SampleTables,
     chunking: &Chunking,
 ) -> Vec<u8> {
-    write_full_moov_delayed(video, audio, tables, chunking, 0)
+    write_full_moov_with_start(video, audio, tables, chunking, AudioStart::default())
 }
 
-pub fn write_full_moov_delayed(
+pub fn write_full_moov_with_start(
     video: &VideoFormat,
     audio: Option<&AudioFormat>,
     tables: &SampleTables,
     chunking: &Chunking,
-    audio_delay_ms: u64,
+    audio_start: AudioStart,
 ) -> Vec<u8> {
-    build_moov(video, audio, Some((tables, chunking)), audio_delay_ms)
+    build_moov(video, audio, Some((tables, chunking)), audio_start)
 }
 
 enum Media<'a> {
@@ -97,6 +124,7 @@ struct Track<'a> {
     samples: &'a [SampleRow],
     chunks: &'a [Chunk],
     delay_ms: u64,
+    skip_samples: u32,
 }
 
 impl Track<'_> {
@@ -105,7 +133,10 @@ impl Track<'_> {
     }
 
     fn media_movie_duration(&self) -> u64 {
-        self.duration_ticks() * u64::from(MOVIE_TIMESCALE) / u64::from(self.timescale)
+        let ticks = self
+            .duration_ticks()
+            .saturating_sub(u64::from(self.skip_samples));
+        ticks * u64::from(MOVIE_TIMESCALE) / u64::from(self.timescale)
     }
 
     fn movie_duration(&self) -> u64 {
@@ -117,7 +148,7 @@ fn build_moov(
     video: &VideoFormat,
     audio: Option<&AudioFormat>,
     full: Option<(&SampleTables, &Chunking)>,
-    audio_delay_ms: u64,
+    audio_start: AudioStart,
 ) -> Vec<u8> {
     let empty = (&SampleTables::default(), &Chunking::default());
     let (tables, chunking) = full.unwrap_or(empty);
@@ -128,6 +159,7 @@ fn build_moov(
         samples: &tables.video,
         chunks: &chunking.video,
         delay_ms: 0,
+        skip_samples: 0,
     }];
     if let Some(audio) = audio {
         tracks.push(Track {
@@ -136,7 +168,8 @@ fn build_moov(
             media: Media::Audio(audio),
             samples: &tables.audio,
             chunks: &chunking.audio,
-            delay_ms: audio_delay_ms,
+            delay_ms: audio_start.delay_ms,
+            skip_samples: audio_start.skip_samples,
         });
     }
     let movie_duration = tracks.iter().map(Track::movie_duration).max().unwrap_or(0);
@@ -196,7 +229,7 @@ fn write_mvex(w: &mut BoxWriter, with_audio: bool) {
 fn write_trak(w: &mut BoxWriter, track: &Track, full: bool) {
     w.boxed(b"trak", |w| {
         write_tkhd(w, track, track.movie_duration());
-        if track.delay_ms > 0 {
+        if track.delay_ms > 0 || track.skip_samples > 0 {
             write_delay_edits(w, track);
         }
         w.boxed(b"mdia", |w| {
@@ -229,13 +262,16 @@ fn write_trak(w: &mut BoxWriter, track: &Track, full: bool) {
 fn write_delay_edits(w: &mut BoxWriter, track: &Track) {
     w.boxed(b"edts", |w| {
         w.full_boxed(b"elst", 0, 0, |w| {
-            w.u32(2);
-            w.u32(clamp32(track.delay_ms));
-            w.i32(-1);
-            w.u16(1);
-            w.u16(0);
+            let delayed = track.delay_ms > 0;
+            w.u32(if delayed { 2 } else { 1 });
+            if delayed {
+                w.u32(clamp32(track.delay_ms));
+                w.i32(-1);
+                w.u16(1);
+                w.u16(0);
+            }
             w.u32(clamp32(track.media_movie_duration()));
-            w.i32(0);
+            w.i32(i32::try_from(track.skip_samples).unwrap_or(i32::MAX));
             w.u16(1);
             w.u16(0);
         });

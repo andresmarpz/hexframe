@@ -234,13 +234,14 @@ impl AudioTimeline {
     }
 
     fn place(&mut self, ts: Option<Hns>, frames: usize, silent: bool) -> Vec<Span> {
+        let first = !self.seen_first;
         self.seen_first = true;
         let mut spans = Vec::new();
         let mut skip = 0usize;
         if let Some(ts) = ts {
             let gap = ts.saturating_sub(self.expected());
             self.note_gap(gap);
-            if gap > Self::RESYNC {
+            if gap > Self::RESYNC || (first && self.frames_for_hns(gap) >= 1) {
                 self.push_silence(&mut spans, self.frames_for_hns(gap));
             } else if gap < -Self::RESYNC {
                 skip = self.frames_for_hns(gap.saturating_neg()).min(frames);

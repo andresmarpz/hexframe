@@ -332,3 +332,30 @@ fn forward_jump_then_back_is_one_count_per_jump() {
     }
     assert_eq!(timeline.big_gaps(), 2);
 }
+
+#[test]
+fn first_packet_is_padded_by_its_exact_offset() {
+    for rate in [44_100u32, 48_000] {
+        for offset_ms in [0i64, 5, 20, 29, 40] {
+            let mut timeline = AudioTimeline::new(0, rate).expect("rate");
+            let len = frames_at(rate, 10);
+            let spans = timeline.on_packet(Some(offset_ms * MS), len, false);
+            let silence: usize = silence_spans(&spans).iter().sum();
+            let expected = frames_at(rate, offset_ms);
+            assert!(
+                silence.abs_diff(expected) <= 1,
+                "{rate} Hz {offset_ms} ms: {silence} != {expected}"
+            );
+            assert_eq!(data_frames(&spans), len);
+        }
+    }
+}
+
+#[test]
+fn later_packets_keep_the_deadband() {
+    let mut timeline = AudioTimeline::new(0, 48_000).expect("rate");
+    let len = frames_at(48_000, 10);
+    timeline.on_packet(Some(0), len, false);
+    let next = timeline.on_packet(Some(30 * MS), len, false);
+    assert!(silence_spans(&next).is_empty());
+}

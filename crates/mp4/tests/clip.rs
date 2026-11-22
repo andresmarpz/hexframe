@@ -373,3 +373,68 @@ fn rejects_packets_that_do_not_start_with_a_key_frame() {
     assert!(write_clip(&path, &media.video_format, audio, &audio_only).is_err());
     assert!(write_clip(&path, &media.video_format, None, &[]).is_err());
 }
+
+#[test]
+fn clip_audio_starts_with_the_key_frame_to_the_sample() {
+    require_ffmpeg!();
+    let media = media();
+    let all = arrival(&media, 4, true);
+    let part = &slice(&all, 120, 300, 8);
+    let idr = 120 * VIDEO_STEP;
+    let first = part
+        .iter()
+        .filter(|p| p.track == Track::Audio)
+        .find(|p| (p.dts + AUDIO_STEP) * 90_000 > idr * 48_000)
+        .unwrap_or_else(|| panic!("no audio kept"));
+    let dir = TempDir::new("clip-edit-list");
+    let path = dir.join("clip.mp4");
+    write_clip(&path, &media.video_format, Some(&media.audio_format), part)
+        .unwrap_or_else(|e| panic!("write_clip: {e}"));
+
+    let start = audio_skip(&path);
+
+    let offset = first.dts as f64 / 48_000.0 - idr as f64 / 90_000.0;
+    let played = offset + f64::from(start) / 48_000.0;
+    assert!(played >= -1e-9, "plays before video: {played}");
+    assert!(played <= 0.0011, "starts late by {played}");
+    assert!(start > 0, "{start:?}");
+    let probe = ffprobe(
+        &path,
+        &[
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "packet_side_data=skip_samples",
+            "-read_intervals",
+            "%+#1",
+        ],
+    );
+    assert_eq!(
+        field(
+            &probe,
+            "packets.packet.0.side_data_list.side_data.0.skip_samples"
+        ),
+        start.to_string()
+    );
+    assert_decodes_cleanly(&path);
+}
+
+fn audio_skip(path: &Path) -> u32 {
+    let file = std::fs::read(path).unwrap_or_default();
+    let moov = boxes(&file)
+        .find(|b| &b.fourcc == b"moov")
+        .unwrap_or_else(|| panic!("no moov"));
+    let trak = moov
+        .children(&file)
+        .filter(|b| &b.fourcc == b"trak")
+        .nth(1)
+        .unwrap_or_else(|| panic!("no audio track"));
+    let elst = [b"edts", b"elst"]
+        .iter()
+        .try_fold(trak, |parent, name| parent.find(&file, name))
+        .unwrap_or_else(|| panic!("no edit list"));
+    let payload = elst.payload_bytes(&file);
+    let count = u32::from_be_bytes(payload[4..8].try_into().unwrap_or_default()) as usize;
+    let last = 8 + (count - 1) * 12;
+    u32::from_be_bytes(payload[last + 4..last + 8].try_into().unwrap_or_default())
+}

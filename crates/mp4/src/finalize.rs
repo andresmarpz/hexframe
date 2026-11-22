@@ -2,7 +2,7 @@ use std::io::SeekFrom;
 
 use greyscreen_core::media::{AudioFormat, VideoFormat};
 
-use crate::moov::{Chunking, SampleRow, SampleTables, write_full_moov_delayed};
+use crate::moov::{AudioStart, Chunking, SampleRow, SampleTables, write_full_moov_with_start};
 use crate::sink::Sink;
 use crate::{Mp4Error, Result};
 
@@ -41,11 +41,12 @@ fn ticks(rows: &[SampleRow]) -> u64 {
 pub fn duration_secs(
     audio: Option<&AudioFormat>,
     tables: &SampleTables,
-    audio_delay_ms: u64,
+    audio_start: AudioStart,
 ) -> f64 {
     let video_secs = ticks(&tables.video) as f64 / f64::from(VideoFormat::TIMESCALE);
     let audio_secs = audio.map_or(0.0, |a| {
-        ticks(&tables.audio) as f64 / f64::from(a.sample_rate) + audio_delay_ms as f64 / 1000.0
+        let samples = ticks(&tables.audio).saturating_sub(u64::from(audio_start.skip_samples));
+        samples as f64 / f64::from(a.sample_rate) + audio_start.delay_ms as f64 / 1000.0
     });
     video_secs.max(audio_secs)
 }
@@ -57,9 +58,9 @@ pub fn finalize(
     audio: Option<&AudioFormat>,
     tables: &SampleTables,
     chunking: &Chunking,
-    audio_delay_ms: u64,
+    audio_start: AudioStart,
 ) -> Result<FinishedInfo> {
-    let moov = write_full_moov_delayed(video, audio, tables, chunking, audio_delay_ms);
+    let moov = write_full_moov_with_start(video, audio, tables, chunking, audio_start);
     let moov_offset = file.seek(SeekFrom::End(0))?;
     let placeholder = placeholder_bytes(placeholder_offset, moov_offset)?;
     file.write_all(&moov)?;
@@ -68,7 +69,7 @@ pub fn finalize(
     file.write_all(&placeholder)?;
     file.sync()?;
     Ok(FinishedInfo {
-        duration_secs: duration_secs(audio, tables, audio_delay_ms),
+        duration_secs: duration_secs(audio, tables, audio_start),
         bytes: moov_offset + moov.len() as u64,
     })
 }
