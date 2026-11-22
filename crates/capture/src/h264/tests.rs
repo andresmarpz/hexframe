@@ -54,6 +54,21 @@ fn open_steps_map_to_their_failure() {
     );
 }
 
+#[test]
+fn an_open_failure_shows_its_hex_code_and_keeps_non_ascii_text() {
+    use super::H264Error;
+    use super::open_error::at;
+    use greyscreen_core::encoder::OpenStep;
+    use windows::core::{Error, HRESULT};
+
+    let error = Error::new(HRESULT(0x8007_0005_u32 as i32), "ファイル é");
+    let H264Error::NoHardwareEncoder(shown) = at(OpenStep::Start, 0x10de, &error) else {
+        panic!("open failures are NoHardwareEncoder");
+    };
+    assert!(shown.contains("0x80070005"), "{shown}");
+    assert!(shown.contains("ファイル é"), "{shown}");
+}
+
 mod on_fake {
     use std::time::{Duration, Instant};
 

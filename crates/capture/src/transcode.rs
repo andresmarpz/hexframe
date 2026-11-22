@@ -131,3 +131,6 @@ fn run(
     progress(1.0);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

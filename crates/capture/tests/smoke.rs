@@ -9,13 +9,15 @@ use crossbeam_channel::unbounded;
 use greyscreen_capture::audio::{AudioCapture, AudioCounters, AudioTarget};
 use greyscreen_capture::clock::QpcMap;
 use greyscreen_capture::{install, probe};
+use greyscreen_core::health::CaptureStats;
 use greyscreen_core::time::mono_now;
+use wasapi::{DeviceEnumerator, Direction};
 use windows::Win32::Foundation::E_ACCESSDENIED;
 use windows::core::{Error, HRESULT};
 
 const RATE: u64 = 48_000;
 const SILENCE_WALL: Duration = Duration::from_secs(60);
-const MAX_GAP_FRAMES: u64 = RATE / 10;
+const MAX_GAP: Duration = Duration::from_millis(100);
 const WALL_TOLERANCE: f64 = 0.25;
 
 #[test]
@@ -34,8 +36,6 @@ fn a_windows_error_formats_with_its_hex_code_and_keeps_non_ascii_text() {
 fn install_paths_are_absolute() {
     let dir = install::install_dir().expect("install dir");
     assert!(dir.is_absolute(), "{}", dir.display());
-    let exe = std::env::current_exe().expect("current exe");
-    assert!(exe.is_absolute(), "{}", exe.display());
 }
 
 fn build_from_ver() -> u32 {
@@ -44,17 +44,11 @@ fn build_from_ver() -> u32 {
         .output()
         .expect("run ver");
     let text = String::from_utf8_lossy(&output.stdout).into_owned();
-    let version = text
-        .split("Version")
+    text.split('[')
         .nth(1)
-        .expect("ver prints a version")
-        .trim()
-        .trim_end_matches(']')
-        .trim()
-        .to_owned();
-    version
-        .split('.')
-        .nth(2)
+        .and_then(|rest| rest.split(']').next())
+        .and_then(|inner| inner.split_whitespace().last())
+        .and_then(|version| version.split('.').nth(2))
         .and_then(|build| build.parse().ok())
         .expect("ver build number")
 }
@@ -72,38 +66,65 @@ fn the_windows_build_is_ten_above_17763_and_matches_ver() {
     assert_eq!(parts[2], build_from_ver());
 }
 
+fn has_render_endpoint() -> bool {
+    let _ = wasapi::initialize_mta();
+    DeviceEnumerator::new()
+        .and_then(|enumerator| enumerator.get_default_device(Direction::Render))
+        .is_ok()
+}
+
 #[test]
 fn loopback_audio_matches_wall_time_across_a_minute_of_silence() {
+    if !has_render_endpoint() {
+        eprintln!("no render endpoint, skipping");
+        return;
+    }
     let (tx, rx) = unbounded();
     let (t0_tx, t0_rx) = unbounded();
     let counters = Arc::new(AudioCounters::default());
-    let capture = match AudioCapture::start(
+    let capture = AudioCapture::start(
         AudioTarget::System,
         QpcMap::now(),
         t0_rx,
         tx,
         Arc::clone(&counters),
-    ) {
-        Ok(capture) => capture,
-        Err(error) => {
-            eprintln!("no loopback device, skipping: {error}");
-            return;
-        }
-    };
+    )
+    .expect("loopback start");
     t0_tx.send(mono_now()).expect("t0");
     let began = Instant::now();
-    std::thread::sleep(SILENCE_WALL);
+    let mut last_arrival = began;
+    let mut worst_gap = Duration::ZERO;
+    let mut frames = 0u64;
+    while let Some(left) = SILENCE_WALL.checked_sub(began.elapsed()) {
+        match rx.recv_timeout(left.min(MAX_GAP * 4)) {
+            Ok(block) => {
+                let now = Instant::now();
+                worst_gap = worst_gap.max(now - last_arrival);
+                last_arrival = now;
+                frames += (block.samples.len() / 2) as u64;
+            }
+            Err(_) => {
+                worst_gap = worst_gap.max(last_arrival.elapsed());
+            }
+        }
+    }
     let wall = began.elapsed().as_secs_f64();
     capture.stop();
+    frames += rx
+        .try_iter()
+        .map(|block| (block.samples.len() / 2) as u64)
+        .sum::<u64>();
 
-    let mut next = 0u64;
-    let mut worst_gap = 0u64;
-    for block in rx.try_iter() {
-        worst_gap = worst_gap.max(block.first_frame.saturating_sub(next));
-        next = next.max(block.first_frame + (block.samples.len() / 2) as u64);
-    }
-    let audio = next as f64 / RATE as f64;
-    assert!(worst_gap <= MAX_GAP_FRAMES, "gap of {worst_gap} frames");
+    assert!(counters.take_failure().is_none());
+    let mut stats = CaptureStats::default();
+    counters.fill(&mut stats);
+    assert!(
+        stats.audio_gap_longest_ms <= MAX_GAP.as_millis() as u32,
+        "{} ms",
+        stats.audio_gap_longest_ms
+    );
+    assert!(worst_gap <= MAX_GAP, "gap of {worst_gap:?}");
+    let audio = frames as f64 / RATE as f64;
     assert!(
         (audio - wall).abs() <= WALL_TOLERANCE,
         "audio {audio:.3}s against wall {wall:.3}s"

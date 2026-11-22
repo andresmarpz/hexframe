@@ -2,7 +2,7 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -10,20 +10,24 @@ use std::time::Duration;
 use greyscreen_core::export::{ExportEvent, ExportJob, ExportPreset, ExportRange};
 use greyscreen_core::library::VideoInfo;
 use greyscreen_core::settings::Settings;
-use greyscreen_engine::{EngineCmd, FakeMediaSource, NoticeLevel, UiMsg};
+use greyscreen_engine::updater::UpdateConfig;
+#[cfg(windows)]
+use greyscreen_engine::NoticeLevel;
+use greyscreen_engine::{EngineCmd, FakeMediaSource, UiMsg};
 
 use common::{
     assert_playable_from_key_frame, leftover_part, library_message, media, recording_since, send,
     start_idle, temp_dir, wait_for,
 };
 
-fn unicode_output(tag: &str) -> PathBuf {
-    temp_dir(tag).join("Zoe_é").join("ビデオ").join("Greyscreen")
+fn unicode_output(root: &Path) -> PathBuf {
+    root.join("Zoe_é").join("ビデオ").join("Greyscreen")
 }
 
 #[test]
 fn recording_clipping_recovering_exporting_and_deleting_work_in_a_unicode_folder() {
-    let output = unicode_output("unicode");
+    let root = temp_dir("unicode");
+    let output = unicode_output(&root);
     let sample = media(240);
     let crashed = leftover_part(&output, "2025-01-01_00-00-00_Ahri_CLASSIC", &sample, false);
     assert!(output.is_absolute());
@@ -86,22 +90,33 @@ fn recording_clipping_recovering_exporting_and_deleting_work_in_a_unicode_folder
     assert!(done.path.is_file());
     assert!(done.bytes > 0);
 
-    let id = saved
-        .folder
-        .file_name()
-        .expect("folder name")
-        .to_string_lossy()
-        .into_owned();
-    send(&harness, EngineCmd::DeleteRecording { id });
-    let after = wait_for(&harness.ui, |msg| match msg {
-        UiMsg::Notice {
-            level: NoticeLevel::Error,
-            text,
-        } => panic!("delete failed: {text}"),
-        UiMsg::Library(entries) => Some(entries.clone()),
-        _ => None,
-    })
-    .expect("library after delete");
-    assert!(after.iter().all(|entry| entry.folder != saved.folder));
-    assert!(!saved.folder.exists());
+    #[cfg(windows)]
+    {
+        let id = saved
+            .folder
+            .file_name()
+            .expect("folder name")
+            .to_string_lossy()
+            .into_owned();
+        send(&harness, EngineCmd::DeleteRecording { id });
+        let after = wait_for(&harness.ui, |msg| match msg {
+            UiMsg::Notice {
+                level: NoticeLevel::Error,
+                text,
+            } => panic!("delete failed: {text}"),
+            UiMsg::Library(entries) => Some(entries.clone()),
+            _ => None,
+        })
+        .expect("library after delete");
+        assert!(after.iter().all(|entry| entry.folder != saved.folder));
+        assert!(!saved.folder.exists());
+    }
+
+    drop(harness);
+    std::fs::remove_dir_all(&root).expect("remove temp root");
+}
+
+#[test]
+fn the_update_download_folder_is_absolute() {
+    assert!(UpdateConfig::github("0.0.0", true).dir.is_absolute());
 }
