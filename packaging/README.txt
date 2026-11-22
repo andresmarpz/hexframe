@@ -24,6 +24,11 @@ First run
 
 Set League to Borderless window mode. Greyscreen cannot see exclusive fullscreen.
 
+License
+
+Greyscreen is free software under the GNU Affero General Public License, version 3 or later. The full text is in LICENSE.txt in the same release.
+The source code for this version is at https://github.com/andresmarpz/greyscreen (find the tag of your version).
+
 Third-party
 
 The sound effects come from Hex (https://github.com/anomalyco/hex), lightly edited, under this license:

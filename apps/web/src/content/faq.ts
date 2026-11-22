@@ -172,7 +172,7 @@ export const faqGroups: FaqGroup[] = [
         id: "free",
         q: "Is it free and open source?",
         a: [
-          "Yes. Greyscreen is free and MIT licensed, and the source is on GitHub. It is a public beta, so expect rough edges.",
+          "Yes. Greyscreen is free and licensed under the AGPL-3.0, and the source is on GitHub. It is a public beta, so expect rough edges.",
         ],
       },
     ],

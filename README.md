@@ -141,7 +141,7 @@ just ci
 # Build Windows release executables
 just build-win
 
-# Build both exes plus README.txt into dist/
+# Build both exes plus README.txt and LICENSE.txt into dist/
 just dist
 
 # Simulate a League match, then run the UI against it with fake capture
@@ -172,9 +172,12 @@ Greyscreen is an early preview. It is built and tested on macOS and in CI, and r
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Copyright (c) 2026 andresmarpz. GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE). Releases up to and including `0.1.19-preview.21` were published under the MIT license and stay under it.
 
-The sound effects in `crates/app/assets/sounds` come from [Hex](https://github.com/anomalyco/hex) (MIT, see `LICENSE-hex.txt` there).
+Parts that keep their own license:
+
+- `vendor/rune-media` is [Rune](https://github.com/anomalyco/rune)'s media crate with Greyscreen's fixes. It stays MIT (`vendor/rune-media/LICENSE`) so the fixes can go back upstream.
+- The sound effects in `crates/app/assets/sounds` come from [Hex](https://github.com/anomalyco/hex) (MIT, see `LICENSE-hex.txt` there).
 
 ## Legal
 
