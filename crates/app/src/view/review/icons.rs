@@ -98,3 +98,21 @@ pub(super) static LIST: Icon = Icon {
         r#"<circle cx="2.5" cy="4" r="1" fill="currentColor"/><circle cx="2.5" cy="8" r="1" fill="currentColor"/><circle cx="2.5" cy="12" r="1" fill="currentColor"/>"#
     ),
 };
+
+pub(super) static PANEL_LEFT: Icon = Icon {
+    name: "greyscreen-panel-left",
+    view: 16.0,
+    body: concat!(
+        r#"<rect x="2" y="3" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#,
+        r#"<line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#
+    ),
+};
+
+pub(super) static PANEL_RIGHT: Icon = Icon {
+    name: "greyscreen-panel-right",
+    view: 16.0,
+    body: concat!(
+        r#"<rect x="2" y="3" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#,
+        r#"<line x1="10" y1="3" x2="10" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#
+    ),
+};

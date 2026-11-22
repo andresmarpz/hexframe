@@ -11,7 +11,9 @@ fn newest_ids(rt: &rune::Runtime<crate::ui::Ui>) -> Vec<String> {
 
 #[test]
 fn recent_lists_the_five_newest_games_top_down() {
-    let rt = runtime();
+    let mut rt = runtime();
+    rt.update(|ui, _| ui.screen = Screen::Home);
+    settle(&mut rt);
     let ids = newest_ids(&rt);
     assert_eq!(ids.len(), 5);
     let tops: Vec<f32> = ids
@@ -23,10 +25,25 @@ fn recent_lists_the_five_newest_games_top_down() {
 }
 
 #[test]
+fn recent_is_hidden_on_the_games_screen() {
+    let mut rt = runtime();
+    rt.update(|ui, _| ui.screen = Screen::Home);
+    settle(&mut rt);
+    assert!(rt.find("nav-recent").is_some());
+    rt.update(|ui, _| ui.screen = Screen::Clips);
+    settle(&mut rt);
+    assert!(rt.find("nav-recent").is_some());
+    rt.update(|ui, _| ui.screen = Screen::Games);
+    settle(&mut rt);
+    assert!(rt.find("nav-recent").is_none());
+}
+
+#[test]
 fn recent_is_left_out_without_games() {
     let mut rt = runtime();
     rt.update(|ui, _| {
         ui.close_game();
+        ui.screen = Screen::Home;
         ui.recordings.clear();
     });
     settle(&mut rt);
@@ -46,7 +63,11 @@ fn clicking_a_recent_game_opens_it_in_games() {
     assert_eq!(rt.state.screen, Screen::Games);
     assert_eq!(rt.state.detail(), Detail::Game);
     assert_eq!(rt.state.selected_id(), Some(ids[2].as_str()));
+    assert!(rt.find("nav-recent").is_none());
+    tap(&mut rt, "nav-clips");
+    settle(&mut rt);
     tap(&mut rt, &format!("nav-game-{}", ids[0]));
+    assert_eq!(rt.state.screen, Screen::Games);
     assert_eq!(rt.state.selected_id(), Some(ids[0].as_str()));
 }
 

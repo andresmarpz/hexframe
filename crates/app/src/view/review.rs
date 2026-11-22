@@ -15,10 +15,11 @@ mod transport;
 mod tests;
 
 use rune::{Color, El, PlayerState, ScrollSpec, TextStyle, Tx, col, el, row, text};
-use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit};
+use rune_kit::{Button, ButtonVariant, ControlSize, Divider, IconButton, IconButtonVariant, Kit};
 
 use super::TABULAR;
-use crate::ui::{ReviewState, Ui, format_clock};
+use crate::ui::library::format::clip_title;
+use crate::ui::{ReviewState, Source, Ui, format_clock};
 
 const PAGE_PADDING: f32 = 16.0;
 const STACK_BELOW: f32 = 800.0;
@@ -94,7 +95,7 @@ pub(super) fn page(s: &Ui, k: &Kit, width: Option<f32>) -> El {
     match &review.death {
         Some(state) if state.summary => death_summary::screen(review, state, k),
         Some(state) => deaths::screen(review, state, &s.death_note, k),
-        None => screen(review, k, width),
+        None => screen(review, k, width, s.settings.review_inspector_hidden),
     }
 }
 
@@ -102,46 +103,98 @@ pub(super) fn is_stacked(width: Option<f32>) -> bool {
     width.is_some_and(|w| w < STACK_BELOW)
 }
 
-fn screen(review: &ReviewState, k: &Kit, width: Option<f32>) -> El {
-    let stacked = is_stacked(width);
+fn screen(review: &ReviewState, k: &Kit, width: Option<f32>, inspector_hidden: bool) -> El {
     let inner = width.map(|w| w - 2.0 * PAGE_PADDING);
-    let body = if stacked {
-        col()
+    if inspector_hidden {
+        return col()
+            .key("review")
             .w_full()
-            .grow(1.0)
+            .h_full()
             .min_h(0.0)
-            .gap(COLUMN_GAP)
-            .scroll(ScrollSpec {
-                stick_bottom: false,
-            })
-            .child(player_column(review, k, true, inner))
-            .child(panel::panel(review, k, true))
-    } else {
-        let player = inner.map(|w| w - COLUMN_GAP - panel::PANEL_WIDTH);
-        row()
+            .padding(PAGE_PADDING)
+            .child(player_column(review, k, false, inner));
+    }
+    if is_stacked(width) {
+        return col()
+            .key("review")
             .w_full()
-            .grow(1.0)
+            .h_full()
             .min_h(0.0)
-            .gap(COLUMN_GAP)
-            .child(player_column(review, k, false, player))
-            .child(panel::panel(review, k, false))
-    };
-    col()
+            .padding(PAGE_PADDING)
+            .child(
+                col()
+                    .w_full()
+                    .grow(1.0)
+                    .min_h(0.0)
+                    .gap(COLUMN_GAP)
+                    .scroll(ScrollSpec {
+                        stick_bottom: false,
+                    })
+                    .child(player_column(review, k, true, inner))
+                    .child(panel::panel(review, k, true)),
+            );
+    }
+    let player = width.map(|w| w - panel::PANEL_WIDTH - 1.0 - 2.0 * PAGE_PADDING);
+    row()
         .key("review")
         .w_full()
         .h_full()
         .min_h(0.0)
-        .padding(PAGE_PADDING)
-        .child(body)
+        .child(player_column(review, k, false, player).padding(PAGE_PADDING))
+        .child(Divider::vertical().build(k))
+        .child(panel::panel(review, k, false))
+}
+
+fn clip_banner(review: &ReviewState, k: &Kit) -> Option<El> {
+    let Source::Clip(i) = review.source else {
+        return None;
+    };
+    let label = review
+        .entry
+        .meta
+        .clips
+        .get(i)
+        .map(|c| clip_title(&c.label))
+        .unwrap_or_default();
+    Some(
+        row()
+            .key("clip-notice")
+            .w_full()
+            .px(12.0)
+            .py(6.0)
+            .gap(8.0)
+            .center_y()
+            .radius(8.0)
+            .fill(k.c.layer_02)
+            .child(
+                el().grow(1.0).min_w(0.0).child(
+                    text(format!("Playing clip: {label}"))
+                        .font(k.ty.small)
+                        .color(k.c.text_base)
+                        .truncate(),
+                ),
+            )
+            .child(
+                Button::new("Full game")
+                    .variant(ButtonVariant::Neutral)
+                    .control_size(ControlSize::Small)
+                    .on_press(|ui: &mut Ui| ui.play_game())
+                    .build(k)
+                    .key("review-game"),
+            ),
+    )
 }
 
 fn player_column(review: &ReviewState, k: &Kit, stacked: bool, width: Option<f32>) -> El {
     let column = col().key("review-player").min_w(0.0).gap(8.0);
-    let column = if stacked {
+    let mut column = if stacked {
         column.w_full()
     } else {
         column.grow(1.0).min_h(0.0)
     };
+    if let Some(banner) = clip_banner(review, k) {
+        column = column.child(banner);
+    }
     column
         .child(video(review, k, stacked))
         .child(transport::transport(review, k, false, width))

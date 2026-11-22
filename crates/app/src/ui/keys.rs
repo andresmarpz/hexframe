@@ -50,6 +50,16 @@ impl Ui {
             Action::NextGame => self.step_selection(1),
             Action::FocusPlayer if self.detail() == Detail::Game => tx.focus("review-video", true),
             Action::FocusPlayer => return false,
+            Action::ToggleGamesList
+                if self.screen == Screen::Games
+                    && self.detail() == Detail::Game
+                    && !self.in_theater()
+                    && self.review.as_ref().is_none_or(|r| r.death.is_none()) =>
+            {
+                tx.instant();
+                self.change(|s| s.games_list_hidden = !s.games_list_hidden);
+            }
+            Action::ToggleGamesList => return false,
             _ => return self.run_review_action(action, tx),
         }
         true
@@ -79,7 +89,15 @@ impl Ui {
             Action::Mute => self.review_mute(),
             Action::SpeedDown => self.review_step_speed(-1),
             Action::SpeedUp => self.review_step_speed(1),
-            Action::ReviewDeaths
+            Action::ToggleInspector
+                if !theater && self.review.as_ref().is_none_or(|r| r.death.is_none()) =>
+            {
+                tx.instant();
+                self.change(|s| s.review_inspector_hidden = !s.review_inspector_hidden);
+            }
+            Action::ToggleInspector
+            | Action::ToggleGamesList
+            | Action::ReviewDeaths
             | Action::NextDeath
             | Action::PreviousDeath
             | Action::ReplayDeath

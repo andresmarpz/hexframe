@@ -48,7 +48,7 @@ fn main() {
     settings.validate();
     let opening_size = settings
         .window_size
-        .map_or((1180.0, 680.0), |(w, h)| (w as f32, h as f32));
+        .map_or((1280.0, 760.0), |(w, h)| (w as f32, h as f32));
     let spec = AppSpec {
         min_size: Some((1000.0, 600.0)),
         scenes: ui::scene_list(),

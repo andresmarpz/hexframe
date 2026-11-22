@@ -1,4 +1,4 @@
-use rune::{El, Icon, Side, col, el, row};
+use rune::{El, Icon, Side, Transition, col, el, row};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, State};
 
 use super::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME, LOGO, SIDEBAR};
@@ -36,7 +36,7 @@ pub(super) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
             .help_side(Side::Right),
         s.settings_open,
     ));
-    col()
+    let mut rail = col()
         .key("nav")
         .w(WIDTH)
         .h_full()
@@ -61,20 +61,25 @@ pub(super) fn panel(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
                 .child(item(k, Screen::Home, "Home", &HOME, "nav-home", s))
                 .child(item(k, Screen::Games, "Games", &GAMES, "nav-games", s))
                 .child(item(k, Screen::Clips, "Clips", &CLIPS, "nav-clips", s)),
-        )
-        .child(divider(k))
-        .child(
+        );
+    if s.screen != Screen::Games {
+        rail = rail.child(divider(k).transition(Transition::none())).child(
             col()
                 .key("nav-recent-scroll")
                 .w_full()
                 .grow(1.0)
                 .min_h(0.0)
+                .transition(Transition::none())
+                .instant_changes()
                 .scroll(rune::ScrollSpec {
                     stick_bottom: false,
                 })
                 .child(recent::rail(s, k)),
-        )
-        .child(footer)
+        );
+    } else {
+        rail = rail.child(el().grow(1.0).transition(Transition::none()));
+    }
+    rail.child(footer)
 }
 
 fn brand(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {

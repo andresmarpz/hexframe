@@ -3,10 +3,9 @@ mod events;
 pub(super) mod filter;
 
 use rune::{Color, El, ScrollSpec, col, el, row, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
+use rune_kit::Kit;
 
-use crate::ui::library::format::clip_title;
-use crate::ui::{PanelTab, ReviewState, Source, Ui};
+use crate::ui::{PanelTab, ReviewState, Ui};
 use crate::view::{card, hairline};
 
 #[cfg(test)]
@@ -117,58 +116,20 @@ pub(super) fn muted_note(message: &str, k: &Kit) -> El {
     )
 }
 
-fn clip_banner(review: &ReviewState, k: &Kit) -> Option<El> {
-    let Source::Clip(i) = review.source else {
-        return None;
-    };
-    let label = review
-        .entry
-        .meta
-        .clips
-        .get(i)
-        .map(|c| clip_title(&c.label))
-        .unwrap_or_default();
-    Some(
-        row()
-            .key("clip-notice")
-            .w_full()
-            .px(12.0)
-            .py(8.0)
-            .gap(8.0)
-            .center_y()
-            .child(
-                el().grow(1.0).min_w(0.0).child(
-                    text(format!("Playing clip: {label}"))
-                        .font(k.ty.small)
-                        .color(k.c.text_base)
-                        .truncate(),
-                ),
-            )
-            .child(
-                Button::new("Full game")
-                    .variant(ButtonVariant::Neutral)
-                    .control_size(ControlSize::Small)
-                    .on_press(|ui: &mut Ui| ui.play_game())
-                    .build(k)
-                    .key("review-game"),
-            ),
-    )
-}
-
 pub(super) fn panel(review: &ReviewState, k: &Kit, stacked: bool) -> El {
     let body = match review.tab {
         PanelTab::Events => events_body(review, k),
         PanelTab::Clips => clips::clips_list(review, k),
     };
-    let sized = card(k).key("review-panel");
     let sized = if stacked {
-        sized.w_full().h(STACKED_HEIGHT)
+        card(k).key("review-panel").w_full().h(STACKED_HEIGHT)
     } else {
-        sized.w(PANEL_WIDTH).h_full().min_h(0.0)
+        col()
+            .key("review-panel")
+            .w(PANEL_WIDTH)
+            .h_full()
+            .min_h(0.0)
+            .fill(k.c.bg_base)
     };
-    let mut panel = sized.child(tabs(review, k)).child(hairline(k));
-    if let Some(banner) = clip_banner(review, k) {
-        panel = panel.child(banner).child(hairline(k));
-    }
-    panel.child(body)
+    sized.child(tabs(review, k)).child(hairline(k)).child(body)
 }

@@ -293,7 +293,7 @@ fn the_review_toolbar_never_runs_the_title_under_the_buttons() {
                 trailing[0]
             );
         }
-        for key in ["review-deaths", "review-more"] {
+        for key in ["review-deaths", "review-more", "review-toggle-inspector"] {
             let r = super::nav_rect_of(&rt, key);
             assert!(
                 r[0] >= trailing[0] - 0.5 && r[2] >= 24.0,
@@ -301,4 +301,60 @@ fn the_review_toolbar_never_runs_the_title_under_the_buttons() {
             );
         }
     }
+}
+
+#[test]
+fn toggling_the_inspector_hides_the_panel_widens_the_player_and_keeps_clip_notice() {
+    let mut rt = key_review_runtime();
+    let before = super::rect(&rt, "review-player")[2];
+    assert!(rt.find("review-panel").is_some());
+    tap(&mut rt, "tab-clips");
+    tap(&mut rt, "clip-1");
+    assert!(rt.find("clip-notice").is_some());
+    assert!(rt.find("review-game").is_some());
+
+    tap(&mut rt, "review-toggle-inspector");
+    assert!(rt.state.settings.review_inspector_hidden);
+    assert!(rt.find("review-panel").is_none());
+    let widened = super::rect(&rt, "review-player")[2];
+    assert!(widened > before + 200.0, "{before} -> {widened}");
+    assert!(rt.find("clip-notice").is_some());
+    assert!(rt.find("review-game").is_some());
+
+    press_char(&mut rt, "i");
+    assert!(!rt.state.settings.review_inspector_hidden);
+    assert!(rt.find("review-panel").is_some());
+    press_char(&mut rt, "i");
+    assert!(rt.state.settings.review_inspector_hidden);
+    assert!(rt.find("review-panel").is_none());
+}
+
+#[test]
+fn toggling_the_games_list_hides_and_restores_it_and_persists() {
+    let mut rt = key_review_runtime();
+    assert!(rt.find("games-list").is_some());
+    tap(&mut rt, "review-toggle-games-list");
+    assert!(rt.state.settings.games_list_hidden);
+    assert!(rt.find("games-list").is_none());
+    press_char(&mut rt, "g");
+    assert!(!rt.state.settings.games_list_hidden);
+    assert!(rt.find("games-list").is_some());
+    press_char(&mut rt, "g");
+    assert!(rt.state.settings.games_list_hidden);
+    assert!(rt.find("games-list").is_none());
+}
+
+#[test]
+fn death_review_hides_the_games_list_and_restores_it_when_done() {
+    let mut rt = key_review_runtime();
+    assert!(rt.find("games-list").is_some());
+    assert!(!rt.state.settings.games_list_hidden);
+    press_char(&mut rt, "d");
+    assert!(rt.find("games-list").is_none());
+    assert!(rt.find("review-toggle-games-list").is_none());
+    assert!(rt.find("review-toggle-inspector").is_none());
+    assert!(!rt.state.settings.games_list_hidden);
+    press(&mut rt, Key::Escape);
+    press(&mut rt, Key::Escape);
+    assert!(rt.find("games-list").is_some());
 }

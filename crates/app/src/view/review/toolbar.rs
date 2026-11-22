@@ -43,14 +43,14 @@ fn stats_line(review: &ReviewState) -> String {
     )
 }
 
-pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
+pub(crate) fn toolbar(s: &Ui, review: &ReviewState, k: &Kit) -> Toolbar {
     let meta = &review.entry.meta;
     let champion = meta.game.info.me.champion.as_str();
-    let mut line = row()
-        .key("review-header")
-        .shrink()
-        .gap(10.0)
-        .center_y()
+    let mut line = row().key("review-header").shrink().gap(10.0).center_y();
+    if review.death.is_none() {
+        line = line.child(games_list_toggle(s, k));
+    }
+    line = line
         .child(champion_icon(k, champion, CHAMPION_ICON))
         .child(
             text(champion.to_owned())
@@ -87,10 +87,64 @@ pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
                 .color(k.c.text_muted)
                 .truncate(),
         );
-    Toolbar::new()
+    let mut bar = Toolbar::new()
         .leading(line)
         .trailing(deaths_button(review, k))
-        .trailing(more_trigger(review, k))
+        .trailing(more_trigger(review, k));
+    if review.death.is_none() {
+        bar = bar.trailing(inspector_toggle(s, k));
+    }
+    bar
+}
+
+fn games_list_toggle(s: &Ui, k: &Kit) -> El {
+    let hidden = s.settings.games_list_hidden;
+    let label = if hidden {
+        "Show games list"
+    } else {
+        "Hide games list"
+    };
+    IconButton::new(&icons::PANEL_LEFT)
+        .label(label)
+        .help(label)
+        .shortcut("G")
+        .variant(if hidden {
+            IconButtonVariant::Ghost
+        } else {
+            IconButtonVariant::Neutral
+        })
+        .control_size(ControlSize::Regular)
+        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| {
+            tx.instant();
+            ui.change(|s| s.games_list_hidden = !s.games_list_hidden);
+        })
+        .build(k)
+        .key("review-toggle-games-list")
+}
+
+fn inspector_toggle(s: &Ui, k: &Kit) -> El {
+    let hidden = s.settings.review_inspector_hidden;
+    let label = if hidden {
+        "Show events panel"
+    } else {
+        "Hide events panel"
+    };
+    IconButton::new(&icons::PANEL_RIGHT)
+        .label(label)
+        .help(label)
+        .shortcut("I")
+        .variant(if hidden {
+            IconButtonVariant::Ghost
+        } else {
+            IconButtonVariant::Neutral
+        })
+        .control_size(ControlSize::Regular)
+        .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| {
+            tx.instant();
+            ui.change(|s| s.review_inspector_hidden = !s.review_inspector_hidden);
+        })
+        .build(k)
+        .key("review-toggle-inspector")
 }
 
 fn health_alert(review: &ReviewState) -> Option<Level> {

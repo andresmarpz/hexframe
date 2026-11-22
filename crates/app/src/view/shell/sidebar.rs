@@ -5,7 +5,7 @@ mod status;
 mod storage;
 
 use rune::tok::type_;
-use rune::{El, Icon, ScrollSpec, col, el, row, text};
+use rune::{El, Icon, ScrollSpec, Transition, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, SidebarRow};
 
 use self::icons::{CLIPS, FEEDBACK, GAMES, GEAR, HOME, LOGO, SIDEBAR};
@@ -106,14 +106,25 @@ fn expanded(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
 
 fn middle(s: &Ui, k: &Kit, list: El) -> El {
     let mut body = col().w_full().gap(12.0).child(list);
-    if let Some(recent) = recent::section(s, k) {
-        body = body.child(col().w_full().px(PAD - 4.0).focus_group().child(recent));
+    if s.screen != Screen::Games
+        && let Some(recent) = recent::section(s, k)
+    {
+        body = body.child(
+            col()
+                .w_full()
+                .px(PAD - 4.0)
+                .focus_group()
+                .transition(Transition::none())
+                .instant_changes()
+                .child(recent),
+        );
     }
     col()
         .key("nav-middle")
         .w_full()
         .grow(1.0)
         .min_h(0.0)
+        .instant_changes()
         .scroll(ScrollSpec {
             stick_bottom: false,
         })

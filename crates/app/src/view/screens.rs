@@ -42,22 +42,25 @@ fn clips_screen(s: &Ui, k: &Kit, inset: f32) -> El {
 
 fn games_screen(s: &Ui, k: &Kit, inset: f32, review_width: Option<f32>) -> El {
     let (main, toolbar) = match (s.detail(), &s.review) {
-        (Detail::Game, Some(review)) => {
-            (review_page(s, k, review_width), review::toolbar(review, k))
-        }
+        (Detail::Game, Some(review)) => (
+            review_page(s, k, review_width),
+            review::toolbar(s, review, k),
+        ),
         (Detail::Live, _) => (
             fixed_content(s, home::page(s, k)),
             Toolbar::new().title("Recording"),
         ),
         _ => (fixed_content(s, games::pick(s, k)), Toolbar::new()),
     };
-    let body = row()
-        .key("games-body")
-        .w_full()
-        .h_full()
-        .child(games::list(s, k))
-        .child(Divider::vertical().build(k))
-        .child(col().grow(1.0).min_w(0.0).h_full().child(main));
+    let hide_list = s.detail() == Detail::Game
+        && (s.settings.games_list_hidden || s.review.as_ref().is_some_and(|r| r.death.is_some()));
+    let mut body = row().key("games-body").w_full().h_full();
+    if !hide_list {
+        body = body
+            .child(games::list(s, k))
+            .child(Divider::vertical().build(k));
+    }
+    let body = body.child(col().grow(1.0).min_w(0.0).h_full().child(main));
     Page::new(body)
         .toolbar(toolbar)
         .titlebar_inset(inset)

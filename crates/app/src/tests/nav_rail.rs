@@ -76,15 +76,21 @@ fn the_rail_navigates_and_opens_recent_games() {
         ui.settings.sidebar_collapsed = true;
     });
     settle(&mut rt);
+    assert!(rt.find("nav-recent").is_some());
     tap(&mut rt, "nav-clips");
+    settle(&mut rt);
     assert_eq!(rt.state.screen, Screen::Clips);
-    tap(&mut rt, "nav-games");
-    assert_eq!(rt.state.screen, Screen::Games);
+    assert!(rt.find("nav-recent").is_some());
     let id = recent_games(&rt.state.recordings, 5)[1].meta.id.clone();
     tap(&mut rt, &format!("nav-game-{id}"));
+    settle(&mut rt);
+    assert_eq!(rt.state.screen, Screen::Games);
     assert_eq!(rt.state.selected_id(), Some(id.as_str()));
+    assert!(rt.find("nav-recent").is_none());
     tap(&mut rt, "nav-status");
+    settle(&mut rt);
     assert_eq!(rt.state.screen, Screen::Home);
+    assert!(rt.find("nav-recent").is_some());
 }
 
 #[test]
