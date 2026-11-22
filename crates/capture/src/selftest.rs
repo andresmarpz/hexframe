@@ -1,9 +1,7 @@
 use std::time::{Duration, Instant};
 
 use greyscreen_core::crop::CropRect;
-use greyscreen_core::encoder::{
-    self, Attempt, Candidate, EncoderKind, Probe, Reason, nv12_report,
-};
+use greyscreen_core::encoder::{self, Attempt, Candidate, EncoderKind, Probe, Reason, nv12_report};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, encode_size};
 use greyscreen_core::time::HNS_PER_SEC;
 use windows::Win32::Foundation::E_POINTER;

@@ -487,7 +487,7 @@ fn render(span: &Span, bytes: &[u8]) -> Vec<i16> {
     }
 }
 
-fn f32_to_i16(sample: f32) -> i16 {
+pub(crate) fn f32_to_i16(sample: f32) -> i16 {
     (sample.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16
 }
 

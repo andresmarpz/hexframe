@@ -18,6 +18,7 @@ use crate::d3d::GpuDevice;
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug)]
 pub(crate) struct Copied {
     pub(crate) wait: Wait,
     pub(crate) thumbed: bool,

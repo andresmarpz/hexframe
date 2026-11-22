@@ -615,7 +615,7 @@ fn assert_idle_tail(blocks: &[PcmBlock], scripted_frames: u64) {
 fn is_sine_block(block: &PcmBlock, first_frame: u64) -> bool {
     let expected: Vec<i16> = sine(FRAMES, first_frame, 440.0)
         .into_iter()
-        .map(super::f32_to_i16)
+        .map(crate::audio::f32_to_i16)
         .collect();
     block.first_frame == first_frame && block.samples == expected
 }

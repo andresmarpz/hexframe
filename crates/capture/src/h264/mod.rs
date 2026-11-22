@@ -147,7 +147,7 @@ impl H264Encoder {
         Self::from_opened(opened, kind, name, width, height)
     }
 
-    pub(crate) fn from_opened(
+    fn from_opened(
         opened: setup::Opened,
         kind: EncoderKind,
         name: String,

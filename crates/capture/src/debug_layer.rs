@@ -52,9 +52,9 @@ pub(crate) fn report_live(debug: &ID3D11Debug) {
     // SAFETY: the queue is a live interface on the debug device and the call takes no arguments.
     unsafe { queue.ClearStoredMessages() };
     // SAFETY: the debug interface is live and the call only takes flags.
-    if let Err(error) =
-        unsafe { debug.ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL) }
-    {
+    let report =
+        unsafe { debug.ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL) };
+    if let Err(error) = report {
         tracing::warn!(%error, "live object report failed");
         return;
     }

@@ -76,6 +76,7 @@ pub fn install(report_file: Option<PathBuf>, app_version: &str) {
     unsafe { SetUnhandledExceptionFilter(Some(on_crash)) };
 }
 
+#[derive(Debug)]
 pub struct ReportOutOfMemory<A>(pub A);
 
 // SAFETY: every call forwards unchanged to the inner allocator, which upholds the contract.

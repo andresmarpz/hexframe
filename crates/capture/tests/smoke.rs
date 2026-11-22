@@ -67,7 +67,7 @@ fn the_windows_build_is_ten_above_17763_and_matches_ver() {
 }
 
 fn has_render_endpoint() -> bool {
-    let _ = wasapi::initialize_mta();
+    wasapi::initialize_mta().ok().unwrap_or(());
     DeviceEnumerator::new()
         .and_then(|enumerator| enumerator.get_default_device(Direction::Render))
         .is_ok()
