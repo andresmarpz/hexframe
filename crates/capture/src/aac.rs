@@ -31,6 +31,32 @@ pub enum AacError {
 
 pub type Result<T> = std::result::Result<T, AacError>;
 
+pub trait PcmEncoder {
+    fn encode(&mut self, block: &PcmBlock, out: &mut Vec<Vec<u8>>) -> Result<()>;
+    fn finish(self: Box<Self>, out: &mut Vec<Vec<u8>>) -> Result<()>;
+    fn asc(&self) -> Vec<u8>;
+}
+
+pub type OpenEncoder = Box<dyn FnOnce() -> Result<Box<dyn PcmEncoder>> + Send>;
+
+pub fn open_aac(sample_rate: u32, channels: u16, bitrate: u32) -> OpenEncoder {
+    Box::new(move || Ok(Box::new(AacEncoder::new(sample_rate, channels, bitrate)?)))
+}
+
+impl PcmEncoder for AacEncoder {
+    fn encode(&mut self, block: &PcmBlock, out: &mut Vec<Vec<u8>>) -> Result<()> {
+        AacEncoder::encode(self, block, out)
+    }
+
+    fn finish(self: Box<Self>, out: &mut Vec<Vec<u8>>) -> Result<()> {
+        AacEncoder::finish(*self, out)
+    }
+
+    fn asc(&self) -> Vec<u8> {
+        AacEncoder::asc(self)
+    }
+}
+
 #[derive(Debug)]
 pub struct AacEncoder {
     transform: IMFTransform,

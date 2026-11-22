@@ -7,8 +7,8 @@ use greyscreen_core::media::{AudioFormat, CaptureTarget, Packet, Track};
 use greyscreen_core::time::Hns;
 
 use super::emit::Sink;
-use crate::aac::AacEncoder;
-use crate::audio::{AudioCapture, AudioCounters, AudioTarget, PcmBlock};
+use crate::aac::{OpenEncoder, open_aac};
+use crate::audio::{AudioCapture, AudioCounters, AudioTarget, OpenSource, PcmBlock, open_device};
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
 
@@ -39,12 +39,26 @@ pub(crate) struct AudioPipe {
 
 impl AudioPipe {
     pub(crate) fn start(target: &CaptureTarget, qpc: QpcMap, bitrate: u32) -> Result<Self, String> {
+        let audio_target = match *target {
+            CaptureTarget::GameWindow { pid, .. } => AudioTarget::Process(pid),
+            CaptureTarget::PrimaryMonitor => AudioTarget::System,
+        };
+        let encoder = open_aac(SAMPLE_RATE, CHANNELS, bitrate);
+        Self::start_with(open_device(audio_target), encoder, qpc, bitrate)
+    }
+
+    pub(crate) fn start_with(
+        source: OpenSource,
+        encoder: OpenEncoder,
+        qpc: QpcMap,
+        bitrate: u32,
+    ) -> Result<Self, String> {
         let (pcm_tx, pcm_rx) = pcm_queue();
         let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
         let worker = std::thread::Builder::new()
             .name("greyscreen-aac".into())
-            .spawn(move || aac_main(bitrate, pcm_rx, msg_tx, ready_tx))
+            .spawn(move || aac_main(encoder, pcm_rx, msg_tx, ready_tx))
             .map_err(|e| format!("could not spawn the AAC thread: {e}"))?;
         let asc = match ready_rx.recv() {
             Ok(Ok(asc)) => asc,
@@ -57,14 +71,9 @@ impl AudioPipe {
                 return Err("the AAC thread ended before it was ready".into());
             }
         };
-        let audio_target = match *target {
-            CaptureTarget::GameWindow { pid, .. } => AudioTarget::Process(pid),
-            CaptureTarget::PrimaryMonitor => AudioTarget::System,
-        };
         let (t0_tx, t0_rx) = crossbeam_channel::bounded(1);
         let counters = Arc::new(AudioCounters::default());
-        let capture = match AudioCapture::start(audio_target, qpc, t0_rx, pcm_tx, counters.clone())
-        {
+        let capture = match AudioCapture::start_with(source, qpc, t0_rx, pcm_tx, counters.clone()) {
             Ok(capture) => capture,
             Err(error) => {
                 join(worker);
@@ -134,7 +143,7 @@ fn join(thread: JoinHandle<()>) {
     }
 }
 
-fn aac_main(bitrate: u32, pcm: Receiver<PcmBlock>, out: Sender<AudioMsg>, ready: Ready) {
+fn aac_main(open: OpenEncoder, pcm: Receiver<PcmBlock>, out: Sender<AudioMsg>, ready: Ready) {
     let _com = match ComGuard::mta() {
         Ok(guard) => guard,
         Err(e) => return report(&ready, Err(format!("COM init failed: {e}"))),
@@ -143,7 +152,7 @@ fn aac_main(bitrate: u32, pcm: Receiver<PcmBlock>, out: Sender<AudioMsg>, ready:
         Ok(guard) => guard,
         Err(e) => return report(&ready, Err(format!("Media Foundation start failed: {e}"))),
     };
-    let mut encoder = match AacEncoder::new(SAMPLE_RATE, CHANNELS, bitrate) {
+    let mut encoder = match open() {
         Ok(encoder) => encoder,
         Err(e) => return report(&ready, Err(format!("AAC encoder failed: {e}"))),
     };
