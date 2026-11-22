@@ -11,6 +11,7 @@ pub mod inspect;
 pub mod moov;
 pub mod reader;
 pub mod recover;
+pub mod sink;
 pub mod trim;
 
 #[derive(Debug, thiserror::Error)]

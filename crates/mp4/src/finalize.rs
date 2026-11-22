@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::{Seek, SeekFrom, Write};
+use std::io::SeekFrom;
 
 use greyscreen_core::media::{AudioFormat, VideoFormat};
 
 use crate::moov::{Chunking, SampleRow, SampleTables, write_full_moov};
+use crate::sink::Sink;
 use crate::{Mp4Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -47,7 +47,7 @@ pub fn duration_secs(audio: Option<&AudioFormat>, tables: &SampleTables) -> f64 
 }
 
 pub fn finalize(
-    file: &mut File,
+    file: &mut impl Sink,
     placeholder_offset: u64,
     video: &VideoFormat,
     audio: Option<&AudioFormat>,
@@ -58,10 +58,10 @@ pub fn finalize(
     let moov_offset = file.seek(SeekFrom::End(0))?;
     let placeholder = placeholder_bytes(placeholder_offset, moov_offset)?;
     file.write_all(&moov)?;
-    file.sync_data()?;
+    file.sync()?;
     file.seek(SeekFrom::Start(placeholder_offset))?;
     file.write_all(&placeholder)?;
-    file.sync_data()?;
+    file.sync()?;
     Ok(FinishedInfo {
         duration_secs: duration_secs(audio, tables),
         bytes: moov_offset + moov.len() as u64,

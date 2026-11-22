@@ -1,5 +1,4 @@
 use std::fs::File;
-use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -11,6 +10,7 @@ use crate::moov::{
     AUDIO_TRACK_ID, Chunk, Chunking, NON_SYNC_SAMPLE_FLAGS, SYNC_SAMPLE_FLAGS, SampleRow,
     SampleTables, VIDEO_TRACK_ID, write_ftyp, write_init_moov,
 };
+use crate::sink::Sink;
 use crate::{Mp4Error, Result};
 
 pub use crate::finalize::FinishedInfo;
@@ -92,8 +92,8 @@ struct TrafInput<'a> {
 }
 
 #[derive(Debug)]
-pub struct FragmentedWriter {
-    file: File,
+pub struct FragmentedWriter<S: Sink = File> {
+    file: S,
     video_format: VideoFormat,
     audio_format: Option<AudioFormat>,
     video: TrackState,
@@ -107,8 +107,18 @@ pub struct FragmentedWriter {
     audio_backlog: Vec<Packet>,
 }
 
-impl FragmentedWriter {
+impl FragmentedWriter<File> {
     pub fn create(path: &Path, video: &VideoFormat, audio: Option<&AudioFormat>) -> Result<Self> {
+        Self::with_sink(File::create(path)?, video, audio)
+    }
+}
+
+impl<S: Sink> FragmentedWriter<S> {
+    pub fn with_sink(
+        mut file: S,
+        video: &VideoFormat,
+        audio: Option<&AudioFormat>,
+    ) -> Result<Self> {
         let mut head = write_ftyp(b"isom", &BRANDS);
         let placeholder_offset = head.len() as u64;
         let mut placeholder = BoxWriter::new();
@@ -118,7 +128,6 @@ impl FragmentedWriter {
         head.extend_from_slice(&placeholder.into_inner());
         head.extend_from_slice(&write_init_moov(video, audio));
 
-        let mut file = File::create(path)?;
         file.write_all(&head)?;
         Ok(Self {
             file,
@@ -244,7 +253,7 @@ impl FragmentedWriter {
         if video_ticks - self.synced_video_ticks
             >= SYNC_INTERVAL_SECS * u64::from(VideoFormat::TIMESCALE)
         {
-            self.file.sync_data()?;
+            self.file.sync()?;
             self.synced_video_ticks = video_ticks;
         }
         Ok(())

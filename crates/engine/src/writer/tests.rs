@@ -1,7 +1,9 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use greyscreen_core::media::Track;
+use greyscreen_core::media::{Track, VideoFormat};
 
 use super::*;
 
@@ -71,4 +73,96 @@ fn rename_gives_up_after_five_attempts() {
     assert!(started.elapsed() >= Duration::from_millis(800));
     assert!(part.is_file());
     fs::remove_dir_all(dir).ok();
+}
+
+struct BrokenDisk {
+    bytes: std::io::Cursor<Vec<u8>>,
+    full: Arc<AtomicBool>,
+}
+
+impl std::io::Write for BrokenDisk {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.full.load(Ordering::SeqCst) {
+            return Err(std::io::Error::from(std::io::ErrorKind::StorageFull));
+        }
+        self.bytes.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl std::io::Seek for BrokenDisk {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.bytes.seek(pos)
+    }
+}
+
+impl Sink for BrokenDisk {
+    fn sync(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn disk(full: &Arc<AtomicBool>) -> BrokenDisk {
+    BrokenDisk {
+        bytes: std::io::Cursor::new(Vec::new()),
+        full: Arc::clone(full),
+    }
+}
+
+fn key_packet(dts: i64) -> Arc<Packet> {
+    Arc::new(Packet {
+        track: Track::Video,
+        dts,
+        pts: dts,
+        duration: 1500,
+        key: true,
+        data: Arc::from(vec![0u8; 64]),
+    })
+}
+
+fn video_format() -> VideoFormat {
+    VideoFormat {
+        width: 640,
+        height: 360,
+        fps: 60,
+        sps: vec![0x67, 0x42, 0xc0, 0x1e],
+        pps: vec![0x68, 0xce, 0x3c, 0x80],
+    }
+}
+
+fn run_game(full: &Arc<AtomicBool>, fill_after: usize, packets: i64) -> Report {
+    let dir = test_dir("sink");
+    fs::write(dir.join(PART_FILE), b"").unwrap();
+    let (done_tx, done_rx) = mpsc::channel();
+    let mut writer = GameWriter::spawn_on(disk(full), &dir, &video_format(), None, 16, move |r| {
+        done_tx.send(r).ok();
+    })
+    .unwrap();
+    for i in 0..packets {
+        if i as usize == fill_after {
+            full.store(true, Ordering::SeqCst);
+        }
+        assert_eq!(writer.send(key_packet(i * 1500)), Sent::Queued);
+    }
+    writer.close();
+    let report = done_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert!(!dir.join(VIDEO_FILE).exists() || report.is_ok());
+    drop(writer);
+    fs::remove_dir_all(dir).ok();
+    report
+}
+
+#[test]
+fn write_error_mid_game_is_reported_at_the_end_of_the_game() {
+    let full = Arc::new(AtomicBool::new(false));
+    assert!(run_game(&full, 1, 5).is_err());
+}
+
+#[test]
+fn healthy_sink_finishes_the_game() {
+    let full = Arc::new(AtomicBool::new(false));
+    assert!(run_game(&full, usize::MAX, 3).is_ok());
 }

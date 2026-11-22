@@ -1,16 +1,21 @@
 #[macro_use]
 mod common;
 
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
+use greyscreen_mp4::Mp4Error;
 use greyscreen_mp4::aac::asc_lc;
 use greyscreen_mp4::avc::{annexb_to_avcc, nal_type, split_annexb};
 use greyscreen_mp4::finalize::placeholder_bytes;
 use greyscreen_mp4::fragmented::FragmentedWriter;
 use greyscreen_mp4::reader::boxes;
+
+use common::faulty::FaultySink;
 
 const VIDEO: &[u8] = include_bytes!("fixtures/v.h264");
 const AUDIO: &[u8] = include_bytes!("fixtures/a.adts");
@@ -484,4 +489,57 @@ fn audio_that_ends_before_the_first_key_frame_is_dropped_by_absolute_time() {
     let kept = audio_sample_count(&muxed(&media, &ordered, "audio-late-video"));
 
     assert_eq!(all_audio - kept, 46);
+}
+
+#[test]
+fn write_failure_is_returned_by_the_first_push_that_hits_it() {
+    let media = media();
+    let packets = packets(&media, 3, false);
+    let probe = FaultySink::healthy();
+    let head = probe.written();
+    FragmentedWriter::with_sink(probe, &media.video_format, None).expect("create");
+    let head_len = head.load(Ordering::SeqCst);
+    let second_key = packets
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.key)
+        .nth(1)
+        .map(|(i, _)| i)
+        .expect("second key frame");
+    for kind in [ErrorKind::StorageFull, ErrorKind::Other] {
+        let sink = FaultySink::new(head_len + 1, kind);
+        let mut writer =
+            FragmentedWriter::with_sink(sink, &media.video_format, None).expect("create");
+        let (index, err) = packets
+            .iter()
+            .enumerate()
+            .find_map(|(i, packet)| writer.push(packet).err().map(|e| (i, e)))
+            .expect("a push fails");
+        assert_eq!(index, second_key);
+        match err {
+            Mp4Error::Io(io) => assert_eq!(io.kind(), kind),
+            other => panic!("unexpected error {other}"),
+        }
+    }
+}
+
+#[test]
+fn healthy_sink_writes_the_same_bytes_as_a_real_file() {
+    let media = media();
+    let packets = packets(&media, 3, true);
+    let file = TempPath::new("sink-identical");
+    write_file(file.path(), &media, &packets, true, true);
+    let sink = FaultySink::healthy();
+    let contents = sink.contents();
+    let mut writer =
+        FragmentedWriter::with_sink(sink, &media.video_format, Some(&media.audio_format))
+            .expect("create");
+    for packet in &packets {
+        writer.push(packet).expect("push");
+    }
+    writer.finish().expect("finish");
+    let on_disk = std::fs::read(file.path()).expect("read");
+    let in_memory = contents.lock().expect("lock").get_ref().clone();
+    assert!(!on_disk.is_empty());
+    assert!(on_disk == in_memory, "sink bytes differ from the file");
 }

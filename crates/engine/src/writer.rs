@@ -8,6 +8,7 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
 use greyscreen_core::media::{AudioFormat, Packet, Track, VideoFormat};
 use greyscreen_mp4::fragmented::{FinishedInfo, FragmentedWriter};
+use greyscreen_mp4::sink::Sink;
 
 pub(crate) const PART_FILE: &str = "game.mp4.part";
 pub(crate) const VIDEO_FILE: &str = "game.mp4";
@@ -49,6 +50,29 @@ impl GameWriter {
     ) -> Result<Self, String> {
         let part = folder.join(PART_FILE);
         let writer = FragmentedWriter::create(&part, video, audio).map_err(|e| e.to_string())?;
+        Self::spawn_writer(writer, folder, queue, on_done)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn spawn_on(
+        sink: impl Sink + Send + 'static,
+        folder: &Path,
+        video: &VideoFormat,
+        audio: Option<&AudioFormat>,
+        queue: usize,
+        on_done: impl FnOnce(Report) + Send + 'static,
+    ) -> Result<Self, String> {
+        let writer = FragmentedWriter::with_sink(sink, video, audio).map_err(|e| e.to_string())?;
+        Self::spawn_writer(writer, folder, queue, on_done)
+    }
+
+    fn spawn_writer(
+        writer: FragmentedWriter<impl Sink + Send + 'static>,
+        folder: &Path,
+        queue: usize,
+        on_done: impl FnOnce(Report) + Send + 'static,
+    ) -> Result<Self, String> {
+        let part = folder.join(PART_FILE);
         let target = folder.join(VIDEO_FILE);
         let (tx, rx) = bounded(queue);
         let thread = thread::Builder::new()
@@ -108,7 +132,7 @@ impl Drop for GameWriter {
 }
 
 fn drain(
-    mut writer: FragmentedWriter,
+    mut writer: FragmentedWriter<impl Sink>,
     rx: &Receiver<Arc<Packet>>,
     part: &Path,
     target: &Path,
