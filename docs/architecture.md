@@ -378,6 +378,7 @@ The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and e
 | `warnings` | encoder setup warnings from `Setup`, such as a bitrate cap the encoder did not keep |
 | `capture_errors`, `capture_soft_errors` | `MediaEvent::Failed` count while recording, and recovered capture step failures |
 | `frames_torn_dropped`, `copy_wait_slow`, `copy_wait_timeouts` | the capture frame counters above; a Capture finding shows when frames were dropped (OK) or copies timed out (WARNING) |
+| `frame_stalls`, `longest_frame_stall_secs` | stretches of 10 s or more with no captured frame while audio packets kept arriving (`health::StallWatch`, fed by `Stats`); the encoder keeps writing the held frame. A Capture finding shows WARNING, or BAD from 120 s. `diagnostics.jsonl` samples carry the running counts once a stall exists. No notice while recording |
 
 Verdicts (`greyscreen-core::health::verdict`, shared by the popover and the analyzer) are OK below the first number, WARNING from it and BAD from the second: dropped frames 0.5% and 2%, repeated frames 5% and 20%, longest video gap 100 ms and 500 ms, audio gap 50 ms and 250 ms, audio drift 50 ms and 250 ms, audio start offset 50 ms and 250 ms. Encode p95 above one frame interval warns and above two is bad. Any capture error is bad, any soft error warns, and an average bitrate under 1 Mbps at 720p or more over 30 s warns.
 

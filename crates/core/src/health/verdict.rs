@@ -14,6 +14,7 @@ pub const DRIFT_WARN_MS: f64 = 50.0;
 pub const DRIFT_BAD_MS: f64 = 250.0;
 pub const OFFSET_WARN_MS: f64 = 50.0;
 pub const OFFSET_BAD_MS: f64 = 250.0;
+pub const STALL_BAD_SECS: f64 = 120.0;
 pub const MIN_BITRATE_KBPS: u32 = 1_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -183,6 +184,21 @@ pub(super) fn findings(health: &RecordingHealth) -> Vec<Finding> {
             format!(
                 "{} torn frames from Windows capture replaced, {} late and {} slow GPU copies",
                 health.frames_torn_dropped, health.copy_wait_timeouts, health.copy_wait_slow
+            ),
+        ));
+    }
+    if health.frame_stalls > 0 {
+        let level = if health.longest_frame_stall_secs >= STALL_BAD_SECS {
+            Level::Bad
+        } else {
+            Level::Warn
+        };
+        out.push(finding(
+            Area::Capture,
+            level,
+            format!(
+                "{} stalls with no new game frame while audio ran (longest {:.0} s); the last frame was held",
+                health.frame_stalls, health.longest_frame_stall_secs
             ),
         ));
     }

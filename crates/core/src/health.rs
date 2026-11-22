@@ -4,11 +4,13 @@ use crate::time::Hns;
 
 mod caps;
 pub mod gpu;
+mod stall;
 mod stats;
 mod tracker;
 pub mod verdict;
 
 pub use caps::{BufferUnit, CapMismatch, buffer_size, cap_mismatch, cap_warning};
+pub use stall::{STALL_MIN_SECS, StallWatch};
 pub use stats::{
     CaptureSetup, CaptureStats, LatencyHistogram, SpinShare, WakeLateness, driver_version_text,
 };
@@ -42,6 +44,8 @@ pub struct RecordingHealth {
     pub copy_wait_slow: u64,
     pub copy_wait_timeouts: u64,
     pub video_stopped_secs: Option<f64>,
+    pub frame_stalls: u32,
+    pub longest_frame_stall_secs: f64,
     pub warnings: Vec<String>,
 }
 

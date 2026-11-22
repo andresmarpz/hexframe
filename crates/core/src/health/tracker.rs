@@ -1,6 +1,8 @@
 use serde::Serialize;
 
-use super::{AudioHealth, CaptureStats, EncodeTiming, RecordingHealth, hns_ms, ticks_to_ms};
+use super::{
+    AudioHealth, CaptureStats, EncodeTiming, RecordingHealth, StallWatch, hns_ms, ticks_to_ms,
+};
 use crate::media::{Packet, Track, VideoFormat};
 use crate::time::Hns;
 
@@ -28,6 +30,10 @@ pub struct DiagSample {
     pub first_output_ms: Option<u32>,
     pub torn: u64,
     pub copy_wait_ms_max: f64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub frame_stalls: u32,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub longest_frame_stall_secs: f64,
     pub audio_packets: u64,
     pub audio_trims: u32,
     pub audio_trimmed_ms: u64,
@@ -50,6 +56,10 @@ pub struct DiagSample {
     pub gpu_encode_pct: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gpu_copy_pct: Option<f32>,
+}
+
+fn is_zero<T: Default + PartialEq>(value: &T) -> bool {
+    *value == T::default()
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -109,6 +119,7 @@ pub struct HealthTracker {
     warnings: Vec<String>,
     last: Option<CaptureStats>,
     marks: Marks,
+    stalls: StallWatch,
 }
 
 impl HealthTracker {
@@ -131,6 +142,7 @@ impl HealthTracker {
             warnings: Vec::new(),
             last: None,
             marks: Marks::default(),
+            stalls: StallWatch::default(),
         }
     }
 
@@ -190,6 +202,9 @@ impl HealthTracker {
             torn: stats.torn_dropped,
         };
         self.last = Some(stats.clone());
+        self.stalls
+            .observe(stats.at, stats.captured, stats.audio_packets);
+        let (frame_stalls, longest_frame_stall_secs) = self.stalls.summary();
         DiagSample {
             t: round1(hns_ms(stats.at - self.t0) / 1000.0),
             captured: stats.captured.saturating_sub(marks.captured),
@@ -204,6 +219,8 @@ impl HealthTracker {
             first_output_ms: stats.first_output_ms,
             torn: stats.torn_dropped.saturating_sub(marks.torn),
             copy_wait_ms_max: round1(f64::from(stats.window_copy_wait_max_us) / 1000.0),
+            frame_stalls,
+            longest_frame_stall_secs: round1(longest_frame_stall_secs),
             audio_packets: self.audio.packets,
             audio_trims: stats.audio_trims,
             audio_trimmed_ms: stats.audio_trimmed_ms,
@@ -241,6 +258,7 @@ impl HealthTracker {
         let expected = encoded + self.missing_frames;
         let stats = self.last.clone().unwrap_or_default();
         let bytes = file_bytes.unwrap_or(self.video.bytes + self.audio.bytes);
+        let (frame_stalls, longest_frame_stall_secs) = self.stalls.summary();
         let pct = |part: u64, whole: u64| {
             if whole == 0 {
                 0.0
@@ -290,6 +308,8 @@ impl HealthTracker {
             copy_wait_slow: stats.copy_wait_slow,
             copy_wait_timeouts: stats.copy_wait_timeouts,
             video_stopped_secs: self.video_stopped_secs,
+            frame_stalls,
+            longest_frame_stall_secs: round1(longest_frame_stall_secs),
             warnings: self.warnings.clone(),
         }
     }

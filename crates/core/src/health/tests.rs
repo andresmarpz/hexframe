@@ -505,3 +505,67 @@ fn audio_trims_reach_the_sample_and_the_summary() {
         (3, 120, 70)
     );
 }
+
+fn stall_stats(at_secs: i64, captured: u64, audio_packets: u64) -> CaptureStats {
+    CaptureStats {
+        at: at_secs * crate::time::HNS_PER_SEC,
+        captured,
+        audio_packets,
+        ..CaptureStats::default()
+    }
+}
+
+#[test]
+fn a_stall_is_recorded_only_after_ten_seconds_without_a_captured_frame() {
+    let mut tracker = tracker();
+    tracker.on_stats(&stall_stats(0, 1, 1), Queues::default());
+    tracker.on_stats(&stall_stats(8, 1, 400), Queues::default());
+    tracker.on_stats(&stall_stats(9, 2, 450), Queues::default());
+    let health = tracker.finish(None);
+    assert_eq!(health.frame_stalls, 0);
+    assert!(!health.findings().iter().any(|f| f.text.contains("stalls")));
+
+    tracker.on_stats(&stall_stats(20, 2, 900), Queues::default());
+    let sample = tracker.on_stats(&stall_stats(31, 90, 1400), Queues::default());
+    assert_eq!(sample.frame_stalls, 1);
+    assert_eq!(sample.longest_frame_stall_secs, 22.0);
+    let health = tracker.finish(None);
+    assert_eq!(health.frame_stalls, 1);
+    assert_eq!(health.longest_frame_stall_secs, 22.0);
+    assert!(
+        health
+            .findings()
+            .iter()
+            .any(|f| f.area == Area::Capture && f.level == Level::Warn)
+    );
+}
+
+#[test]
+fn a_stall_still_open_at_the_end_counts_and_needs_audio() {
+    let mut tracker = tracker();
+    tracker.on_stats(&stall_stats(0, 1, 1), Queues::default());
+    tracker.on_stats(&stall_stats(15, 1, 700), Queues::default());
+    assert_eq!(tracker.finish(None).frame_stalls, 1);
+
+    let mut silent = HealthTracker::new(0, &format(), "Test encoder", None);
+    silent.on_stats(&stall_stats(0, 1, 0), Queues::default());
+    silent.on_stats(&stall_stats(15, 1, 0), Queues::default());
+    assert_eq!(silent.finish(None).frame_stalls, 0);
+}
+
+#[test]
+fn a_second_session_starts_from_zero_stalls() {
+    let mut first = tracker();
+    first.on_stats(&stall_stats(0, 1, 1), Queues::default());
+    first.on_stats(&stall_stats(30, 1, 900), Queues::default());
+    assert_eq!(first.finish(None).frame_stalls, 1);
+    assert_eq!(tracker().finish(None).frame_stalls, 0);
+}
+
+#[test]
+fn a_very_long_stall_grades_bad() {
+    let mut tracker = tracker();
+    tracker.on_stats(&stall_stats(0, 1, 1), Queues::default());
+    tracker.on_stats(&stall_stats(200, 1, 9000), Queues::default());
+    assert_eq!(tracker.finish(None).worst(), Level::Bad);
+}
