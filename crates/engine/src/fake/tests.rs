@@ -182,14 +182,15 @@ fn fail_after_delay_sends_the_failure_once_the_delay_passed() {
     let session = source
         .start(CaptureTarget::PrimaryMonitor, config(), tx)
         .unwrap();
+    let deadline = began + Duration::from_secs(2);
     let failed_at = loop {
-        match rx.recv_timeout(Duration::from_secs(2)) {
+        assert!(Instant::now() < deadline, "no failure event");
+        match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(MediaEvent::Failed(message)) => {
                 assert_eq!(message, "late");
                 break began.elapsed();
             }
-            Ok(_) => {}
-            Err(_) => panic!("no failure event"),
+            Ok(_) | Err(_) => {}
         }
     };
     session.stop();
