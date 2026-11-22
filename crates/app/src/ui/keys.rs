@@ -179,6 +179,18 @@ impl Ui {
     pub(crate) fn review_health(&mut self, open: bool) {
         if let Some(review) = &mut self.review {
             review.health_open = open;
+            if open {
+                review.more_menu = false;
+            }
+        }
+    }
+
+    pub(crate) fn review_more_menu(&mut self, open: bool) {
+        if let Some(review) = &mut self.review {
+            review.more_menu = open;
+            if open {
+                review.health_open = false;
+            }
         }
     }
 

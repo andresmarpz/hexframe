@@ -47,6 +47,17 @@ fn skip_button(forward: bool, k: &Kit) -> El {
         .key(key)
 }
 
+fn export_button(k: &Kit) -> El {
+    IconButton::new(&crate::view::widgets::EXPORT)
+        .label("Export this moment")
+        .help("Export this moment…")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Regular)
+        .on_press(|ui: &mut Ui| ui.open_export_moment())
+        .build(k)
+        .key("review-export")
+}
+
 fn screen_button(theater: bool, k: &Kit) -> El {
     let (icon, name, key) = if theater {
         (&icons::SHRINK, "Exit theater", "theater-shrink")
@@ -90,6 +101,9 @@ pub(super) fn transport(review: &ReviewState, k: &Kit, theater: bool, width: Opt
         buttons = buttons.child(clock_text(review, k, clock));
     }
     buttons = buttons.child(el().grow(1.0));
+    if !theater && show.speed && review.can_export_moment() {
+        buttons = buttons.child(export_button(k));
+    }
     if show.speed {
         buttons = buttons.child(controls::speed_trigger(review, k));
     }

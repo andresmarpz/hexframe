@@ -214,7 +214,12 @@ fn theater_top_bar_names_the_game_and_exits() {
 fn the_fullscreen_toggle_sits_at_the_far_right_of_the_transport() {
     let mut rt = review_runtime();
     let toggle = super::rect(&rt, "review-theater");
-    for key in ["review-speed", "review-mute", "review-play"] {
+    for key in [
+        "review-export",
+        "review-speed",
+        "review-mute",
+        "review-play",
+    ] {
         assert!(super::rect(&rt, key)[0] < toggle[0], "{key}");
     }
     tap(&mut rt, "review-theater");
@@ -288,7 +293,7 @@ fn the_review_toolbar_never_runs_the_title_under_the_buttons() {
                 trailing[0]
             );
         }
-        for key in ["review-deaths", "review-folder"] {
+        for key in ["review-deaths", "review-more"] {
             let r = super::nav_rect_of(&rt, key);
             assert!(
                 r[0] >= trailing[0] - 0.5 && r[2] >= 24.0,

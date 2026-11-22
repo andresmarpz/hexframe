@@ -1,16 +1,15 @@
 use crate::qa::reveal;
 use greyscreen_core::game::GameResult;
+use greyscreen_core::health::Level;
 use rune::{El, el, row, text};
 use rune_kit::{
     Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
-    Toolbar, glyphs,
+    Menu, MenuItem, Placement, Toolbar,
 };
 
 use super::{health, icons, tabular, tone_pill};
 use crate::ui::library::format::{kda, mode_label, total_time, when};
 use crate::ui::{ReviewState, Ui, format_clock};
-use crate::view::overlays::delete_key;
-use crate::view::widgets::EXPORT;
 use crate::view::widgets::champion::champion_icon;
 
 const CHAMPION_ICON: f32 = 28.0;
@@ -47,24 +46,6 @@ fn stats_line(review: &ReviewState) -> String {
 pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     let meta = &review.entry.meta;
     let champion = meta.game.info.me.champion.as_str();
-    let video = review.entry.folder.join(&meta.video);
-    let folder = IconButton::new(&glyphs::FOLDER_OPEN)
-        .label("Open folder")
-        .help("Open folder")
-        .variant(IconButtonVariant::Ghost)
-        .control_size(ControlSize::Regular)
-        .on_press(move |_: &mut Ui| reveal(&video))
-        .build(k)
-        .key("review-folder");
-    let id = meta.id.clone();
-    let delete = IconButton::new(&icons::TRASH)
-        .label("Delete recording")
-        .help("Delete recording")
-        .variant(IconButtonVariant::Ghost)
-        .control_size(ControlSize::Regular)
-        .on_press(move |ui: &mut Ui| ui.ask_delete(id.clone()))
-        .build(k)
-        .key(delete_key(&meta.id));
     let mut line = row()
         .key("review-header")
         .shrink()
@@ -109,24 +90,95 @@ pub(crate) fn toolbar(review: &ReviewState, k: &Kit) -> Toolbar {
     Toolbar::new()
         .leading(line)
         .trailing(deaths_button(review, k))
-        .trailing(export_moment(review, k))
-        .trailing(health::trigger(review, k))
-        .trailing(folder)
-        .trailing(delete)
+        .trailing(more_trigger(review, k))
 }
 
-fn export_moment(review: &ReviewState, k: &Kit) -> El {
-    if !review.can_export_moment() {
-        return el();
+fn health_alert(review: &ReviewState) -> Option<Level> {
+    let findings = review.entry.meta.health.as_ref()?.findings();
+    if findings.iter().any(|f| f.level == Level::Bad) {
+        Some(Level::Bad)
+    } else if findings.iter().any(|f| f.level == Level::Warn) {
+        Some(Level::Warn)
+    } else {
+        None
     }
-    IconButton::new(&EXPORT)
-        .label("Export this moment")
-        .help("Export this moment…")
+}
+
+fn more_menu(open: bool) -> Menu {
+    Menu::new("review-more-menu")
+        .open(open)
+        .placement(Placement::BottomEnd)
+        .min_width(184.0)
+        .on_close(|ui: &mut Ui| ui.review_more_menu(false))
+}
+
+fn more_trigger(review: &ReviewState, k: &Kit) -> El {
+    let open = review.more_menu;
+    let mut button = IconButton::new(&icons::MORE)
+        .label("More actions")
         .variant(IconButtonVariant::Ghost)
         .control_size(ControlSize::Regular)
-        .on_press(|ui: &mut Ui| ui.open_export_moment())
-        .build(k)
-        .key("review-export")
+        .expanded(open)
+        .on_press(move |ui: &mut Ui| ui.review_more_menu(!open));
+    if !open && !review.health_open {
+        button = button.help("More actions");
+    }
+    let button = button.build(k).key("review-more");
+    let trigger = match health_alert(review) {
+        Some(level) => {
+            let color = if level == Level::Bad {
+                k.c.danger.icon
+            } else {
+                k.c.warning.icon
+            };
+            el().child(button).child(
+                el().key("review-more-alert")
+                    .w(6.0)
+                    .h(6.0)
+                    .radius(3.0)
+                    .fill(color)
+                    .pin(None, Some(3.0), Some(3.0), None)
+                    .a11y_hidden(),
+            )
+        }
+        None => button,
+    };
+    let anchored = more_menu(open).trigger(trigger).build(k, &mut Vec::new());
+    health::anchor(anchored, review.health_open, k)
+}
+
+pub(crate) fn more_overlay(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) {
+    if !review.more_menu {
+        return;
+    }
+    let meta = &review.entry.meta;
+    let video = review.entry.folder.join(&meta.video);
+    let id = meta.id.clone();
+    let mut health = MenuItem::new("Recording health").on_select(|ui: &mut Ui| {
+        ui.review_more_menu(false);
+        ui.review_health(true);
+    });
+    if health_alert(review).is_some() {
+        health = health.description("Issues found");
+    }
+    more_menu(true)
+        .item(health)
+        .item(
+            MenuItem::new("Show in folder").on_select(move |ui: &mut Ui| {
+                ui.review_more_menu(false);
+                reveal(&video);
+            }),
+        )
+        .separator()
+        .item(
+            MenuItem::new("Delete…")
+                .danger(true)
+                .on_select(move |ui: &mut Ui| {
+                    ui.review_more_menu(false);
+                    ui.ask_delete(id.clone());
+                }),
+        )
+        .build(k, layer);
 }
 
 fn deaths_button(review: &ReviewState, k: &Kit) -> El {
@@ -135,7 +187,7 @@ fn deaths_button(review: &ReviewState, k: &Kit) -> El {
         return el();
     }
     Button::new(format!("Review deaths ({count})"))
-        .variant(ButtonVariant::Submit)
+        .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Regular)
         .shortcut("D")
         .on_press(|ui: &mut Ui| ui.review_deaths())

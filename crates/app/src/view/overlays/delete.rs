@@ -9,10 +9,6 @@ use crate::ui::{Ui, format_size};
 const WIDTH: f32 = 400.0;
 const PADDING: f32 = 16.0;
 
-pub(crate) fn delete_key(id: &str) -> String {
-    format!("delete-{id}")
-}
-
 pub(crate) fn confirm_delete(rec: &RecordingEntry, k: &Kit, layer: &mut Vec<El>) {
     let shown = when(&rec.meta.started_at, &crate::qa::now());
     let summary = format!(

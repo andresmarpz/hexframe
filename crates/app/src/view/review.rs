@@ -150,6 +150,7 @@ fn player_column(review: &ReviewState, k: &Kit, stacked: bool, width: Option<f32
 fn video(review: &ReviewState, k: &Kit, stacked: bool) -> El {
     let frame = el()
         .key("review-video")
+        .label("Game video")
         .focusable(true)
         .w_full()
         .min_h(0.0)

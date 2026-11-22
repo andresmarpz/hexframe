@@ -86,14 +86,20 @@ fn the_dialog_names_the_champion_and_the_size() {
     assert!(texts.iter().any(|t| t.starts_with("Ahri · ")));
 }
 
+fn ask_from_more_menu(rt: &mut Runtime<Ui>) {
+    tap(rt, "review-more");
+    settle(rt);
+    tap(rt, "review-more-menu-item3");
+    settle(rt);
+}
+
 #[test]
-fn the_toolbar_trash_button_opens_the_same_dialog() {
+fn the_toolbar_more_menu_opens_the_same_dialog() {
     let (mut rt, rx) = browsing();
     let id = first_game(&rt);
     tap(&mut rt, &id);
     settle(&mut rt);
-    tap(&mut rt, &format!("delete-{id}"));
-    settle(&mut rt);
+    ask_from_more_menu(&mut rt);
     assert!(rt.find("delete-dialog").is_some());
     tap(&mut rt, "delete-confirm");
     assert_eq!(deletes(&rx), vec![id]);
@@ -108,8 +114,7 @@ fn deleting_the_open_game_closes_its_player_first() {
     settle(&mut rt);
     assert!(rt.state.review.is_some());
     assert_eq!(crate::ui::fake_player::open_players(), 1);
-    tap(&mut rt, &format!("delete-{id}"));
-    settle(&mut rt);
+    ask_from_more_menu(&mut rt);
     tap(&mut rt, "delete-confirm");
     assert!(rt.state.review.is_none());
     assert_eq!(crate::ui::fake_player::open_players(), 0);

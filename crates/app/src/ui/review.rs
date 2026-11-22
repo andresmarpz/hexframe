@@ -60,6 +60,7 @@ pub(crate) struct ReviewState {
     pub volume: f32,
     pub speed_menu: bool,
     pub health_open: bool,
+    pub more_menu: bool,
     pub volume_hover: VolumeHover,
     pub drawer: bool,
     pub death: Option<DeathReviewState>,
@@ -116,6 +117,7 @@ impl ReviewState {
             volume: sound.volume,
             speed_menu: false,
             health_open: false,
+            more_menu: false,
             volume_hover: VolumeHover::default(),
             drawer: false,
             death: None,
@@ -290,6 +292,7 @@ impl ReviewState {
         self.settling = false;
         self.hovered = None;
         self.filter_menu = false;
+        self.more_menu = false;
     }
 
     pub(crate) fn needs_ticks(&mut self) -> bool {

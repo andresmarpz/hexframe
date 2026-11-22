@@ -1,8 +1,8 @@
 use greyscreen_core::health::{Finding, Level, RecordingHealth, no_health_text};
 use rune::{El, col, row, text};
-use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Placement, Popover, StateColors};
+use rune_kit::{Kit, Placement, Popover, StateColors};
 
-use super::{icons, tabular, tone_pill};
+use super::{tabular, tone_pill};
 use crate::ui::{ReviewState, Ui};
 
 const BODY_WIDTH: f32 = 288.0;
@@ -19,19 +19,8 @@ fn popover(open: bool) -> Popover {
         .on_close(|ui: &mut Ui| ui.review_health(false))
 }
 
-pub(super) fn trigger(review: &ReviewState, k: &Kit) -> El {
-    let open = review.health_open;
-    let mut button = IconButton::new(&icons::INFO)
-        .label("Recording health")
-        .variant(IconButtonVariant::Ghost)
-        .control_size(ControlSize::Regular)
-        .on_press(move |ui: &mut Ui| ui.review_health(!open));
-    if !open {
-        button = button.help("Recording health");
-    }
-    popover(open)
-        .trigger(button.build(k).key("review-health"))
-        .build(k, &mut Vec::new())
+pub(super) fn anchor(trigger: El, open: bool, k: &Kit) -> El {
+    popover(open).trigger(trigger).build(k, &mut Vec::new())
 }
 
 pub(crate) fn overlay(review: &ReviewState, k: &Kit, layer: &mut Vec<El>) {

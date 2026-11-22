@@ -40,17 +40,23 @@ fn has_text(rt: &Runtime<Ui>, wanted: &str) -> bool {
     visible_texts(rt).iter().any(|t| t == wanted)
 }
 
+fn open_health(rt: &mut Runtime<Ui>) {
+    tap(rt, "review-more");
+    tap(rt, "review-more-menu-item0");
+}
+
 #[test]
-fn the_info_button_opens_the_summary_and_toggles_it_shut() {
+fn the_more_menu_opens_the_summary_and_closes_when_reopened() {
     let mut rt = review_runtime();
     set_health(&mut rt, Some(health(0.3, 4.0)));
     assert!(rt.find("health-summary").is_none());
-    tap(&mut rt, "review-health");
+    assert!(rt.find("review-more-alert").is_none());
+    open_health(&mut rt);
     assert!(has_text(
         &rt,
         "59.8 fps · 0.3% dropped · audio OK · 18 Mbps"
     ));
-    tap(&mut rt, "review-health");
+    tap(&mut rt, "review-more");
     assert!(rt.find("health-summary").is_none());
 }
 
@@ -58,7 +64,7 @@ fn the_info_button_opens_the_summary_and_toggles_it_shut() {
 fn pressing_outside_closes_it() {
     let mut rt = review_runtime();
     set_health(&mut rt, Some(health(0.3, 4.0)));
-    tap(&mut rt, "review-health");
+    open_health(&mut rt);
     assert!(rt.find("health-summary").is_some());
     rt.pointer_down(300.0, 400.0);
     rt.pointer_up(300.0, 400.0);
@@ -69,10 +75,11 @@ fn pressing_outside_closes_it() {
 }
 
 #[test]
-fn warnings_and_bad_areas_get_their_own_tone_rows() {
+fn warnings_and_bad_areas_get_their_own_tone_rows_and_alert_dot() {
     let mut rt = review_runtime();
     set_health(&mut rt, Some(health(1.2, -400.0)));
-    tap(&mut rt, "review-health");
+    assert!(rt.find("review-more-alert").is_some());
+    open_health(&mut rt);
     for level in ["WARNING", "BAD", "OK"] {
         assert!(has_text(&rt, level), "no {level} row");
     }
@@ -86,7 +93,8 @@ fn warnings_and_bad_areas_get_their_own_tone_rows() {
 fn a_recording_without_health_says_so() {
     let mut rt = review_runtime();
     set_health(&mut rt, None);
-    tap(&mut rt, "review-health");
+    assert!(rt.find("review-more-alert").is_none());
+    open_health(&mut rt);
     assert!(has_text(
         &rt,
         "No health data (recorded before 0.1.12-preview.14)"

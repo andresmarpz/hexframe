@@ -80,7 +80,11 @@ impl ReviewState {
     }
 
     pub(crate) fn controls_menu_open(&self) -> bool {
-        self.speed_menu || self.volume_open() || self.filter_menu || self.health_open
+        self.speed_menu
+            || self.volume_open()
+            || self.filter_menu
+            || self.health_open
+            || self.more_menu
     }
 
     fn push_volume(&self) {
