@@ -29,6 +29,7 @@ pub(super) struct Inputs<'a> {
     pub(super) window: Option<(u32, u32)>,
     pub(super) encode: (u32, u32),
     pub(super) encoder: String,
+    pub(super) warnings: Vec<String>,
 }
 
 pub(super) fn describe(inputs: Inputs) -> CaptureSetup {
@@ -57,6 +58,7 @@ pub(super) fn describe(inputs: Inputs) -> CaptureSetup {
         quality: inputs.cfg.quality,
         gop_frames: inputs.cfg.gop_frames,
         audio: inputs.cfg.audio,
+        warnings: inputs.warnings,
     }
 }
 

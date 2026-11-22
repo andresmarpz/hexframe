@@ -384,3 +384,32 @@ fn a_write_failure_marks_the_video_stopped_once() {
             .any(|f| f.area == Area::File && f.level == Level::Bad)
     );
 }
+
+#[test]
+fn a_twelve_mbit_peak_gives_the_buffer_size_in_each_unit() {
+    assert_eq!(buffer_size(12_000_000, BufferUnit::Bytes), 1_500_000);
+    assert_eq!(buffer_size(12_000_000, BufferUnit::Bits), 12_000_000);
+}
+
+#[test]
+fn each_cap_the_encoder_does_not_keep_is_a_mismatch() {
+    assert_eq!(
+        cap_mismatch("AVEncCommonMaxBitRate", 12_000_000, Some(12_000_000)),
+        None
+    );
+    let max = cap_mismatch("AVEncCommonMaxBitRate", 12_000_000, Some(6_000_000)).expect("max");
+    assert_eq!(max.read_back, Some(6_000_000));
+    let buffer = cap_mismatch("AVEncCommonBufferSize", 1_500_000, None).expect("buffer");
+    assert_eq!(buffer.read_back, None);
+    let text = cap_warning("NVENC", &max);
+    assert!(text.contains("NVENC") && text.contains("12000000") && text.contains("6000000"));
+}
+
+#[test]
+fn setup_warnings_reach_the_health_once() {
+    let mut tracker = tracker();
+    let warnings = vec!["cap ignored".to_owned()];
+    tracker.add_warnings(&warnings);
+    tracker.add_warnings(&warnings);
+    assert_eq!(tracker.finish(None).warnings, warnings);
+}

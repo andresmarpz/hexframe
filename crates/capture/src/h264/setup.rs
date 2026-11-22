@@ -2,6 +2,7 @@ use greyscreen_core::encoder::OpenStep;
 
 use super::open_error;
 use super::rate::{self, RateMode};
+use greyscreen_core::health::{CapMismatch, cap_warning};
 use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, LUID, S_OK};
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncCommonQualityVsSpeed, CODECAPI_AVEncH264CABACEnable,
@@ -46,6 +47,7 @@ pub(super) struct Opened {
     pub(super) output_id: u32,
     pub(super) name: String,
     pub(super) sequence_header: Vec<u8>,
+    pub(super) warnings: Vec<String>,
 }
 
 struct Configured {
@@ -54,6 +56,7 @@ struct Configured {
     output_id: u32,
     sequence_header: Vec<u8>,
     mode: RateMode,
+    mismatches: Vec<CapMismatch>,
 }
 
 pub(super) struct Property {
@@ -93,6 +96,7 @@ pub(super) fn open_candidates(
                     output_id: configured.output_id,
                     name: format!("{name} ({})", configured.mode.label()),
                     sequence_header: configured.sequence_header,
+                    warnings: cap_warnings(&name, &configured.mismatches),
                 });
             }
             Err(error) => {
@@ -238,7 +242,7 @@ fn configure(
         return Err(open_error::at(OpenStep::D3dManager, vendor_id, &error));
     }
     let (input_id, output_id) = stream_ids(&*mft)?;
-    let mode = apply_codec_properties(&*mft, spec, HARDWARE_QUALITY_VS_SPEED)?;
+    let (mode, mismatches) = apply_codec_properties(&*mft, spec, HARDWARE_QUALITY_VS_SPEED)?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
     // SAFETY: the type is live and not modified after this point.
     unsafe {
@@ -270,6 +274,7 @@ fn configure(
         output_id,
         sequence_header,
         mode,
+        mismatches,
     })
 }
 
@@ -390,12 +395,23 @@ pub(super) fn apply_codec_properties(
     codec: &dyn Mft,
     spec: &Spec,
     quality_vs_speed: u32,
-) -> Result<RateMode> {
-    let mode = rate::apply(codec, spec)?;
+) -> Result<(RateMode, Vec<CapMismatch>)> {
+    let rate = rate::apply(codec, spec)?;
     for property in base_properties(spec, quality_vs_speed) {
         apply_property(codec, &property)?;
     }
-    Ok(mode)
+    Ok((rate.mode, rate.mismatches))
+}
+
+pub(super) fn cap_warnings(encoder: &str, mismatches: &[CapMismatch]) -> Vec<String> {
+    mismatches
+        .iter()
+        .map(|mismatch| {
+            let text = cap_warning(encoder, mismatch);
+            tracing::warn!(encoder, property = mismatch.property, "{text}");
+            text
+        })
+        .collect()
 }
 
 pub(super) struct Applied {

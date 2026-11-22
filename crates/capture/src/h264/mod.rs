@@ -78,6 +78,7 @@ pub struct H264Encoder {
     mft: Box<dyn Mft>,
     kind: EncoderKind,
     name: String,
+    warnings: Vec<String>,
     sequence_header: Vec<u8>,
     input_id: u32,
     output_id: u32,
@@ -145,6 +146,7 @@ impl H264Encoder {
             mft: opened.mft,
             kind,
             name,
+            warnings: opened.warnings,
             sequence_header: opened.sequence_header,
             input_id: opened.input_id,
             output_id: opened.output_id,
@@ -173,6 +175,10 @@ impl H264Encoder {
 
     pub fn encoder_name(&self) -> String {
         self.name.clone()
+    }
+
+    pub fn setup_warnings(&self) -> Vec<String> {
+        self.warnings.clone()
     }
 
     pub fn sequence_header(&self) -> &[u8] {

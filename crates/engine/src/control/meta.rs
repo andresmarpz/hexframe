@@ -76,7 +76,8 @@ impl Recording {
         }
     }
 
-    pub(super) fn on_setup(&self, setup: &CaptureSetup) {
+    pub(super) fn on_setup(&mut self, setup: &CaptureSetup) {
+        self.health.add_warnings(&setup.warnings);
         if let Some(diag) = &self.diag {
             diag.line("setup", setup);
         }

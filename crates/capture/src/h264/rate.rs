@@ -1,3 +1,4 @@
+use greyscreen_core::health::{BufferUnit, CapMismatch, buffer_size, cap_mismatch};
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncCommonBufferSize, CODECAPI_AVEncCommonMaxBitRate,
     CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonQuality,
@@ -27,21 +28,30 @@ impl RateMode {
     }
 }
 
-pub(super) fn apply(codec: &dyn Mft, spec: &Spec) -> Result<RateMode> {
+pub(super) struct RateOutcome {
+    pub(super) mode: RateMode,
+    pub(super) mismatches: Vec<CapMismatch>,
+}
+
+pub(super) fn apply(codec: &dyn Mft, spec: &Spec) -> Result<RateOutcome> {
     if let Some(quality) = spec.quality {
         match try_quality(codec, quality) {
             Ok(()) => {
-                apply_caps(codec, spec)?;
-                return Ok(RateMode::Quality(quality));
+                return Ok(RateOutcome {
+                    mode: RateMode::Quality(quality),
+                    mismatches: apply_caps(codec, spec)?,
+                });
             }
             Err(reason) => {
                 tracing::warn!(%reason, "quality rate control unavailable, using peak-constrained VBR");
             }
         }
     }
-    apply_vbr(codec, spec)?;
-    Ok(RateMode::Vbr {
-        mean_bitrate: spec.mean_bitrate,
+    Ok(RateOutcome {
+        mode: RateMode::Vbr {
+            mean_bitrate: spec.mean_bitrate,
+        },
+        mismatches: apply_vbr(codec, spec)?,
     })
 }
 
@@ -82,14 +92,16 @@ fn try_quality(codec: &dyn Mft, quality: u32) -> std::result::Result<(), String>
     Ok(())
 }
 
-fn apply_caps(codec: &dyn Mft, spec: &Spec) -> Result<()> {
-    for property in caps(spec) {
-        apply_property(codec, &property)?;
+fn apply_caps(codec: &dyn Mft, spec: &Spec) -> Result<Vec<CapMismatch>> {
+    let mut mismatches = Vec::new();
+    for (property, wanted) in caps(spec) {
+        let applied = apply_property(codec, &property)?;
+        mismatches.extend(cap_mismatch(property.name, wanted, applied.read_back));
     }
-    Ok(())
+    Ok(mismatches)
 }
 
-fn apply_vbr(codec: &dyn Mft, spec: &Spec) -> Result<()> {
+fn apply_vbr(codec: &dyn Mft, spec: &Spec) -> Result<Vec<CapMismatch>> {
     let mode = eAVEncCommonRateControlMode_PeakConstrainedVBR.0 as u32;
     let leading = [
         Property {
@@ -111,19 +123,26 @@ fn apply_vbr(codec: &dyn Mft, spec: &Spec) -> Result<()> {
     apply_caps(codec, spec)
 }
 
-fn caps(spec: &Spec) -> [Property; 2] {
+fn caps(spec: &Spec) -> [(Property, u32); 2] {
+    let buffer = buffer_size(spec.peak_bitrate, BufferUnit::Bytes);
     [
-        Property {
-            name: "AVEncCommonMaxBitRate",
-            id: CODECAPI_AVEncCommonMaxBitRate,
-            value: VARIANT::from(spec.peak_bitrate),
-            required: false,
-        },
-        Property {
-            name: "AVEncCommonBufferSize",
-            id: CODECAPI_AVEncCommonBufferSize,
-            value: VARIANT::from(spec.peak_bitrate / 8),
-            required: false,
-        },
+        (
+            Property {
+                name: "AVEncCommonMaxBitRate",
+                id: CODECAPI_AVEncCommonMaxBitRate,
+                value: VARIANT::from(spec.peak_bitrate),
+                required: false,
+            },
+            spec.peak_bitrate,
+        ),
+        (
+            Property {
+                name: "AVEncCommonBufferSize",
+                id: CODECAPI_AVEncCommonBufferSize,
+                value: VARIANT::from(buffer),
+                required: false,
+            },
+            buffer,
+        ),
     ]
 }

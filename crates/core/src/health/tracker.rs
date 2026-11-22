@@ -97,6 +97,7 @@ pub struct HealthTracker {
     audio_longest_gap: i64,
     errors: u32,
     video_stopped_secs: Option<f64>,
+    warnings: Vec<String>,
     last: Option<CaptureStats>,
     marks: Marks,
 }
@@ -118,8 +119,17 @@ impl HealthTracker {
             audio_longest_gap: 0,
             errors: 0,
             video_stopped_secs: None,
+            warnings: Vec::new(),
             last: None,
             marks: Marks::default(),
+        }
+    }
+
+    pub fn add_warnings(&mut self, warnings: &[String]) {
+        for warning in warnings {
+            if !self.warnings.contains(warning) {
+                self.warnings.push(warning.clone());
+            }
         }
     }
 
@@ -263,6 +273,7 @@ impl HealthTracker {
             copy_wait_slow: stats.copy_wait_slow,
             copy_wait_timeouts: stats.copy_wait_timeouts,
             video_stopped_secs: self.video_stopped_secs,
+            warnings: self.warnings.clone(),
         }
     }
 

@@ -2,11 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::time::Hns;
 
+mod caps;
 pub mod gpu;
 mod stats;
 mod tracker;
 pub mod verdict;
 
+pub use caps::{BufferUnit, CapMismatch, buffer_size, cap_mismatch, cap_warning};
 pub use stats::{CaptureSetup, CaptureStats, LatencyHistogram, driver_version_text};
 pub use tracker::{DiagSample, HealthTracker, Queues};
 pub use verdict::{Area, Finding, Level, audio_level};
@@ -38,6 +40,7 @@ pub struct RecordingHealth {
     pub copy_wait_slow: u64,
     pub copy_wait_timeouts: u64,
     pub video_stopped_secs: Option<f64>,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]

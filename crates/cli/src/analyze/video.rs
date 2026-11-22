@@ -52,6 +52,12 @@ pub(crate) struct Bitrate {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub(crate) struct Vbv {
+    pub peak_kbps: u32,
+    pub at_secs: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct VideoReport {
     pub frames: u64,
     pub nominal_fps: u32,
@@ -63,6 +69,7 @@ pub(crate) struct VideoReport {
     pub gaps: Gaps,
     pub keyframes: Keyframes,
     pub bitrate: Bitrate,
+    pub vbv: Vbv,
 }
 
 pub(crate) struct AudioBytes<'a> {
@@ -120,6 +127,36 @@ pub(crate) fn analyze(rows: &[SampleRow], fps: u32, audio: Option<AudioBytes>) -
         gaps: summarize_gaps(gaps),
         keyframes: keyframes(&keys),
         bitrate: bitrate(rows, audio, duration_secs),
+        vbv: vbv(rows),
+    }
+}
+
+fn vbv(rows: &[SampleRow]) -> Vbv {
+    let span = u64::from(VideoFormat::TIMESCALE);
+    let mut starts = Vec::with_capacity(rows.len());
+    let mut at = 0u64;
+    for row in rows {
+        starts.push(at);
+        at += u64::from(row.duration);
+    }
+    let mut peak_bytes = 0u64;
+    let mut peak_at = 0u64;
+    let mut sum = 0u64;
+    let mut end = 0usize;
+    for (first, &start) in starts.iter().enumerate() {
+        while end < rows.len() && starts[end] < start + span {
+            sum += u64::from(rows[end].size);
+            end += 1;
+        }
+        if sum > peak_bytes {
+            peak_bytes = sum;
+            peak_at = start;
+        }
+        sum -= u64::from(rows[first].size);
+    }
+    Vbv {
+        peak_kbps: (peak_bytes as f64 * 8.0 / 1000.0).round() as u32,
+        at_secs: peak_at as f64 / span as f64,
     }
 }
 

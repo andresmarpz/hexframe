@@ -228,6 +228,14 @@ What others use (verified): OBS Advanced Recording guide: Constant QP/CQP/ICQ wi
 7. **Output type before input type**, or `MF_E_TRANSFORM_TYPE_NOT_SET`.
 8. **Async unlock first**, or everything returns `MF_E_TRANSFORM_ASYNC_LOCKED`. Do not call `ProcessInput` without a matching `NeedInput` event: the MFT returns `MF_E_NOTACCEPTING`. `ProcessOutput` without `HaveOutput` returns `E_UNEXPECTED`.
 9. **Buffer size units:** Microsoft says `AVEncCommonBufferSize` is in bytes for CBR. Other docs and encoders use bits. Set `max_bitrate / 8` and check the resulting stream with a VBV analyser (**UNVERIFIED** per vendor).
+
+    Greyscreen now reads max bitrate and buffer size back after setting them. A mismatch logs one warning and adds a warning to the diagnostics setup line and to `game.json` health (`warnings`). `greyscreen-cli analyze` reports the peak over any 1 s window and flags it above the cap plus 10 percent when `diagnostics.jsonl` has the cap.
+
+    | Vendor | Driver | Read-back equals set | Peak over any 1 s (1080p60, Max quality, 1 min) | Buffer unit that holds the cap |
+    |---|---|---|---|---|
+    | NVIDIA | | not measured yet | not measured yet | not measured yet |
+    | AMD | | needs a tester (#17) | | |
+    | Intel | | needs a tester (#17) | | |
 10. **Odd sizes:** Chromium notes the MF video encoder accelerator does not handle odd resolutions well. Encode size must be a multiple of 2, preferably of 16. 1080 is not a multiple of 16: encoders pad internally. Do not set a crop rectangle yourself.
 11. **Hybrid GPUs:** the MFT must be on the same adapter as the D3D device. Use the LUID filter in step 4; otherwise a cross-adapter copy hits system memory.
 12. **COM and MF:** MTA, `MFSTARTUP_FULL`, one dedicated encoder thread. Release every COM object before `MFShutdown`. A leaked `IMFSample` that holds a pool texture will deadlock the pool.

@@ -14,6 +14,7 @@ const KEYFRAME_WARN_SECS: f64 = 5.0;
 const QUEUE_WARN: u64 = 1_000;
 const MIN_SECS_FOR_BITRATE: f64 = 30.0;
 const MIN_HEIGHT_FOR_BITRATE: u32 = 720;
+const VBV_TOLERANCE: f64 = 1.1;
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct Verdict {
@@ -44,6 +45,7 @@ pub(super) fn collect(
         keyframes(video),
         bitrate(video, file.height),
     ];
+    out.extend(vbv(video, diag));
     if let Some(audio) = audio {
         out.push(audio_continuity(audio));
         out.push(audio_sync(audio));
@@ -54,6 +56,12 @@ pub(super) fn collect(
                 .findings()
                 .into_iter()
                 .map(|f| verdict(&format!("Health: {}", f.area.label()), f.level, f.text)),
+        );
+        out.extend(
+            health
+                .warnings
+                .iter()
+                .map(|text| verdict("Health: Setup", Level::Warn, text.clone())),
         );
     }
     if let Some(diag) = diag {
@@ -150,6 +158,33 @@ fn bitrate(video: &VideoReport, height: u32) -> Verdict {
             rate.window_secs
         ),
     )
+}
+
+pub(super) fn vbv(video: &VideoReport, diag: Option<&DiagReport>) -> Option<Verdict> {
+    let cap_kbps = diag?
+        .setup
+        .as_ref()?
+        .get("peak")?
+        .as_u64()
+        .map(|bps| bps as f64 / 1000.0)?;
+    let peak = f64::from(video.vbv.peak_kbps);
+    let over = cap_kbps > 0.0 && peak > cap_kbps * VBV_TOLERANCE;
+    let text = format!(
+        "peak {:.1} Mbps over any 1 s (at {:.1} s) against a {:.1} Mbps cap{}",
+        peak / 1000.0,
+        video.vbv.at_secs,
+        cap_kbps / 1000.0,
+        if over {
+            ": the encoder ignores the cap or reads the buffer size in another unit"
+        } else {
+            ""
+        }
+    );
+    Some(verdict(
+        "Bitrate cap",
+        if over { Level::Warn } else { Level::Ok },
+        text,
+    ))
 }
 
 fn audio_continuity(audio: &AudioReport) -> Verdict {

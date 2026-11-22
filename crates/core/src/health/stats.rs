@@ -143,4 +143,5 @@ pub struct CaptureSetup {
     pub quality: Option<u32>,
     pub gop_frames: u32,
     pub audio: bool,
+    pub warnings: Vec<String>,
 }

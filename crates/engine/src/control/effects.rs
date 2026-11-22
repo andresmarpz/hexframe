@@ -158,7 +158,7 @@ impl Control {
                 }
             }
             MediaEvent::Setup(setup) => {
-                if let Some(recording) = self.recording.as_ref() {
+                if let Some(recording) = self.recording.as_mut() {
                     recording.on_setup(&setup);
                 }
             }

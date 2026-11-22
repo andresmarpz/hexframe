@@ -8,8 +8,8 @@ use windows::Win32::System::Variant::VARIANT;
 
 use super::readback::Readback;
 use super::setup::{
-    Opened, Property, Spec, apply_codec_properties, apply_property, read_sequence_header,
-    start_streaming, stream_ids, video_type,
+    Opened, Property, Spec, apply_codec_properties, apply_property, cap_warnings,
+    read_sequence_header, start_streaming, stream_ids, video_type,
 };
 use super::transform::{Mft, RealMft};
 use super::{Mode, Result};
@@ -25,7 +25,7 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
     let transform: IMFTransform =
         unsafe { CoCreateInstance(&CLSID_MSH264EncoderMFT, None, CLSCTX_INPROC_SERVER)? };
     let mft = RealMft::new(transform, None)?;
-    let mode = apply_codec_properties(&mft, spec, QUALITY_VS_SPEED)?;
+    let (mode, mismatches) = apply_codec_properties(&mft, spec, QUALITY_VS_SPEED)?;
     apply_property(&mft, &worker_threads())?;
     let (input_id, output_id) = stream_ids(&mft)?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
@@ -50,6 +50,7 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
         output_id,
         name: format!("{NAME} ({})", mode.label()),
         sequence_header,
+        warnings: cap_warnings(NAME, &mismatches),
     })
 }
 

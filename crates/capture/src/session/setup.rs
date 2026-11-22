@@ -87,18 +87,17 @@ pub(crate) fn build(
     for message in warnings {
         sink.warning(message);
     }
-    if cfg.diagnostics {
-        sink.setup(facts::describe(facts::Inputs {
-            target,
-            cfg: &video_cfg,
-            gpu: &gpu,
-            frame,
-            crop,
-            window: client_area.client_size(),
-            encode: size,
-            encoder: encoder.encoder_name(),
-        }));
-    }
+    sink.setup(facts::describe(facts::Inputs {
+        target,
+        cfg: &video_cfg,
+        gpu: &gpu,
+        frame,
+        crop,
+        window: client_area.client_size(),
+        encode: size,
+        encoder: encoder.encoder_name(),
+        warnings: encoder.setup_warnings(),
+    }));
     if let Some((sps, pps)) = parameter_sets(encoder.sequence_header()) {
         sink.set_fallback(sps, pps);
     }
