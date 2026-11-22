@@ -25,7 +25,7 @@ use windows::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
 use windows::Win32::UI::WindowsAndMessaging::IsWindow;
 use windows::core::{IInspectable, Interface};
 
-use self::publish::Published;
+use self::publish::{Outcome, Published};
 use self::setup::{configure_session, create_item};
 use crate::clock::QpcMap;
 use crate::d3d::GpuDevice;
@@ -67,6 +67,7 @@ struct Shared {
     waits: Mutex<CopyWaits>,
     frame_errors: Mutex<LogOnce>,
     torn: AtomicU64,
+    rewound: AtomicU64,
     promote_after: Hns,
     closed: AtomicBool,
     frames: AtomicU64,
@@ -170,6 +171,7 @@ impl WgcCapture {
             waits: Mutex::new(CopyWaits::default()),
             frame_errors: Mutex::new(LogOnce::new()),
             torn: AtomicU64::new(0),
+            rewound: AtomicU64::new(0),
             promote_after: HNS_PER_SEC * 5 / 2 / i64::from(options.fps.max(1)),
             closed: AtomicBool::new(false),
             frames: AtomicU64::new(0),
@@ -247,6 +249,7 @@ impl WgcCapture {
         stats.window_copy_wait_max_us = waits.max_us;
         waits.max_us = 0;
         stats.torn_dropped = self.shared.torn.load(Ordering::Relaxed);
+        stats.rewound_dropped = self.shared.rewound.load(Ordering::Relaxed);
     }
 
     pub fn is_closed(&self) -> bool {
@@ -310,6 +313,7 @@ impl WgcCapture {
         tracing::info!(
             frames = self.shared.frames.load(Ordering::Relaxed),
             torn_dropped = self.shared.torn.load(Ordering::Relaxed),
+            rewound_dropped = self.shared.rewound.load(Ordering::Relaxed),
             copy_wait_slow = waits.slow,
             copy_wait_timeouts = waits.timeouts,
             "capture stopped"
@@ -390,9 +394,16 @@ impl Shared {
         if let Some(width) = width {
             published.holdback.store_thumb(copy.slot, thumb, width);
         }
-        if published.arrive(copy.slot, texture, copy.size, at, checked) {
-            let torn = self.torn.fetch_add(1, Ordering::Relaxed) + 1;
-            tracing::debug!(torn, "torn capture frame dropped, next frame published");
+        match published.arrive(copy.slot, texture, copy.size, at, checked) {
+            Outcome::Kept => {}
+            Outcome::Torn => {
+                let torn = self.torn.fetch_add(1, Ordering::Relaxed) + 1;
+                tracing::debug!(torn, "torn capture frame dropped, next frame published");
+            }
+            Outcome::Rewound => {
+                let rewound = self.rewound.fetch_add(1, Ordering::Relaxed) + 1;
+                tracing::debug!(rewound, "out-of-order capture frame dropped");
+            }
         }
     }
 

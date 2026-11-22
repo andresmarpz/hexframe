@@ -9,6 +9,14 @@ const CELL_DELTA: u8 = 40;
 const CONTENT_DELTA: u8 = 4;
 const UNCHANGED_CELL_SHARE: usize = 300;
 const UNCHANGED_MAX_CELLS: usize = 16;
+const HISTORY_SLOTS: usize = 6;
+const STALE_SLOTS: usize = 2;
+const MAX_CONSECUTIVE_REWINDS: u8 = 4;
+const REWIND_MOVE_MIN_X100: u32 = 22;
+const REWIND_MATCH_MAX_X100: u32 = 15;
+const REWIND_RATIO: u32 = 3;
+const REWIND_CELL_DELTA: u8 = 2;
+const REWIND_AREA_SHARE: usize = 32;
 const MIN_CELL_SHARE: usize = 64;
 const MIN_CELLS: usize = 4;
 const NEIGHBOUR_RATIO: usize = 4;
@@ -28,6 +36,7 @@ pub enum Arrival {
     Published(usize),
     Dropped(usize),
     Merged { content_changed: bool },
+    Rewound,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -37,6 +46,11 @@ pub struct HoldBack {
     published: Option<usize>,
     pending: Option<usize>,
     reading: Option<usize>,
+    history: [Vec<u8>; HISTORY_SLOTS],
+    history_next: usize,
+    stale: [Vec<u8>; STALE_SLOTS],
+    stale_next: usize,
+    consecutive_rewinds: u8,
 }
 
 impl HoldBack {
@@ -73,6 +87,14 @@ impl HoldBack {
     }
 
     pub fn arrive(&mut self, slot: usize) -> Arrival {
+        if self.is_rewind(slot) {
+            return Arrival::Rewound;
+        }
+        if self.consecutive_rewinds >= MAX_CONSECUTIVE_REWINDS {
+            self.clear_stale();
+        }
+        self.consecutive_rewinds = 0;
+
         let Some(candidate) = self.pending else {
             if self
                 .published
@@ -87,6 +109,7 @@ impl HoldBack {
             return Arrival::Held;
         };
         if is_same_content(&self.thumbs[candidate], &self.thumbs[slot]) {
+            self.record_published();
             self.published = Some(slot);
             self.pending = None;
             return Arrival::Merged {
@@ -107,22 +130,111 @@ impl HoldBack {
             )
         });
         if torn {
+            self.record_published();
             self.published = Some(slot);
             self.pending = None;
             Arrival::Dropped(candidate)
         } else {
+            self.record_published();
             self.published = Some(candidate);
             Arrival::Published(candidate)
         }
     }
 
+    fn is_rewind(&mut self, slot: usize) -> bool {
+        if self.consecutive_rewinds >= MAX_CONSECUTIVE_REWINDS {
+            return false;
+        }
+        let Some(newest) = self.pending.or(self.published) else {
+            return false;
+        };
+        if let (Some(prev), Some(candidate)) = (self.published, self.pending) {
+            let width = self.widths[slot];
+            let same_width = self.widths[prev] == width && self.widths[candidate] == width;
+            if is_torn_frame(
+                [
+                    &self.thumbs[prev],
+                    &self.thumbs[candidate],
+                    &self.thumbs[slot],
+                ],
+                if same_width { width } else { 0 },
+            ) {
+                return false;
+            }
+        }
+        let Some((d_newest, moved)) = diff_stats(&self.thumbs[newest], &self.thumbs[slot]) else {
+            return false;
+        };
+        if d_newest < REWIND_MOVE_MIN_X100 || moved < self.thumbs[slot].len() / REWIND_AREA_SHARE {
+            return false;
+        }
+        let matches_prev_pub = match (self.published, self.pending) {
+            (Some(prev), Some(_)) => mad_x100(&self.thumbs[prev], &self.thumbs[slot])
+                .is_some_and(|d| is_rewind_match(d_newest, d)),
+            _ => false,
+        };
+        let matches_old = matches_prev_pub
+            || self.history.iter().any(|old| {
+                mad_x100(old, &self.thumbs[slot]).is_some_and(|d| is_rewind_match(d_newest, d))
+            })
+            || self.stale.iter().any(|old| {
+                mad_x100(old, &self.thumbs[slot]).is_some_and(|d| is_rewind_match(d_newest, d))
+            });
+        if !matches_old {
+            return false;
+        }
+        self.remember_stale(slot);
+        self.consecutive_rewinds = self.consecutive_rewinds.saturating_add(1);
+        true
+    }
+
+    fn record_published(&mut self) {
+        let Some(prev) = self.published else {
+            return;
+        };
+        let thumb = &self.thumbs[prev];
+        if thumb.is_empty() {
+            return;
+        }
+        let dst = &mut self.history[self.history_next];
+        dst.clear();
+        dst.extend_from_slice(thumb);
+        self.history_next = (self.history_next + 1) % HISTORY_SLOTS;
+    }
+
+    fn remember_stale(&mut self, slot: usize) {
+        let thumb = &self.thumbs[slot];
+        if thumb.is_empty()
+            || self
+                .stale
+                .iter()
+                .any(|s| mad_x100(s, thumb).is_some_and(|d| d <= REWIND_MATCH_MAX_X100))
+        {
+            return;
+        }
+        let dst = &mut self.stale[self.stale_next];
+        dst.clear();
+        dst.extend_from_slice(thumb);
+        self.stale_next = (self.stale_next + 1) % STALE_SLOTS;
+    }
+
+    fn clear_stale(&mut self) {
+        for s in &mut self.stale {
+            s.clear();
+        }
+        self.stale_next = 0;
+    }
+
     pub fn publish_now(&mut self, slot: usize) {
+        self.record_published();
         self.published = Some(slot);
         self.pending = None;
+        self.consecutive_rewinds = 0;
     }
 
     pub fn promote(&mut self) -> Option<usize> {
         let slot = self.pending.take()?;
+        self.record_published();
         self.published = Some(slot);
         Some(slot)
     }
@@ -131,7 +243,36 @@ impl HoldBack {
         self.published = None;
         self.pending = None;
         self.reading = None;
+        for h in &mut self.history {
+            h.clear();
+        }
+        self.history_next = 0;
+        self.clear_stale();
+        self.consecutive_rewinds = 0;
     }
+}
+
+fn is_rewind_match(d_newest: u32, d_old: u32) -> bool {
+    d_old <= REWIND_MATCH_MAX_X100 && d_newest >= d_old.saturating_mul(REWIND_RATIO)
+}
+
+fn diff_stats(a: &[u8], b: &[u8]) -> Option<(u32, usize)> {
+    if a.is_empty() || a.len() != b.len() {
+        return None;
+    }
+    let mut sum = 0u64;
+    let mut moved = 0usize;
+    for (&x, &y) in a.iter().zip(b) {
+        let d = x.abs_diff(y);
+        sum += u64::from(d);
+        moved += usize::from(d >= REWIND_CELL_DELTA);
+    }
+    let mad = ((sum * 100) / a.len() as u64).min(u64::from(u32::MAX)) as u32;
+    Some((mad, moved))
+}
+
+pub fn mad_x100(a: &[u8], b: &[u8]) -> Option<u32> {
+    diff_stats(a, b).map(|(mad, _)| mad)
 }
 
 pub fn is_same_content(a: &[u8], b: &[u8]) -> bool {

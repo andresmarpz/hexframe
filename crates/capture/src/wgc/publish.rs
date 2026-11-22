@@ -19,6 +19,12 @@ pub(super) struct Published {
     content_seq: u64,
 }
 
+pub(super) enum Outcome {
+    Kept,
+    Torn,
+    Rewound,
+}
+
 impl Published {
     pub(super) fn has_frame(&self) -> bool {
         self.current.is_some() || self.pending.is_some()
@@ -55,7 +61,25 @@ impl Published {
         size: (u32, u32),
         at: Hns,
         checked: bool,
-    ) -> bool {
+    ) -> Outcome {
+        if !checked {
+            self.seq += 1;
+            self.holdback.publish_now(slot);
+            self.content_seq += 1;
+            self.pending = None;
+            self.current = Some(Latest {
+                texture,
+                size,
+                at,
+                seq: self.seq,
+                content_seq: self.content_seq,
+            });
+            return Outcome::Kept;
+        }
+        let arrival = self.holdback.arrive(slot);
+        if arrival == Arrival::Rewound {
+            return Outcome::Rewound;
+        }
         self.seq += 1;
         let seq = self.seq;
         let make = |content_seq| Latest {
@@ -65,18 +89,11 @@ impl Published {
             seq,
             content_seq,
         };
-        if !checked {
-            self.holdback.publish_now(slot);
-            self.content_seq += 1;
-            self.pending = None;
-            self.current = Some(make(self.content_seq));
-            return false;
-        }
-        match self.holdback.arrive(slot) {
+        match arrival {
             Arrival::Held => {
                 self.content_seq += 1;
                 self.pending = Some(make(self.content_seq));
-                false
+                Outcome::Kept
             }
             Arrival::Published(_) => {
                 if let Some(pending) = self.pending.take() {
@@ -84,7 +101,7 @@ impl Published {
                 }
                 self.content_seq += 1;
                 self.pending = Some(make(self.content_seq));
-                false
+                Outcome::Kept
             }
             Arrival::Merged { content_changed } => {
                 let content_seq = if content_changed {
@@ -102,14 +119,15 @@ impl Published {
                         .map_or(self.content_seq, |current| current.content_seq)
                 };
                 self.current = Some(make(content_seq));
-                false
+                Outcome::Kept
             }
             Arrival::Dropped(_) => {
                 self.content_seq += 1;
                 self.current = Some(make(self.content_seq));
                 self.pending = None;
-                true
+                Outcome::Torn
             }
+            Arrival::Rewound => Outcome::Rewound,
         }
     }
 }

@@ -564,3 +564,89 @@ fn a_one_frame_flash_over_the_ability_bar_is_dropped() {
 fn a_one_frame_flash_over_the_score_corner_is_dropped() {
     assert_eq!(flash_at(0..8, 80..88), vec![6]);
 }
+
+fn smooth_game(step: usize) -> Vec<u8> {
+    (0..GAME_WIDTH * GAME_HEIGHT)
+        .map(|i| {
+            let x = (i % GAME_WIDTH) + step;
+            let y = i / GAME_WIDTH;
+            (((x * 3 + y * 5) % 180) + 30) as u8
+        })
+        .collect()
+}
+
+#[test]
+fn a_b_a_and_three_frame_rewind_loops_are_dropped() {
+    let mut guard = HoldBack::default();
+    let f = smooth_game;
+    let feed_one = |guard: &mut HoldBack, mut thumb: Vec<u8>| {
+        let slot = guard.write_slot();
+        guard.store_thumb(slot, &mut thumb, GAME_WIDTH);
+        guard.arrive(slot)
+    };
+
+    assert_eq!(feed_one(&mut guard, f(0)), Arrival::Held);
+    assert!(matches!(feed_one(&mut guard, f(1)), Arrival::Published(_)));
+    // A -> B -> A rewind where B is normal moving gameplay (not a HUD tear).
+    assert_eq!(feed_one(&mut guard, f(0)), Arrival::Rewound);
+    // Forward motion continues cleanly: B publishes on C.
+    assert!(matches!(feed_one(&mut guard, f(2)), Arrival::Published(_)));
+    assert!(matches!(feed_one(&mut guard, f(3)), Arrival::Published(_)));
+    // 3-frame rewind loop: 1, 2, 3 -> 1, 2, 3 -> 4.
+    assert_eq!(feed_one(&mut guard, f(1)), Arrival::Rewound);
+    assert_eq!(feed_one(&mut guard, f(2)), Arrival::Rewound);
+    assert_eq!(
+        feed_one(&mut guard, f(3)),
+        Arrival::Merged {
+            content_changed: true
+        }
+    );
+    assert_eq!(feed_one(&mut guard, f(4)), Arrival::Held);
+}
+
+#[test]
+fn a_persistent_stale_buffer_keeps_being_dropped_across_many_frames() {
+    let mut guard = HoldBack::default();
+    let stale = smooth_game(0);
+    let feed_one = |guard: &mut HoldBack, mut thumb: Vec<u8>| {
+        let slot = guard.write_slot();
+        guard.store_thumb(slot, &mut thumb, GAME_WIDTH);
+        guard.arrive(slot)
+    };
+
+    assert_eq!(feed_one(&mut guard, stale.clone()), Arrival::Held);
+    for step in 1..30usize {
+        if step % 3 == 0 {
+            assert_eq!(
+                feed_one(&mut guard, stale.clone()),
+                Arrival::Rewound,
+                "stale buffer at step {step} must be dropped"
+            );
+        } else {
+            assert_ne!(
+                feed_one(&mut guard, smooth_game(step)),
+                Arrival::Rewound,
+                "forward frame at step {step} must be kept"
+            );
+        }
+    }
+}
+
+#[test]
+fn consecutive_rewinds_self_heal_if_the_scene_genuinely_returned() {
+    let mut guard = HoldBack::default();
+    let f0 = smooth_game(0);
+    let f1 = smooth_game(1);
+    let feed_one = |guard: &mut HoldBack, mut thumb: Vec<u8>| {
+        let slot = guard.write_slot();
+        guard.store_thumb(slot, &mut thumb, GAME_WIDTH);
+        guard.arrive(slot)
+    };
+
+    feed_one(&mut guard, f0.clone());
+    feed_one(&mut guard, f1);
+    for _ in 0..MAX_CONSECUTIVE_REWINDS {
+        assert_eq!(feed_one(&mut guard, f0.clone()), Arrival::Rewound);
+    }
+    assert_ne!(feed_one(&mut guard, f0), Arrival::Rewound);
+}

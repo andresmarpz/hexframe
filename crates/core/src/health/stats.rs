@@ -120,6 +120,7 @@ pub struct CaptureStats {
     pub resyncs: u64,
     pub soft_errors: u64,
     pub torn_dropped: u64,
+    pub rewound_dropped: u64,
     pub copy_wait_slow: u64,
     pub copy_wait_timeouts: u64,
     pub window_copy_wait_max_us: u32,

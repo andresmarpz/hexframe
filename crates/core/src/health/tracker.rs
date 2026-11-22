@@ -31,6 +31,8 @@ pub struct DiagSample {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_output_ms: Option<u32>,
     pub torn: u64,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub rewound: u64,
     pub copy_wait_ms_max: f64,
     #[serde(skip_serializing_if = "is_zero")]
     pub frame_stalls: u32,
@@ -101,6 +103,7 @@ struct Marks {
     repeated: u64,
     unchanged: u64,
     torn: u64,
+    rewound: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -204,6 +207,7 @@ impl HealthTracker {
             repeated: stats.repeated,
             unchanged: stats.unchanged,
             torn: stats.torn_dropped,
+            rewound: stats.rewound_dropped,
         };
         self.last = Some(stats.clone());
         self.stalls
@@ -223,6 +227,7 @@ impl HealthTracker {
             spin_pct: stats.pacer_spin.pct(),
             first_output_ms: stats.first_output_ms,
             torn: stats.torn_dropped.saturating_sub(marks.torn),
+            rewound: stats.rewound_dropped.saturating_sub(marks.rewound),
             copy_wait_ms_max: round1(f64::from(stats.window_copy_wait_max_us) / 1000.0),
             frame_stalls,
             longest_frame_stall_secs: round1(longest_frame_stall_secs),
