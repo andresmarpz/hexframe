@@ -279,7 +279,12 @@ fn a_callback_inside_the_copy_cannot_publish_after_stop() {
         !probe.has_frame(),
         "the stalled callback had already published"
     );
+    let stopping = Instant::now();
     capture.stop();
+    assert!(
+        stopping.elapsed() >= STALL_IN_COPY,
+        "no callback was inside the copy at stop"
+    );
     std::thread::sleep(AFTER_STOP);
     assert!(
         !probe.has_frame(),

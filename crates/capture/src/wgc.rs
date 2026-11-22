@@ -61,6 +61,7 @@ struct Worker {
     copier: Option<FrameCopier>,
     thumb: Vec<u8>,
     pool_size: (i32, i32),
+    stopped: bool,
 }
 
 struct Taken {
@@ -153,6 +154,7 @@ impl WgcCapture {
                 copier: Some(copier),
                 thumb: Vec::new(),
                 pool_size: (item_size.Width, item_size.Height),
+                stopped: false,
             }),
             waits: Mutex::new(CopyWaits::default()),
             frame_errors: Mutex::new(LogOnce::new()),
@@ -311,6 +313,7 @@ impl WgcCapture {
             tracing::warn!(%error, "close frame pool failed");
         }
         let mut worker = lock(&self.shared.worker);
+        worker.stopped = true;
         *lock(&self.shared.published) = Published::default();
         if let Some(copier) = &mut worker.copier {
             copier.release();
@@ -340,6 +343,9 @@ impl Shared {
         let content = frame.ContentSize()?;
         let at = self.qpc.to_mono(frame.SystemRelativeTime()?.Duration);
         let mut worker = lock(&self.worker);
+        if worker.stopped {
+            return Ok(());
+        }
         let copy = if content.Width > 0 && content.Height > 0 {
             let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
             // SAFETY: the surface is a live D3D11 texture owned by the checked-out frame.
