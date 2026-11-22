@@ -1,12 +1,14 @@
 use serde::Serialize;
 
 const BYTES_PER_MB: f64 = 1024.0 * 1024.0;
-const MIN_POINTS: usize = 10;
+const MIN_POINTS: usize = 6;
 const MAX_WINDOW: usize = 10;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(crate) struct Sample {
     pub(crate) t_secs: f64,
+    pub(crate) recording: bool,
+    pub(crate) checkpoint: bool,
     pub(crate) private_bytes: Option<u64>,
     pub(crate) handles: Option<u32>,
     pub(crate) threads: Option<u32>,
@@ -20,6 +22,7 @@ pub(crate) struct Limits {
     pub(crate) handle_growth: u32,
     pub(crate) thread_growth: u32,
     pub(crate) warmup_secs: f64,
+    pub(crate) warmup_cycles: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -30,6 +33,7 @@ pub(crate) struct CycleResult {
     pub(crate) dropped_pct: f64,
     pub(crate) capture_errors: u32,
     pub(crate) problem: Option<String>,
+    pub(crate) diag_seconds: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -45,6 +49,7 @@ pub(crate) struct Run<'a> {
     pub(crate) engine_errors: &'a [String],
     pub(crate) min_saved: u32,
     pub(crate) require_usage: bool,
+    pub(crate) by_checkpoint: bool,
 }
 
 pub(crate) fn slope_per_min(points: &[(f64, f64)]) -> Option<f64> {
@@ -83,10 +88,24 @@ pub(crate) fn growth(values: &[f64]) -> Option<f64> {
     Some(last - first)
 }
 
-fn series(samples: &[Sample], warmup: f64, pick: fn(&Sample) -> Option<f64>) -> Vec<(f64, f64)> {
+fn judged<'a>(run: &Run<'a>, limits: &Limits) -> Vec<&'a Sample> {
+    if run.by_checkpoint {
+        run.samples
+            .iter()
+            .filter(|s| s.checkpoint)
+            .skip(limits.warmup_cycles as usize)
+            .collect()
+    } else {
+        run.samples
+            .iter()
+            .filter(|s| !s.recording && s.t_secs >= limits.warmup_secs)
+            .collect()
+    }
+}
+
+fn series(samples: &[&Sample], pick: fn(&Sample) -> Option<f64>) -> Vec<(f64, f64)> {
     samples
         .iter()
-        .filter(|s| s.t_secs >= warmup)
         .filter_map(|s| pick(s).map(|v| (s.t_secs, v)))
         .collect()
 }
@@ -108,7 +127,7 @@ impl Judge {
         }
         if points.len() < MIN_POINTS {
             self.notes.push(format!(
-                "{name}: only {} samples after warmup, slope not checked",
+                "{name}: only {} idle samples after warmup, slope not checked",
                 points.len()
             ));
             return;
@@ -124,6 +143,10 @@ impl Judge {
 
     fn growth(&mut self, name: &str, points: &[(f64, f64)], limit: u32) {
         if points.len() < MIN_POINTS {
+            self.notes.push(format!(
+                "{name}: only {} idle samples after warmup, growth not checked",
+                points.len()
+            ));
             return;
         }
         let values: Vec<f64> = points.iter().map(|p| p.1).collect();
@@ -138,15 +161,15 @@ impl Judge {
 
 pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
     let mut judge = Judge::default();
-    let warmup = limits.warmup_secs;
-    let private = series(run.samples, warmup, |s| megabytes(s.private_bytes));
-    let gpu = series(run.samples, warmup, |s| megabytes(s.gpu_bytes));
-    let handles = series(run.samples, warmup, |s| s.handles.map(f64::from));
-    let threads = series(run.samples, warmup, |s| s.threads.map(f64::from));
+    let picked = judged(run, limits);
+    let private = series(&picked, |s| megabytes(s.private_bytes));
+    let gpu = series(&picked, |s| megabytes(s.gpu_bytes));
+    let handles = series(&picked, |s| s.handles.map(f64::from));
+    let threads = series(&picked, |s| s.threads.map(f64::from));
     if run.require_usage && private.is_empty() {
         judge
             .failures
-            .push("no process memory samples after warmup".to_owned());
+            .push("no idle process memory samples after warmup".to_owned());
     }
     judge.slope("private memory", &private, limits.mem_mb_per_min);
     judge.slope("GPU dedicated memory", &gpu, limits.gpu_mb_per_min);

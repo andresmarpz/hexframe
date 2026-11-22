@@ -28,11 +28,11 @@ const MIN_GAME_VIDEO_SECS: f64 = 1.0;
 
 #[derive(clap::Args, Debug, Clone)]
 pub(crate) struct Args {
-    #[arg(long, default_value_t = 3)]
+    #[arg(long, default_value_t = 8)]
     pub(crate) cycles: u32,
     #[arg(long, default_value_t = 30)]
     pub(crate) seconds: u32,
-    #[arg(long, default_value_t = 3)]
+    #[arg(long, default_value_t = 10)]
     pub(crate) gap_secs: u32,
     #[arg(long, value_name = "MINUTES")]
     pub(crate) game_minutes: Option<u32>,
@@ -44,6 +44,8 @@ pub(crate) struct Args {
     pub(crate) keep: bool,
     #[arg(long, default_value_t = 60.0)]
     pub(crate) warmup_secs: f64,
+    #[arg(long, default_value_t = 2)]
+    pub(crate) warmup_cycles: u32,
     #[arg(long, default_value_t = 2.0, value_name = "MB")]
     pub(crate) max_mem_mb_per_min: f64,
     #[arg(long, default_value_t = 2.0, value_name = "MB")]
@@ -62,6 +64,7 @@ impl Args {
             handle_growth: self.max_handle_growth,
             thread_growth: self.max_thread_growth,
             warmup_secs: self.warmup_secs,
+            warmup_cycles: self.warmup_cycles,
         }
     }
 
@@ -134,6 +137,7 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
     let settings = Settings {
         output_dir,
         auto_record: game_mode,
+        recording_diagnostics: true,
         ..Settings::default()
     };
     let (tx, rx) = unbounded();
@@ -149,15 +153,15 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
         feedback: None,
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     let mut soak = Soak::new(args, rx);
-    let outcome = match args.game_minutes {
+    match args.game_minutes {
         Some(minutes) => soak.run_games(&engine.cmd, minutes),
         None => soak.run_cycles(&engine.cmd),
-    };
+    }
     drop(engine);
     soak.discard_saved();
-    outcome?;
     soak.finish()
 }
 
@@ -172,6 +176,7 @@ struct Soak<'a> {
     engine_errors: Vec<String>,
     pending_folders: Vec<PathBuf>,
     recording: bool,
+    stopped: bool,
 }
 
 impl<'a> Soak<'a> {
@@ -188,63 +193,97 @@ impl<'a> Soak<'a> {
             engine_errors: Vec::new(),
             pending_folders: Vec::new(),
             recording: false,
+            stopped: false,
         }
     }
 
-    fn run_cycles(&mut self, cmd: &Sender<EngineCmd>) -> Result<()> {
+    fn send(&mut self, cmd: &Sender<EngineCmd>, msg: EngineCmd) -> bool {
+        if self.stopped {
+            return false;
+        }
+        if cmd.send(msg).is_err() {
+            self.engine_stopped();
+        }
+        !self.stopped
+    }
+
+    fn engine_stopped(&mut self) {
+        if !self.stopped {
+            self.stopped = true;
+            self.engine_errors.push("engine stopped".to_owned());
+        }
+    }
+
+    fn checkpoint(&mut self) {
+        let t = self.started.elapsed().as_secs_f64();
+        let mut sample = self.meter.sample(t);
+        sample.checkpoint = true;
+        self.samples.push(sample);
+    }
+
+    fn run_cycles(&mut self, cmd: &Sender<EngineCmd>) {
         let secs = Duration::from_secs(u64::from(self.args.seconds));
         for index in 1..=self.args.cycles {
             println!("cycle {index} of {}", self.args.cycles);
-            cmd.send(EngineCmd::StartTestRecording {
+            let start = EngineCmd::StartTestRecording {
                 secs: self.args.seconds,
-            })
-            .context("engine stopped")?;
-            if !self.pump(Instant::now() + secs + SAVE_GRACE, true)? {
-                self.cycles.push(missing_recording(index, secs));
-                cmd.send(EngineCmd::StopRecording).ok();
+            };
+            if !self.send(cmd, start) || !self.pump(Instant::now() + secs + SAVE_GRACE, true) {
+                if !self.stopped {
+                    self.cycles.push(missing_recording(index, secs));
+                    cmd.send(EngineCmd::StopRecording).ok();
+                }
                 break;
             }
             let gap = Duration::from_secs(u64::from(self.args.gap_secs));
-            self.pump(Instant::now() + gap, false)?;
+            self.pump(Instant::now() + gap, false);
             self.discard_saved();
+            self.checkpoint();
+            if self.stopped {
+                break;
+            }
         }
-        Ok(())
     }
 
-    fn run_games(&mut self, cmd: &Sender<EngineCmd>, minutes: u32) -> Result<()> {
+    fn run_games(&mut self, cmd: &Sender<EngineCmd>, minutes: u32) {
         println!("waiting for games for {minutes} minutes");
         self.pump(
             self.started + Duration::from_secs(u64::from(minutes) * 60),
             false,
-        )?;
-        if self.recording {
-            cmd.send(EngineCmd::StopRecording)
-                .context("engine stopped")?;
-            self.pump(Instant::now() + GAME_STOP_GRACE, true)?;
+        );
+        if self.recording && self.send(cmd, EngineCmd::StopRecording) {
+            self.pump(Instant::now() + GAME_STOP_GRACE, true);
         }
-        Ok(())
     }
 
-    fn pump(&mut self, until: Instant, stop_on_saved: bool) -> Result<bool> {
+    fn pump(&mut self, until: Instant, stop_on_saved: bool) -> bool {
+        if self.stopped {
+            return false;
+        }
         loop {
             let now = Instant::now();
             if now >= self.next_sample {
                 let t = now.duration_since(self.started).as_secs_f64();
-                self.samples.push(self.meter.sample(t));
+                let mut sample = self.meter.sample(t);
+                sample.recording = self.recording;
+                self.samples.push(sample);
                 self.next_sample = now + SAMPLE_PERIOD;
             }
             if now >= until {
-                return Ok(false);
+                return false;
             }
             let wake = until.min(self.next_sample);
             match self.rx.recv_timeout(wake.saturating_duration_since(now)) {
                 Ok(msg) => {
                     if self.on_message(msg) && stop_on_saved {
-                        return Ok(true);
+                        return true;
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => bail!("engine stopped"),
+                Err(RecvTimeoutError::Disconnected) => {
+                    self.engine_stopped();
+                    return false;
+                }
             }
         }
     }
@@ -317,6 +356,7 @@ impl<'a> Soak<'a> {
                 engine_errors: &self.engine_errors,
                 min_saved,
                 require_usage: cfg!(windows),
+                by_checkpoint: self.args.game_minutes.is_none(),
             },
             &self.args.limits(),
         );
@@ -359,6 +399,7 @@ fn missing_recording(index: u32, waited: Duration) -> CycleResult {
         video_secs: 0.0,
         dropped_pct: 0.0,
         capture_errors: 0,
+        diag_seconds: Vec::new(),
         problem: Some(format!(
             "no saved recording {} s after the start",
             (waited + SAVE_GRACE).as_secs()
@@ -379,7 +420,18 @@ fn judge_recording(index: u32, entry: &RecordingEntry, min_secs: f64) -> CycleRe
         dropped_pct: health.map_or(0.0, |h| h.dropped_pct),
         capture_errors: health.map_or(0, |h| h.capture_errors),
         problem,
+        diag_seconds: diag_seconds(&entry.folder),
     }
+}
+
+fn diag_seconds(folder: &std::path::Path) -> Vec<serde_json::Value> {
+    let Ok(text) = std::fs::read_to_string(folder.join("diagnostics.jsonl")) else {
+        return Vec::new();
+    };
+    text.lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|v| v["type"] == "second")
+        .collect()
 }
 
 fn playable_secs(entry: &RecordingEntry, min_secs: f64) -> Result<f64, String> {
