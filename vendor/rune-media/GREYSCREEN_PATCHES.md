@@ -63,7 +63,7 @@ Upstream: none. Test-only, except for the sound output's split below.
 
 ## 5. Seeks never block the UI, a scrub can ask for keyframes, and a wedged seek recovers
 
-Upstream: no issue filed yet.
+Upstream: anomalyco/rune#1336.
 
 - Problem: a drag on a seek bar sends a seek per pointer move. The decoder thread held the inbox lock while Media Foundation moved its source reader (`SetCurrentPosition`), and the UI thread takes that lock for every seek and every pull. So each seek of the drag stalled the UI thread for a whole source seek, the play and pause keys waited behind the drag, and a 20-minute recording took seconds to play again. A seek that never delivered a picture left the phase in Buffering with nothing to end it.
 - Change:
@@ -76,7 +76,7 @@ Upstream: no issue filed yet.
 
 ## 6. The layer drops pictures that are late instead of presenting them fast
 
-Upstream: no issue filed yet.
+Upstream: anomalyco/rune#1335.
 
 - Problem: the decoder presents each picture on the layer as soon as its time has passed, and nothing dropped late ones. A decoder that fell behind the clock (the clock follows the sound) replayed its backlog back to back until it caught up, so the picture ran fast for a moment and then went normal.
 - Change: on the layer, a picture more than `LAYER_LATE` (50 ms) past its time on the clock is decoded but not copied or presented, so the layer jumps to the clock. The layer still shows a picture at least every `LAYER_GAP` (250 ms), so a decoder slower than the clip still moves. A fast seek's first picture and a seek's own landing are never dropped (no clock runs for them yet).
@@ -84,7 +84,7 @@ Upstream: no issue filed yet.
 
 ## 7. A seek storm no longer starves the decoder of textures
 
-Upstream: no issue filed yet.
+Upstream: anomalyco/rune#1334.
 
 - Problem: a texture of the ring is free again only when Rune's draw of its picture signals the release fence. A picture that is thrown away without a draw never does. During a burst of seeks the decoder is a few seeks behind the window, so the window threw away every picture it decoded as stale. After six of them (the ring's size) no texture was free, no draw came to release one, and the decoder waited for ever for the picture of the last seek until the 2 s restart.
 - Change: the window hands the textures of pictures it drops as stale to the decoder (`Inbox::unread`, `Inbox::drop_stale`), which frees them at once, and the decoder does the same for the queue a seek flushes. A slot is freed only if it still holds that picture (`Ring::unread` takes the fence value it was written with). The layer path already freed its dropped pictures this way.
@@ -100,7 +100,7 @@ Upstream: none (Rune logs only to stderr under `RUNE_VIDEO_LOG`).
 
 ## 9. A layer made again never takes the closed layer's surface handle
 
-Upstream: no issue filed yet. Rune's `window/win32/video_layer.rs` could also key its visual on more than the handle's value.
+Upstream: anomalyco/rune#1333. Rune's `window/win32/video_layer.rs` could also key its visual on more than the handle's value.
 
 - Problem: a seek (or a pause) while the layer showed froze the picture for good while the sound and the time ran on. The window lets go of the layer when the clock stops, and the decoder closes the layer and its DirectComposition surface handle. When the seek lands and the window asks again, the decoder makes a new layer, and Windows often gives its handle the value of the one just closed. Rune's window makes a new visual only when the handle's value changes (`video_layer::show`), so it kept the old visual, with the closed surface and its last picture from before the seek, and punched the UI over it. The decoder presented every new picture to a surface nothing showed. `Player::time` follows the layer's clock, so the time moved and the app's stall report saw nothing.
 - Change: `layer.rs` remembers the values of the last 16 closed layer handles. A new handle with one of those values stays open while the next is made, then closes, so a new layer always has a value the window hasn't shown. Each new layer logs its handle to the app's log, and a skipped value is logged too.
