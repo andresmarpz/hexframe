@@ -283,33 +283,38 @@ fn nvidia_probe() -> Probe {
 
 #[test]
 fn every_known_failure_gets_its_own_reason() {
+    use OpenStep::*;
     let busy = [BUSY_CODE];
+    let other = 0x8000_4005;
     let cases = [
-        (BUSY_CODE, OpenFailure::Other, OpenFailure::Busy),
-        (0x887A_0005, OpenFailure::Other, OpenFailure::DeviceRemoved),
-        (0x887A_0007, OpenFailure::Other, OpenFailure::DeviceRemoved),
+        (Activate, VENDOR_NVIDIA, BUSY_CODE, OpenFailure::Busy),
+        (D3dManager, VENDOR_NVIDIA, BUSY_CODE, OpenFailure::Busy),
         (
-            0x8000_4005,
-            OpenFailure::StartFailed,
-            OpenFailure::StartFailed,
+            Start,
+            VENDOR_NVIDIA,
+            0x887A_0005,
+            OpenFailure::DeviceRemoved,
         ),
         (
-            0xC00D_36B4,
-            OpenFailure::InputRefused,
-            OpenFailure::InputRefused,
+            D3dManager,
+            VENDOR_NVIDIA,
+            0x887A_0007,
+            OpenFailure::DeviceRemoved,
         ),
-        (
-            0xC00D_36B4,
-            OpenFailure::Unsupported,
-            OpenFailure::Unsupported,
-        ),
-        (0x1234_5678, OpenFailure::Other, OpenFailure::Other),
+        (Start, VENDOR_NVIDIA, other, OpenFailure::StartFailed),
+        (InputType, VENDOR_NVIDIA, other, OpenFailure::InputRefused),
+        (D3dManager, VENDOR_NVIDIA, other, OpenFailure::Unsupported),
+        (Activate, VENDOR_NVIDIA, other, OpenFailure::Other),
+        (OutputType, VENDOR_NVIDIA, other, OpenFailure::Other),
+        (Setup, VENDOR_NVIDIA, 0x1234_5678, OpenFailure::Other),
+        (Activate, VENDOR_INTEL, BUSY_CODE, OpenFailure::Other),
+        (Start, VENDOR_AMD, BUSY_CODE, OpenFailure::StartFailed),
     ];
-    for (code, fallback, expected) in cases {
+    for (step, vendor, code, expected) in cases {
         assert_eq!(
-            OpenFailure::from_code_with(code, fallback, &busy),
+            OpenFailure::at_step_with(step, vendor, code, &busy),
             expected,
-            "{code:#x}"
+            "{step:?} {vendor:#x} {code:#x}"
         );
     }
 }
@@ -317,12 +322,12 @@ fn every_known_failure_gets_its_own_reason() {
 #[test]
 fn only_a_code_the_measurement_saw_means_busy() {
     assert_eq!(
-        OpenFailure::from_code_with(BUSY_CODE, OpenFailure::Other, &[]),
+        OpenFailure::at_step_with(OpenStep::Activate, VENDOR_NVIDIA, BUSY_CODE, &[]),
         OpenFailure::Other
     );
     for code in BUSY_CODES {
         assert_eq!(
-            OpenFailure::from_code(*code, OpenFailure::Other),
+            OpenFailure::at_step(OpenStep::Activate, VENDOR_NVIDIA, *code),
             OpenFailure::Busy
         );
     }

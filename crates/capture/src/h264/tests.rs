@@ -34,14 +34,22 @@ fn garbage_is_rejected() {
 
 #[test]
 fn open_steps_map_to_their_failure() {
-    use super::open_error::{Step, classify};
-    use greyscreen_core::encoder::OpenFailure;
+    use super::open_error::classify;
+    use greyscreen_core::encoder::{OpenFailure, OpenStep};
 
+    let nvidia = 0x10de;
     let other = 0x8000_4005_u32 as i32;
-    assert_eq!(classify(Step::Start, other), OpenFailure::StartFailed);
-    assert_eq!(classify(Step::InputType, other), OpenFailure::InputRefused);
-    assert_eq!(classify(Step::Activate, other), OpenFailure::Other);
-    assert_eq!(classify(Step::OutputType, other), OpenFailure::Other);
+    assert_eq!(
+        classify(OpenStep::Start, nvidia, other),
+        OpenFailure::StartFailed
+    );
+    assert_eq!(
+        classify(OpenStep::D3dManager, nvidia, other),
+        OpenFailure::Unsupported
+    );
     let removed = 0x887A_0005_u32 as i32;
-    assert_eq!(classify(Step::Start, removed), OpenFailure::DeviceRemoved);
+    assert_eq!(
+        classify(OpenStep::D3dManager, nvidia, removed),
+        OpenFailure::DeviceRemoved
+    );
 }

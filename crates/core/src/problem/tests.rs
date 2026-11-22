@@ -104,3 +104,12 @@ fn a_full_disk_write_error_gets_its_own_text() {
         WRITE_ERROR_NOTICE
     );
 }
+
+#[test]
+fn a_busy_encoder_failure_notice_asks_to_close_other_apps() {
+    use crate::encoder::{BUSY_HELP, OpenFailure};
+    let busy = OpenFailure::Busy.tag("no usable hardware H.264 encoder: SetOutputType failed");
+    assert_eq!(Problem::notice("Capture failed", &busy), BUSY_HELP);
+    let other = OpenFailure::Other.tag("no usable hardware H.264 encoder: SetOutputType failed");
+    assert_ne!(Problem::notice("Capture failed", &other), BUSY_HELP);
+}

@@ -181,6 +181,27 @@ const DEVICE_REMOVED_CODES: &[u32] = &[0x887A_0005, 0x887A_0006, 0x887A_0007];
 const FAILURE_TAG: &str = "[open failure: ";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenStep {
+    Setup,
+    Activate,
+    D3dManager,
+    OutputType,
+    InputType,
+    Start,
+}
+
+impl OpenStep {
+    fn fallback(self) -> OpenFailure {
+        match self {
+            OpenStep::Setup | OpenStep::Activate | OpenStep::OutputType => OpenFailure::Other,
+            OpenStep::D3dManager => OpenFailure::Unsupported,
+            OpenStep::InputType => OpenFailure::InputRefused,
+            OpenStep::Start => OpenFailure::StartFailed,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenFailure {
     Busy,
     StartFailed,
@@ -200,17 +221,17 @@ impl OpenFailure {
         OpenFailure::Other,
     ];
 
-    pub fn from_code(code: u32, fallback: OpenFailure) -> OpenFailure {
-        Self::from_code_with(code, fallback, BUSY_CODES)
+    pub fn at_step(step: OpenStep, vendor_id: u32, code: u32) -> OpenFailure {
+        Self::at_step_with(step, vendor_id, code, BUSY_CODES)
     }
 
-    pub fn from_code_with(code: u32, fallback: OpenFailure, busy: &[u32]) -> OpenFailure {
-        if busy.contains(&code) {
+    pub fn at_step_with(step: OpenStep, vendor_id: u32, code: u32, busy: &[u32]) -> OpenFailure {
+        if vendor_id == VENDOR_NVIDIA && busy.contains(&code) {
             OpenFailure::Busy
         } else if DEVICE_REMOVED_CODES.contains(&code) {
             OpenFailure::DeviceRemoved
         } else {
-            fallback
+            step.fallback()
         }
     }
 

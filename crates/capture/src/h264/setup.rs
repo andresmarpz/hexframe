@@ -1,4 +1,6 @@
-use super::open_error::{self, Step};
+use greyscreen_core::encoder::OpenStep;
+
+use super::open_error;
 use super::rate::{self, RateMode};
 use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, LUID, S_OK};
 use windows::Win32::Media::MediaFoundation::{
@@ -77,7 +79,7 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
     let mut failures = Vec::new();
     for activate in candidates {
         let name = describe(&activate);
-        match configure(&activate, &manager, spec) {
+        match configure(&activate, &manager, spec, gpu.vendor_id) {
             Ok(configured) => {
                 tracing::info!(encoder = %name, "hardware H.264 encoder configured");
                 return Ok(Opened {
@@ -95,6 +97,7 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
                 });
             }
             Err(error) => {
+                let error = open_error::tag_untagged(error, gpu.vendor_id);
                 tracing::warn!(encoder = %name, %error, "hardware H.264 encoder candidate rejected");
                 failures.push(format!("{name}: {error}"));
                 // SAFETY: the activate object is live; shutting it down releases the failed transform.
@@ -213,11 +216,12 @@ fn configure(
     activate: &IMFActivate,
     manager: &IMFDXGIDeviceManager,
     spec: &Spec,
+    vendor_id: u32,
 ) -> Result<Configured> {
     fault!(MftActivation)?;
     // SAFETY: the activate object is live.
-    let transform: IMFTransform =
-        unsafe { activate.ActivateObject() }.map_err(|e| open_error::at(Step::Activate, &e))?;
+    let transform: IMFTransform = unsafe { activate.ActivateObject() }
+        .map_err(|e| open_error::at(OpenStep::Activate, vendor_id, &e))?;
     // SAFETY: the transform is live.
     let attributes = unsafe { transform.GetAttributes()? };
     // SAFETY: the attribute store is live.
@@ -240,7 +244,7 @@ fn configure(
     let device_set =
         unsafe { transform.ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize) };
     if let Err(error) = device_set {
-        return Err(rejected(&format!("SET_D3D_MANAGER failed: {error}")));
+        return Err(open_error::at(OpenStep::D3dManager, vendor_id, &error));
     }
     let (input_id, output_id) = stream_ids(&transform)?;
     let codec: ICodecAPI = transform.cast()?;
@@ -253,13 +257,13 @@ fn configure(
     }
     // SAFETY: the transform and type are live.
     unsafe { transform.SetOutputType(output_id, &output_type, 0) }
-        .map_err(|e| open_error::at(Step::OutputType, &e))?;
+        .map_err(|e| open_error::at(OpenStep::OutputType, vendor_id, &e))?;
     let mut sequence_header = read_sequence_header(&transform, output_id);
     log_input_types(&transform, input_id);
     let input_type = video_type(spec, &MFVideoFormat_NV12)?;
     // SAFETY: the transform and type are live.
     if let Err(error) = unsafe { transform.SetInputType(input_id, &input_type, 0) } {
-        return Err(open_error::at(Step::InputType, &error));
+        return Err(open_error::at(OpenStep::InputType, vendor_id, &error));
     }
     if sequence_header.is_empty() {
         sequence_header = read_sequence_header(&transform, output_id);
@@ -270,7 +274,7 @@ fn configure(
     log_bind_flags(&transform, input_id);
     let events: IMFMediaEventGenerator = transform.cast()?;
     start_streaming(&transform).map_err(|error| match error {
-        H264Error::Windows(e) => open_error::at(Step::Start, &e),
+        H264Error::Windows(e) => open_error::at(OpenStep::Start, vendor_id, &e),
         other => other,
     })?;
     Ok(Configured {
