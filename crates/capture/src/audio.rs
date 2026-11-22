@@ -35,6 +35,9 @@ pub struct AudioCounters {
     idle_ms: AtomicU64,
     timestamp_gaps_over_5s: AtomicU32,
     largest_timestamp_gap_ms: AtomicU64,
+    trims: AtomicU32,
+    trimmed_ms: AtomicU64,
+    trim_longest_ms: AtomicU32,
     queue_depth: AtomicU32,
     failure: Mutex<Option<String>>,
 }
@@ -58,6 +61,11 @@ impl AudioCounters {
             .store(timeline.big_gaps(), Ordering::Relaxed);
         let ms = u64::try_from(timeline.largest_gap() / 10_000).unwrap_or(0);
         self.largest_timestamp_gap_ms.store(ms, Ordering::Relaxed);
+        self.trims.store(timeline.trims(), Ordering::Relaxed);
+        self.trimmed_ms
+            .store(hns_to_ms(timeline.trimmed()), Ordering::Relaxed);
+        let longest = u32::try_from(hns_to_ms(timeline.longest_trim())).unwrap_or(u32::MAX);
+        self.trim_longest_ms.store(longest, Ordering::Relaxed);
     }
 
     fn fail(&self, text: String) {
@@ -79,6 +87,9 @@ impl AudioCounters {
         stats.audio_timestamp_gaps_over_5s = self.timestamp_gaps_over_5s.load(Ordering::Relaxed);
         stats.audio_largest_timestamp_gap_ms =
             self.largest_timestamp_gap_ms.load(Ordering::Relaxed);
+        stats.audio_trims = self.trims.load(Ordering::Relaxed);
+        stats.audio_trimmed_ms = self.trimmed_ms.load(Ordering::Relaxed);
+        stats.audio_trim_longest_ms = self.trim_longest_ms.load(Ordering::Relaxed);
         stats.pcm_queue = self.queue_depth.load(Ordering::Relaxed);
     }
 }
@@ -108,6 +119,10 @@ fn send_block(
             }
         }
     }
+}
+
+fn hns_to_ms(hns: Hns) -> u64 {
+    u64::try_from(hns / 10_000).unwrap_or(0)
 }
 
 fn frames_to_ms(frames: usize) -> u32 {
@@ -288,6 +303,8 @@ fn run(
         tracing::info!(
             largest_timestamp_gap_ms = counters.largest_timestamp_gap_ms.load(Ordering::Relaxed),
             timestamp_gaps_over_5s = counters.timestamp_gaps_over_5s.load(Ordering::Relaxed),
+            trims = counters.trims.load(Ordering::Relaxed),
+            trimmed_ms = counters.trimmed_ms.load(Ordering::Relaxed),
             "audio timestamp gaps"
         );
     }

@@ -197,6 +197,13 @@ impl FakeMediaSource {
         self.with_faults(|faults| faults.final_stats = true)
     }
 
+    pub fn with_final_torn(self, frames: u64) -> Self {
+        self.with_faults(|faults| {
+            faults.final_stats = true;
+            faults.final_torn = frames;
+        })
+    }
+
     pub fn probe(&self) -> Arc<FakeProbe> {
         self.probe.clone()
     }
@@ -326,6 +333,7 @@ fn run(
     let mut stats = CaptureStats::default();
     produce(fixtures, plan, t0, diagnostics, &link, &mut stats);
     if plan.faults.final_stats {
+        stats.torn_dropped = plan.faults.final_torn;
         out.try_send(MediaEvent::Stats(Box::new(stats))).ok();
     }
 }

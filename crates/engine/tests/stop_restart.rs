@@ -274,6 +274,19 @@ fn stop_right_after_start_keeps_the_last_packets() {
 }
 
 #[test]
+fn stats_queued_at_stop_reach_the_recording_health() {
+    let media = FakeMediaSource::new().with_speed(20).with_final_torn(7);
+    let harness = start_idle(settings("final-stats"), Arc::new(media));
+    start_test(&harness, 600);
+    recording_since(&harness.ui);
+    thread::sleep(Duration::from_millis(300));
+    send(&harness, EngineCmd::StopRecording);
+    let entry = wait_saved(&harness);
+    let health = entry.meta.health.as_ref().expect("health");
+    assert_eq!(health.frames_torn_dropped, 7);
+}
+
+#[test]
 fn a_second_recording_in_one_process_starts_clean() {
     let media = FakeMediaSource::new().with_speed(20).with_final_stats();
     let harness = start_idle(settings("restart"), Arc::new(media));

@@ -65,6 +65,9 @@ pub struct AudioHealth {
     pub drift_ms: f64,
     pub timestamp_gaps_over_5s: u32,
     pub largest_timestamp_gap_ms: u64,
+    pub trims: u32,
+    pub trimmed_ms: u64,
+    pub longest_trim_ms: u32,
 }
 
 impl RecordingHealth {

@@ -392,3 +392,24 @@ fn packet_fully_before_t0_does_not_count_as_the_first() {
     assert!(silence.abs_diff(frames_at(48_000, 20)) <= 1, "{next:?}");
     assert_eq!(data_frames(&next), len);
 }
+
+#[test]
+fn a_packet_behind_the_slot_is_a_trim_and_one_ahead_is_a_gap() {
+    let mut timeline = timeline(0);
+    timeline.on_packet(Some(0), frames(10), false);
+    let ahead = timeline.expected() + 100 * MS;
+    let spans = timeline.on_packet(Some(ahead), frames(10), false);
+    assert_eq!(silence_spans(&spans).iter().sum::<usize>(), frames(100));
+    assert_eq!(timeline.trims(), 0);
+
+    let behind = timeline.expected() - 50 * MS;
+    let spans = timeline.on_packet(Some(behind), frames(100), false);
+    assert_eq!(data_frames(&spans), frames(100) - frames(50));
+    assert_eq!(timeline.trims(), 1);
+    assert_eq!(timeline.trimmed(), 50 * MS);
+    assert_eq!(timeline.longest_trim(), 50 * MS);
+
+    let behind = timeline.expected() - 20 * MS;
+    timeline.on_packet(Some(behind), frames(100), false);
+    assert_eq!(timeline.trims(), 1);
+}

@@ -102,6 +102,10 @@ impl AudioPipe {
         self.counters.fill(stats);
     }
 
+    pub(crate) fn counters(&self) -> Arc<AudioCounters> {
+        Arc::clone(&self.counters)
+    }
+
     pub(crate) fn begin(&self, t0: Hns) {
         self.t0_tx.send(t0).ok();
     }

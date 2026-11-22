@@ -1,7 +1,6 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::thread;
 
-use crossbeam_channel::never;
 use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
 use greyscreen_core::encoder;
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
@@ -25,7 +24,7 @@ use crate::storage;
 use crate::writer::{GameWriter, VIDEO_FILE};
 
 const RING_MARGIN_SECS: u32 = 5;
-const DISK_TOO_SLOW: &str = "Disk too slow: the full game recording stopped";
+pub(super) const DISK_TOO_SLOW: &str = "Disk too slow: the full game recording stopped";
 const ENCODER_STOPPED: &str = "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point.";
 
 pub(super) fn ring_keep() -> Hns {
@@ -208,35 +207,6 @@ impl Control {
                 self.try_complete();
             }
         }
-    }
-
-    fn on_media_stopped(&mut self, generation: u64) {
-        if generation != self.media_gen {
-            return;
-        }
-        self.stopping = false;
-        let rx = std::mem::replace(&mut self.media_rx, never());
-        match self.recording.as_mut() {
-            Some(recording) => {
-                let mut overflowed = false;
-                for event in rx.try_iter() {
-                    if let MediaEvent::Packet(packet) = event {
-                        overflowed |= recording.push(packet);
-                    }
-                }
-                recording.media_stopped = true;
-                recording.close_writer();
-                if overflowed {
-                    self.notice(NoticeLevel::Error, DISK_TOO_SLOW);
-                }
-            }
-            None if self.orphan_finalize => {
-                self.orphan_finalize = false;
-                self.feed(Input::Finalized);
-            }
-            None => {}
-        }
-        self.try_complete();
     }
 
     fn begin_recording(&mut self, since: Hns, game: Option<GameInfo>) -> Result<(), String> {

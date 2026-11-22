@@ -453,3 +453,57 @@ fn diag_sample_reports_pacer_stats() {
     assert_eq!(sample.first_output_ms, Some(80));
     assert_eq!(sample.encoder_stalls_early, 1);
 }
+
+#[test]
+fn loss_causes_stay_apart_and_each_has_its_own_base() {
+    let mut stalled = tracker();
+    for tick in 0..600 {
+        stalled.on_packet(&video(tick));
+    }
+    stalled.on_stats(
+        &CaptureStats {
+            captured: 5,
+            repeated: 590,
+            ..CaptureStats::default()
+        },
+        Queues::default(),
+    );
+    let health = stalled.finish(None);
+    assert_eq!(health.frames_dropped, 0);
+    assert_eq!(health.dropped_pct, 0.0);
+    assert_eq!(health.frames_repeated, 590);
+    assert!(health.repeated_pct > 90.0);
+
+    let mut holes = tracker();
+    for tick in (0..540).chain(570..630) {
+        holes.on_packet(&video(tick));
+    }
+    let health = holes.finish(None);
+    assert_eq!(health.frames_encoded, 600);
+    assert_eq!(health.frames_dropped, 30);
+    assert_eq!(health.dropped_pct, 4.76);
+    assert_eq!(health.frames_repeated, 0);
+
+    let fresh = tracker().finish(None);
+    assert_eq!(fresh.frames_dropped, 0);
+    assert_eq!(fresh.frames_repeated, 0);
+}
+
+#[test]
+fn audio_trims_reach_the_sample_and_the_summary() {
+    let mut tracker = tracker();
+    tracker.on_packet(&audio(0));
+    let stats = CaptureStats {
+        audio_trims: 3,
+        audio_trimmed_ms: 120,
+        audio_trim_longest_ms: 70,
+        ..CaptureStats::default()
+    };
+    let sample = tracker.on_stats(&stats, Queues::default());
+    assert_eq!((sample.audio_trims, sample.audio_trimmed_ms), (3, 120));
+    let audio = tracker.finish(None).audio.expect("audio");
+    assert_eq!(
+        (audio.trims, audio.trimmed_ms, audio.longest_trim_ms),
+        (3, 120, 70)
+    );
+}

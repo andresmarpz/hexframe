@@ -3,6 +3,7 @@ mod disk;
 mod effects;
 mod folder;
 mod media_start;
+mod media_stop;
 mod meta;
 mod writer_failure;
 

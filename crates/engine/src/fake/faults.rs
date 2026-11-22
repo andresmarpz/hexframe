@@ -17,6 +17,7 @@ pub struct Faults {
     pub audio_delay_secs: u32,
     pub audio_stop: Option<(u32, String)>,
     pub final_stats: bool,
+    pub final_torn: u64,
 }
 
 #[derive(Debug, Default)]

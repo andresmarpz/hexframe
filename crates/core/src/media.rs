@@ -149,6 +149,9 @@ pub struct AudioTimeline {
     big_gaps: u32,
     largest_gap: Hns,
     last_gap: Hns,
+    trims: u32,
+    trimmed: Hns,
+    longest_trim: Hns,
 }
 
 impl AudioTimeline {
@@ -169,6 +172,9 @@ impl AudioTimeline {
             big_gaps: 0,
             largest_gap: 0,
             last_gap: 0,
+            trims: 0,
+            trimmed: 0,
+            longest_trim: 0,
         })
     }
 
@@ -178,6 +184,25 @@ impl AudioTimeline {
 
     pub fn largest_gap(&self) -> Hns {
         self.largest_gap
+    }
+
+    pub fn trims(&self) -> u32 {
+        self.trims
+    }
+
+    pub fn trimmed(&self) -> Hns {
+        self.trimmed
+    }
+
+    pub fn longest_trim(&self) -> Hns {
+        self.longest_trim
+    }
+
+    fn note_trim(&mut self, skipped_frames: usize) {
+        let size = self.hns_for_frames(skipped_frames as u64);
+        self.trims = self.trims.saturating_add(1);
+        self.trimmed = self.trimmed.saturating_add(size);
+        self.longest_trim = self.longest_trim.max(size);
     }
 
     #[cfg(test)]
@@ -250,9 +275,22 @@ impl AudioTimeline {
                     skip = self.frames_for_hns(gap.saturating_neg()).min(frames);
                 }
             } else if gap > Self::RESYNC {
+                tracing::debug!(
+                    source = ts,
+                    expected = self.expected(),
+                    gap,
+                    "audio gap filled"
+                );
                 self.push_silence(&mut spans, self.frames_for_hns(gap));
             } else if gap < -Self::RESYNC {
                 skip = self.frames_for_hns(gap.saturating_neg()).min(frames);
+                tracing::debug!(
+                    source = ts,
+                    expected = self.expected(),
+                    gap,
+                    "audio trimmed"
+                );
+                self.note_trim(skip);
             }
         }
         let take = frames - skip;

@@ -127,11 +127,7 @@ impl Video {
         self.sink.fill_stats(&mut self.stats.c);
         self.wgc.fill_stats(&mut self.stats.c);
         if let Some(sampler) = &mut self.sampler {
-            let (cpu, mem) = sampler.sample();
-            self.stats.c.cpu_pct = cpu;
-            self.stats.c.mem_mb = mem;
-            self.stats.c.foreground = sampler.target_in_foreground();
-            sampler.fill_gpu(&mut self.stats.c);
+            fill_process_stats(sampler, &mut self.stats);
         }
         let snapshot = self.stats.take_snapshot(mono_now());
         self.sink.stats(snapshot);
@@ -258,6 +254,8 @@ impl Video {
             mf,
             com,
             mut power,
+            mut stats,
+            mut sampler,
             ..
         } = self;
         power.release();
@@ -278,9 +276,19 @@ impl Video {
         } else {
             drop(encoder);
         }
+        let audio_counters = audio.as_ref().map(AudioPipe::counters);
         if let Some(audio) = audio {
-            audio.finish(&mut sink);
+            stats.c.audio_packets += audio.finish(&mut sink);
         }
+        if let Some(counters) = &audio_counters {
+            counters.fill(&mut stats.c);
+        }
+        sink.fill_stats(&mut stats.c);
+        wgc.fill_stats(&mut stats.c);
+        if let Some(sampler) = &mut sampler {
+            fill_process_stats(sampler, &mut stats);
+        }
+        sink.stats(stats.take_snapshot(mono_now()));
         wgc.stop();
         drop(converter);
         drop(gpu);
@@ -293,6 +301,14 @@ impl Video {
             sink.failed(reason);
         }
     }
+}
+
+fn fill_process_stats(sampler: &mut ProcessSampler, stats: &mut Stats) {
+    let (cpu, mem) = sampler.sample();
+    stats.c.cpu_pct = cpu;
+    stats.c.mem_mb = mem;
+    stats.c.foreground = sampler.target_in_foreground();
+    sampler.fill_gpu(&mut stats.c);
 }
 
 fn is_device_lost(code: HRESULT) -> bool {

@@ -30,6 +30,8 @@ pub struct DiagSample {
     pub torn: u64,
     pub copy_wait_ms_max: f64,
     pub audio_packets: u64,
+    pub audio_trims: u32,
+    pub audio_trimmed_ms: u64,
     pub av_skew_ms: f64,
     pub queue_writer: u32,
     pub queue_media: u32,
@@ -205,6 +207,8 @@ impl HealthTracker {
             torn: stats.torn_dropped.saturating_sub(marks.torn),
             copy_wait_ms_max: round1(f64::from(stats.window_copy_wait_max_us) / 1000.0),
             audio_packets: self.audio.packets,
+            audio_trims: stats.audio_trims,
+            audio_trimmed_ms: stats.audio_trimmed_ms,
             av_skew_ms: round1(self.av_skew_ms()),
             queue_writer: queues.writer,
             queue_media: queues.media,
@@ -315,6 +319,9 @@ impl HealthTracker {
             idle_silence_ms: stats.audio_idle_ms,
             timestamp_gaps_over_5s: stats.audio_timestamp_gaps_over_5s,
             largest_timestamp_gap_ms: stats.audio_largest_timestamp_gap_ms,
+            trims: stats.audio_trims,
+            trimmed_ms: stats.audio_trimmed_ms,
+            longest_trim_ms: stats.audio_trim_longest_ms,
             start_offset_ms: if has_audio {
                 round1(ticks_to_ms(kept - origin_audio, rate))
             } else {
