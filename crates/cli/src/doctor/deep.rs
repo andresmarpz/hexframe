@@ -166,7 +166,7 @@ fn check_headers(
 ) -> Option<HeaderReport> {
     let first_key = observation.packets.iter().find(|p| p.key)?;
     let Some(sps) = first_idr_sps(&first_key.annexb) else {
-        failures.push("the first key frame carries no SPS".to_owned());
+        notes.push("no in-band SPS; the recorder uses the encoder's header".to_owned());
         return None;
     };
     let expected = Expected {
@@ -182,7 +182,7 @@ fn check_headers(
     let mismatch = observation
         .packets
         .iter()
-        .filter(|p| p.key)
+        .filter(|p| p.key && first_idr_sps(&p.annexb).is_some())
         .find_map(|p| check_avcc_matches_idr(&record, &p.annexb));
     failures.extend(mismatch);
     let parsed = parse_sps_info(sps)?;

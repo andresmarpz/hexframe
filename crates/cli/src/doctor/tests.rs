@@ -196,12 +196,26 @@ fn a_30_fps_setting_against_a_60_fps_header_fails() {
 }
 
 #[test]
-fn a_key_frame_without_an_sps_fails() {
+fn a_first_key_frame_without_an_sps_passes_with_a_note() {
     let mut bare = clean_packets();
     bare[0].annexb = IDR.to_vec();
     let report = build(&[observation(bare)], "0.1", "windows x86_64");
-    assert!(!report.pass);
+    assert!(report.pass);
     assert!(report.adapters[0].header.is_none());
+    assert!(
+        report.adapters[0]
+            .notes
+            .iter()
+            .any(|n| n.contains("no in-band SPS"))
+    );
+}
+
+#[test]
+fn a_later_bare_key_frame_passes() {
+    let mut packets = clean_packets();
+    packets.push(packet(&IDR, 500_000, true));
+    let report = build(&[observation(packets)], "0.1", "windows x86_64");
+    assert!(report.pass);
 }
 
 #[test]
