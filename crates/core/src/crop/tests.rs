@@ -137,15 +137,21 @@ mod property {
 
     proptest! {
         #[test]
-        fn fit_crop_always_lands_inside_the_frame(
-            frame in (1u32..8000, 1u32..8000),
-            left in any::<u32>(),
-            top in any::<u32>(),
-            width in any::<u32>(),
-            height in any::<u32>(),
+        fn fit_crop_keeps_fitting_rects_and_replaces_the_rest(
+            frame in (1u32..4000, 1u32..4000),
+            near in (0u32..4064, 0u32..4064, 0u32..4064, 0u32..4064),
+            far in (any::<u32>(), any::<u32>(), any::<u32>(), any::<u32>()),
+            use_far in 0u8..8,
         ) {
-            let fitted = fit_crop(crop(left, top, width, height), frame);
-            prop_assert!(inside_frame(fitted, frame));
+            let values = if use_far == 0 { far } else { near };
+            let rect = crop(values.0, values.1, values.2, values.3);
+            let fits = inside_frame(rect, frame);
+            let fitted = fit_crop(rect, frame);
+            if fits {
+                prop_assert_eq!(fitted, rect);
+            } else {
+                prop_assert_eq!(fitted, CropRect::full(frame));
+            }
         }
 
         #[test]
@@ -153,9 +159,26 @@ mod property {
             frame in (0u32..6000, 0u32..4000),
             monitor in (-8000i32..8000, -8000i32..8000),
             monitor_size in (-100i32..6000, -100i32..4000),
-            client_origin in (-8000i32..8000, -8000i32..8000),
-            client_size in (-100i32..6000, -100i32..4000),
+            near in (any::<u16>(), any::<u16>(), any::<u16>(), any::<u16>()),
+            far_origin in (-8000i32..8000, -8000i32..8000),
+            far_size in (-100i32..6000, -100i32..4000),
+            use_far in 0u8..8,
         ) {
+            let (client_origin, client_size) = if use_far == 0 {
+                (far_origin, far_size)
+            } else {
+                let (width, height) = (monitor_size.0.max(1), monitor_size.1.max(1));
+                (
+                    (
+                        monitor.0 - 4 + i32::from(near.0) % (width + 8),
+                        monitor.1 - 4 + i32::from(near.1) % (height + 8),
+                    ),
+                    (
+                        -100 + i32::from(near.2) % (width + 108),
+                        -100 + i32::from(near.3) % (height + 108),
+                    ),
+                )
+            };
             let result = client_crop(
                 frame,
                 bounds(monitor.0, monitor.1, monitor_size.0, monitor_size.1),

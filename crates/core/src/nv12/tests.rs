@@ -169,18 +169,34 @@ mod property {
     proptest! {
         #[test]
         fn scaling_never_panics_and_sizes_the_output_exactly(
-            width in 1usize..80,
-            height in 1usize..60,
+            width in 2usize..80,
+            height in 2usize..60,
             pad in 0usize..20,
-            crop in (0usize..90, 0usize..70, 0usize..100, 0usize..80),
+            raw in (0usize..1000, 0usize..1000, 0usize..1000, 0usize..1000),
+            wild in 0u8..8,
             target in (0usize..100, 0usize..80),
             seed in any::<u64>(),
         ) {
             let pitch = width + pad;
+            let crop = if wild == 0 {
+                (raw.0 % 100, raw.1 % 80, raw.2 % 110, raw.3 % 90)
+            } else {
+                let x = raw.0 % (pitch - 1);
+                let y = raw.1 % (height - 1);
+                (x, y, 2 + raw.2 % (pitch - x - 1), 2 + raw.3 % (height - y - 1))
+            };
             let data = noise(seed, pitch * height * 3 / 2);
             let picture = Nv12Source { data: &data, pitch, rows: height, crop };
+            let expected_fit = (target.0 & !1) >= 2
+                && (target.1 & !1) >= 2
+                && crop.2 >= 2
+                && crop.3 >= 2
+                && (crop.0 & !1) + crop.2 <= pitch
+                && (crop.1 & !1) + crop.3 <= height;
             let mut out = vec![7; 3];
-            if scale(&picture, target.0, target.1, &mut out) {
+            let scaled = scale(&picture, target.0, target.1, &mut out);
+            prop_assert_eq!(scaled, expected_fit);
+            if scaled {
                 prop_assert_eq!(out.len(), frame_len(target.0 & !1, target.1 & !1));
             }
         }
