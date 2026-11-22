@@ -130,6 +130,7 @@ pub(crate) fn build(
         seq: 0,
         last_seq: 0,
         soft_errors: 0,
+        drain_errors: 0,
         power,
     })
 }

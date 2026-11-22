@@ -322,7 +322,6 @@ fn an_encoder_that_refuses_input_returns_every_slot_and_ends_after_repeated_fail
 }
 
 #[test]
-#[ignore = "a successful submit resets the error count, so a failing drain only ends at the stall watchdog"]
 fn encoder_output_errors_that_repeat_end_the_run_before_the_watchdog() {
     let fake = FakeTransform::new().failing_from(Step::ProcessOutput, 0, E_FAIL);
     let events = run_to_failure(fake, 60);

@@ -51,6 +51,7 @@ pub(crate) struct Video {
     pub(super) seq: u64,
     pub(super) last_seq: u64,
     pub(super) soft_errors: u32,
+    pub(super) drain_errors: u32,
     pub(super) power: SystemPowerGuard,
 }
 
@@ -214,6 +215,7 @@ impl Video {
             return self.encoder_error("encoder drain", &error);
         }
         self.sink.video(&mut self.scratch);
+        self.drain_errors = 0;
         Ok(())
     }
 
@@ -233,8 +235,13 @@ impl Video {
         tracing::warn!(%error, what, "capture step failed");
         self.stats.c.dropped += 1;
         self.stats.c.soft_errors += 1;
-        self.soft_errors += 1;
-        if self.soft_errors >= MAX_SOFT_ERRORS {
+        let streak = if what == "encoder drain" {
+            &mut self.drain_errors
+        } else {
+            &mut self.soft_errors
+        };
+        *streak += 1;
+        if *streak >= MAX_SOFT_ERRORS {
             let reason = format!("{what} keeps failing: {error}");
             return Err(Exit::Failed(if what.starts_with("encoder") {
                 encoder::stopped_reason(&reason)
