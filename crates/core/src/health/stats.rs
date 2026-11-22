@@ -138,6 +138,8 @@ pub struct CaptureStats {
     pub audio_timestamp_gaps_over_5s: u32,
     pub audio_largest_timestamp_gap_ms: u64,
     pub in_flight: u32,
+    pub encoder_skipped_inputs: u64,
+    pub encoder_step_backs: u64,
     pub pcm_queue: u32,
     pub cpu_pct: Option<f32>,
     pub mem_mb: Option<u32>,

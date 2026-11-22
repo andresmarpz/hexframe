@@ -95,6 +95,107 @@ fn idle_capture_never_stalls() {
     assert!(dog.stalled(35 * HNS_PER_SEC, 0, true));
 }
 
+fn pending(count: u64) -> VecDeque<Pending> {
+    (0..count)
+        .map(|i| Pending {
+            tick: i,
+            pts: i as Hns * 100,
+            slot: i as usize,
+        })
+        .collect()
+}
+
+#[test]
+fn counts_inputs_an_output_skips_past() {
+    let q = queue(&[(0, 0), (1, 100), (2, 200), (3, 300)]);
+    assert_eq!(count_skipped(&q, 0, true), 0);
+    assert_eq!(count_skipped(&q, 100, false), 1);
+    assert_eq!(count_skipped(&q, 250, false), 3);
+    assert_eq!(count_skipped(&q, 0, false), 0);
+}
+
+#[test]
+fn rising_output_releases_every_older_slot() {
+    let mut rule = SlotRelease::new();
+    let mut p = pending(5);
+    assert_eq!(rule.on_output(&mut p, 0), vec![0]);
+    assert_eq!(rule.on_output(&mut p, 300), vec![1, 2, 3]);
+    assert_eq!(p.len(), 1);
+    assert!(!rule.one_per_output());
+}
+
+#[test]
+fn flush_releases_everything_once() {
+    let mut p = pending(3);
+    assert_eq!(SlotRelease::flush(&mut p), vec![0, 1, 2]);
+    assert!(SlotRelease::flush(&mut p).is_empty());
+}
+
+#[test]
+fn a_step_back_switches_to_one_per_output_for_good() {
+    let mut rule = SlotRelease::new();
+    let mut p = pending(10);
+    assert_eq!(rule.on_output(&mut p, 0), vec![0]);
+    assert_eq!(rule.on_output(&mut p, 300), vec![1, 2, 3]);
+    assert_eq!(rule.on_output(&mut p, 100), vec![4]);
+    assert!(rule.one_per_output());
+    assert_eq!(rule.on_output(&mut p, 200), vec![5]);
+    assert_eq!(rule.on_output(&mut p, 900), vec![6]);
+    assert_eq!(rule.on_output(&mut p, 900), vec![7]);
+}
+
+#[test]
+fn a_duplicate_output_releases_one_slot_not_more() {
+    let mut rule = SlotRelease::new();
+    let mut p = pending(4);
+    assert_eq!(rule.on_output(&mut p, 100), vec![0, 1]);
+    assert_eq!(rule.on_output(&mut p, 100), vec![2]);
+    assert_eq!(p.len(), 1);
+}
+
+#[test]
+fn an_encoder_that_swallows_inputs_never_exhausts_the_pool() {
+    const SLOTS: usize = 6;
+    const LAG: usize = 2;
+    let mut free: Vec<usize> = (0..SLOTS).collect();
+    let mut p: VecDeque<Pending> = VecDeque::new();
+    let mut rule = SlotRelease::new();
+    let mut outputs: VecDeque<Hns> = VecDeque::new();
+    let mut encoded = 0;
+    for frame in 0..2000u64 {
+        let slot = free.pop().expect("pool ran out");
+        let pts = frame as Hns * 100;
+        p.push_back(Pending {
+            tick: frame,
+            pts,
+            slot,
+        });
+        if frame % 7 != 3 {
+            outputs.push_back(pts);
+        }
+        if frame == 1000 {
+            free.extend(SlotRelease::flush(&mut p));
+            outputs.clear();
+        }
+        if outputs.len() > LAG {
+            let out = outputs.pop_front().unwrap();
+            free.extend(rule.on_output(&mut p, out));
+            encoded += 1;
+        }
+        assert!(free.len() + p.len() == SLOTS);
+    }
+    assert!(encoded > 1700);
+    assert!(!rule.one_per_output());
+}
+
+#[test]
+fn no_output_at_all_still_stalls_near_five_seconds() {
+    let mut dog = Watchdog::new(0);
+    let frame = HNS_PER_SEC / 60;
+    let stalled_at = (1..1000).find(|&i| dog.stalled(i * frame, 0, true));
+    assert!(matches!(stalled_at, Some(300 | 301)));
+}
+
 mod properties {
     use proptest::prelude::*;
 

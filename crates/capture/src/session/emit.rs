@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
-use greyscreen_core::frame_timing::next_tick;
+use greyscreen_core::frame_timing::{OrderGuard, count_skipped, next_tick};
 use greyscreen_core::health::{CaptureSetup, CaptureStats, LatencyHistogram};
 use greyscreen_core::media::{AudioFormat, MediaEvent, Packet, Track, VideoFormat};
 use greyscreen_core::time::{Hns, mono_now};
@@ -36,6 +36,8 @@ pub(crate) struct Sink {
     encode: LatencyHistogram,
     window_encode_max_us: u32,
     last_tick: Option<u64>,
+    order: OrderGuard,
+    skipped_inputs: u64,
     frame_ticks: i64,
     parameters: Option<(Vec<u8>, Vec<u8>)>,
     fallback: Option<(Vec<u8>, Vec<u8>)>,
@@ -59,6 +61,8 @@ impl Sink {
             encode: LatencyHistogram::default(),
             window_encode_max_us: 0,
             last_tick: None,
+            order: OrderGuard::new(),
+            skipped_inputs: 0,
             frame_ticks,
             parameters: None,
             fallback: None,
@@ -106,6 +110,8 @@ impl Sink {
         stats.encode = self.encode.clone();
         stats.window_encode_max_us = std::mem::take(&mut self.window_encode_max_us);
         stats.in_flight = u32::try_from(self.in_flight.len()).unwrap_or(u32::MAX);
+        stats.encoder_skipped_inputs = self.skipped_inputs;
+        stats.encoder_step_backs = self.order.step_backs();
     }
 
     pub(crate) fn stats(&mut self, stats: Box<CaptureStats>) {
@@ -119,11 +125,24 @@ impl Sink {
     }
 
     fn next_tick(&mut self, output_pts: Hns) -> u64 {
+        let first_output = self.out_index == 0;
+        self.skipped_inputs += count_skipped(&self.in_flight, output_pts, first_output);
+        let timed = output_pts != 0 || first_output;
+        if timed
+            && let Err(step_back) = self.order.check(output_pts)
+            && self.order.step_backs() == 1
+        {
+            tracing::warn!(
+                previous = step_back.previous,
+                pts = step_back.pts,
+                "encoder output timestamps stepped back"
+            );
+        }
         let tick = next_tick(
             &mut self.in_flight,
             self.last_tick,
             output_pts,
-            self.out_index == 0,
+            first_output,
         );
         self.last_tick = Some(tick);
         tick

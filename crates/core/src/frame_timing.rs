@@ -148,5 +148,61 @@ impl OrderGuard {
     }
 }
 
+pub fn count_skipped(in_flight: &VecDeque<(u64, Hns)>, output_pts: Hns, first_output: bool) -> u64 {
+    if output_pts == 0 && !first_output {
+        return 0;
+    }
+    in_flight
+        .iter()
+        .take_while(|&&(_, pts)| pts < output_pts)
+        .count() as u64
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pending {
+    pub tick: u64,
+    pub pts: Hns,
+    pub slot: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SlotRelease {
+    last: Option<Hns>,
+    one_per_output: bool,
+}
+
+impl SlotRelease {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn one_per_output(&self) -> bool {
+        self.one_per_output
+    }
+
+    pub fn on_output(&mut self, pending: &mut VecDeque<Pending>, output_pts: Hns) -> Vec<usize> {
+        if self.last.is_some_and(|last| output_pts <= last) {
+            self.one_per_output = true;
+        }
+        self.last = Some(output_pts);
+        if self.one_per_output {
+            return pending
+                .pop_front()
+                .map(|entry| entry.slot)
+                .into_iter()
+                .collect();
+        }
+        let mut slots = Vec::new();
+        while pending.front().is_some_and(|entry| entry.pts <= output_pts) {
+            slots.extend(pending.pop_front().map(|entry| entry.slot));
+        }
+        slots
+    }
+
+    pub fn flush(pending: &mut VecDeque<Pending>) -> Vec<usize> {
+        pending.drain(..).map(|entry| entry.slot).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests;
