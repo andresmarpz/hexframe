@@ -392,21 +392,34 @@ type Change = Box<dyn Fn(&mut EncoderCheckSpec)>;
 
 #[test]
 fn a_changed_setting_or_version_runs_the_check_again() {
-    let cache = cache_path();
-    let media = Encoders::new(vec![hardware(Ok("NVIDIA MFT"))]);
-    run(&spec(&media, &cache));
     let changes: Vec<Change> = vec![
         Box::new(|s| s.cfg.fps += 30),
         Box::new(|s| s.cfg.max_height = Some(720)),
         Box::new(|s| s.cfg.quality = Some(80)),
         Box::new(|s| s.version = "9.9".into()),
     ];
-    for (index, change) in changes.iter().enumerate() {
+    for change in &changes {
+        let cache = cache_path();
+        let media = Encoders::new(vec![hardware(Ok("NVIDIA MFT"))]);
+        run(&spec(&media, &cache));
+        run(&spec(&media, &cache));
+        assert_eq!(media.checks(), 1);
         let mut changed = spec(&media, &cache);
         change(&mut changed);
         run(&changed);
-        assert_eq!(media.checks(), index as u32 + 2);
+        assert_eq!(media.checks(), 2);
     }
+}
+
+#[test]
+fn abandoning_the_check_removes_the_marker() {
+    let cache = cache_path();
+    let marker = marker_path(&cache);
+    std::fs::create_dir_all(marker.parent().unwrap()).unwrap();
+    std::fs::write(&marker, "{}").unwrap();
+    abandon_encoder_check(&cache);
+    assert!(!marker.exists());
+    abandon_encoder_check(&cache);
 }
 
 #[test]

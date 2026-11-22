@@ -91,6 +91,10 @@ fn marker_path(cache: &Path) -> PathBuf {
     cache.with_extension("running")
 }
 
+pub fn abandon_encoder_check(cache: &Path) {
+    std::fs::remove_file(marker_path(cache)).ok();
+}
+
 fn record_leftover_crash(
     spec: &EncoderCheckSpec,
     previous: Option<EncoderCheck>,

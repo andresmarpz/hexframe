@@ -189,6 +189,16 @@ fn the_check_key_changes_with_drivers_settings_and_version() {
         ..cfg.clone()
     };
     assert_ne!(base, check_key("NVIDIA 1.0", &other, "0.1"));
+    let taller = CaptureConfig {
+        max_height: Some(cfg.max_height.map_or(720, |h| h + 1)),
+        ..cfg.clone()
+    };
+    assert_ne!(base, check_key("NVIDIA 1.0", &taller, "0.1"));
+    let better = CaptureConfig {
+        quality: Some(cfg.quality.map_or(80, |q| q + 1)),
+        ..cfg.clone()
+    };
+    assert_ne!(base, check_key("NVIDIA 1.0", &better, "0.1"));
 }
 
 #[test]

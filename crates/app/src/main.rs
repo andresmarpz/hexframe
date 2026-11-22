@@ -134,4 +134,5 @@ fn main() {
         (tray, Some(engine))
     };
     app.run();
+    greyscreen_engine::abandon_encoder_check(&paths::encoder_check_file());
 }
