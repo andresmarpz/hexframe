@@ -71,7 +71,8 @@ fn pip(index: usize, state: &DeathReviewState, review: &ReviewState, k: &Kit) ->
 }
 
 fn header(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {
-    let finish = Button::new("Finish (Esc)")
+    let finish = Button::new("Finish")
+        .shortcut("Esc")
         .icon(&icons::ARROW_LEFT)
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Regular)

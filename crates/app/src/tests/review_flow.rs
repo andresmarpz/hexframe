@@ -213,18 +213,71 @@ fn theater_top_bar_names_the_game_and_exits() {
 #[test]
 fn the_fullscreen_toggle_sits_at_the_far_right_of_the_transport() {
     let mut rt = review_runtime();
-    let toggle = super::rect(&rt, "review-theater");
+    let theater = super::rect(&rt, "review-theater");
+    let full = super::rect(&rt, "review-fullscreen");
     for key in [
         "review-export",
         "review-speed",
         "review-mute",
         "review-play",
     ] {
-        assert!(super::rect(&rt, key)[0] < toggle[0], "{key}");
+        assert!(super::rect(&rt, key)[0] < theater[0], "{key}");
     }
-    tap(&mut rt, "review-theater");
+    assert!(theater[0] < full[0]);
+    tap(&mut rt, "review-fullscreen");
+    assert!(rt.find("review-theater").is_none());
     let toggle = super::rect(&rt, "theater-shrink");
     assert!(super::rect(&rt, "review-mute")[0] < toggle[0]);
+}
+
+#[test]
+fn t_and_theater_button_toggle_windowed_theater_without_os_fullscreen() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "t");
+    assert!(rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+    press_char(&mut rt, "t");
+    assert!(!rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+
+    tap(&mut rt, "review-theater");
+    assert!(rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+    press(&mut rt, Key::Escape);
+    assert!(!rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+}
+
+#[test]
+fn f_and_fullscreen_button_toggle_os_fullscreen_theater() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "f");
+    assert!(rt.state.in_theater());
+    assert!(rt.state.window_full_screen);
+    press_char(&mut rt, "f");
+    assert!(!rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+
+    tap(&mut rt, "review-fullscreen");
+    assert!(rt.state.in_theater());
+    assert!(rt.state.window_full_screen);
+    press(&mut rt, Key::Escape);
+    assert!(!rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+}
+
+#[test]
+fn f_in_windowed_theater_upgrades_to_os_fullscreen() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "t");
+    assert!(rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
+    press_char(&mut rt, "f");
+    assert!(rt.state.in_theater());
+    assert!(rt.state.window_full_screen);
+    press(&mut rt, Key::Escape);
+    assert!(!rt.state.in_theater());
+    assert!(!rt.state.window_full_screen);
 }
 
 fn clips_only_entry() -> greyscreen_engine::RecordingEntry {

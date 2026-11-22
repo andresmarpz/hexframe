@@ -72,7 +72,8 @@ fn title_line(review: &ReviewState) -> String {
 }
 
 fn top_bar(review: &ReviewState, k: &Kit) -> El {
-    let exit = Button::new("Exit (Esc)")
+    let exit = Button::new("Exit")
+        .shortcut("Esc")
         .icon(&icons::ARROW_LEFT)
         .variant(ButtonVariant::Ghost)
         .control_size(ControlSize::Regular)

@@ -97,6 +97,7 @@ actions! {
     ReplayDeath => Spec::new("replay_death", "Replay death", Group::Review, Scope::App, &["R"]),
     ToggleInspector => Spec::new("toggle_inspector", "Show or hide the events panel", Group::Review, Scope::App, &["I"]),
     ToggleGamesList => Spec::new("toggle_games_list", "Show or hide the games list", Group::Review, Scope::App, &["G"]),
+    ToggleTheater => Spec::new("toggle_theater", "Toggle theater mode", Group::Review, Scope::App, &["T"]),
     ToggleFullscreen => Spec::new("toggle_fullscreen", "Toggle fullscreen", Group::Review, Scope::App, &["F"]),
     ExitFullscreen => Spec::new("exit_fullscreen", "Go back or close the game", Group::Review, Scope::App, &["Escape"]).fixed(),
     OpenSettings => Spec::new("open_settings", "Open settings", Group::General, Scope::App, &["Mod+,"]),

@@ -282,7 +282,7 @@ Every key action is one line in `actions!` in `crates/core/src/keybinds/action.r
 | Group | Action (keys) |
 |---|---|
 | Recording | Save clip (F9, Global) |
-| Review | Play or pause (Space), Seek back 5 s (Left, J), Seek forward 5 s (Right, L), Previous event (Shift+Left), Next event (Shift+Right), Frame back (,), Frame forward (.), Slower (\[), Faster (\]), Mute (M), Review deaths (D), Next death (N), Previous death (P), Replay death (R), Show or hide the events panel (I), Show or hide the games list (G), Toggle fullscreen (F), Go back or close the game (Escape, fixed) |
+| Review | Play or pause (Space), Seek back 5 s (Left, J), Seek forward 5 s (Right, L), Previous event (Shift+Left), Next event (Shift+Right), Frame back (,), Frame forward (.), Slower (\[), Faster (\]), Mute (M), Review deaths (D), Next death (N), Previous death (P), Replay death (R), Show or hide the events panel (I), Show or hide the games list (G), Toggle theater mode (T), Toggle fullscreen (F), Go back or close the game (Escape, fixed) |
 | General | Open settings (Mod+,), Go to Home (Mod+1), Go to Games (Mod+2), Go to Clips (Mod+3), Previous game (Up), Next game (Down), Focus the player (Enter), Collapse or expand the navigation (Mod+\\), Search games (Mod+F), Send feedback (no key) |
 
 The Keybinds settings page lists every action, rebinds on click, and refuses a key that another action uses. A Global key that Windows refuses shows an error next to the action.

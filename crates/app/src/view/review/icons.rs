@@ -22,6 +22,12 @@ pub(super) static PAUSE: Icon = Icon {
     body: r#"<rect x="3.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="9.5" y="3" width="3" height="10" rx="1" fill="currentColor"/>"#,
 };
 
+pub(super) static THEATER: Icon = Icon {
+    name: "greyscreen-theater",
+    view: 16.0,
+    body: r#"<rect x="2" y="4" width="12" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/>"#,
+};
+
 pub(super) static EXPAND: Icon = Icon {
     name: "greyscreen-expand",
     view: 16.0,

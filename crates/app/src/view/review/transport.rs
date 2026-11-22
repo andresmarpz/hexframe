@@ -58,11 +58,28 @@ fn export_button(k: &Kit) -> El {
         .key("review-export")
 }
 
-fn screen_button(theater: bool, k: &Kit) -> El {
-    let (icon, name, key) = if theater {
-        (&icons::SHRINK, "Exit theater", "theater-shrink")
+fn theater_button(theater: bool, k: &Kit) -> El {
+    let name = if theater {
+        "Exit theater"
     } else {
-        (&icons::EXPAND, "Theater", "review-theater")
+        "Theater mode"
+    };
+    IconButton::new(&icons::THEATER)
+        .label(name)
+        .help(name)
+        .shortcut("T")
+        .variant(IconButtonVariant::Ghost)
+        .control_size(ControlSize::Regular)
+        .on_press_tx(move |ui: &mut Ui, tx: &mut Tx| ui.set_theater(!theater, tx))
+        .build(k)
+        .key("review-theater")
+}
+
+fn screen_button(full_screen: bool, k: &Kit) -> El {
+    let (icon, name, key) = if full_screen {
+        (&icons::SHRINK, "Exit fullscreen", "theater-shrink")
+    } else {
+        (&icons::EXPAND, "Fullscreen", "review-fullscreen")
     };
     IconButton::new(icon)
         .label(name)
@@ -70,7 +87,7 @@ fn screen_button(theater: bool, k: &Kit) -> El {
         .shortcut("F")
         .variant(IconButtonVariant::Ghost)
         .control_size(ControlSize::Regular)
-        .on_press_tx(move |ui: &mut Ui, tx: &mut Tx| ui.set_theater(!theater, tx))
+        .on_press_tx(move |ui: &mut Ui, tx: &mut Tx| ui.set_full_screen(!full_screen, tx))
         .build(k)
         .key(key)
 }
@@ -107,9 +124,11 @@ pub(super) fn transport(review: &ReviewState, k: &Kit, theater: bool, width: Opt
     if show.speed {
         buttons = buttons.child(controls::speed_trigger(review, k));
     }
-    let buttons = buttons
-        .child(controls::volume_trigger(review, k))
-        .child(screen_button(theater, k));
+    let mut buttons = buttons.child(controls::volume_trigger(review, k));
+    if !review.full_screen {
+        buttons = buttons.child(theater_button(theater, k));
+    }
+    let buttons = buttons.child(screen_button(review.full_screen, k));
     col()
         .key("review-controls")
         .w_full()

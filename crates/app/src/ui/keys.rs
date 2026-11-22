@@ -78,7 +78,8 @@ impl Ui {
         match action {
             Action::ExitFullscreen if theater => self.set_theater(false, tx),
             Action::ExitFullscreen => self.close_game(),
-            Action::ToggleFullscreen => self.set_theater(!theater, tx),
+            Action::ToggleTheater => self.set_theater(!theater, tx),
+            Action::ToggleFullscreen => self.set_full_screen(!self.in_full_screen(), tx),
             Action::PlayPause => self.review_toggle(),
             Action::SeekBack => self.review_step(-STEP_SECS),
             Action::SeekForward => self.review_step(STEP_SECS),
@@ -132,8 +133,25 @@ impl Ui {
         self.review.as_ref().is_some_and(|r| r.theater)
     }
 
+    pub(crate) fn in_full_screen(&self) -> bool {
+        self.review.as_ref().is_some_and(|r| r.full_screen)
+    }
+
     pub(crate) fn set_theater(&mut self, on: bool, tx: &mut Tx) {
         if let Some(review) = &mut self.review {
+            review.theater = on;
+            review.drawer &= on;
+            if !on {
+                review.full_screen = false;
+            }
+            review.wake_controls(tx.clock());
+        }
+        self.sync_full_screen(tx);
+    }
+
+    pub(crate) fn set_full_screen(&mut self, on: bool, tx: &mut Tx) {
+        if let Some(review) = &mut self.review {
+            review.full_screen = on;
             review.theater = on;
             review.drawer &= on;
             review.wake_controls(tx.clock());
@@ -142,7 +160,7 @@ impl Ui {
     }
 
     pub(crate) fn sync_full_screen(&mut self, tx: &mut Tx) {
-        let want = self.in_theater();
+        let want = self.in_full_screen();
         if want != self.window_full_screen {
             self.window_full_screen = want;
             tx.toggle_full_screen();

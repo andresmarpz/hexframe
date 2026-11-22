@@ -165,7 +165,7 @@ impl Ui {
             }
             Action::ReplayDeath => self.death_replay(),
             Action::PlayPause if finished => self.death_replay(),
-            Action::ReviewDeaths | Action::ToggleFullscreen => {}
+            Action::ReviewDeaths | Action::ToggleTheater | Action::ToggleFullscreen => {}
             _ => return false,
         }
         true

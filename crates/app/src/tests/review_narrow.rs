@@ -33,6 +33,7 @@ fn the_panel_sits_below_the_player_in_a_narrow_window() {
 fn the_fullscreen_button_fits_in_a_narrow_window() {
     let rt = review_at(1000.0, 600.0);
     assert!(inside((1000.0, 600.0), rect(&rt, "review-theater")));
+    assert!(inside((1000.0, 600.0), rect(&rt, "review-fullscreen")));
     assert!(rt.find("review-speed").is_some());
     assert!(rt.find("review-mute").is_some());
 }
