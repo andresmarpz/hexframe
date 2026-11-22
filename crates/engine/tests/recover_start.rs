@@ -258,6 +258,16 @@ fn a_recording_process_killed_mid_game_comes_back_playable_on_the_next_start() {
     let flushed_secs = wait_for_fragments(&output);
     drop(child);
     assert!(flushed_secs > 0.0);
+    let folder = fs::read_dir(&output)
+        .expect("output dir")
+        .flatten()
+        .next()
+        .expect("recording folder")
+        .path();
+    let inspected = inspect(&folder.join("game.mp4.part")).expect("inspect part");
+    let expected =
+        greyscreen_mp4::finalize::duration_secs(inspected.audio.as_ref(), &inspected.tables);
+    assert!(expected >= flushed_secs, "{expected} < {flushed_secs}");
 
     let harness = launch(&output);
     let entries = first_library(&harness);
@@ -266,8 +276,8 @@ fn a_recording_process_killed_mid_game_comes_back_playable_on_the_next_start() {
     let entry = &entries[0];
     assert!(entry.meta.recovered);
     assert!(
-        entry.meta.duration_secs + 0.5 >= flushed_secs,
-        "{} < {flushed_secs}",
+        (entry.meta.duration_secs - expected).abs() <= 0.002,
+        "{} != {expected}",
         entry.meta.duration_secs
     );
     assert!(!entry.folder.join("game.mp4.part").exists());
