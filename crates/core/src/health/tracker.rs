@@ -287,6 +287,8 @@ impl HealthTracker {
             ),
             discontinuities: stats.audio_discontinuities,
             idle_silence_ms: stats.audio_idle_ms,
+            timestamp_gaps_over_5s: stats.audio_timestamp_gaps_over_5s,
+            largest_timestamp_gap_ms: stats.audio_largest_timestamp_gap_ms,
             start_offset_ms: if has_audio {
                 round1(ticks_to_ms(kept - origin_audio, rate))
             } else {

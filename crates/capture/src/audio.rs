@@ -33,6 +33,8 @@ pub struct AudioCounters {
     gap_longest_ms: AtomicU32,
     gap_total_ms: AtomicU64,
     idle_ms: AtomicU64,
+    timestamp_gaps_over_5s: AtomicU32,
+    largest_timestamp_gap_ms: AtomicU64,
     queue_depth: AtomicU32,
 }
 
@@ -50,12 +52,22 @@ impl AudioCounters {
             .fetch_add(u64::from(frames_to_ms(frames)), Ordering::Relaxed);
     }
 
+    fn timestamp_gaps(&self, timeline: &AudioTimeline) {
+        self.timestamp_gaps_over_5s
+            .store(timeline.big_gaps(), Ordering::Relaxed);
+        let ms = u64::try_from(timeline.largest_gap() / 10_000).unwrap_or(0);
+        self.largest_timestamp_gap_ms.store(ms, Ordering::Relaxed);
+    }
+
     pub fn fill(&self, stats: &mut CaptureStats) {
         stats.audio_discontinuities = self.discontinuities.load(Ordering::Relaxed);
         stats.audio_gaps = self.gaps.load(Ordering::Relaxed);
         stats.audio_gap_longest_ms = self.gap_longest_ms.load(Ordering::Relaxed);
         stats.audio_gap_total_ms = self.gap_total_ms.load(Ordering::Relaxed);
         stats.audio_idle_ms = self.idle_ms.load(Ordering::Relaxed);
+        stats.audio_timestamp_gaps_over_5s = self.timestamp_gaps_over_5s.load(Ordering::Relaxed);
+        stats.audio_largest_timestamp_gap_ms =
+            self.largest_timestamp_gap_ms.load(Ordering::Relaxed);
         stats.pcm_queue = self.queue_depth.load(Ordering::Relaxed);
     }
 }
@@ -262,6 +274,11 @@ fn run(
     notify(&ready, Ok(()));
     if let Some(t0) = wait_for_t0(&t0, &stop) {
         capture_loop(stream.as_mut(), qpc, t0, &out, &counters, &stop);
+        tracing::info!(
+            largest_timestamp_gap_ms = counters.largest_timestamp_gap_ms.load(Ordering::Relaxed),
+            timestamp_gaps_over_5s = counters.timestamp_gaps_over_5s.load(Ordering::Relaxed),
+            "audio timestamp gaps"
+        );
     }
     stream.stop();
 }
@@ -284,7 +301,9 @@ fn capture_loop(
     counters: &AudioCounters,
     stop: &AtomicBool,
 ) {
-    let mut timeline = AudioTimeline::new(t0, RATE);
+    let Some(mut timeline) = AudioTimeline::new(t0, RATE) else {
+        return;
+    };
     let mut buffer = Vec::new();
     while !stop.load(Ordering::Acquire) {
         match stream.wait(TICK_MS) {
@@ -355,6 +374,7 @@ fn drain(
         let first_frame = timeline.frames_out();
         let first_packet = first_frame == 0;
         let spans = timeline.on_packet_now(ts, now, read as usize, info.silent);
+        counters.timestamp_gaps(timeline);
         let missing = gap_frames(&spans, info.silent);
         if first_packet {
             counters.idle(missing);

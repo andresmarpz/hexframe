@@ -145,20 +145,57 @@ pub struct AudioTimeline {
     frames_out: u64,
     trust_device_clock: bool,
     seen_first: bool,
+    big_gaps: u32,
+    largest_gap: Hns,
 }
 
 impl AudioTimeline {
     pub(crate) const RESYNC: Hns = 300_000;
     pub(crate) const FIRST_DISTRUST: Hns = 5_000_000;
     pub(crate) const TIMEOUT_SAFETY: Hns = 600_000;
+    pub const BIG_GAP: Hns = 50_000_000;
+    pub const MAX_SILENCE_CHUNK: Hns = HNS_PER_SEC;
 
-    pub fn new(t0: Hns, rate: u32) -> Self {
-        Self {
+    pub fn new(t0: Hns, rate: u32) -> Option<Self> {
+        (rate > 0).then_some(Self {
             t0,
             rate,
             frames_out: 0,
             trust_device_clock: true,
             seen_first: false,
+            big_gaps: 0,
+            largest_gap: 0,
+        })
+    }
+
+    pub fn big_gaps(&self) -> u32 {
+        self.big_gaps
+    }
+
+    pub fn largest_gap(&self) -> Hns {
+        self.largest_gap
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_frames_out(mut self, frames_out: u64) -> Self {
+        self.frames_out = frames_out;
+        self
+    }
+
+    fn note_gap(&mut self, gap: Hns) {
+        let size = gap.saturating_abs();
+        if size > Self::BIG_GAP {
+            self.big_gaps = self.big_gaps.saturating_add(1);
+        }
+        self.largest_gap = self.largest_gap.max(size);
+    }
+
+    fn push_silence(&self, spans: &mut Vec<Span>, mut frames: usize) {
+        let chunk = self.frames_for_hns(Self::MAX_SILENCE_CHUNK).max(1);
+        while frames > 0 {
+            let n = frames.min(chunk);
+            spans.push(Span::Silence(n));
+            frames -= n;
         }
     }
 
@@ -175,13 +212,13 @@ impl AudioTimeline {
     ) -> Vec<Span> {
         if !self.seen_first
             && let Some(first) = ts
-            && (first - now).abs() > Self::FIRST_DISTRUST
+            && first.saturating_sub(now).saturating_abs() > Self::FIRST_DISTRUST
         {
             self.trust_device_clock = false;
         }
         if !self.trust_device_clock {
             let span = self.hns_for_frames(frames as u64);
-            return self.place(Some(now - span), frames, silent);
+            return self.place(Some(now.saturating_sub(span)), frames, silent);
         }
         self.on_packet(ts, frames, silent)
     }
@@ -196,11 +233,12 @@ impl AudioTimeline {
         let mut spans = Vec::new();
         let mut skip = 0usize;
         if let Some(ts) = ts {
-            let gap = ts - self.expected();
+            let gap = ts.saturating_sub(self.expected());
+            self.note_gap(gap);
             if gap > Self::RESYNC {
-                spans.push(Span::Silence(self.frames_for_hns(gap)));
+                self.push_silence(&mut spans, self.frames_for_hns(gap));
             } else if gap < -Self::RESYNC {
-                skip = self.frames_for_hns(-gap).min(frames);
+                skip = self.frames_for_hns(gap.saturating_neg()).min(frames);
             }
         }
         let take = frames - skip;
@@ -216,7 +254,9 @@ impl AudioTimeline {
     }
 
     pub fn on_timeout(&mut self, now: Hns) -> Option<Span> {
-        let gap = now - Self::TIMEOUT_SAFETY - self.expected();
+        let gap = now
+            .saturating_sub(Self::TIMEOUT_SAFETY)
+            .saturating_sub(self.expected());
         if gap <= 0 {
             return None;
         }
@@ -229,15 +269,17 @@ impl AudioTimeline {
     }
 
     fn expected(&self) -> Hns {
-        self.t0 + self.hns_for_frames(self.frames_out)
+        self.t0.saturating_add(self.hns_for_frames(self.frames_out))
     }
 
     fn hns_for_frames(&self, frames: u64) -> Hns {
-        (i128::from(frames) * i128::from(HNS_PER_SEC) / i128::from(self.rate)) as Hns
+        let hns = i128::from(frames) * i128::from(HNS_PER_SEC) / i128::from(self.rate);
+        Hns::try_from(hns).unwrap_or(Hns::MAX)
     }
 
     fn frames_for_hns(&self, hns: Hns) -> usize {
-        (i128::from(hns) * i128::from(self.rate) / i128::from(HNS_PER_SEC)) as usize
+        let frames = i128::from(hns.max(0)) * i128::from(self.rate) / i128::from(HNS_PER_SEC);
+        usize::try_from(frames).unwrap_or(usize::MAX)
     }
 
     fn span_frames(span: &Span) -> u64 {
@@ -272,5 +314,7 @@ pub fn capture_min_update_interval_hns(fps: u32, display_hz: u32) -> i64 {
     (HNS_PER_SEC / fps - refresh - REFRESH_MARGIN_HNS).clamp(0, cap)
 }
 
+#[cfg(test)]
+mod reference;
 #[cfg(test)]
 mod tests;

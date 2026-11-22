@@ -58,6 +58,8 @@ pub struct AudioHealth {
     pub idle_silence_ms: u64,
     pub start_offset_ms: f64,
     pub drift_ms: f64,
+    pub timestamp_gaps_over_5s: u32,
+    pub largest_timestamp_gap_ms: u64,
 }
 
 impl RecordingHealth {

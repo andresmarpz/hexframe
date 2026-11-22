@@ -366,7 +366,7 @@ The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and e
 | `longest_video_gap_ms` | the longest time between two video packets (16.7 ms at 60 fps is normal) |
 | `encoder` | the encoder label, MFT name and rate-control mode (`MediaEvent::Started.encoder`) |
 | `encode_ms` (`avg`, `p95`, `max`) | the encode latency above, left out when capture sent no timing |
-| `audio` (`packets`, `gaps`, `longest_gap_ms`, `discontinuities`, `idle_silence_ms`, `start_offset_ms`, `drift_ms`) | `gaps` counts audio dts holes plus filled gaps; `drift_ms` is audio minus video track length; `start_offset_ms` is the first kept audio packet against the first video frame; left out without an audio track |
+| `audio` (`packets`, `gaps`, `longest_gap_ms`, `discontinuities`, `idle_silence_ms`, `start_offset_ms`, `drift_ms`, `timestamp_gaps_over_5s`, `largest_timestamp_gap_ms`) | `gaps` counts audio dts holes plus filled gaps; `drift_ms` is audio minus video track length; `start_offset_ms` is the first kept audio packet against the first video frame; `timestamp_gaps_over_5s` and `largest_timestamp_gap_ms` count jumps of the device timestamp against the audio timeline, in either direction; left out without an audio track |
 | `file_bytes`, `avg_bitrate_kbps` | the finalized file size and its average bitrate (video and audio) |
 | `capture_errors`, `capture_soft_errors` | `MediaEvent::Failed` count while recording, and recovered capture step failures |
 | `frames_torn_dropped`, `copy_wait_slow`, `copy_wait_timeouts` | the capture frame counters above; a Capture finding shows when frames were dropped (OK) or copies timed out (WARNING) |

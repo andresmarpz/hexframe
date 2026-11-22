@@ -1,5 +1,7 @@
 use super::*;
 
+mod limits;
+
 #[test]
 fn frame_ticks_at_60_fps_is_1500() {
     let format = VideoFormat {
@@ -14,6 +16,10 @@ fn frame_ticks_at_60_fps_is_1500() {
 
 const RATE: u32 = 48_000;
 const MS: Hns = 10_000;
+
+fn timeline(t0: Hns) -> AudioTimeline {
+    AudioTimeline::new(t0, RATE).unwrap()
+}
 
 fn frames(ms: i64) -> usize {
     (ms * 48) as usize
@@ -31,7 +37,7 @@ fn total(spans: &[Span]) -> usize {
 
 #[test]
 fn first_packet_pads_from_t0() {
-    let mut timeline = AudioTimeline::new(1_000_000, RATE);
+    let mut timeline = timeline(1_000_000);
     let spans = timeline.on_packet(Some(1_000_000 + 100 * MS), frames(10), false);
     assert_eq!(
         spans,
@@ -48,7 +54,7 @@ fn first_packet_pads_from_t0() {
 
 #[test]
 fn gap_is_filled_with_silence() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet(Some(0), frames(10), false);
     let spans = timeline.on_packet(Some(60 * MS), frames(10), false);
     assert_eq!(spans[0], Span::Silence(frames(50)));
@@ -57,7 +63,7 @@ fn gap_is_filled_with_silence() {
 
 #[test]
 fn overlap_drops_leading_frames() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet(Some(0), frames(10), false);
     let dropped = timeline.on_packet(Some(-50 * MS), frames(10), false);
     assert!(dropped.is_empty());
@@ -75,7 +81,7 @@ fn overlap_drops_leading_frames() {
 
 #[test]
 fn small_jitter_is_ignored() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet(Some(0), frames(10), false);
     let late = timeline.on_packet(Some(10 * MS + 20 * MS), frames(10), false);
     assert_eq!(
@@ -97,14 +103,14 @@ fn small_jitter_is_ignored() {
 
 #[test]
 fn silent_packet_becomes_silence() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     let spans = timeline.on_packet(Some(0), frames(10), true);
     assert_eq!(spans, vec![Span::Silence(frames(10))]);
 }
 
 #[test]
 fn missing_timestamp_appends() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet(None, frames(10), false);
     let spans = timeline.on_packet(None, frames(10), false);
     assert_eq!(
@@ -119,7 +125,7 @@ fn missing_timestamp_appends() {
 
 #[test]
 fn timeout_fills_up_to_now_minus_safety() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     assert_eq!(timeline.on_timeout(50 * MS), None);
     assert_eq!(
         timeline.on_timeout(160 * MS),
@@ -131,7 +137,7 @@ fn timeout_fills_up_to_now_minus_safety() {
 
 #[test]
 fn packet_after_timeout_fill_overlaps_and_is_trimmed() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_timeout(160 * MS);
     let spans = timeline.on_packet(Some(40 * MS), frames(80), false);
     assert_eq!(
@@ -145,7 +151,7 @@ fn packet_after_timeout_fill_overlaps_and_is_trimmed() {
 
 #[test]
 fn distrusts_first_timestamp_far_from_now() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     let spans = timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
     assert_eq!(
         spans,
@@ -169,7 +175,7 @@ fn distrusts_first_timestamp_far_from_now() {
 
 #[test]
 fn distrusted_timestamps_reanchor_on_now_past_the_threshold() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
     let small = timeline.on_packet_now(Some(1), 220 * MS, frames(10), false);
     assert_eq!(total(&small), frames(10));
@@ -189,7 +195,7 @@ fn distrusted_timestamps_reanchor_on_now_past_the_threshold() {
 
 #[test]
 fn distrusted_timestamps_drop_frames_when_audio_runs_ahead() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
     let spans = timeline.on_packet_now(None, 210 * MS, frames(10), false);
     assert_eq!(total(&spans), frames(10));
@@ -205,7 +211,7 @@ fn distrusted_timestamps_drop_frames_when_audio_runs_ahead() {
 
 #[test]
 fn distrusted_jitter_under_the_threshold_is_ignored() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     timeline.on_packet_now(Some(10_000 * MS), 200 * MS, frames(10), false);
     let spans = timeline.on_packet_now(None, 225 * MS, frames(10), false);
     assert_eq!(
@@ -219,14 +225,14 @@ fn distrusted_jitter_under_the_threshold_is_ignored() {
 
 #[test]
 fn trusts_first_timestamp_near_now() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     let spans = timeline.on_packet_now(Some(100 * MS), 300 * MS, frames(10), false);
     assert_eq!(spans[0], Span::Silence(frames(100)));
 }
 
 #[test]
 fn drift_over_many_packets_stays_gapless() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     let mut emitted = 0usize;
     for i in 0..2000i64 {
         let ts = i * 10 * MS + i * 50;
@@ -239,7 +245,7 @@ fn drift_over_many_packets_stays_gapless() {
 
 #[test]
 fn cumulative_frames_never_go_backwards() {
-    let mut timeline = AudioTimeline::new(0, RATE);
+    let mut timeline = timeline(0);
     let mut last = 0;
     let stamps = [0, 500 * MS, 20 * MS, 600 * MS, 0, 1_000 * MS, 40 * MS];
     for ts in stamps {
