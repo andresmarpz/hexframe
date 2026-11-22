@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crossbeam_channel::Sender;
-use greyscreen_core::encoder::{Attempt, EncoderKind, Probe, Reason, Verdict};
+use greyscreen_core::encoder::{Attempt, EncoderKind, PROBE_FLAG, Probe, Reason, Verdict};
 use greyscreen_core::media::{CaptureTarget, MediaEvent, MediaSession};
 use greyscreen_core::settings::Settings;
 
@@ -455,4 +455,89 @@ fn verdicts_are_saved_in_the_cache() {
         saved.verdicts,
         vec![verdict("A", Some(Reason::Crashed)), verdict("B", None)]
     );
+}
+
+#[cfg(unix)]
+mod child {
+    use super::*;
+
+    const CHILD_DEADLINE: Duration = Duration::from_millis(500);
+
+    fn runner(script: &str) -> Arc<ChildRunner> {
+        let media = Encoders::new(vec![hardware(Ok("x")), software(Ok("x"))]);
+        Arc::new(ChildRunner::with_args(
+            media,
+            "sh".into(),
+            vec!["-c".into(), script.into()],
+            CHILD_DEADLINE,
+        ))
+    }
+
+    fn run_script(script: &str) -> ProbeResult {
+        let cfg = Settings::default().capture_config(1080);
+        runner(script).run(&cfg, &probe(Hardware, "A"))
+    }
+
+    #[test]
+    fn a_result_line_is_read_from_the_child() {
+        assert_eq!(
+            run_script("echo noise; echo 'result=ok detail=NVENC'"),
+            ProbeResult::Passed("NVENC".into())
+        );
+        assert_eq!(
+            run_script("echo 'result=failed detail=no device'; exit 1"),
+            ProbeResult::Failed("no device".into())
+        );
+    }
+
+    #[test]
+    fn an_abnormal_exit_or_empty_output_is_a_crash() {
+        assert!(matches!(run_script("kill -9 $$"), ProbeResult::Crashed(_)));
+        assert!(matches!(run_script("exit 0"), ProbeResult::Crashed(_)));
+        assert!(matches!(run_script("exit 7"), ProbeResult::Crashed(_)));
+    }
+
+    #[test]
+    fn a_child_that_hangs_is_stopped_at_the_deadline_and_times_out() {
+        let started = std::time::Instant::now();
+        let result = run_script("exec sleep 30");
+        assert!(matches!(result, ProbeResult::TimedOut(_)));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn a_missing_program_fails_without_taking_the_parent_down() {
+        let media = Encoders::new(vec![hardware(Ok("x"))]);
+        let runner = ChildRunner::new(media, "/nonexistent/greyscreen".into(), CHILD_DEADLINE);
+        let cfg = Settings::default().capture_config(1080);
+        assert!(matches!(
+            runner.run(&cfg, &probe(Hardware, "A")),
+            ProbeResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn the_parent_survives_a_crashed_child_and_runs_the_next_candidate() {
+        let script = r#"case "$0" in *'"kind":"hardware"'*) kill -9 $$;; *) echo 'result=ok detail=software';; esac"#;
+        let runner: Arc<dyn ProbeRunner> = runner(script);
+        let media = Encoders::new(vec![hardware(Ok("x")), software(Ok("x"))]);
+        let check = run_with_runner(
+            &spec(&media, &cache_path()),
+            &runner,
+            CHILD_DEADLINE + Duration::from_secs(3),
+            &|_| {},
+        )
+        .unwrap();
+        assert_eq!(check.outcome, CheckOutcome::Software);
+        assert_eq!(reasons(&check)[0].1, Some(Reason::Crashed));
+    }
+
+    #[test]
+    fn the_child_entry_point_ignores_a_normal_launch_and_rejects_a_bad_request() {
+        let media = Encoders::new(vec![]);
+        assert_eq!(run_probe_child(&[], &*media), None);
+        assert_eq!(run_probe_child(&["--hidden".into()], &*media), None);
+        let bad = [PROBE_FLAG.to_owned(), "nonsense".to_owned()];
+        assert_eq!(run_probe_child(&bad, &*media), Some(2));
+    }
 }

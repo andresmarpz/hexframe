@@ -85,6 +85,10 @@ enum Command {
 }
 
 fn main() -> ExitCode {
+    #[cfg(windows)]
+    if let Some(code) = probe_child() {
+        return code;
+    }
     let cli = Cli::parse();
     match cli.command {
         Command::FakeLeague {
@@ -145,6 +149,18 @@ fn finish(result: anyhow::Result<()>) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+#[cfg(windows)]
+fn probe_child() -> Option<ExitCode> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) != Some(greyscreen_core::encoder::PROBE_FLAG) {
+        return None;
+    }
+    greyscreen_capture::probe::init_process().ok();
+    let media = greyscreen_capture::WindowsMediaSource::new();
+    let code = greyscreen_engine::run_probe_child(&args, &media).unwrap_or(2);
+    Some(ExitCode::from(code as u8))
 }
 
 #[cfg(windows)]

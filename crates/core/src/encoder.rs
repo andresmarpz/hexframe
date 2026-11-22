@@ -184,6 +184,72 @@ impl Probe {
     }
 }
 
+pub const PROBE_FLAG: &str = "--greyscreen-probe";
+pub const PROBE_CRASH_FLAG: &str = "--crash";
+pub const PROBE_SELF_DEADLINE_MS: u64 = 2500;
+const PROBE_PREFIX: &str = "result=";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProbeRequest {
+    pub luid: u64,
+    pub kind: EncoderKind,
+    pub cfg: CaptureConfig,
+}
+
+impl ProbeRequest {
+    pub fn to_arg(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
+
+    pub fn from_arg(arg: &str) -> Option<Self> {
+        serde_json::from_str(arg).ok()
+    }
+
+    pub fn probe(&self) -> Probe {
+        Probe {
+            kind: self.kind,
+            adapter: String::new(),
+            vendor_id: 0,
+            driver_version: String::new(),
+            luid: self.luid,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeLine {
+    Passed(String),
+    Failed(String),
+    TimedOut(String),
+}
+
+impl ProbeLine {
+    pub fn format(&self) -> String {
+        let (status, detail) = match self {
+            Self::Passed(d) => ("ok", d),
+            Self::Failed(d) => ("failed", d),
+            Self::TimedOut(d) => ("timeout", d),
+        };
+        let detail = detail.replace(['\r', '\n'], " ");
+        format!("{PROBE_PREFIX}{status} detail={detail}")
+    }
+
+    pub fn parse(output: &str) -> Option<Self> {
+        let line = output
+            .lines()
+            .rev()
+            .find_map(|l| l.trim().strip_prefix(PROBE_PREFIX))?;
+        let (status, rest) = line.split_once(' ').unwrap_or((line, ""));
+        let detail = rest.strip_prefix("detail=").unwrap_or(rest).to_owned();
+        match status {
+            "ok" => Some(Self::Passed(detail)),
+            "failed" => Some(Self::Failed(detail)),
+            "timeout" => Some(Self::TimedOut(detail)),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Verdict {
     pub probe: Probe,

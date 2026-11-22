@@ -228,3 +228,43 @@ fn a_check_survives_a_json_round_trip() {
     assert!(json.contains("\"outcome\":\"software\""));
     assert_eq!(serde_json::from_str::<EncoderCheck>(&json).unwrap(), check);
 }
+
+#[test]
+fn probe_line_round_trips_every_result() {
+    for line in [
+        ProbeLine::Passed("NVENC, 10 frames".into()),
+        ProbeLine::Failed("no device: lost".into()),
+        ProbeLine::TimedOut("no answer".into()),
+    ] {
+        assert_eq!(ProbeLine::parse(&line.format()), Some(line));
+    }
+}
+
+#[test]
+fn probe_line_is_one_line_and_found_among_driver_noise() {
+    let line = ProbeLine::Failed("first\nsecond".into()).format();
+    assert_eq!(line.lines().count(), 1);
+    let output = format!("driver banner\n{line}\n");
+    assert_eq!(
+        ProbeLine::parse(&output),
+        Some(ProbeLine::Failed("first second".into()))
+    );
+}
+
+#[test]
+fn probe_line_rejects_empty_and_unknown_output() {
+    assert_eq!(ProbeLine::parse(""), None);
+    assert_eq!(ProbeLine::parse("result=maybe detail=x"), None);
+    assert_eq!(ProbeLine::parse("something else"), None);
+}
+
+#[test]
+fn probe_request_round_trips_through_an_argument() {
+    let request = ProbeRequest {
+        luid: u64::MAX - 5,
+        kind: EncoderKind::Software,
+        cfg: Settings::default().capture_config(2160),
+    };
+    assert_eq!(ProbeRequest::from_arg(&request.to_arg()), Some(request));
+    assert_eq!(ProbeRequest::from_arg("not json"), None);
+}

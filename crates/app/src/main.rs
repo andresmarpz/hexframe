@@ -14,6 +14,7 @@ mod view;
 #[cfg(test)]
 mod tests;
 
+use greyscreen_core::encoder::PROBE_FLAG;
 use greyscreen_core::install::HIDDEN_FLAG;
 use greyscreen_core::paths;
 use greyscreen_core::settings::NATIVE_HEIGHT_CEILING;
@@ -21,7 +22,7 @@ use greyscreen_core::settings::Settings;
 use greyscreen_engine::updater::UpdateConfig;
 use greyscreen_engine::{
     EncoderCheckSpec, Engine, EngineConfig, EngineStatus, FeedbackConfig, league_factory_default,
-    spawn_encoder_check,
+    run_probe_child, spawn_isolated_encoder_check,
 };
 use rune::{App, AppSpec, Chrome};
 
@@ -31,6 +32,12 @@ use ui::Ui;
 const ENCODER_CHECK_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
 fn main() {
+    let probe_args: Vec<String> = std::env::args().skip(1).collect();
+    if probe_args.first().map(String::as_str) == Some(PROBE_FLAG) {
+        platform::init_dpi();
+        let code = run_probe_child(&probe_args, &*platform::media_source()).unwrap_or(2);
+        std::process::exit(code);
+    }
     let headless = rune::is_headless();
     if headless && setup::scene_requested() {
         return setup::run();
@@ -104,7 +111,7 @@ fn main() {
             });
         }
         let check_handle = handle.clone();
-        spawn_encoder_check(
+        spawn_isolated_encoder_check(
             EncoderCheckSpec {
                 media,
                 cfg: settings.capture_config(NATIVE_HEIGHT_CEILING),

@@ -51,7 +51,7 @@ pub enum CaptureTarget {
     PrimaryMonitor,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CaptureConfig {
     pub fps: u32,
     pub max_height: Option<u32>,

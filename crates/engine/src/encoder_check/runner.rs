@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use greyscreen_core::encoder::{Probe, Reason};
+use greyscreen_core::encoder::{Attempt, Probe, Reason};
 use greyscreen_core::media::{CaptureConfig, MediaSource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,6 +10,25 @@ pub enum ProbeResult {
     Passed(String),
     Failed(String),
     Crashed(String),
+    TimedOut(String),
+}
+
+impl ProbeResult {
+    pub fn into_attempt(self, probe: &Probe) -> Attempt {
+        let (result, reason) = match self {
+            Self::Passed(detail) => (Ok(detail), Reason::Failed),
+            Self::Failed(error) => (Err(error), Reason::Failed),
+            Self::Crashed(error) => (Err(error), Reason::Crashed),
+            Self::TimedOut(error) => (Err(error), Reason::TimedOut),
+        };
+        Attempt {
+            kind: probe.kind,
+            adapter: probe.adapter.clone(),
+            vendor_id: probe.vendor_id,
+            result,
+            reason,
+        }
+    }
 }
 
 pub trait ProbeRunner: Send + Sync {
@@ -66,6 +85,7 @@ pub(super) fn run_with_deadline(
         Ok(ProbeResult::Passed(detail)) => Ok(detail),
         Ok(ProbeResult::Failed(error)) => Err((Reason::Failed, error)),
         Ok(ProbeResult::Crashed(error)) => Err((Reason::Crashed, error)),
+        Ok(ProbeResult::TimedOut(error)) => Err((Reason::TimedOut, error)),
         Err(mpsc::RecvTimeoutError::Timeout) => Err((
             Reason::TimedOut,
             format!("no answer within {} s", deadline.as_secs_f32()),

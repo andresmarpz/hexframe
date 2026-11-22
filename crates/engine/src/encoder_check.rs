@@ -11,12 +11,15 @@ use greyscreen_core::problem::Problem;
 
 use crate::api::{NoticeAction, NoticeLevel, UiMsg};
 
+mod child;
 mod runner;
 
+pub use child::{ChildRunner, run_probe_child};
 use runner::run_with_deadline;
 pub use runner::{InProcessRunner, ProbeResult, ProbeRunner};
 
 const PROBE_DEADLINE: Duration = Duration::from_secs(10);
+const CHILD_GRACE: Duration = Duration::from_secs(3);
 
 pub struct EncoderCheckSpec {
     pub media: Arc<dyn MediaSource>,
@@ -38,11 +41,26 @@ pub fn spawn_encoder_check(
     spec: EncoderCheckSpec,
     sink: Box<dyn Fn(UiMsg) + Send>,
 ) -> Option<JoinHandle<()>> {
+    spawn_with(spec, sink, run_encoder_check)
+}
+
+pub fn spawn_isolated_encoder_check(
+    spec: EncoderCheckSpec,
+    sink: Box<dyn Fn(UiMsg) + Send>,
+) -> Option<JoinHandle<()>> {
+    spawn_with(spec, sink, run_isolated_encoder_check)
+}
+
+fn spawn_with(
+    spec: EncoderCheckSpec,
+    sink: Box<dyn Fn(UiMsg) + Send>,
+    run: fn(&EncoderCheckSpec, &dyn Fn(UiMsg)) -> Option<EncoderCheck>,
+) -> Option<JoinHandle<()>> {
     let spawned = std::thread::Builder::new()
         .name("encoder-check".into())
         .spawn(move || {
             std::thread::sleep(spec.delay);
-            run_encoder_check(&spec, &*sink);
+            run(&spec, &*sink);
         });
     match spawned {
         Ok(handle) => Some(handle),
@@ -56,6 +74,22 @@ pub fn spawn_encoder_check(
 pub fn run_encoder_check(spec: &EncoderCheckSpec, sink: &dyn Fn(UiMsg)) -> Option<EncoderCheck> {
     let runner: Arc<dyn ProbeRunner> = Arc::new(InProcessRunner::new(spec.media.clone()));
     run_with_runner(spec, &runner, PROBE_DEADLINE, sink)
+}
+
+pub fn run_isolated_encoder_check(
+    spec: &EncoderCheckSpec,
+    sink: &dyn Fn(UiMsg),
+) -> Option<EncoderCheck> {
+    let exe = match std::env::current_exe() {
+        Ok(exe) => exe,
+        Err(err) => {
+            tracing::warn!(%err, "cannot find the app to run the encoder check in a child");
+            return None;
+        }
+    };
+    let runner: Arc<dyn ProbeRunner> =
+        Arc::new(ChildRunner::new(spec.media.clone(), exe, PROBE_DEADLINE));
+    run_with_runner(spec, &runner, PROBE_DEADLINE + CHILD_GRACE, sink)
 }
 
 fn run_with_runner(

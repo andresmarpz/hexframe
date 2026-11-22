@@ -28,8 +28,9 @@ pub use api::{
 pub use clipboard::copy_file;
 pub use disk::{FreeSpace, LOW_DISK_URL};
 pub use encoder_check::{
-    EncoderCheckSpec, InProcessRunner, ProbeResult, ProbeRunner, abandon_encoder_check,
-    run_encoder_check, spawn_encoder_check,
+    ChildRunner, EncoderCheckSpec, InProcessRunner, ProbeResult, ProbeRunner,
+    abandon_encoder_check, run_encoder_check, run_isolated_encoder_check, run_probe_child,
+    spawn_encoder_check, spawn_isolated_encoder_check,
 };
 pub use export::REENCODE_AVAILABLE;
 pub use fake::{FailAt, FakeMediaSource, FakeProbe, Faults};

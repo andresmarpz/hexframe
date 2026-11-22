@@ -46,12 +46,27 @@ fn capture_checks() -> ExitCode {
 
 #[cfg(windows)]
 fn encoder_checks() -> bool {
-    use greyscreen_capture::selftest;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use greyscreen_capture::WindowsMediaSource;
     use greyscreen_core::encoder::{CheckOutcome, EncoderCheck};
+    use greyscreen_engine::{ChildRunner, ProbeRunner};
+
+    const PROBE_DEADLINE: Duration = Duration::from_secs(10);
 
     let settings = Settings::load(&paths::settings_file());
     let cfg = settings.capture_config(NATIVE_HEIGHT_CEILING);
-    let attempts = selftest::check(&cfg, true);
+    let Ok(exe) = std::env::current_exe() else {
+        println!("encoder check: FAILED cannot find greyscreen-cli to run the check in a child");
+        return false;
+    };
+    let runner = ChildRunner::new(Arc::new(WindowsMediaSource::new()), exe, PROBE_DEADLINE);
+    let attempts: Vec<_> = runner
+        .probes()
+        .iter()
+        .map(|probe| runner.run(&cfg, probe).into_attempt(probe))
+        .collect();
     println!("encoder check (every encoder, your settings):");
     for (index, attempt) in attempts.iter().enumerate() {
         let result = match &attempt.result {
