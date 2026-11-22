@@ -5,7 +5,7 @@ use greyscreen_engine::{EngineStatus, NoticeAction, NoticeLevel, RecordingEntry}
 use super::{Scene, death, encoder, first_run, game, home};
 use crate::ui::{Notice, Screen, TestRun, Ui, preview};
 
-const SAMPLE_FAILURE: &str = "NVIDIA NVENC (hardware): the encoder could not start (0x8000FFFF)";
+const SAMPLE_FAILURE: &str = "NVIDIA NVENC (hardware) on NVIDIA GeForce GT 1030: the encoder could not start (0x8000FFFF)";
 
 fn test_recording() -> RecordingEntry {
     let mut entry = preview::demo_recordings().remove(0);

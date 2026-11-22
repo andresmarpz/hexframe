@@ -207,11 +207,16 @@ fn client_ids_are_random_version_4_uuids() {
 #[test]
 fn the_encoder_failure_line_is_scrubbed_and_added_to_the_message() {
     let mut with_line = draft();
-    with_line.encoder_failure = Some("NVIDIA NVENC: failed opening /Users/ana/x summoner=Faker".into());
+    with_line.encoder_failure =
+        Some("NVIDIA NVENC: failed opening /Users/ana/x summoner=Faker".into());
     let home = vec!["/Users/ana".to_owned()];
     let report = build_report(&with_line, context(&home), || None);
     assert!(report.message.starts_with("The clip button does nothing."));
-    assert!(report.message.contains("Encoder check: NVIDIA NVENC: failed opening ~/x"));
+    assert!(
+        report
+            .message
+            .contains("Encoder check: NVIDIA NVENC: failed opening ~/x")
+    );
     assert!(!report.message.contains("ana"));
     assert!(!report.message.contains("Faker"));
 }

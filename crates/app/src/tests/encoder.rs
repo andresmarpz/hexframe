@@ -45,12 +45,12 @@ fn a_failed_check_shows_what_to_try_on_home() {
 fn the_failed_card_opens_the_first_failure_line() {
     let (mut rt, _rx) = live_runtime();
     let mut failed = check(CheckOutcome::Failed, "");
-    failed.first_failure = "NVIDIA NVENC (hardware): E_FAIL".into();
+    failed.first_failure = "NVIDIA NVENC (hardware) on NVIDIA GeForce GT 1030: E_FAIL".into();
     receive(&mut rt, UiMsg::Encoder(failed));
     assert!(rt.find("encoder-detail").is_some());
     assert!(rt.find("encoder-detail-line").is_none());
     tap(&mut rt, "encoder-detail");
-    assert!(visible_texts(&rt).contains(&"NVIDIA NVENC (hardware): E_FAIL".to_owned()));
+    assert!(visible_texts(&rt).contains(&"NVIDIA NVENC (hardware) on NVIDIA GeForce GT 1030: E_FAIL".to_owned()));
 }
 
 #[test]

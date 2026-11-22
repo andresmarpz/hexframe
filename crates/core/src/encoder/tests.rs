@@ -102,6 +102,23 @@ fn attempt(kind: EncoderKind, vendor_id: u32, result: Result<&str, &str>) -> Att
 }
 
 #[test]
+fn the_failure_line_names_the_adapter_once() {
+    let known = EncoderCheck::from_attempts(
+        "k".into(),
+        &[attempt(EncoderKind::Hardware, VENDOR_NVIDIA, Err("E_FAIL"))],
+    );
+    assert_eq!(
+        known.failure_line(),
+        Some("NVIDIA NVENC (hardware) on GPU: E_FAIL")
+    );
+    let unknown = EncoderCheck::from_attempts(
+        "k".into(),
+        &[attempt(EncoderKind::Hardware, 0x1234, Err("E_FAIL"))],
+    );
+    assert_eq!(unknown.failure_line(), Some("GPU (hardware): E_FAIL"));
+}
+
+#[test]
 fn a_working_hardware_encoder_is_the_choice() {
     let check = EncoderCheck::from_attempts(
         "k".into(),
@@ -132,7 +149,10 @@ fn a_failed_hardware_encoder_falls_back_to_software_once_noticed() {
         "Windows software encoder — uses more CPU"
     );
     assert_eq!(check.detail, "AMD AMF (hardware): E_FAIL");
-    assert_eq!(check.failure_line(), Some("AMD AMF (hardware): E_FAIL"));
+    assert_eq!(
+        check.failure_line(),
+        Some("AMD AMF (hardware) on GPU: E_FAIL")
+    );
     assert!(check.wants_notice());
     check.noticed = true;
     assert!(!check.wants_notice());

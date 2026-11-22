@@ -25,7 +25,7 @@ export const privacy = {
     },
     {
       title: "Send feedback",
-      body: "Only when you press Send. The report goes to Greyscreen's server at api.greyscreen.app and holds your message and its type (bug, idea or other), the app version, your Windows version, an email if you typed one, and a random ID the app made for itself. The ID is not tied to who you are. If Include recent logs is ticked, it also holds the last 300 log lines, with your user folder name replaced by ~ and Riot ID and summoner name values removed. The server keeps a hash of your IP address to limit spam, not the address itself. We use a report to fix problems and, if you gave an email, to reply to you.",
+      body: "Only when you press Send. The report goes to Greyscreen's server at api.greyscreen.app and holds your message and its type (bug, idea or other), the app version, your Windows version, an email if you typed one, and a random ID the app made for itself. The ID is not tied to who you are. If Include recent logs is ticked, it also holds the last 300 log lines, with your user folder name replaced by ~ and Riot ID and summoner name values removed. When no video encoder works on your PC, the report also holds the first encoder error line (your graphics encoder, graphics card name and the Windows error text), with your user folder name replaced by ~, even if logs are not ticked. The server keeps a hash of your IP address to limit spam, not the address itself. We use a report to fix problems and, if you gave an email, to reply to you.",
     },
     {
       title: "Crash reports",
