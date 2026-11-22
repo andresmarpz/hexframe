@@ -347,26 +347,41 @@ fn capture_failure_while_recording_is_an_error_notice() {
     );
 }
 
+const DEVICE_LOST_REASONS: [&str; 5] = [
+    "the video encoder stopped: 0x887a0005",
+    "graphics device removed: DXGI_ERROR_DEVICE_REMOVED (0x887a0005)",
+    "graphics device lost in encoder submit: DXGI_ERROR_DEVICE_HUNG (0x887a0006)",
+    "graphics device lost in convert: DXGI_ERROR_DEVICE_RESET (0x887a0007)",
+    "graphics device lost in encoder drain: DXGI_ERROR_DRIVER_INTERNAL_ERROR (0x887a0020)",
+];
+
+const ENCODER_NOTICE: &str = "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point.";
+
 #[test]
 fn an_encoder_failure_while_recording_saves_the_game_so_far() {
-    let harness = game_with(
-        clip_settings("fail-encoder", true),
-        Arc::new(FakeMediaSource::new().failing_after(
-            Duration::from_secs(1),
-            "the video encoder stopped: 0x887a0005",
-        )),
-        Vec::new(),
-        LeagueMsg::Skipped("never".to_owned()),
-        Duration::ZERO,
-    );
-    let msgs = collect_until_saved(&harness.ui);
-    assert_eq!(
-        error_notices(&msgs),
-        vec![
-            "Recording stopped: the video encoder or graphics driver failed. The game is saved up to that point."
-        ]
-    );
-    let meta = saved_meta(&msgs);
-    assert!(meta.duration_secs > 0.5, "{}", meta.duration_secs);
-    assert!(!meta.video.is_empty());
+    for (index, reason) in DEVICE_LOST_REASONS.iter().enumerate() {
+        let harness = game_with(
+            clip_settings(&format!("fail-encoder-{index}"), true),
+            Arc::new(FakeMediaSource::new().failing_after(Duration::from_secs(1), reason)),
+            Vec::new(),
+            LeagueMsg::Skipped("never".to_owned()),
+            Duration::ZERO,
+        );
+        let msgs = collect_until_saved(&harness.ui);
+        assert_eq!(error_notices(&msgs), vec![ENCODER_NOTICE], "{reason}");
+        let meta = saved_meta(&msgs);
+        assert!(meta.duration_secs > 0.5, "{reason}: {}", meta.duration_secs);
+        assert!(!meta.video.is_empty(), "{reason}");
+        let health = meta.health.as_ref().expect("health");
+        assert_eq!(health.capture_errors, 1, "{reason}");
+        assert!(health.frames_encoded > 0, "{reason}");
+        let folder = msgs
+            .iter()
+            .find_map(|m| match m {
+                UiMsg::RecordingSaved(entry) => Some(entry.folder.clone()),
+                _ => None,
+            })
+            .expect("recording saved");
+        assert_playable_from_key_frame(&folder.join(&meta.video));
+    }
 }
