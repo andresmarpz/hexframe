@@ -49,7 +49,7 @@ impl Problem {
             "os error 112",
         ]) {
             Problem::LowDisk
-        } else if has(&[FOLDER_UNUSABLE]) {
+        } else if has(&[FOLDER_UNUSABLE, "os error 5)"]) {
             Problem::FolderUnusable
         } else if has(&["graphics capture is not supported"]) {
             Problem::WindowsTooOld

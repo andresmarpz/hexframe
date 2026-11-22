@@ -84,8 +84,19 @@ fn a_full_disk_is_told_from_an_access_error() {
     ] {
         assert_eq!(Problem::from_error(raw), Problem::LowDisk, "{raw}");
     }
-    for raw in ["Access is denied. (0x80070005)", "access is denied"] {
-        assert_eq!(Problem::from_error(raw), Problem::CaptureBlocked, "{raw}");
+    assert_eq!(
+        Problem::from_error("Access is denied. (0x80070005)"),
+        Problem::CaptureBlocked
+    );
+}
+
+#[test]
+fn a_refused_write_is_a_folder_problem_not_a_capture_block() {
+    for raw in [
+        "Access is denied. (os error 5)",
+        "rename failed: Access is denied. (os error 5)",
+    ] {
+        assert_eq!(Problem::from_error(raw), Problem::FolderUnusable, "{raw}");
     }
 }
 
