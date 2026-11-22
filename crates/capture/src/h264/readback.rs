@@ -12,6 +12,9 @@ use windows::Win32::Media::MediaFoundation::{IMFSample, MFCreateMemoryBuffer, MF
 use super::Result;
 use crate::d3d::GpuDevice;
 
+#[cfg(test)]
+mod tests;
+
 const MAP_TIMEOUT: Duration = Duration::from_millis(100);
 const MAP_POLL: Duration = Duration::from_micros(250);
 

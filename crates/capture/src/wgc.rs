@@ -1,4 +1,6 @@
 mod setup;
+#[cfg(test)]
+mod tests;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};

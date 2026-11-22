@@ -31,6 +31,7 @@ pub enum Point {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Fail(HRESULT),
+    FailAfter(HRESULT, usize),
     Stall(Duration),
 }
 
@@ -43,11 +44,19 @@ fn armed() -> MutexGuard<'static, Vec<(Point, Action)>> {
 
 pub fn hit(point: Point) -> windows::core::Result<()> {
     let action = armed()
-        .iter()
-        .find_map(|(armed, action)| (*armed == point).then_some(*action));
+        .iter_mut()
+        .find(|(armed, _)| *armed == point)
+        .map(|(_, action)| match action {
+            Action::FailAfter(code, 0) => Action::Fail(*code),
+            Action::FailAfter(_, skips) => {
+                *skips -= 1;
+                Action::Stall(Duration::ZERO)
+            }
+            other => *other,
+        });
     match action {
         None => Ok(()),
-        Some(Action::Fail(code)) => Err(Error::from(code)),
+        Some(Action::Fail(code) | Action::FailAfter(code, _)) => Err(Error::from(code)),
         Some(Action::Stall(duration)) => {
             std::thread::sleep(duration);
             Ok(())
@@ -75,6 +84,11 @@ impl Armed {
 
     pub fn fail(self, point: Point, code: HRESULT) -> Self {
         armed().push((point, Action::Fail(code)));
+        self
+    }
+
+    pub fn fail_after(self, point: Point, skips: usize, code: HRESULT) -> Self {
+        armed().push((point, Action::FailAfter(code, skips)));
         self
     }
 

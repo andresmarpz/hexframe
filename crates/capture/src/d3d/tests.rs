@@ -1,4 +1,4 @@
-use windows::Win32::Foundation::E_FAIL;
+use windows::Win32::Foundation::{E_FAIL, E_NOTIMPL};
 use windows::Win32::Graphics::Direct3D::D3D_FEATURE_LEVEL_11_0;
 
 use super::GpuDevice;
@@ -19,6 +19,12 @@ fn a_device_limited_to_feature_level_11_0_still_builds_the_capture_objects() {
     );
     VideoConverter::new(&gpu, 64, 64, 30).unwrap();
     FrameCopier::new(&gpu).unwrap();
+}
+
+#[test]
+fn a_gpu_priority_call_that_is_not_implemented_still_gives_a_device() {
+    let _armed = Armed::new().fail(Point::GpuPriority, E_NOTIMPL);
+    assert!(warp::device().is_ok());
 }
 
 #[test]

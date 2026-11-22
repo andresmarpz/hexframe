@@ -112,18 +112,12 @@ impl FrameCopier {
         // SAFETY: the staging texture is live, CPU readable and used only by this thread.
         unsafe { context.Map(&thumb.staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))? };
         let (width, height) = (thumb.size.0 as usize, thumb.size.1 as usize);
-        out.clear();
-        out.resize(width * height, 0);
-        let base = mapped.pData.cast::<u8>().cast_const();
-        for y in 0..height {
-            // SAFETY: the mapping holds `height` rows of `RowPitch` bytes, each at least `width` BGRA pixels.
-            let row = unsafe {
-                std::slice::from_raw_parts(base.add(y * mapped.RowPitch as usize), width * 4)
-            };
-            for (x, pixel) in row.as_chunks::<4>().0.iter().enumerate() {
-                out[y * width + x] = tear::luma(pixel[2], pixel[1], pixel[0]);
-            }
-        }
+        let pitch = mapped.RowPitch as usize;
+        let len = (height - 1) * pitch + width * 4;
+        // SAFETY: the mapping holds `height` rows of `RowPitch` bytes, each at least `width` BGRA pixels.
+        let bytes =
+            unsafe { std::slice::from_raw_parts(mapped.pData.cast::<u8>().cast_const(), len) };
+        luma_rows(bytes, pitch, (width, height), out);
         // SAFETY: the texture was mapped above and `row` no longer borrows the mapping.
         unsafe { context.Unmap(&thumb.staging, 0) };
         Ok(width)
@@ -193,6 +187,18 @@ impl FrameCopier {
             }
         }
         Ok(())
+    }
+}
+
+fn luma_rows(bytes: &[u8], pitch: usize, size: (usize, usize), out: &mut Vec<u8>) {
+    let (width, height) = size;
+    out.clear();
+    out.resize(width * height, 0);
+    for (y, line) in out.chunks_exact_mut(width).enumerate() {
+        let row = &bytes[y * pitch..y * pitch + width * 4];
+        for (luma, pixel) in line.iter_mut().zip(row.as_chunks::<4>().0) {
+            *luma = tear::luma(pixel[2], pixel[1], pixel[0]);
+        }
     }
 }
 
