@@ -133,8 +133,8 @@ fn a_game_row_shows_how_many_deaths_are_reviewed() {
             .iter()
             .any(|t| t.starts_with("Ahri") && t.ends_with(wanted))
     };
-    assert!(has(&rt, "0 of 7 reviewed"));
+    assert!(has(&rt, "0/7"));
     rt.update(|ui, _| ui.recordings[0].meta.review.set_note(2, "late"));
     settle(&mut rt);
-    assert!(has(&rt, "1 of 7 reviewed"));
+    assert!(has(&rt, "1/7"));
 }

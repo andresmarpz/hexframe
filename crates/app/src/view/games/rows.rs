@@ -4,7 +4,7 @@ use rune::{Cursor, El, TextStyle, Tx, col, row, text};
 use rune_kit::Kit;
 
 use super::ROW_HEIGHT;
-use crate::ui::library::format::{Kda, kda, mode_label, review_progress, when};
+use crate::ui::library::format::{Kda, kda, mode_label, review_progress, short_mode_label, when};
 use crate::ui::{Ui, format_clock};
 use crate::view::TABULAR;
 use crate::view::champion::champion_icon;
@@ -28,7 +28,7 @@ fn base(k: &Kit, key: String, label: String, selected: bool) -> El {
         .center_y()
         .radius(k.radius.md)
         .cursor(Cursor::Pointer)
-        .focusable(false)
+        .focusable(true)
         .preserve_focus_on_press(true);
     let line = k.interactive(line);
     if selected {
@@ -117,9 +117,10 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
         .font(k.ty.body_medium)
         .color(k.c.text_base)
         .truncate();
+    let short_mode = short_mode_label(&info.mode);
     let detail_line = match &progress {
-        Some(progress) => format!("{mode} · {} · {progress}", shown.time),
-        None => format!("{mode} · {}", shown.time),
+        Some(progress) => format!("{short_mode} · {} · {progress}", shown.time),
+        None => format!("{short_mode} · {}", shown.time),
     };
     let detail = text(detail_line)
         .font(k.ty.small.features(TABULAR))

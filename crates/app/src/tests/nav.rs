@@ -181,3 +181,25 @@ fn a_live_recording_shows_its_feed_on_home() {
     assert_eq!(rt.state.detail(), Detail::Live);
     assert!(rt.find("feed-card").is_some());
 }
+
+#[test]
+fn nav_games_from_home_auto_opens_newest_game_and_escape_returns_to_pick() {
+    let mut rt = idle_games();
+    chord(&mut rt, '1');
+    assert_eq!(rt.state.screen, Screen::Home);
+    assert!(rt.state.review.is_none());
+
+    let newest = rt.state.recordings[rt.state.visible_games()[0]]
+        .meta
+        .id
+        .clone();
+    tap(&mut rt, "nav-games");
+    assert_eq!(rt.state.screen, Screen::Games);
+    assert_eq!(rt.state.detail(), Detail::Game);
+    assert_eq!(rt.state.selected_id(), Some(newest.as_str()));
+
+    press(&mut rt, Key::Escape);
+    assert_eq!(rt.state.screen, Screen::Games);
+    assert_eq!(rt.state.detail(), Detail::Pick);
+    assert!(rt.find("games-pick").is_some());
+}

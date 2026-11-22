@@ -34,6 +34,15 @@ pub(crate) fn mode_label(mode: &str) -> String {
     mode_name(mode).map_or_else(|| title_case(mode), str::to_owned)
 }
 
+pub(crate) fn short_mode_label(mode: &str) -> String {
+    let full = mode_label(mode);
+    if full == "Summoner's Rift" {
+        "Rift".to_owned()
+    } else {
+        full
+    }
+}
+
 fn title_case(raw: &str) -> String {
     raw.split(|c: char| c == '_' || c.is_whitespace())
         .filter(|word| !word.is_empty())
@@ -128,13 +137,7 @@ pub(crate) fn death_total(rec: &RecordingEntry) -> usize {
 pub(crate) fn review_progress(rec: &RecordingEntry) -> Option<String> {
     let meta = &rec.meta;
     let list = deaths(&meta.events, &meta.game.info);
-    (!list.is_empty()).then(|| {
-        format!(
-            "{} of {} reviewed",
-            meta.review.reviewed_among(&list),
-            list.len()
-        )
-    })
+    (!list.is_empty()).then(|| format!("{}/{}", meta.review.reviewed_among(&list), list.len()))
 }
 
 pub(crate) fn death_hint(rec: &RecordingEntry) -> Option<String> {

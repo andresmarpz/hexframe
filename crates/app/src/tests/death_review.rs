@@ -466,11 +466,11 @@ fn the_hint_counts_deaths_and_reviews() {
 #[test]
 fn review_progress_reads_k_of_n_and_hides_without_deaths() {
     let mut entry = death_entry();
-    assert_eq!(review_progress(&entry).as_deref(), Some("0 of 7 reviewed"));
+    assert_eq!(review_progress(&entry).as_deref(), Some("0/7"));
     entry.meta.review.toggle_tag(2, DeathTag::Ganked);
-    assert_eq!(review_progress(&entry).as_deref(), Some("1 of 7 reviewed"));
+    assert_eq!(review_progress(&entry).as_deref(), Some("1/7"));
     entry.meta.events.retain(|e| e.id == 2);
-    assert_eq!(review_progress(&entry).as_deref(), Some("1 of 1 reviewed"));
+    assert_eq!(review_progress(&entry).as_deref(), Some("1/1"));
     entry.meta.events.clear();
     assert_eq!(review_progress(&entry), None);
 }

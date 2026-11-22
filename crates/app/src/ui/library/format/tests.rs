@@ -63,6 +63,14 @@ fn modes_are_named_for_people() {
 }
 
 #[test]
+fn short_mode_label_shortens_summoners_rift() {
+    assert_eq!(short_mode_label("CLASSIC"), "Rift");
+    assert_eq!(short_mode_label("Summoner's Rift"), "Rift");
+    assert_eq!(short_mode_label("ARAM"), "ARAM");
+    assert_eq!(short_mode_label("CHERRY"), "Arena");
+}
+
+#[test]
 fn dates_are_relative_to_now() {
     let now = at("2026-11-21T10:00:00+00:00[UTC]");
     let day = |s: &str| when(&at(s), &now).day;

@@ -147,9 +147,12 @@ fn duration_badge(k: &Kit, secs: f64) -> El {
 pub(crate) fn game_thumb(k: &Kit, rec: &RecordingEntry, width: f32) -> El {
     let shape = el().size(width, (width / ASPECT).round());
     let champion = rec.meta.game.info.me.champion.as_str();
-    framed(k, &game_path(rec), shape)
-        .child(play_overlay(k, PLAY_CHIP))
-        .child(champion_badge(k, champion, k.c.bg_base, badge_icon(width)))
+    framed(k, &game_path(rec), shape).child(champion_badge(
+        k,
+        champion,
+        k.c.bg_base,
+        badge_icon(width),
+    ))
 }
 
 pub(crate) fn clip_thumb(k: &Kit, rec: &RecordingEntry, clip: &ClipEntry, shape: El) -> El {

@@ -21,7 +21,7 @@ pub(super) fn list(s: &Ui, k: &Kit) -> El {
         .h_full()
         .min_h(0.0)
         .child(content(s, k))
-        .child(grip(s, PaneEdge::List, "list-grip", "Resize games list"))
+        .child(grip(s, k, PaneEdge::List, "list-grip", "Resize games list"))
 }
 
 fn content(s: &Ui, k: &Kit) -> El {

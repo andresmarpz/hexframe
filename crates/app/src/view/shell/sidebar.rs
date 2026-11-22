@@ -101,7 +101,7 @@ fn expanded(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
                         .child(settings(s, k)),
                 ),
         )
-        .child(grip(s, PaneEdge::Nav, "nav-grip", "Resize navigation"))
+        .child(grip(s, k, PaneEdge::Nav, "nav-grip", "Resize navigation"))
 }
 
 fn middle(s: &Ui, k: &Kit, list: El) -> El {
