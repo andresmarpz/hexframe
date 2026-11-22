@@ -173,7 +173,9 @@ When nothing renders, a loopback client may get no packets and no events (system
 
 ### Clock drift
 
-The audio engine clock and QPC drift apart by tens of ppm, typically. Because `expected` is the frame count and `ts` is QPC-derived, drift shows up as slowly growing `gap`. At 50 ppm that is about 3 ms/min, so the 30 ms resync fires roughly every 10 minutes and is inaudible when inserting or dropping at a packet boundary. Drift rate figures are from reasoning, not a source: UNVERIFIED, TEST with a 30-minute recording.
+The audio engine clock and QPC drift apart by tens of ppm, typically. Because `expected` is the frame count and `ts` is QPC-derived, drift shows up as slowly growing `gap`. At 50 ppm that would be about 3 ms/min, so the 30 ms resync would fire roughly every 10 minutes and is inaudible when inserting or dropping at a packet boundary. Real drift is much smaller:
+
+Measured on 10 game recordings of 16 to 23 minutes (3.3 hours in total, builds 0.1.15 to 0.1.20, game process loopback, one PC), the per-second audio-minus-video skew drifts by -3.3 ms per hour on average (range -9 to +4, about -1 ppm), which is about -10 ms over a 3-hour recording and -27 ms at the worst recording's rate, under a 40 ms bar. No recording shows a 30 ms step in the skew, and `gaps` is 0 in 6 recordings, 1 (31 to 42 ms) in 3 and 231 in one (longest 92 ms, no net drift), so corrections come about once an hour at most, against a trigger of one every 5 minutes. In `game.mp4` the audio and video track lengths differ by -6.7 to +14.0 ms on the three longest recordings, matching `drift_ms` in `game.json`, with both tracks starting at 0 and no edit lists. No recording is longer than 23 minutes and these builds do not log trims, so the 3-hour figure is an extrapolation and audibility was not tested. Slewing is not needed; re-check with an `av-180` run.
 
 ### Start offset and encoder delay
 
