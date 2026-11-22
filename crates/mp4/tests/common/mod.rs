@@ -85,7 +85,11 @@ pub mod faulty {
             if so_far.saturating_add(buf.len() as u64) > self.fail_after {
                 return Err(io::Error::new(self.kind, "injected write failure"));
             }
-            let n = self.inner.lock().expect("lock").write(buf)?;
+            let n = self
+                .inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .write(buf)?;
             self.written.fetch_add(n as u64, Ordering::SeqCst);
             Ok(n)
         }
@@ -97,7 +101,10 @@ pub mod faulty {
 
     impl Seek for FaultySink {
         fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-            self.inner.lock().expect("lock").seek(pos)
+            self.inner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .seek(pos)
         }
     }
 

@@ -459,7 +459,7 @@ fn a_crash_between_the_index_append_and_the_placeholder_patch_recovers_everythin
     for cut in bytes.len()..=unpatched.len() {
         let inside = cut - bytes.len();
         let near_edge = inside < edge || unpatched.len() - cut < edge;
-        if !near_edge && inside % 13 != 0 {
+        if !near_edge && !inside.is_multiple_of(13) {
             continue;
         }
         assert_recovers_to(&dir, &unpatched, cut, Some(total));
