@@ -54,10 +54,14 @@ fn repeated_samples_leave_the_staging_texture_mappable() {
 
 #[test]
 fn a_failed_map_returns_an_error_and_the_next_sample_works() {
-    let _mf = MfGuard::start().unwrap();
-    let gpu = warp::device().unwrap();
-    let texture = nv12_texture(&gpu, 64, 64);
-    let readback = Readback::new(&gpu, 64, 64).unwrap();
+    let (_mf, gpu, texture, readback) = {
+        let _armed = Armed::new();
+        let mf = MfGuard::start().unwrap();
+        let gpu = warp::device().unwrap();
+        let texture = nv12_texture(&gpu, 64, 64);
+        let readback = Readback::new(&gpu, 64, 64).unwrap();
+        (mf, gpu, texture, readback)
+    };
     {
         let _armed = Armed::new().fail(Point::StagingMap, E_FAIL);
         assert!(readback.sample(&texture, 0, HNS).is_err());

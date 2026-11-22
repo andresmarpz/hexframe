@@ -89,7 +89,10 @@ fn plain_texture(
 
 #[test]
 fn a_failed_resize_leaves_no_stale_textures_and_the_next_copy_recovers() {
-    let gpu = crate::testing::warp::device().unwrap();
+    let gpu = {
+        let _armed = Armed::new();
+        crate::testing::warp::device().unwrap()
+    };
     let wider = (SIZE.0 + 1, SIZE.1);
     let source = plain_texture(&gpu, wider);
     let mut copier = FrameCopier::new(&gpu).unwrap();
@@ -109,13 +112,19 @@ fn a_failed_resize_leaves_no_stale_textures_and_the_next_copy_recovers() {
 
 #[test]
 fn a_thumbnail_texture_failure_turns_thumbnails_off_for_good_and_the_copy_still_works() {
-    let _armed = Armed::new().fail_after(Point::FrameCopyTexture, RING_SLOTS, E_OUTOFMEMORY);
-    let gpu = crate::testing::warp::device().unwrap();
+    let gpu = {
+        let _armed = Armed::new();
+        crate::testing::warp::device().unwrap()
+    };
     let source = plain_texture(&gpu, SIZE);
     let mut copier = FrameCopier::new(&gpu).unwrap();
-    let copied = copier.copy(&source, SIZE, 0).unwrap();
-    assert!(!copied.thumbed);
-    assert!(copier.thumbs_off && copier.thumb.is_none());
+    {
+        let _armed = Armed::new().fail_after(Point::FrameCopyTexture, RING_SLOTS, E_OUTOFMEMORY);
+        let copied = copier.copy(&source, SIZE, 0).unwrap();
+        assert!(!copied.thumbed);
+        assert!(copier.thumbs_off && copier.thumb.is_none());
+    }
+    let _armed = Armed::new();
     let wider = (SIZE.0 + 2, SIZE.1);
     let source = plain_texture(&gpu, wider);
     let copied = copier.copy(&source, wider, 0).unwrap();
@@ -140,7 +149,10 @@ fn repeated_thumbnail_reads_leave_the_staging_texture_mappable() {
 
 #[test]
 fn a_failed_thumbnail_map_returns_an_error_and_the_next_read_works() {
-    let gpu = crate::testing::warp::device().unwrap();
+    let gpu = {
+        let _armed = Armed::new();
+        crate::testing::warp::device().unwrap()
+    };
     let source = plain_texture(&gpu, SIZE);
     let mut copier = FrameCopier::new(&gpu).unwrap();
     let mut luma = Vec::new();
