@@ -1,7 +1,9 @@
 use std::alloc::{GlobalAlloc, Layout};
+use std::cell::UnsafeCell;
 use std::fmt::Write as _;
 use std::fs::File;
 use std::io::Write as _;
+use std::mem::MaybeUninit;
 use std::os::windows::io::AsRawHandle;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -9,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use windows::Wdk::System::SystemServices::RtlGetVersion;
-use windows::Win32::Foundation::{HANDLE, HMODULE};
+use windows::Win32::Foundation::{EXCEPTION_STACK_OVERFLOW, HANDLE, HMODULE};
 use windows::Win32::System::Diagnostics::Debug::{
     EXCEPTION_POINTERS, MINIDUMP_EXCEPTION_INFORMATION, MINIDUMP_TYPE,
     MiniDumpWithIndirectlyReferencedMemory, MiniDumpWithThreadInfo, MiniDumpWithUnloadedModules,
@@ -21,7 +23,7 @@ use windows::Win32::System::LibraryLoader::{
 };
 use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
 use windows::Win32::System::Threading::{
-    GetCurrentProcess, GetCurrentProcessId, GetCurrentThreadId,
+    GetCurrentProcess, GetCurrentProcessId, GetCurrentThreadId, GetCurrentThreadStackLimits,
 };
 use windows::core::PCWSTR;
 
@@ -37,6 +39,17 @@ static DUMP_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
 static BUILD_INFO: OnceLock<String> = OnceLock::new();
 static IN_HANDLER: AtomicBool = AtomicBool::new(false);
 static OOM_REPORTED: AtomicBool = AtomicBool::new(false);
+static CRASH_TEXT: Exclusive<Text> = Exclusive(UnsafeCell::new(Text::new()));
+static CRASH_CONTEXT: Exclusive<MaybeUninit<AlignedContext>> =
+    Exclusive(UnsafeCell::new(MaybeUninit::zeroed()));
+
+struct Exclusive<T>(UnsafeCell<T>);
+
+// SAFETY: only the one thread that wins IN_HANDLER touches the value.
+unsafe impl<T> Sync for Exclusive<T> {}
+
+#[repr(C, align(16))]
+struct AlignedContext(windows::Win32::System::Diagnostics::Debug::CONTEXT);
 
 pub fn install(report_file: Option<PathBuf>, app_version: &str) {
     BUILD_INFO
@@ -129,15 +142,16 @@ struct Text {
 }
 
 impl Text {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             bytes: [0; 8192],
             len: 0,
         }
     }
 
-    fn filled(&self) -> &[u8] {
-        &self.bytes[..self.len]
+    fn flush(&mut self) {
+        write_report(&self.bytes[..self.len]);
+        self.len = 0;
     }
 }
 
@@ -152,23 +166,27 @@ impl std::fmt::Write for Text {
 }
 
 fn write_report(bytes: &[u8]) {
-    std::io::stderr().write_all(bytes).ok();
     if let Some(Some(file)) = REPORT.get() {
         let mut file: &File = file;
         file.write_all(bytes).ok();
     }
+    std::io::stderr().write_all(bytes).ok();
 }
 
 unsafe extern "system" fn on_crash(info: *const EXCEPTION_POINTERS) -> i32 {
     if IN_HANDLER.swap(true, Ordering::SeqCst) {
         return 0;
     }
-    let mut text = Text::new();
-    describe(info, &mut text);
-    write_report(text.filled());
-    let mut text = Text::new();
-    write_dump(info, &mut text);
-    write_report(text.filled());
+    // SAFETY: IN_HANDLER lets only this thread reach the buffer.
+    let text = unsafe { &mut *CRASH_TEXT.0.get() };
+    describe(info, text);
+    text.flush();
+    // SAFETY: the system passes valid exception pointers to the filter.
+    if let Some(context) = unsafe { info.as_ref().map(|i| i.ContextRecord) } {
+        walk_stack(context, text);
+    }
+    write_dump(info, text);
+    text.flush();
     0
 }
 
@@ -205,10 +223,6 @@ fn describe(info: *const EXCEPTION_POINTERS, text: &mut Text) {
         BUILD_INFO.get().map_or("", String::as_str)
     )
     .ok();
-    // SAFETY: the system passes valid exception pointers to the filter.
-    if let Some(context) = unsafe { info.as_ref().map(|i| i.ContextRecord) } {
-        walk_stack(context, text);
-    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -223,42 +237,54 @@ fn walk_stack(
     if context.is_null() {
         return;
     }
-    // SAFETY: the system passes a valid context record to the filter.
-    let mut context = unsafe { *context };
+    let (mut low, mut high) = (0usize, 0usize);
+    // SAFETY: both pointers are live locals.
+    unsafe { GetCurrentThreadStackLimits(&mut low, &mut high) };
+    // SAFETY: IN_HANDLER lets only this thread reach the slot, and the system passes a valid context record to the filter.
+    let slot = unsafe { &mut *CRASH_CONTEXT.0.get() };
+    // SAFETY: as above.
+    let slot = slot.write(AlignedContext(unsafe { *context }));
+    let context = &mut slot.0;
+    let on_stack = |sp: u64| (low..high).contains(&(sp as usize));
     for index in 0..MAX_FRAMES {
         let pc = context.Rip;
-        if pc == 0 {
+        if pc == 0 && index != 0 {
             break;
         }
         write!(text, "crash: stack #{index} ").ok();
         write_location(text, pc as usize);
         writeln!(text).ok();
+        text.flush();
+        let (last_pc, last_sp) = (pc, context.Rsp);
         let mut base = 0u64;
         // SAFETY: the lookup only reads the loaded images' unwind tables.
         let entry = unsafe { RtlLookupFunctionEntry(pc, &mut base, None) };
         if entry.is_null() {
-            if index != 0 {
+            if index != 0 || !on_stack(context.Rsp) {
                 break;
             }
-            // SAFETY: a frame without unwind data is a leaf, so its return address is at the stack pointer.
+            // SAFETY: a frame without unwind data is a leaf, so its return address is at the stack pointer, which lies inside the thread's stack.
             context.Rip = unsafe { (context.Rsp as *const u64).read() };
             context.Rsp += 8;
             continue;
         }
         let mut handler_data = std::ptr::null_mut();
         let mut frame = 0u64;
-        // SAFETY: the entry and base come from the lookup above and the context is a live local copy.
+        // SAFETY: the entry and base come from the lookup above and the context is an aligned private copy.
         unsafe {
             RtlVirtualUnwind(
                 RTL_VIRTUAL_UNWIND_HANDLER_TYPE(0),
                 base,
                 pc,
                 entry,
-                &mut context,
+                context,
                 &mut handler_data,
                 &mut frame,
                 None,
             );
+        }
+        if !on_stack(context.Rsp) || (context.Rip == last_pc && context.Rsp == last_sp) {
+            break;
         }
     }
 }
@@ -271,6 +297,28 @@ fn walk_stack(
 }
 
 fn write_dump(info: *const EXCEPTION_POINTERS, text: &mut Text) {
+    // SAFETY: the system passes valid exception pointers to the filter.
+    let code = unsafe { info.as_ref().and_then(|i| i.ExceptionRecord.as_ref()) }
+        .map(|record| record.ExceptionCode);
+    if code != Some(EXCEPTION_STACK_OVERFLOW) {
+        write_dump_file(info, text);
+        return;
+    }
+    let address = info as usize;
+    let outcome = std::thread::scope(|scope| {
+        let text = &mut *text;
+        std::thread::Builder::new()
+            .spawn_scoped(scope, move || {
+                write_dump_file(address as *const EXCEPTION_POINTERS, text)
+            })
+            .map(|handle| handle.join().ok())
+    });
+    if !matches!(outcome, Ok(Some(()))) {
+        writeln!(text, "crash: dump thread failed").ok();
+    }
+}
+
+fn write_dump_file(info: *const EXCEPTION_POINTERS, text: &mut Text) {
     let Some(Some(dir)) = DUMP_DIR.get() else {
         return;
     };
