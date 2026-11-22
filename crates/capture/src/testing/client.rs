@@ -12,7 +12,6 @@ const IDLE_SLEEP: Duration = Duration::from_millis(5);
 pub(crate) enum Step {
     Packet { pcm: Vec<f32>, info: PacketInfo },
     Idle,
-    WaitFails(SourceError),
     ReadFails(SourceError),
 }
 
@@ -63,10 +62,6 @@ impl CaptureClient for FakeClient {
                 self.steps.pop_front();
                 Ok(false)
             }
-            Some(Step::WaitFails(_)) => match self.steps.pop_front() {
-                Some(Step::WaitFails(error)) => Err(error),
-                _ => Ok(false),
-            },
             None => {
                 std::thread::sleep(IDLE_SLEEP);
                 Ok(false)
@@ -85,7 +80,7 @@ impl CaptureClient for FakeClient {
     fn read(&mut self, buffer: &mut [u8]) -> Result<(u32, PacketInfo), SourceError> {
         match self.steps.pop_front() {
             Some(Step::Packet { pcm, info }) => {
-                for (chunk, sample) in buffer.chunks_exact_mut(4).zip(&pcm) {
+                for (chunk, sample) in buffer.as_chunks_mut::<4>().0.iter_mut().zip(&pcm) {
                     chunk.copy_from_slice(&sample.to_le_bytes());
                 }
                 Ok(((pcm.len() / CHANNELS) as u32, info))

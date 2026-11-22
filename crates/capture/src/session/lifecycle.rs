@@ -27,7 +27,10 @@ impl Drop for LiveGuard {
     }
 }
 
-#[cfg_attr(not(any(test, feature = "fault-injection")), allow(dead_code))]
+#[cfg_attr(
+    not(any(test, feature = "fault-injection")),
+    allow(dead_code, unreachable_pub)
+)]
 pub fn live_sessions() -> usize {
     LIVE.load(Ordering::Acquire)
 }

@@ -1,7 +1,7 @@
 #![cfg(windows)]
 
-use std::sync::{Arc, Mutex, PoisonError};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use crossbeam_channel::unbounded;
@@ -44,7 +44,11 @@ fn a_timed_out_setup_exits_when_it_wakes_and_the_next_start_works() {
     assert_eq!(live_sessions(), 1, "the stalled thread is still running");
     drop(armed);
     let session = start().expect("the next start works");
-    assert_eq!(live_sessions(), 1, "the next start overlapped the stalled thread");
+    assert_eq!(
+        live_sessions(),
+        1,
+        "the next start overlapped the stalled thread"
+    );
     session.stop();
     assert_eq!(live_sessions(), 0);
 }

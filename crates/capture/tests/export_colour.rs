@@ -90,7 +90,9 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 fn sps_of(file: &[u8]) -> Vec<u8> {
-    let at = find(file, b"avcC").expect("avcC box");
+    let Some(at) = find(file, b"avcC") else {
+        panic!("avcC box");
+    };
     let length = usize::from(u16::from_be_bytes([file[at + 10], file[at + 11]]));
     file[at + 12..at + 12 + length].to_vec()
 }

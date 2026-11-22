@@ -217,8 +217,8 @@ struct Mmcss(Option<HANDLE>);
 impl Mmcss {
     fn enter() -> Self {
         let mut task = 0u32;
-        // SAFETY: the task index pointer refers to a live local u32 and the name is a static wide string.
         match fault!(Mmcss)
+            // SAFETY: the task index pointer refers to a live local u32 and the name is a static wide string.
             .and_then(|()| unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut task) })
         {
             Ok(handle) => Self(Some(handle)),

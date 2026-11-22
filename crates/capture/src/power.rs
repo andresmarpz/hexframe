@@ -34,6 +34,7 @@ impl<A: PowerApi> PowerGuard<A> {
         self.apply(false);
     }
 
+    #[cfg(test)]
     pub(crate) fn is_held(&self) -> bool {
         self.held
     }
@@ -108,8 +109,8 @@ impl PowerApi for WindowsPower {
             if on && let Err(error) = result {
                 // SAFETY: as above.
                 unsafe {
-                    let _ = PowerClearRequest(handle, PowerRequestSystemRequired);
-                    let _ = PowerClearRequest(handle, PowerRequestDisplayRequired);
+                    PowerClearRequest(handle, PowerRequestSystemRequired).ok();
+                    PowerClearRequest(handle, PowerRequestDisplayRequired).ok();
                 }
                 return Err(error);
             }
@@ -122,7 +123,7 @@ impl Drop for WindowsPower {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
             // SAFETY: the handle came from `PowerCreateRequest` and is closed once.
-            let _ = unsafe { CloseHandle(handle) };
+            unsafe { CloseHandle(handle) }.ok();
         }
     }
 }

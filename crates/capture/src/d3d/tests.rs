@@ -12,8 +12,8 @@ fn a_device_limited_to_feature_level_11_0_still_builds_the_capture_objects() {
     let _armed = Armed::new();
     let adapter = warp::adapter().unwrap();
     let gpu = GpuDevice::from_adapter_with_levels(&adapter, &[D3D_FEATURE_LEVEL_11_0]).unwrap();
-    // SAFETY: the device is live and the call only reads its state.
     assert_eq!(
+        // SAFETY: the device is live and the call only reads its state.
         unsafe { gpu.device.GetFeatureLevel() },
         D3D_FEATURE_LEVEL_11_0
     );

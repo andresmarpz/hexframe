@@ -85,8 +85,8 @@ impl Video {
     }
 
     fn step(&mut self) -> Result<(), Exit> {
-        // SAFETY: the device is live and the call only reads its state.
         if let Err(error) = fault!(DeviceRemovedCheck)
+            // SAFETY: the device is live and the call only reads its state.
             .and_then(|()| unsafe { self.gpu.device.GetDeviceRemovedReason() })
         {
             return Err(Exit::Lost(format!("graphics device removed: {error}")));

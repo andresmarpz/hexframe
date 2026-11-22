@@ -428,7 +428,7 @@ fn a_stalled_encoder_fills_the_queue_to_its_bound_and_audio_resumes_in_place_by_
     let hns_per_sec = HNS_PER_SEC as u64;
     let t0 = mono_now();
     let timestamp = |frames: u64| t0 + (frames * hns_per_sec / 48_000) as Hns;
-    let steps = (0..700u64)
+    let steps: Vec<Step> = (0..700u64)
         .map(|index| {
             let jump = if index >= JUMP_AT { JUMP_FRAMES } else { 0 };
             Step::flagged(

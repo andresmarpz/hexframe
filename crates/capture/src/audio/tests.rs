@@ -7,7 +7,8 @@ use super::{
     AudioCounters, AudioTimeline, CHANNELS, CaptureClient, PacketInfo, PcmBlock, RATE, SourceError,
     drain, send_block,
 };
-use crate::clock::{QpcMap, mono_now};
+use crate::clock::QpcMap;
+use greyscreen_core::time::mono_now;
 
 fn block() -> PcmBlock {
     PcmBlock {

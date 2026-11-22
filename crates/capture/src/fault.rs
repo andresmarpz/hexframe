@@ -61,6 +61,7 @@ pub fn pending(point: Point) -> bool {
         .any(|(armed, action)| *armed == point && matches!(action, Action::Stall(_)))
 }
 
+#[derive(Debug)]
 pub struct Armed {
     _serial: MutexGuard<'static, ()>,
 }
