@@ -5,6 +5,7 @@ mod folder;
 mod media_start;
 mod media_stop;
 mod meta;
+mod recording_start;
 mod sidecar;
 mod writer_failure;
 
@@ -49,6 +50,7 @@ pub(crate) enum Internal {
     StartFailed(String),
     UnwantedStopped,
     DiskFree(disk::DiskCheck),
+    FolderCreated(Result<PathBuf, String>),
     MediaStart {
         id: u64,
         result: Result<Box<dyn MediaSession>, String>,
@@ -93,6 +95,7 @@ struct Control {
     stopping: bool,
     started: Option<StartedMedia>,
     recording: Option<Recording>,
+    folder_start: Option<recording_start::PendingFolder>,
     orphan_finalize: bool,
     internal_tx: Sender<Internal>,
     internal_rx: Receiver<Internal>,
@@ -198,6 +201,7 @@ impl Control {
             stopping: false,
             started: None,
             recording: None,
+            folder_start: None,
             orphan_finalize: false,
             internal_tx,
             internal_rx,
@@ -389,6 +393,7 @@ impl Control {
             self.session.state(),
             SessionState::Idle | SessionState::Armed { .. } | SessionState::Cooldown
         ) && self.recording.is_none()
+            && self.folder_start.is_none()
             && self.start.is_none()
             && self.unwanted_stops == 0
             && !self.stopping
@@ -405,6 +410,7 @@ impl Control {
             self.session.state(),
             SessionState::Idle | SessionState::Cooldown
         ) || self.recording.is_some()
+            || self.folder_start.is_some()
             || self.start.is_some()
             || self.unwanted_stops > 0
             || self.stopping

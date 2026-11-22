@@ -1,25 +1,22 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::thread;
 
-use greyscreen_core::clips::{ClipPlanner, DUE_DELAY, MAX_PLAN};
+use greyscreen_core::clips::{DUE_DELAY, MAX_PLAN};
 use greyscreen_core::encoder;
 use greyscreen_core::game::{GameInfo, GameResult, TimedEvent};
 use greyscreen_core::gamedata;
-use greyscreen_core::health::HealthTracker;
 use greyscreen_core::highlight::classify;
-use greyscreen_core::library::{EventEntry, GameRecord, META_VERSION, RecordingMeta, VideoInfo};
+use greyscreen_core::library::EventEntry;
 use greyscreen_core::media::MediaEvent;
 use greyscreen_core::problem::Problem;
 use greyscreen_core::session::{Effect, Input, SessionState, Status};
 use greyscreen_core::time::{Hns, hns_to_secs, mono_now, secs_to_hns};
-use jiff::Zoned;
 
-use super::meta::{self, Recording};
+use super::meta;
 use super::{Control, Internal, StartedMedia};
 use crate::api::{FeedItem, NoticeLevel, RecordingEntry, UiMsg};
 use crate::diagnostics::DiagWriter;
 use crate::library;
-use crate::ring::ClipRing;
 use crate::storage;
 use crate::writer::{GameWriter, VIDEO_FILE};
 
@@ -54,17 +51,18 @@ impl Control {
             since,
             game: game.clone(),
         };
-        match self.begin_recording(since, game) {
-            Ok(()) => self.send(UiMsg::Status(status)),
-            Err(err) => {
-                tracing::error!(%err, "cannot begin recording");
-                self.notice(
-                    NoticeLevel::Error,
-                    Problem::notice("Cannot start recording", &err),
-                );
-                self.feed(Input::MediaFailed(err));
-            }
+        if let Err(err) = self.begin_recording(since, game, status) {
+            self.fail_recording_start(&err);
         }
+    }
+
+    pub(super) fn fail_recording_start(&mut self, err: &str) {
+        tracing::error!(%err, "cannot begin recording");
+        self.notice(
+            NoticeLevel::Error,
+            Problem::notice("Cannot start recording", err),
+        );
+        self.feed(Input::MediaFailed(err.to_owned()));
     }
 
     fn stop_media(&mut self) {
@@ -99,11 +97,18 @@ impl Control {
     fn finalize(&mut self, result: GameResult) {
         match self.recording.as_mut() {
             Some(recording) => recording.result = Some(result),
-            None => self.orphan_finalize = true,
+            None => match self.folder_start.as_mut() {
+                Some(pending) => pending.result = Some(result),
+                None => self.orphan_finalize = true,
+            },
         }
     }
 
-    fn on_highlight(&mut self, event: TimedEvent) {
+    pub(super) fn on_highlight(&mut self, event: TimedEvent) {
+        if let Some(pending) = self.folder_start.as_mut() {
+            pending.highlights.push(event);
+            return;
+        }
         let Some(recording) = self.recording.as_mut() else {
             return;
         };
@@ -140,6 +145,16 @@ impl Control {
                 });
                 self.feed(Input::MediaStarted { t0 });
                 self.started = None;
+            }
+            event @ (MediaEvent::Packet(_)
+            | MediaEvent::Stats(_)
+            | MediaEvent::Setup(_)
+            | MediaEvent::Failed(_))
+                if self.folder_start.is_some() =>
+            {
+                if let Some(pending) = self.folder_start.as_mut() {
+                    pending.events.push(event);
+                }
             }
             MediaEvent::Packet(packet) => {
                 let overflowed = self
@@ -198,6 +213,7 @@ impl Control {
             Internal::MediaStart { id, result, rx } => self.on_media_start(id, result, rx),
             Internal::UnwantedStopped => self.on_unwanted_stopped(),
             Internal::DiskFree(check) => self.on_disk_free(check),
+            Internal::FolderCreated(result) => self.on_folder_created(result),
             Internal::StartFailed(reason) => self.feed(Input::MediaFailed(reason)),
             Internal::WriterFailed(err) => self.on_writer_failed(&err),
             Internal::WriterDone(report) => {
@@ -209,83 +225,7 @@ impl Control {
         }
     }
 
-    fn begin_recording(&mut self, since: Hns, game: Option<GameInfo>) -> Result<(), String> {
-        let started = self
-            .started
-            .take()
-            .ok_or_else(|| "capture started without formats".to_owned())?;
-        let started_at = Zoned::now();
-        let info = game.unwrap_or_else(meta::manual_game);
-        gamedata::report_unmapped_game(&info);
-        let folder = meta::create_folder(&self.settings.output_dir, started_at.clone(), &info)
-            .map_err(|err| format!("{}: {err}", greyscreen_core::problem::FOLDER_UNUSABLE))?;
-        let writer = self.spawn_writer(&folder, &started);
-        let health = HealthTracker::new(
-            since,
-            &started.video,
-            &started.encoder,
-            started.audio.as_ref().map(|a| a.sample_rate),
-        );
-        let diag = self.start_diagnostics(&folder);
-        let meta = RecordingMeta {
-            version: META_VERSION,
-            id: folder_id(&folder),
-            started_at,
-            duration_secs: 0.0,
-            video: if writer.is_some() { VIDEO_FILE } else { "" }.to_owned(),
-            game: GameRecord {
-                info,
-                result: GameResult::Unknown,
-            },
-            events: Vec::new(),
-            clips: Vec::new(),
-            encoder: started.encoder,
-            video_format: VideoInfo {
-                width: started.video.width,
-                height: started.video.height,
-                fps: started.video.fps,
-            },
-            review: Default::default(),
-            health: None,
-            recovered: false,
-        };
-        let rate = started.audio.as_ref().map_or(48_000, |a| a.sample_rate);
-        let mut recording = Recording {
-            meta,
-            folder,
-            t0: since,
-            media_offset_secs: None,
-            ring: ClipRing::new(since, ring_keep(), rate),
-            video: started.video,
-            audio: started.audio,
-            writer,
-            report: None,
-            write_failed: false,
-            result: None,
-            media_stopped: false,
-            dirty: false,
-            last_write: mono_now(),
-            planner: self.settings.clips.enabled.then(|| {
-                ClipPlanner::new(
-                    secs_to_hns(f64::from(self.settings.clips.pre_secs)),
-                    secs_to_hns(f64::from(self.settings.clips.post_secs)),
-                )
-            }),
-            queued: Vec::new(),
-            pending_clips: 0,
-            clips_flushed: false,
-            clip_names: Default::default(),
-            health,
-            diag,
-        };
-        let (folder, meta) = recording.snapshot(mono_now());
-        self.sidecars.queue(folder, meta);
-        self.set_active_folder(Some(folder_id(&recording.folder)));
-        self.recording = Some(recording);
-        Ok(())
-    }
-
-    fn start_diagnostics(&self, folder: &std::path::Path) -> Option<DiagWriter> {
+    pub(super) fn start_diagnostics(&self, folder: &std::path::Path) -> Option<DiagWriter> {
         if !self.settings.recording_diagnostics {
             return None;
         }
@@ -298,7 +238,11 @@ impl Control {
         }
     }
 
-    fn spawn_writer(&self, folder: &std::path::Path, started: &StartedMedia) -> Option<GameWriter> {
+    pub(super) fn spawn_writer(
+        &self,
+        folder: &std::path::Path,
+        started: &StartedMedia,
+    ) -> Option<GameWriter> {
         if !self.settings.record_full_game {
             return None;
         }
@@ -384,14 +328,14 @@ impl Control {
         );
     }
 
-    fn set_active_folder(&self, id: Option<String>) {
+    pub(super) fn set_active_folder(&self, id: Option<String>) {
         if let Ok(mut active) = self.active_folder.lock() {
             *active = id;
         }
     }
 }
 
-fn folder_id(folder: &std::path::Path) -> String {
+pub(super) fn folder_id(folder: &std::path::Path) -> String {
     folder
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())

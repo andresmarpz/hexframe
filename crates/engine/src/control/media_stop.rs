@@ -12,6 +12,14 @@ impl Control {
         }
         self.stopping = false;
         let rx = std::mem::replace(&mut self.media_rx, never());
+        if let Some(pending) = self.folder_start.as_mut() {
+            pending.events.extend(
+                rx.try_iter()
+                    .filter(|e| matches!(e, MediaEvent::Packet(_) | MediaEvent::Stats(_))),
+            );
+            pending.media_stopped = true;
+            return;
+        }
         match self.recording.as_mut() {
             Some(recording) => {
                 let mut overflowed = false;
