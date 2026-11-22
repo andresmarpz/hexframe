@@ -56,6 +56,9 @@ fn verdict(samples: &[Sample], cycles: &[CycleResult], errors: &[String]) -> Ver
 
 fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
     Args {
+        profile: None,
+        list_profiles: false,
+        window: WindowTarget::League,
         cycles,
         seconds: 1,
         gap_secs: 0,
@@ -232,4 +235,50 @@ fn two_engine_cycles_with_the_fake_source_pass_and_write_the_report() {
 #[test]
 fn zero_cycles_are_rejected() {
     assert!(args(0, PathBuf::from("x.json"), None).validate().is_err());
+}
+
+fn with_profile(name: &str) -> Args {
+    Args {
+        profile: Some(name.to_owned()),
+        ..args(8, PathBuf::from("x.json"), None)
+    }
+}
+
+#[test]
+fn every_profile_resolves_to_valid_args_with_unique_names() {
+    let mut names = std::collections::HashSet::new();
+    for profile in profiles::PROFILES {
+        assert!(names.insert(profile.name), "duplicate {}", profile.name);
+        let resolved = with_profile(profile.name).resolve().unwrap();
+        resolved.validate().unwrap();
+        match profile.shape {
+            profiles::Shape::Games { minutes } => {
+                assert_eq!(resolved.game_minutes, Some(minutes));
+                assert!(profile.uses_window);
+            }
+            profiles::Shape::Cycles {
+                cycles, seconds, ..
+            } => {
+                assert_eq!((resolved.cycles, resolved.seconds), (cycles, seconds));
+                assert_eq!(resolved.game_minutes, None);
+            }
+        }
+    }
+}
+
+#[test]
+fn a_long_profile_covers_the_three_hour_limit() {
+    let resolved = with_profile("av-180").resolve().unwrap();
+    assert!(resolved.game_minutes.unwrap() > 180);
+    assert!(resolved.warmup_secs >= 300.0);
+}
+
+#[test]
+fn unknown_profiles_and_the_unbuilt_cloaked_window_are_rejected() {
+    assert!(with_profile("nope").resolve().is_err());
+    let mut cloaked = with_profile("game-30");
+    cloaked.window = WindowTarget::Cloaked;
+    assert!(cloaked.resolve().is_err());
+    cloaked.profile = Some("smoke".to_owned());
+    assert!(cloaked.resolve().is_ok());
 }

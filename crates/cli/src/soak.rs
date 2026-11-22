@@ -1,5 +1,6 @@
 mod check;
 mod meter;
+mod profiles;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -20,6 +21,7 @@ use serde::Serialize;
 
 use check::{CycleResult, Limits, Run, Sample, Verdict, evaluate};
 use meter::Meter;
+use profiles::WindowTarget;
 
 const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
 const SAVE_GRACE: Duration = Duration::from_secs(90);
@@ -28,6 +30,15 @@ const MIN_GAME_VIDEO_SECS: f64 = 1.0;
 
 #[derive(clap::Args, Debug, Clone)]
 pub(crate) struct Args {
+    #[arg(
+        long,
+        conflicts_with_all = ["cycles", "seconds", "gap_secs", "game_minutes", "warmup_secs", "warmup_cycles", "max_mem_mb_per_min", "max_gpu_mb_per_min", "max_handle_growth", "max_thread_growth"]
+    )]
+    pub(crate) profile: Option<String>,
+    #[arg(long)]
+    pub(crate) list_profiles: bool,
+    #[arg(long, value_enum, default_value = "league")]
+    pub(crate) window: WindowTarget,
     #[arg(long, default_value_t = 8)]
     pub(crate) cycles: u32,
     #[arg(long, default_value_t = 30)]
@@ -101,6 +112,11 @@ pub(crate) fn run(args: &Args) -> ExitCode {
 }
 
 fn start(args: &Args) -> Result<bool> {
+    if args.list_profiles {
+        println!("{}", profiles::describe());
+        return Ok(true);
+    }
+    let args = &args.resolve()?;
     args.validate()?;
     #[cfg(windows)]
     crate::init_windows();
