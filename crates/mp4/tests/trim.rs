@@ -444,3 +444,40 @@ fn trim_keeps_the_audio_start_of_a_source_with_early_audio() {
         "source {source_gap} cut {cut_gap}"
     );
 }
+
+fn late_audio_source(dir: &TempDir, name: &str) -> PathBuf {
+    let media = media();
+    let all: Vec<Arc<Packet>> = packets(&media, 2, true)
+        .into_iter()
+        .map(|mut p| {
+            if p.track == Track::Audio {
+                p.dts += 24_000;
+                p.pts += 24_000;
+            }
+            Arc::new(p)
+        })
+        .collect();
+    let path = dir.join(name);
+    write_clip(&path, &media.video_format, Some(&media.audio_format), &all)
+        .unwrap_or_else(|e| panic!("write source: {e}"));
+    path
+}
+
+#[test]
+fn trim_keeps_the_audio_start_of_a_source_with_late_audio() {
+    require_ffmpeg!();
+    let dir = TempDir::new("trim-late-audio");
+    let from = late_audio_source(&dir, "source.mp4");
+    let source_gap = stream_start_secs(&from, "a") - stream_start_secs(&from, "v");
+    assert!((source_gap - 0.5).abs() < 0.01, "source {source_gap}");
+
+    let path = dir.join("cut.mp4");
+    trim(&from, &path, 0.0, 100.0).unwrap_or_else(|e| panic!("trim: {e}"));
+    assert_decodes_cleanly(&path);
+
+    let cut_gap = stream_start_secs(&path, "a") - stream_start_secs(&path, "v");
+    assert!(
+        (source_gap - cut_gap).abs() < 0.001,
+        "source {source_gap} cut {cut_gap}"
+    );
+}
