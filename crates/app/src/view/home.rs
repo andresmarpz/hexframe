@@ -155,7 +155,7 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         .grow(1.0)
         .min_w(0.0)
         .gap(10.0)
-        .child(h.pill)
+        .child(h.pill.self_start())
         .child(
             col()
                 .gap(2.0)

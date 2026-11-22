@@ -38,7 +38,13 @@ pub(crate) fn busy_label_content(
     let overlay = busy.then(|| {
         el().pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
             .center()
-            .child(Spinner::new().size(SPINNER_SIZE).build(k).key(spinner_key))
+            .child(
+                Spinner::new()
+                    .size(SPINNER_SIZE)
+                    .color(ink)
+                    .build(k)
+                    .key(spinner_key),
+            )
     });
     el().center().child(label_el).children(overlay)
 }

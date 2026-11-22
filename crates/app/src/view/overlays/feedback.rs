@@ -211,11 +211,14 @@ fn footer(f: &FeedbackUi, k: &Kit) -> El {
             Button::new("Send")
                 .variant(ButtonVariant::Contrast)
                 .control_size(ControlSize::Large)
-                .disabled(sending)
                 .label_with(move |font, ink| {
                     busy_label_content(&kit, "Send", sending, "feedback-spinner", font, ink)
                 })
-                .on_press(|ui: &mut Ui| ui.submit_feedback())
+                .on_press(move |ui: &mut Ui| {
+                    if !sending {
+                        ui.submit_feedback();
+                    }
+                })
                 .build(k)
                 .key("feedback-send"),
         );

@@ -16,6 +16,9 @@ const IDLE_WIDTH: f32 = 128.0;
 const RECORDING_WIDTH: f32 = 252.0;
 const SLIDE: f32 = HEIGHT + BOTTOM_GAP + 8.0;
 const HOVER_ZONE: f32 = 104.0;
+const FRAME: f32 = 8.0;
+const REVIEW_PADDING: f32 = 16.0;
+pub(in crate::view) const REVIEW_ROOM: f32 = CLEARANCE - FRAME - REVIEW_PADDING;
 const BLUR: f32 = 18.0;
 const GLASS_ALPHA: f32 = 0.78;
 

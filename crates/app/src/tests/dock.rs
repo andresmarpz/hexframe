@@ -160,9 +160,14 @@ fn the_dock_stays_while_a_game_is_open_and_paused() {
 }
 
 #[test]
-fn the_dock_overlays_review_without_reserving_layout_space() {
+fn the_dock_clears_review_controls_without_dynamic_reserve() {
     let rt = reviewing();
-    assert!(rt.find("dock").is_some());
+    let dock = nav_rect_of(&rt, "dock");
+    let play = nav_rect_of(&rt, "review-play");
+    assert!(
+        play[1] + play[3] <= dock[1],
+        "play {play:?} sits under dock {dock:?}"
+    );
     assert!(rt.find("dock-reserve").is_none());
 }
 

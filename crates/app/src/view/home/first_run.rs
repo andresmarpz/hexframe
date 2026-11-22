@@ -84,7 +84,6 @@ fn test_step(s: &Ui, k: &Kit) -> El {
             let button = Button::new(TEST_BUTTON_LABEL)
                 .variant(ButtonVariant::Outline)
                 .control_size(ControlSize::Large)
-                .disabled(true)
                 .label_with(move |font, ink| {
                     busy_label_content(
                         &kit,

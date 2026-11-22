@@ -1,8 +1,9 @@
+use greyscreen_core::settings::NavStyle;
 use rune::{El, Transition, col, row};
 use rune_kit::{Divider, Kit, Page, Toolbar};
 
 use super::layout::{fixed_content, scrolling_content};
-use super::{clips, games, home, review};
+use super::{clips, games, home, review, shell};
 use crate::ui::{Detail, Screen, Ui};
 
 fn settled(el: El) -> El {
@@ -67,5 +68,10 @@ fn games_screen(s: &Ui, k: &Kit, inset: f32, review_width: Option<f32>) -> El {
 }
 
 fn review_page(s: &Ui, k: &Kit, width: Option<f32>) -> El {
-    review::page(s, k, width)
+    let page = review::page(s, k, width);
+    if s.settings.nav_style == NavStyle::Dock {
+        page.pb(shell::dock::REVIEW_ROOM)
+    } else {
+        page
+    }
 }

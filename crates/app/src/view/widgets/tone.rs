@@ -21,7 +21,6 @@ pub(crate) fn status_pill(
     dot_color: Option<Color>,
 ) -> El {
     let mut pill = row()
-        .self_start()
         .h(22.0)
         .px(10.0)
         .gap(6.0)
