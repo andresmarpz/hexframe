@@ -88,6 +88,26 @@ fn clip_file_name_uses_minutes_and_seconds() {
 }
 
 #[test]
+fn clip_names_always_end_in_mp4_whatever_the_label() {
+    for label in ["MyKill", "", "!!", "a.b.avi", "Kill+Death", "../x"] {
+        let name = clip_file_name(10.0, label);
+        assert!(name.ends_with(".mp4"), "{name}");
+        assert!(!name.contains(".avi"), "{name}");
+    }
+}
+
+#[test]
+fn sanitising_strips_separators_and_spaces() {
+    assert_eq!(sanitize("Lee Sin", "x"), "LeeSin");
+    assert_eq!(sanitize("a/b\\c:d*e?f\"g<h>i|j", "x"), "abcdefghij");
+    assert_eq!(sanitize("  \t ", "Fallback"), "Fallback");
+    assert_eq!(sanitize("Kha'Zix", "x"), "KhaZix");
+    assert_eq!(sanitize("a+b", "x"), "a-b");
+    let clean = sanitize("My Clip (1)/2", "x");
+    assert!(!clean.contains([' ', '/', '\\', '(', ')']));
+}
+
+#[test]
 fn meta_round_trips_through_disk() {
     let dir = tempfile::tempdir().unwrap();
     let original = meta("a", zoned(20, 19));

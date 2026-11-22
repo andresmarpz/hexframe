@@ -239,6 +239,18 @@ fn exporting_twice_keeps_both_files() {
 }
 
 #[test]
+fn exporting_into_the_source_folder_never_touches_the_source() {
+    let scratch = scratch();
+    let before = std::fs::read(&scratch.source).unwrap();
+    let mut here = job(&scratch, ExportPreset::Original, 1.0, 3.0);
+    here.dest_dir = scratch.source.parent().unwrap().to_path_buf();
+    here.stem = "game".into();
+    let saved = done(run_job(&here, &Fake::writing(&[])).0);
+    assert_eq!(saved.path.file_name().unwrap(), "game (2).mp4");
+    assert_eq!(std::fs::read(&scratch.source).unwrap(), before);
+}
+
+#[test]
 fn a_source_that_was_deleted_says_so() {
     let scratch = scratch();
     std::fs::remove_file(&scratch.source).unwrap();

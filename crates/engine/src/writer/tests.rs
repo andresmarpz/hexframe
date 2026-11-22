@@ -62,6 +62,19 @@ fn rename_retries_until_the_target_is_free() {
 }
 
 #[test]
+fn rename_replaces_an_existing_target_file() {
+    let dir = test_dir("rename-over");
+    let part = dir.join(PART_FILE);
+    let target = dir.join(VIDEO_FILE);
+    fs::write(&part, b"new").unwrap();
+    fs::write(&target, b"old").unwrap();
+    assert!(rename_with_retry(&part, &target).is_ok());
+    assert_eq!(fs::read(&target).unwrap(), b"new");
+    assert!(!part.exists());
+    fs::remove_dir_all(dir).ok();
+}
+
+#[test]
 fn rename_gives_up_after_five_attempts() {
     let dir = test_dir("rename-fail");
     let part = dir.join(PART_FILE);

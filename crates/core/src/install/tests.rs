@@ -45,6 +45,22 @@ fn run_command_quotes_the_exe_and_starts_hidden() {
 }
 
 #[test]
+fn commands_quote_paths_with_spaces_and_parentheses() {
+    let exe = Path::new(r"C:\Program Files (x86)\Greyscreen\greyscreen.exe");
+    assert_eq!(
+        run_command(exe),
+        r#""C:\Program Files (x86)\Greyscreen\greyscreen.exe" --hidden"#
+    );
+    assert!(
+        uninstall_command(exe).starts_with(r#""C:\Program Files (x86)\Greyscreen\greyscreen.exe" "#)
+    );
+    assert_eq!(
+        cleanup_command(Path::new(r"C:\Users\Jo (work)\Greyscreen")),
+        r#"ping 127.0.0.1 -n 3 >nul & rmdir /s /q "C:\Users\Jo (work)\Greyscreen""#
+    );
+}
+
+#[test]
 fn uninstall_entry_has_the_expected_values() {
     let values = uninstall_values(
         Path::new("/p/greyscreen.exe"),

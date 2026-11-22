@@ -60,6 +60,47 @@ fn folder_and_disk_errors_are_told_apart_and_disk_wins() {
 }
 
 #[test]
+fn a_folder_that_refuses_writes_is_an_unusable_folder() {
+    for cause in [
+        "Permission denied (os error 13)",
+        "Access is denied. (os error 5)",
+        "The system cannot find the path specified. (os error 3)",
+        "Not a directory (os error 20)",
+    ] {
+        assert_eq!(
+            Problem::from_error(&format!("{FOLDER_UNUSABLE}: D:\\Games: {cause}")),
+            Problem::FolderUnusable,
+            "{cause}"
+        );
+    }
+}
+
+#[test]
+fn a_full_disk_is_told_from_an_access_error() {
+    for raw in [
+        "There is not enough space on the disk. (os error 112)",
+        "No space left on device (os error 28)",
+        "The disk is full",
+    ] {
+        assert_eq!(Problem::from_error(raw), Problem::LowDisk, "{raw}");
+    }
+    for raw in ["Access is denied. (0x80070005)", "access is denied"] {
+        assert_eq!(Problem::from_error(raw), Problem::CaptureBlocked, "{raw}");
+    }
+}
+
+#[test]
+fn a_notice_for_an_unusable_folder_says_to_choose_another() {
+    let raw = format!("{FOLDER_UNUSABLE}: D:\\Games: Access is denied");
+    assert_eq!(
+        Problem::notice("Recording failed", &raw),
+        "Can't save to the recordings folder. Choose another recordings folder."
+    );
+    assert!(Problem::FolderUnusable.offers_folder());
+    assert!(Problem::LowDisk.offers_folder());
+}
+
+#[test]
 fn every_problem_has_unique_anchor_and_plain_text() {
     let mut anchors: Vec<&str> = Problem::ALL.iter().map(|p| p.anchor()).collect();
     anchors.sort_unstable();
