@@ -387,3 +387,33 @@ fn an_encoder_that_opens_and_never_outputs_moves_on_before_the_watchdog_limit() 
         "the session ended instead of moving to the next candidate"
     );
 }
+
+fn run_built(flags: Flags) -> (std::thread::JoinHandle<()>, Receiver<MediaEvent>) {
+    let (tx, rx) = unbounded();
+    let runner = std::thread::spawn(move || {
+        match build(&CaptureTarget::PrimaryMonitor, &config(), tx, flags) {
+            Ok(video) => video.run(),
+            Err(message) => panic!("setup failed: {message}"),
+        }
+    });
+    (runner, rx)
+}
+
+#[test]
+fn a_panic_in_the_video_loop_unwinds_and_the_next_start_works() {
+    let armed = Armed::new().panic(Point::VideoLoopStep);
+    let (doomed, _events) = run_built(Flags::default());
+    assert!(
+        doomed.join().is_err(),
+        "the injected panic did not reach the loop"
+    );
+    drop(armed);
+    let _armed = Armed::new();
+    let flags = Flags::default();
+    let stop = flags.stop.clone();
+    let (next, events) = run_built(flags);
+    let first = events.recv_timeout(Duration::from_secs(20));
+    stop.store(true, std::sync::atomic::Ordering::Release);
+    next.join().unwrap();
+    assert!(first.is_ok(), "the next start produced nothing");
+}

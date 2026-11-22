@@ -87,6 +87,7 @@ impl Video {
     }
 
     fn step(&mut self) -> Result<(), Exit> {
+        let _ = fault!(VideoLoopStep);
         if let Err(error) = fault!(DeviceRemovedCheck)
             // SAFETY: the device is live and the call only reads its state.
             .and_then(|()| unsafe { self.gpu.device.GetDeviceRemovedReason() })

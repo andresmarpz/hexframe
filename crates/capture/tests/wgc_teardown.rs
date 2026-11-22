@@ -306,3 +306,91 @@ fn a_window_that_is_gone_gives_an_error_not_a_panic() {
     let started = WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS);
     assert!(started.is_err(), "a destroyed window was captured");
 }
+
+const CLOSE_FAILED: [&str; 2] = ["close capture session failed", "close frame pool failed"];
+
+#[test]
+#[ignore = "needs the PC: opens a cloaked window and captures it"]
+fn close_errors_on_the_session_and_the_pool_log_once_each_and_clear_the_handles() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
+    let rig = rig();
+    assert!(wait_for_frame(&rig.capture));
+    let pool = rig.capture.frame_pool().expect("a live pool");
+    let probe = rig.capture.probe();
+    let before = (
+        log_count(CLOSE_FAILED[0]),
+        log_count(CLOSE_FAILED[1]),
+        log_count("capture stopped"),
+    );
+    let armed = Armed::new()
+        .fail(Point::CloseSession, E_FAIL)
+        .fail(Point::ClosePool, E_FAIL);
+    rig.capture.stop();
+    drop(armed);
+    assert_eq!(log_count(CLOSE_FAILED[0]) - before.0, 1, "session close");
+    assert_eq!(log_count(CLOSE_FAILED[1]) - before.1, 1, "pool close");
+    assert_eq!(log_count("capture stopped") - before.2, 1, "stop logs once");
+    assert!(!probe.has_frame(), "a frame survived the failed close");
+    drop(pool);
+    assert!(rig.window.close());
+}
+
+#[test]
+#[ignore = "needs the PC: opens a cloaked window and captures it"]
+fn teardown_of_a_capture_without_a_session_does_not_panic() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
+    let _com = ComGuard::mta().expect("COM");
+    log();
+    let window = CloakedWindow::open(640, 360, Reveal::ShownCloaked).expect("cloaked window");
+    let target = window.target();
+    let gpu = GpuDevice::for_target(&target).expect("GPU for the window");
+    let before = log_count("capture stopped");
+    let half = WgcCapture::start_without_session(&gpu, &target, QpcMap::now(), OPTIONS)
+        .expect("half-built capture");
+    assert!(!half.has_frame());
+    half.stop();
+    let dropped = WgcCapture::start_without_session(&gpu, &target, QpcMap::now(), OPTIONS)
+        .expect("half-built capture");
+    drop(dropped);
+    assert_eq!(log_count("capture stopped") - before, 2);
+    assert!(window.close());
+}
+
+#[test]
+#[ignore = "needs the PC: opens a cloaked window and captures it"]
+fn a_panic_that_unwinds_through_the_capture_still_closes_it_and_the_next_start_works() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
+    let rig = rig();
+    assert!(wait_for_frame(&rig.capture));
+    let before = log_count("capture stopped");
+    let probe = rig.capture.probe();
+    let pool = rig.capture.frame_pool().expect("a live pool");
+    let Rig {
+        _com,
+        window,
+        _gpu: gpu,
+        capture,
+    } = rig;
+    let unwound = std::thread::spawn(move || {
+        let _com = ComGuard::mta().expect("COM");
+        let _owned = capture;
+        panic!("video loop panic");
+    })
+    .join();
+    assert!(unwound.is_err());
+    assert_eq!(log_count("capture stopped") - before, 1, "no teardown ran");
+    assert!(!probe.has_frame());
+    let counted = probe.frames_counted();
+    let _ = probe.deliver_frame(&pool);
+    assert_eq!(
+        probe.frames_counted(),
+        counted,
+        "a frame counted after teardown"
+    );
+    assert!(!probe.has_frame(), "a frame published after teardown");
+    let target = window.target();
+    let next = WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("next start");
+    assert!(wait_for_frame(&next), "the next capture gave no frame");
+    next.stop();
+    assert!(window.close());
+}

@@ -26,6 +26,9 @@ pub enum Point {
     GpuPriority,
     StagingMap,
     SingleInstanceEvent,
+    CloseSession,
+    ClosePool,
+    VideoLoopStep,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +36,7 @@ pub enum Action {
     Fail(HRESULT),
     FailAfter(HRESULT, usize),
     Stall(Duration),
+    Panic,
 }
 
 static ARMED: Mutex<Vec<(Point, Action)>> = Mutex::new(Vec::new());
@@ -57,6 +61,7 @@ pub fn hit(point: Point) -> windows::core::Result<()> {
     match action {
         None => Ok(()),
         Some(Action::Fail(code) | Action::FailAfter(code, _)) => Err(Error::from(code)),
+        Some(Action::Panic) => panic!("fault injected at {point:?}"),
         Some(Action::Stall(duration)) => {
             std::thread::sleep(duration);
             Ok(())
@@ -89,6 +94,11 @@ impl Armed {
 
     pub fn fail_after(self, point: Point, skips: usize, code: HRESULT) -> Self {
         armed().push((point, Action::FailAfter(code, skips)));
+        self
+    }
+
+    pub fn panic(self, point: Point) -> Self {
+        armed().push((point, Action::Panic));
         self
     }
 

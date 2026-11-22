@@ -110,6 +110,17 @@ impl PublishProbe {
     }
 }
 
+#[cfg(any(test, feature = "fault-injection"))]
+impl PublishProbe {
+    pub fn deliver_frame(&self, pool: &Direct3D11CaptureFramePool) -> windows::core::Result<()> {
+        self.0.on_frame(pool)
+    }
+
+    pub fn frames_counted(&self) -> u64 {
+        self.0.frames.load(Ordering::Relaxed)
+    }
+}
+
 impl std::fmt::Debug for WgcCapture {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WgcCapture")
@@ -120,6 +131,30 @@ impl std::fmt::Debug for WgcCapture {
 
 impl WgcCapture {
     pub fn start(
+        gpu: &GpuDevice,
+        target: &CaptureTarget,
+        qpc: QpcMap,
+        options: WgcOptions,
+    ) -> Result<Self> {
+        let mut capture = Self::unattached(gpu, target, qpc, options)?;
+        tracing::info!(step = "session", "graphics capture");
+        capture.attach(options)?;
+        let (width, height) = lock(&capture.shared.worker).pool_size;
+        tracing::info!(width, height, "capture started");
+        Ok(capture)
+    }
+
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub fn start_without_session(
+        gpu: &GpuDevice,
+        target: &CaptureTarget,
+        qpc: QpcMap,
+        options: WgcOptions,
+    ) -> Result<Self> {
+        Self::unattached(gpu, target, qpc, options)
+    }
+
+    fn unattached(
         gpu: &GpuDevice,
         target: &CaptureTarget,
         qpc: QpcMap,
@@ -164,7 +199,7 @@ impl WgcCapture {
             frames: AtomicU64::new(0),
         });
 
-        let mut capture = Self {
+        Ok(Self {
             shared: Arc::clone(&shared),
             item: Some(item),
             pool: Some(pool),
@@ -176,15 +211,7 @@ impl WgcCapture {
                 CaptureTarget::PrimaryMonitor => None,
             },
             border_hidden: true,
-        };
-        tracing::info!(step = "session", "graphics capture");
-        capture.attach(options)?;
-        tracing::info!(
-            width = item_size.Width,
-            height = item_size.Height,
-            "capture started"
-        );
-        Ok(capture)
+        })
     }
 
     fn attach(&mut self, options: WgcOptions) -> windows::core::Result<()> {
@@ -280,6 +307,11 @@ impl WgcCapture {
         PublishProbe(Arc::clone(&self.shared))
     }
 
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub fn frame_pool(&self) -> Option<Direct3D11CaptureFramePool> {
+        self.pool.clone()
+    }
+
     pub fn border_hidden(&self) -> bool {
         self.border_hidden
     }
@@ -303,12 +335,12 @@ impl WgcCapture {
             tracing::warn!(%error, "remove closed handler failed");
         }
         if let Some(session) = self.session.take()
-            && let Err(error) = session.Close()
+            && let Err(error) = fault!(CloseSession).and_then(|()| session.Close())
         {
             tracing::warn!(%error, "close capture session failed");
         }
         if let Some(pool) = self.pool.take()
-            && let Err(error) = pool.Close()
+            && let Err(error) = fault!(ClosePool).and_then(|()| pool.Close())
         {
             tracing::warn!(%error, "close frame pool failed");
         }

@@ -70,6 +70,7 @@ fn copy_size(content: (i32, i32), surface_size: (u32, u32)) -> ((u32, u32), (u32
         copier: Some(FrameCopier::new(&gpu).unwrap()),
         thumb: Vec::new(),
         pool_size: (0, 0),
+        stopped: false,
     };
     let content = SizeInt32 {
         Width: content.0,
