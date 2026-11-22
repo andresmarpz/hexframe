@@ -136,6 +136,7 @@ impl Control {
             recovered: false,
         };
         let rate = started.audio.as_ref().map_or(48_000, |a| a.sample_rate);
+        let finalized = result.is_some();
         let mut recording = Recording {
             meta,
             folder,
@@ -168,7 +169,9 @@ impl Control {
         self.sidecars.queue(folder, meta);
         self.set_active_folder(Some(folder_id(&recording.folder)));
         self.recording = Some(recording);
-        self.send(UiMsg::Status(status));
+        if !finalized {
+            self.send(UiMsg::Status(status));
+        }
         for event in events {
             self.on_media(event);
         }
