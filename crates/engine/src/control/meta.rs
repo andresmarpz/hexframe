@@ -110,10 +110,10 @@ impl Recording {
             && self.pending_clips == 0
     }
 
-    pub(super) fn write_sidecar(&mut self, now: Hns) -> Result<(), library::LibraryError> {
+    pub(super) fn snapshot(&mut self, now: Hns) -> (PathBuf, RecordingMeta) {
         self.dirty = false;
         self.last_write = now;
-        library::write_meta(&self.folder, &self.meta)
+        (self.folder.clone(), self.meta.clone())
     }
 
     pub(super) fn sidecar_due(&self, now: Hns) -> bool {

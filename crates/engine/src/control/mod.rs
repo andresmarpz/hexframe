@@ -5,6 +5,7 @@ mod folder;
 mod media_start;
 mod media_stop;
 mod meta;
+mod sidecar;
 mod writer_failure;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -47,7 +48,7 @@ pub(crate) enum Internal {
     ClipDone(ClipResult),
     StartFailed(String),
     UnwantedStopped,
-    DiskFree(Option<u64>),
+    DiskFree(disk::DiskCheck),
     MediaStart {
         id: u64,
         result: Result<Box<dyn MediaSession>, String>,
@@ -98,6 +99,7 @@ struct Control {
     shutting_down: bool,
     test_stop_at: Option<Hns>,
     settings_saver: SettingsSaver,
+    sidecars: sidecar::SidecarWriter,
     updater: Option<UpdateHandle>,
     feedback: Option<FeedbackConfig>,
     update_busy: bool,
@@ -169,6 +171,7 @@ impl Control {
             feedback,
             update_busy: false,
             settings_saver: SettingsSaver::spawn(settings_path, sink.clone()),
+            sidecars: sidecar::SidecarWriter::spawn(),
             hotkeys: hotkeys.unwrap_or_else(|| hotkey::platform(cmd, sink.clone())),
             applied_hotkeys: settings.keymap().global(),
             active_folder,
@@ -334,9 +337,9 @@ impl Control {
         self.check_disk_while_recording();
         if let Some(recording) = self.recording.as_mut()
             && recording.sidecar_due(now)
-            && let Err(err) = recording.write_sidecar(now)
         {
-            tracing::warn!(%err, "cannot write recording sidecar");
+            let (folder, meta) = recording.snapshot(now);
+            self.sidecars.queue(folder, meta);
         }
     }
 

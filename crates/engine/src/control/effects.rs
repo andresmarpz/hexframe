@@ -197,7 +197,7 @@ impl Control {
             Internal::ClipDone(result) => self.on_clip_done(result),
             Internal::MediaStart { id, result, rx } => self.on_media_start(id, result, rx),
             Internal::UnwantedStopped => self.on_unwanted_stopped(),
-            Internal::DiskFree(free) => self.on_disk_free(free),
+            Internal::DiskFree(check) => self.on_disk_free(check),
             Internal::StartFailed(reason) => self.feed(Input::MediaFailed(reason)),
             Internal::WriterFailed(err) => self.on_writer_failed(&err),
             Internal::WriterDone(report) => {
@@ -278,9 +278,8 @@ impl Control {
             health,
             diag,
         };
-        if let Err(err) = recording.write_sidecar(mono_now()) {
-            tracing::warn!(%err, "cannot write recording sidecar");
-        }
+        let (folder, meta) = recording.snapshot(mono_now());
+        self.sidecars.queue(folder, meta);
         self.set_active_folder(Some(folder_id(&recording.folder)));
         self.recording = Some(recording);
         Ok(())
@@ -362,7 +361,8 @@ impl Control {
         recording.diag.take();
         self.set_active_folder(None);
         recording.meta.game.result = recording.result.unwrap_or(GameResult::Unknown);
-        if let Err(err) = recording.write_sidecar(mono_now()) {
+        let (folder, meta) = recording.snapshot(mono_now());
+        if let Err(err) = self.sidecars.write_final(&folder, &meta) {
             tracing::error!(%err, "cannot write final sidecar");
             self.notice(
                 NoticeLevel::Error,

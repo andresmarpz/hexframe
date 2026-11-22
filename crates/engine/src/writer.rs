@@ -53,17 +53,24 @@ impl GameWriter {
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
         let part = folder.join(PART_FILE);
+        let video = video.clone();
+        let audio = audio.cloned();
         match fault::active().then(|| fault::limit().unwrap_or(u64::MAX)) {
             Some(limit) => {
-                let file = fault::LimitedFile::create(&part, limit).map_err(|e| e.to_string())?;
-                let writer =
-                    FragmentedWriter::with_sink(file, video, audio).map_err(|e| e.to_string())?;
-                Self::spawn_writer(writer, folder, queue, on_failed, on_done)
+                let open = move || {
+                    let file =
+                        fault::LimitedFile::create(&part, limit).map_err(|e| e.to_string())?;
+                    FragmentedWriter::with_sink(file, &video, audio.as_ref())
+                        .map_err(|e| e.to_string())
+                };
+                Self::spawn_writer(open, folder, queue, on_failed, on_done)
             }
             None => {
-                let writer =
-                    FragmentedWriter::create(&part, video, audio).map_err(|e| e.to_string())?;
-                Self::spawn_writer(writer, folder, queue, on_failed, on_done)
+                let open = move || {
+                    FragmentedWriter::create(&part, &video, audio.as_ref())
+                        .map_err(|e| e.to_string())
+                };
+                Self::spawn_writer(open, folder, queue, on_failed, on_done)
             }
         }
     }
@@ -78,12 +85,16 @@ impl GameWriter {
         on_failed: impl FnOnce(String) + Send + 'static,
         on_done: impl FnOnce(Report) + Send + 'static,
     ) -> Result<Self, String> {
-        let writer = FragmentedWriter::with_sink(sink, video, audio).map_err(|e| e.to_string())?;
-        Self::spawn_writer(writer, folder, queue, on_failed, on_done)
+        let video = video.clone();
+        let audio = audio.cloned();
+        let open = move || {
+            FragmentedWriter::with_sink(sink, &video, audio.as_ref()).map_err(|e| e.to_string())
+        };
+        Self::spawn_writer(open, folder, queue, on_failed, on_done)
     }
 
-    fn spawn_writer(
-        writer: FragmentedWriter<impl Sink + Send + 'static>,
+    fn spawn_writer<S: Sink + Send + 'static>(
+        open: impl FnOnce() -> Result<FragmentedWriter<S>, String> + Send + 'static,
         folder: &Path,
         queue: usize,
         on_failed: impl FnOnce(String) + Send + 'static,
@@ -95,8 +106,13 @@ impl GameWriter {
         let thread = thread::Builder::new()
             .name("game-writer".into())
             .spawn(move || {
-                let outcome = catch_unwind(AssertUnwindSafe(|| {
-                    drain(writer, &rx, &part, &target, on_failed)
+                let outcome = catch_unwind(AssertUnwindSafe(|| match open() {
+                    Ok(writer) => drain(writer, &rx, &part, &target, on_failed),
+                    Err(err) => {
+                        tracing::error!(%err, "cannot open the game video");
+                        on_failed(err.clone());
+                        Err(err)
+                    }
                 }));
                 let report = outcome.unwrap_or_else(|_| {
                     tracing::error!("game writer thread panicked");

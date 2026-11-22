@@ -241,10 +241,17 @@ fn a_write_error_that_clears_still_leaves_a_finished_game() {
     let full = Arc::new(AtomicBool::new(false));
     let failed = Arc::new(AtomicBool::new(false));
     let (mut writer, done_rx, dir) = start_game(&full, &failed);
-    for i in 0..5 {
-        if i == 1 {
-            full.store(true, Ordering::SeqCst);
-        }
+    assert_eq!(writer.send(key_packet(0)), Sent::Queued);
+    let opened = Instant::now();
+    while writer.queued() > 0 {
+        assert!(
+            opened.elapsed() < Duration::from_secs(10),
+            "header not written"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    full.store(true, Ordering::SeqCst);
+    for i in 1..5 {
         assert_eq!(writer.send(key_packet(i * 1500)), Sent::Queued);
     }
     let waited = Instant::now();
@@ -516,21 +523,34 @@ fn a_disk_that_panics_still_reports_once_and_drop_joins() {
 }
 
 #[test]
-fn a_failed_spawn_leaves_no_thread_and_no_report() {
-    let dir = test_dir("failed-spawn");
+fn a_header_that_cannot_be_written_reports_the_failure_and_one_report() {
+    let dir = test_dir("failed-header");
     let (done_tx, done_rx) = mpsc::channel();
-    let spawned = GameWriter::spawn_on(
+    let failures = Arc::new(AtomicU32::new(0));
+    let counted = Arc::clone(&failures);
+    let mut writer = GameWriter::spawn_on(
         full_after(0),
         &dir,
         &video_format(),
         None,
         8,
-        |_| {},
+        move |_| {
+            counted.fetch_add(1, Ordering::SeqCst);
+        },
         move |report| {
             done_tx.send(report).ok();
         },
+    )
+    .unwrap();
+    assert!(
+        done_rx
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            .is_err()
     );
-    assert!(spawned.is_err());
+    assert_eq!(failures.load(Ordering::SeqCst), 1);
     assert!(done_rx.recv_timeout(Duration::from_millis(200)).is_err());
+    writer.send(key_packet(0));
+    drop(writer);
     fs::remove_dir_all(dir).ok();
 }
