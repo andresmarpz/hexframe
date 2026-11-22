@@ -130,6 +130,26 @@ fn a_start_that_returns_late_is_stopped_and_the_retry_waits_for_it() {
 }
 
 #[test]
+fn a_retry_waits_for_a_blocked_stop_of_a_late_session() {
+    let (mut media, _probe, _log) = StallsFirstStart::new(Duration::from_millis(300));
+    media.inner = media.inner.blocking_stop(Duration::from_secs(1));
+    let probe = media.inner.probe();
+    let timing = EngineTiming {
+        media_start_deadline: Duration::from_millis(200),
+        retry_delay: Duration::from_millis(300),
+        ..EngineTiming::default()
+    };
+    let harness = start_engine_timed(
+        settings("stall-blocked-stop"),
+        Arc::new(media),
+        ready_game(),
+        timing,
+    );
+    recording_since(&harness.ui);
+    assert_eq!(probe.peak_live_sessions(), 1);
+}
+
+#[test]
 fn a_late_start_with_no_retry_leaves_no_session_running() {
     let (media, probe, _log) = StallsFirstStart::new(Duration::from_millis(600));
     let timing = EngineTiming {
@@ -193,5 +213,7 @@ fn shutdown_during_a_blocked_start_stays_within_the_grace_and_leaves_no_session(
     drop(harness.engine.take());
     let took = began.elapsed();
     assert!(took < Duration::from_secs(3), "{took:?}");
+    assert!(took >= Duration::from_millis(600), "{took:?}");
+    assert_eq!(probe.peak_live_sessions(), 1);
     assert_eq!(probe.live_sessions(), 0);
 }

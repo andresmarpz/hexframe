@@ -24,7 +24,7 @@ pub(super) struct PendingStart {
 
 impl Control {
     pub(super) fn start_media(&mut self, target: CaptureTarget) {
-        if self.start.is_some() {
+        if self.start.is_some() || self.unwanted_stops > 0 {
             self.queued_start = Some(target);
             return;
         }
@@ -45,11 +45,18 @@ impl Control {
         let media = self.media.clone();
         let dir = self.settings.output_dir.clone();
         let internal = self.internal_tx.clone();
+        let sink = self.sink.clone();
         let spawned = thread::Builder::new()
             .name("media-start".into())
             .spawn(move || {
-                if let Some(session) = leftover {
-                    session.stop();
+                if let Some(session) = leftover
+                    && catch_unwind(AssertUnwindSafe(|| session.stop())).is_err()
+                {
+                    tracing::error!("media session panicked while stopping");
+                    sink(UiMsg::Notice {
+                        level: NoticeLevel::Error,
+                        text: "The capture session crashed while stopping.".to_owned(),
+                    });
                 }
                 let started = catch_unwind(AssertUnwindSafe(|| {
                     folder::check_writable(&dir).and_then(|()| media.start(target, cfg, tx))
@@ -120,6 +127,12 @@ impl Control {
 
     pub(super) fn on_unwanted_stopped(&mut self) {
         self.unwanted_stops = self.unwanted_stops.saturating_sub(1);
+        if self.unwanted_stops == 0
+            && self.start.is_none()
+            && let Some(target) = self.queued_start.take()
+        {
+            self.begin_start(target, None);
+        }
     }
 
     fn stop_unwanted(&mut self, session: Box<dyn MediaSession>) {
