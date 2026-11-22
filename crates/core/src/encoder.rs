@@ -152,12 +152,51 @@ pub fn is_encoder_failure(reason: &str) -> bool {
     reason.starts_with(ENCODER_STOPPED) || reason.starts_with(DEVICE_LOST)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Reason {
+    Failed,
+    Crashed,
+    TimedOut,
+}
+
+impl Reason {
+    pub fn is_unsure(self) -> bool {
+        self != Reason::Failed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Probe {
+    pub kind: EncoderKind,
+    pub adapter: String,
+    pub vendor_id: u32,
+    pub driver_version: String,
+    #[serde(skip)]
+    pub luid: u64,
+}
+
+impl Probe {
+    pub fn same_target(&self, other: &Probe) -> bool {
+        self.kind == other.kind
+            && self.adapter == other.adapter
+            && self.driver_version == other.driver_version
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Verdict {
+    pub probe: Probe,
+    pub reason: Option<Reason>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attempt {
     pub kind: EncoderKind,
     pub adapter: String,
     pub vendor_id: u32,
     pub result: Result<String, String>,
+    pub reason: Reason,
 }
 
 impl Attempt {
@@ -182,6 +221,8 @@ pub struct EncoderCheck {
     pub detail: String,
     #[serde(default)]
     pub noticed: bool,
+    #[serde(default)]
+    pub verdicts: Vec<Verdict>,
 }
 
 impl EncoderCheck {
@@ -208,7 +249,29 @@ impl EncoderCheck {
             encoder,
             detail: failures,
             noticed: false,
+            verdicts: Vec::new(),
         }
+    }
+
+    pub fn reusable_for(&self, key: &str) -> bool {
+        self.key == key
+            && match self.outcome {
+                CheckOutcome::Failed => false,
+                CheckOutcome::Hardware => true,
+                CheckOutcome::Software => !self.has_unsure_verdict(),
+            }
+    }
+
+    pub fn has_unsure_verdict(&self) -> bool {
+        self.verdicts
+            .iter()
+            .any(|v| v.reason.is_some_and(Reason::is_unsure))
+    }
+
+    pub fn crashed_before(&self, probe: &Probe) -> bool {
+        self.verdicts
+            .iter()
+            .any(|v| v.reason == Some(Reason::Crashed) && v.probe.same_target(probe))
     }
 
     pub fn settings_line(&self) -> String {

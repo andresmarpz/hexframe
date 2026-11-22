@@ -3,11 +3,20 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use greyscreen_core::encoder::{self, CheckOutcome, EncoderCheck, SOFTWARE_NOTICE};
+use greyscreen_core::encoder::{
+    self, Attempt, CheckOutcome, EncoderCheck, Probe, Reason, SOFTWARE_NOTICE, Verdict,
+};
 use greyscreen_core::media::{CaptureConfig, MediaSource};
 use greyscreen_core::problem::Problem;
 
 use crate::api::{NoticeAction, NoticeLevel, UiMsg};
+
+mod runner;
+
+use runner::run_with_deadline;
+pub use runner::{InProcessRunner, ProbeResult, ProbeRunner};
+
+const PROBE_DEADLINE: Duration = Duration::from_secs(10);
 
 pub struct EncoderCheckSpec {
     pub media: Arc<dyn MediaSource>,
@@ -45,14 +54,25 @@ pub fn spawn_encoder_check(
 }
 
 pub fn run_encoder_check(spec: &EncoderCheckSpec, sink: &dyn Fn(UiMsg)) -> Option<EncoderCheck> {
+    let runner: Arc<dyn ProbeRunner> = Arc::new(InProcessRunner::new(spec.media.clone()));
+    run_with_runner(spec, &runner, PROBE_DEADLINE, sink)
+}
+
+fn run_with_runner(
+    spec: &EncoderCheckSpec,
+    runner: &Arc<dyn ProbeRunner>,
+    deadline: Duration,
+    sink: &dyn Fn(UiMsg),
+) -> Option<EncoderCheck> {
     let fingerprint = spec.media.encoder_fingerprint()?;
     let key = encoder::check_key(&fingerprint, &spec.cfg, &spec.version);
-    let mut check = match load(&spec.cache) {
-        Some(cached) if cached.key == key && cached.outcome != CheckOutcome::Failed => {
+    let previous = record_leftover_crash(spec, load(&spec.cache));
+    let mut check = match previous {
+        Some(cached) if cached.reusable_for(&key) => {
             tracing::info!(encoder = %cached.encoder, "encoder check cached");
             cached
         }
-        _ => fresh(spec, key),
+        previous => fresh(spec, runner, deadline, key, previous.as_ref()),
     };
     sink(UiMsg::Encoder(check.clone()));
     if check.wants_notice() {
@@ -67,25 +87,132 @@ pub fn run_encoder_check(spec: &EncoderCheckSpec, sink: &dyn Fn(UiMsg)) -> Optio
     Some(check)
 }
 
-fn fresh(spec: &EncoderCheckSpec, key: String) -> EncoderCheck {
-    let attempts = spec.media.check_encoders(&spec.cfg, false);
-    for attempt in &attempts {
-        match &attempt.result {
-            Ok(detail) => {
-                tracing::info!(encoder = %attempt.label(), adapter = %attempt.adapter, %detail, "encoder check passed")
-            }
-            Err(error) => {
-                tracing::warn!(encoder = %attempt.label(), adapter = %attempt.adapter, %error, "encoder check failed")
-            }
+fn marker_path(cache: &Path) -> PathBuf {
+    cache.with_extension("running")
+}
+
+fn record_leftover_crash(
+    spec: &EncoderCheckSpec,
+    previous: Option<EncoderCheck>,
+) -> Option<EncoderCheck> {
+    let marker = marker_path(&spec.cache);
+    let Ok(text) = std::fs::read_to_string(&marker) else {
+        return previous;
+    };
+    std::fs::remove_file(&marker).ok();
+    let Ok(probe) = serde_json::from_str::<Probe>(&text) else {
+        tracing::warn!("encoder check marker unreadable");
+        return previous;
+    };
+    tracing::warn!(adapter = %probe.adapter, "the last encoder check crashed");
+    let mut check = previous.unwrap_or_else(|| EncoderCheck {
+        key: String::new(),
+        outcome: CheckOutcome::Failed,
+        encoder: String::new(),
+        detail: String::new(),
+        noticed: false,
+        verdicts: Vec::new(),
+    });
+    check.verdicts.retain(|v| !v.probe.same_target(&probe));
+    check.verdicts.push(Verdict {
+        probe,
+        reason: Some(Reason::Crashed),
+    });
+    save(&spec.cache, &check);
+    Some(check)
+}
+
+fn fresh(
+    spec: &EncoderCheckSpec,
+    runner: &Arc<dyn ProbeRunner>,
+    deadline: Duration,
+    key: String,
+    previous: Option<&EncoderCheck>,
+) -> EncoderCheck {
+    let probes = runner.probes();
+    let marker = marker_path(&spec.cache);
+    let mut attempts = Vec::new();
+    let mut verdicts = Vec::new();
+    for probe in &probes {
+        let outcome = if previous.is_some_and(|p| p.crashed_before(probe)) {
+            Err((
+                Reason::Crashed,
+                "skipped, its check crashed with this driver".to_owned(),
+            ))
+        } else {
+            write_marker(&marker, probe);
+            let outcome = run_with_deadline(runner, &spec.cfg, probe, deadline);
+            std::fs::remove_file(&marker).ok();
+            outcome
+        };
+        let passed = outcome.is_ok();
+        let reason = outcome.as_ref().err().map(|(reason, _)| *reason);
+        verdicts.push(Verdict {
+            probe: probe.clone(),
+            reason,
+        });
+        let attempt = Attempt {
+            kind: probe.kind,
+            adapter: probe.adapter.clone(),
+            vendor_id: probe.vendor_id,
+            reason: reason.unwrap_or(Reason::Failed),
+            result: outcome.map_err(|(_, error)| error),
+        };
+        log_attempt(&attempt);
+        attempts.push(attempt);
+        if passed {
+            break;
         }
     }
-    let check = EncoderCheck::from_attempts(key, &attempts);
+    keep_untried_crashes(&mut verdicts, &probes, previous);
+    let mut check = EncoderCheck::from_attempts(key, &attempts);
+    check.verdicts = verdicts;
+    check.noticed = previous.is_some_and(|p| p.key == check.key && p.noticed);
     match check.outcome {
         CheckOutcome::Failed => tracing::error!(detail = %check.detail, "no video encoder works"),
         _ => tracing::info!(encoder = %check.encoder, "encoder check done"),
     }
     save(&spec.cache, &check);
     check
+}
+
+fn keep_untried_crashes(
+    verdicts: &mut Vec<Verdict>,
+    probes: &[Probe],
+    previous: Option<&EncoderCheck>,
+) {
+    let Some(previous) = previous else { return };
+    for old in &previous.verdicts {
+        let current = probes.iter().any(|p| p.same_target(&old.probe));
+        let tried = verdicts.iter().any(|v| v.probe.same_target(&old.probe));
+        if old.reason == Some(Reason::Crashed) && current && !tried {
+            verdicts.push(old.clone());
+        }
+    }
+}
+
+fn log_attempt(attempt: &Attempt) {
+    match &attempt.result {
+        Ok(detail) => {
+            tracing::info!(encoder = %attempt.label(), adapter = %attempt.adapter, %detail, "encoder check passed")
+        }
+        Err(error) => {
+            tracing::warn!(encoder = %attempt.label(), adapter = %attempt.adapter, reason = ?attempt.reason, %error, "encoder check failed")
+        }
+    }
+}
+
+fn write_marker(path: &Path, probe: &Probe) {
+    let written = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| {
+            let json = serde_json::to_string(probe).map_err(std::io::Error::other)?;
+            std::fs::write(path, json)
+        });
+    if let Err(err) = written {
+        tracing::warn!(%err, "cannot write the encoder check marker");
+    }
 }
 
 fn load(path: &Path) -> Option<EncoderCheck> {

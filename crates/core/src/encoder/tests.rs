@@ -97,6 +97,7 @@ fn attempt(kind: EncoderKind, vendor_id: u32, result: Result<&str, &str>) -> Att
         adapter: "GPU".to_owned(),
         vendor_id,
         result: result.map(str::to_owned).map_err(str::to_owned),
+        reason: Reason::Failed,
     }
 }
 

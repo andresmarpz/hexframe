@@ -71,6 +71,7 @@ fn encoder(outcome: CheckOutcome, name: &str) -> Option<EncoderCheck> {
         encoder: name.to_owned(),
         detail: String::new(),
         noticed: true,
+        verdicts: Vec::new(),
     })
 }
 

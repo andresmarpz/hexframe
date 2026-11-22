@@ -14,7 +14,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
-use greyscreen_core::encoder::Attempt;
+use greyscreen_core::encoder::{Attempt, Probe};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource};
 
 const SETUP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -74,6 +74,14 @@ impl MediaSource for WindowsMediaSource {
 
     fn check_encoders(&self, cfg: &CaptureConfig, every: bool) -> Vec<Attempt> {
         crate::selftest::check(cfg, every)
+    }
+
+    fn encoder_probes(&self) -> Vec<Probe> {
+        crate::selftest::probes()
+    }
+
+    fn probe_encoder(&self, cfg: &CaptureConfig, probe: &Probe) -> Result<String, String> {
+        crate::selftest::probe(cfg, probe)
     }
 }
 

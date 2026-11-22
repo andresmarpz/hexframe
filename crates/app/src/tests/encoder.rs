@@ -15,6 +15,7 @@ fn check(outcome: CheckOutcome, encoder: &str) -> EncoderCheck {
         encoder: encoder.into(),
         detail: String::new(),
         noticed: false,
+        verdicts: Vec::new(),
     }
 }
 

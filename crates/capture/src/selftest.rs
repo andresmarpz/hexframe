@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use greyscreen_core::crop::CropRect;
-use greyscreen_core::encoder::{self, Attempt, Candidate, EncoderKind};
+use greyscreen_core::encoder::{self, Attempt, Candidate, EncoderKind, Probe, Reason};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, encode_size};
 use greyscreen_core::time::HNS_PER_SEC;
 use windows::Win32::Foundation::E_POINTER;
@@ -44,6 +44,7 @@ pub fn check(cfg: &CaptureConfig, every: bool) -> Vec<Attempt> {
             adapter: adapter.map_or_else(String::new, |a| a.name.clone()),
             vendor_id: adapter.map_or(0, |a| a.vendor_id),
             result,
+            reason: Reason::Failed,
         });
         if ok && !every {
             break;
@@ -51,6 +52,33 @@ pub fn check(cfg: &CaptureConfig, every: bool) -> Vec<Attempt> {
     }
     drop(guards);
     attempts
+}
+
+pub fn probes() -> Vec<Probe> {
+    let adapters = adapters::for_target(&CaptureTarget::PrimaryMonitor);
+    encoder::plan(&adapters)
+        .into_iter()
+        .map(|candidate| {
+            let adapter = adapters.iter().find(|a| a.luid == candidate.adapter);
+            Probe {
+                kind: candidate.kind,
+                adapter: adapter.map_or_else(String::new, |a| a.name.clone()),
+                vendor_id: adapter.map_or(0, |a| a.vendor_id),
+                driver_version: adapter.map_or_else(String::new, |a| a.driver_version.clone()),
+                luid: candidate.adapter,
+            }
+        })
+        .collect()
+}
+
+pub fn probe(cfg: &CaptureConfig, probe: &Probe) -> Result<String, String> {
+    let _com = ComGuard::mta().map_err(|e| format!("COM failed: {e}"))?;
+    let _mf = MfGuard::start().map_err(|e| format!("Media Foundation failed: {e}"))?;
+    let candidate = Candidate {
+        adapter: probe.luid,
+        kind: probe.kind,
+    };
+    encode_test_frames(candidate, cfg, primary_size())
 }
 
 fn primary_size() -> (u32, u32) {

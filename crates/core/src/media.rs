@@ -113,6 +113,18 @@ pub trait MediaSource: Send + Sync {
     fn check_encoders(&self, _cfg: &CaptureConfig, _every: bool) -> Vec<crate::encoder::Attempt> {
         Vec::new()
     }
+
+    fn encoder_probes(&self) -> Vec<crate::encoder::Probe> {
+        Vec::new()
+    }
+
+    fn probe_encoder(
+        &self,
+        _cfg: &CaptureConfig,
+        _probe: &crate::encoder::Probe,
+    ) -> Result<String, String> {
+        Err("this source has no encoder probe".into())
+    }
 }
 
 pub trait MediaSession: Send {
