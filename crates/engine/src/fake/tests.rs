@@ -185,12 +185,9 @@ fn fail_after_delay_sends_the_failure_once_the_delay_passed() {
     let deadline = began + Duration::from_secs(2);
     let failed_at = loop {
         assert!(Instant::now() < deadline, "no failure event");
-        match rx.recv_timeout(Duration::from_millis(100)) {
-            Ok(MediaEvent::Failed(message)) => {
-                assert_eq!(message, "late");
-                break began.elapsed();
-            }
-            Ok(_) | Err(_) => {}
+        if let Ok(MediaEvent::Failed(message)) = rx.recv_timeout(Duration::from_millis(100)) {
+            assert_eq!(message, "late");
+            break began.elapsed();
         }
     };
     session.stop();

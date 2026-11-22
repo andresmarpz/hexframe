@@ -2,9 +2,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crossbeam_channel::Sender;
-use greyscreen_core::encoder::{
-    Attempt, EncoderKind, PROBE_FLAG, Probe, Reason, SOFTWARE_NOTICE, Verdict,
-};
+use greyscreen_core::encoder::{Attempt, EncoderKind, Probe, Reason, SOFTWARE_NOTICE, Verdict};
 use greyscreen_core::media::{CaptureTarget, MediaEvent, MediaSession};
 use greyscreen_core::settings::Settings;
 
@@ -478,6 +476,8 @@ fn verdicts_are_saved_in_the_cache() {
 
 #[cfg(unix)]
 mod child {
+    use greyscreen_core::encoder::PROBE_FLAG;
+
     use super::*;
 
     const CHILD_DEADLINE: Duration = Duration::from_millis(500);
