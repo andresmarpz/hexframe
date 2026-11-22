@@ -36,7 +36,7 @@ enum AudioMsg {
 
 pub(crate) struct AudioPipe {
     capture: Option<AudioCapture>,
-    worker: JoinHandle<()>,
+    worker: Option<JoinHandle<()>>,
     rx: Receiver<AudioMsg>,
     t0_tx: Sender<Hns>,
     counters: Arc<AudioCounters>,
@@ -85,7 +85,7 @@ impl AudioPipe {
         };
         Ok(Self {
             capture: Some(capture),
-            worker,
+            worker: Some(worker),
             rx: msg_rx,
             t0_tx,
             counters,
@@ -122,8 +122,21 @@ impl AudioPipe {
         for message in self.rx.iter() {
             packets += forward(message, sink);
         }
-        join(self.worker);
+        if let Some(worker) = self.worker.take() {
+            join(worker);
+        }
         packets
+    }
+}
+
+impl Drop for AudioPipe {
+    fn drop(&mut self) {
+        if let Some(capture) = self.capture.take() {
+            capture.stop();
+        }
+        if let Some(worker) = self.worker.take() {
+            join(worker);
+        }
     }
 }
 

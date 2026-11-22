@@ -345,7 +345,7 @@ fn stopping_before_the_session_starts_returns_at_once_and_sends_nothing() {
 }
 
 #[test]
-fn dropping_the_pipe_without_finish_stops_every_thread() {
+fn dropping_the_pipe_without_finish_joins_every_thread() {
     let client = FakeClient::new(sine_packets(10));
     let stopped = client.stopped();
     let (encoder, alive) = tracked(FakeEncoder::new());
@@ -353,7 +353,10 @@ fn dropping_the_pipe_without_finish_stops_every_thread() {
     pipe.begin(far_future_t0());
     drop(pipe);
     assert!(stopped.load(Ordering::Acquire));
-    wait_until_gone(&alive);
+    assert!(
+        !alive.load(Ordering::Acquire),
+        "the AAC thread was not joined"
+    );
 }
 
 #[test]
@@ -392,10 +395,12 @@ fn an_encoder_failing_on_the_first_block_ends_the_audio_thread_within_a_second_o
     let (sink, rx) = sink();
     pipe.begin(far_future_t0());
     wait_until_gone(&alive);
+    let gone = Instant::now();
+    wait_until_stopped(&stopped);
+    assert!(gone.elapsed() < Duration::from_secs(1));
     let begun = Instant::now();
     let (_, _sink) = finish_within_patience(pipe, sink);
     assert!(begun.elapsed() < Duration::from_secs(2));
-    assert!(stopped.load(Ordering::Acquire));
     assert_eq!(warnings(&rx).len(), 1);
 }
 
@@ -416,21 +421,31 @@ fn an_encoder_failing_on_block_fifty_keeps_the_first_packets_warns_once_and_stop
 }
 
 #[test]
-fn a_stalled_encoder_keeps_the_queue_bounded_and_audio_resumes_in_order() {
-    let mut steps = blocks(700);
-    steps[400] = Step::flagged(
-        sine(64, 400 * 64, 440.0),
-        PacketInfo {
-            discontinuity: true,
-            ..PacketInfo::default()
-        },
-    );
+fn a_stalled_encoder_fills_the_queue_to_its_bound_and_audio_resumes_in_place_by_timestamp() {
+    const PACKET_FRAMES: u64 = 64;
+    const JUMP_FRAMES: u64 = 24_000;
+    const JUMP_AT: u64 = 480;
+    let hns_per_sec = HNS_PER_SEC as u64;
+    let t0 = mono_now();
+    let timestamp = |frames: u64| t0 + (frames * hns_per_sec / 48_000) as Hns;
+    let steps = (0..700u64)
+        .map(|index| {
+            let jump = if index >= JUMP_AT { JUMP_FRAMES } else { 0 };
+            Step::flagged(
+                sine(64, index * PACKET_FRAMES, 440.0),
+                PacketInfo {
+                    timestamp: timestamp(index * PACKET_FRAMES + jump) as u64,
+                    ..PacketInfo::default()
+                },
+            )
+        })
+        .collect();
     let client = FakeClient::new(steps);
     let encoder = FakeEncoder::new().stalling_at(0, Duration::from_secs(2));
     let received = encoder.received();
     let pipe = start(client.open(), encoder.open()).expect("pipe starts");
     let (mut sink, _rx) = sink();
-    pipe.begin(far_future_t0());
+    pipe.begin(t0);
     let mut deepest = 0;
     let until = Instant::now() + Duration::from_millis(1500);
     while Instant::now() < until {
@@ -439,17 +454,23 @@ fn a_stalled_encoder_keeps_the_queue_bounded_and_audio_resumes_in_order() {
         deepest = deepest.max(stats.pcm_queue);
         std::thread::sleep(Duration::from_millis(10));
     }
-    assert!(deepest <= 256);
+    assert_eq!(deepest as usize, super::PCM_QUEUE);
     assert_eq!(drain_until(&pipe, &mut sink, 700), 700);
     let mut stats = CaptureStats::default();
     pipe.fill_stats(&mut stats);
-    assert_eq!(stats.audio_discontinuities, 1);
+    assert_eq!(stats.audio_gaps, 1);
     finish_within_patience(pipe, sink);
-    let blocks = received.lock().expect("received lock");
-    assert_eq!(blocks.len(), 700);
+    let got = received.lock().expect("received lock");
+    assert_eq!(got.len(), 701);
+    let jump_at = JUMP_AT as usize;
+    let jump_start = JUMP_AT * PACKET_FRAMES;
+    assert_eq!(got[jump_at].first_frame, jump_start);
+    assert_eq!(got[jump_at].samples.len(), JUMP_FRAMES as usize * 2);
+    assert!(got[jump_at].samples.iter().all(|sample| *sample == 0));
+    let resumed_at = (timestamp(jump_start + JUMP_FRAMES) - t0) as u64 * 48_000 / hns_per_sec;
+    assert_eq!(got[jump_at + 1].first_frame, resumed_at);
     assert!(
-        blocks
-            .windows(2)
+        got.windows(2)
             .all(|pair| pair[0].first_frame < pair[1].first_frame)
     );
 }
