@@ -170,11 +170,13 @@ struct Soak<'a> {
     engine_errors: Vec<String>,
     gpu: GpuReport,
     pending_folders: Vec<PathBuf>,
+    saved_folders: std::collections::HashSet<PathBuf>,
     recording: bool,
     stopped: bool,
     seed: Option<u64>,
     output_dir: PathBuf,
     clip_saves_failed: u32,
+    clip_saves_skipped: u32,
     window: Option<WindowHandle>,
     window_failures: Vec<String>,
     closing_window: bool,
@@ -195,11 +197,13 @@ impl<'a> Soak<'a> {
             engine_errors: Vec::new(),
             gpu: GpuReport::default(),
             pending_folders: Vec::new(),
+            saved_folders: std::collections::HashSet::new(),
             recording: false,
             stopped: false,
             seed: None,
             output_dir: PathBuf::new(),
             clip_saves_failed: 0,
+            clip_saves_skipped: 0,
             window: None,
             window_failures: Vec::new(),
             closing_window: false,
@@ -247,10 +251,11 @@ impl<'a> Soak<'a> {
             let start = EngineCmd::StartTestRecording {
                 secs: self.args.seconds,
             };
+            let known = self.recording_folders();
             let mut started = self.send(cmd, start);
             let saved_before = self.cycles.len();
             if started && self.args.failed_clip_saves {
-                self.fail_a_clip(cmd);
+                self.fail_a_clip(cmd, &known);
             }
             if started && !self.args.failed_clip_saves {
                 self.drive_window(cmd, index, &mut rng);
@@ -354,6 +359,10 @@ impl<'a> Soak<'a> {
                 self.clip_saves_failed += 1;
                 false
             }
+            UiMsg::Notice { text, .. } if clips::is_clip_skipped(&text) => {
+                self.clip_saves_skipped += 1;
+                false
+            }
             UiMsg::RecordingSaved(entry) => {
                 self.on_saved(&entry);
                 true
@@ -388,6 +397,7 @@ impl<'a> Soak<'a> {
                 .as_deref()
                 .map_or_else(String::new, |p| format!(", problem: {p}"))
         );
+        self.saved_folders.insert(entry.folder.clone());
         self.pending_folders.push(entry.folder.clone());
         self.cycles.push(result);
     }

@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::fs;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
@@ -11,21 +13,36 @@ pub(super) const CLIP_FAILED_NOTICE: &str = "A clip could not be saved";
 const CLIPS_DIR: &str = "clips";
 pub(super) const RECORDING_WAIT: Duration = Duration::from_secs(30);
 const CLIP_WAIT: Duration = Duration::from_secs(20);
-const CLIP_AFTER: Duration = Duration::from_secs(2);
+const CLIP_AFTER: Duration = Duration::from_millis(500);
+const CLIP_ATTEMPTS: u32 = 10;
+const CLIP_SKIPPED_NOTICES: [&str; 2] = ["Nothing is recording", "A clip was skipped"];
+
+pub(super) fn is_clip_skipped(text: &str) -> bool {
+    CLIP_SKIPPED_NOTICES.iter().any(|n| text.starts_with(n))
+}
 const POLL: Duration = Duration::from_millis(200);
 
 impl Soak<'_> {
-    pub(super) fn fail_a_clip(&mut self, cmd: &Sender<EngineCmd>) {
-        if !self.wait_for(RECORDING_WAIT, |soak| soak.recording) {
+    pub(super) fn fail_a_clip(&mut self, cmd: &Sender<EngineCmd>, known: &HashSet<PathBuf>) {
+        if !self.wait_for(RECORDING_WAIT, |soak| {
+            soak.recording && soak.block_clips_folder(known)
+        }) {
             return;
         }
         self.pump(Instant::now() + CLIP_AFTER, false);
-        if !self.block_clips_folder() {
-            return;
-        }
         let before = self.clip_saves_failed;
-        if self.send(cmd, EngineCmd::SaveClipNow) {
-            self.wait_for(CLIP_WAIT, |soak| soak.clip_saves_failed > before);
+        for _ in 0..CLIP_ATTEMPTS {
+            let skipped = self.clip_saves_skipped;
+            if !self.send(cmd, EngineCmd::SaveClipNow) {
+                return;
+            }
+            self.wait_for(CLIP_WAIT, |soak| {
+                soak.clip_saves_failed > before || soak.clip_saves_skipped > skipped
+            });
+            if self.clip_saves_failed > before || !self.recording {
+                return;
+            }
+            self.pump(Instant::now() + CLIP_AFTER, false);
         }
     }
 
@@ -60,16 +77,24 @@ impl Soak<'_> {
         true
     }
 
-    fn block_clips_folder(&self) -> bool {
+    fn block_clips_folder(&self, known: &HashSet<PathBuf>) -> bool {
         let Ok(entries) = fs::read_dir(&self.output_dir) else {
             return false;
         };
-        let newest = entries
+        let fresh = entries
             .filter_map(Result::ok)
-            .filter_map(|e| Some((e.metadata().ok()?, e.path())))
-            .filter(|(meta, _)| meta.is_dir())
-            .filter_map(|(meta, path)| Some((meta.modified().ok()?, path)))
-            .max();
-        newest.is_some_and(|(_, folder)| fs::write(folder.join(CLIPS_DIR), b"").is_ok())
+            .filter(|e| e.metadata().is_ok_and(|meta| meta.is_dir()))
+            .map(|e| e.path())
+            .find(|path| !known.contains(path) && !self.saved_folders.contains(path));
+        fresh.is_some_and(|folder| fs::write(folder.join(CLIPS_DIR), b"").is_ok())
+    }
+
+    pub(super) fn recording_folders(&self) -> HashSet<PathBuf> {
+        fs::read_dir(&self.output_dir)
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .collect()
     }
 }
