@@ -105,7 +105,7 @@ api-test:
 api-check:
     cd apps/api && bun run typecheck && bun run test
 
-# Manual deploy to https://greyscreen-lake.vercel.app with a local build that carries a GitHub token. Pushes to main that touch the site deploy by themselves through Vercel's Git integration.
+# Manual deploy to https://greyscreen-lake.vercel.app with a local build that carries a GitHub token. Pushes to main that touch the site deploy through the web.yml workflow and a Vercel deploy hook; this recipe is the manual fallback.
 web-deploy:
     export VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; vercel pull --yes --environment=production && vercel build --prod --yes
     test -s .vercel/output/static/index.html || { echo "web-deploy: .vercel/output/static/index.html is missing, not deploying" >&2; exit 1; }

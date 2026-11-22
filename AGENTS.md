@@ -53,7 +53,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
 - `just web-build`: build the website into `apps/web/dist`.
 - `just web-check`: `astro check` and a website build.
-- Pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock` deploy the website by themselves through Vercel's Git integration (https://greyscreen-lake.vercel.app); other pushes are skipped.
+- Pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock` deploy the website (https://greyscreen-lake.vercel.app): the GitHub workflow `web.yml` triggers a Vercel deploy hook. Vercel's Git deployments are off, so other pushes create no Vercel deployment.
 - `just web-deploy`: manual fallback, a local authenticated build published to Vercel production, then a URL check. `just release` runs it.
 - `just api-dev`: run the backend (`apps/api`, Cloudflare Worker on Effect and Alchemy) locally in workerd with emulated R2 and D1. No Cloudflare account needed.
 - `just api-test`, `just api-check`: backend tests, and typecheck plus tests. They are not part of `just ci`. See `apps/api/README.md` for deploys.

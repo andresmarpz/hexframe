@@ -4,5 +4,7 @@
   "installCommand": "cd ../.. && bun install --frozen-lockfile",
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../../brand ../../package.json ../../bun.lock"
+  "git": {
+    "deploymentEnabled": false
+  }
 }

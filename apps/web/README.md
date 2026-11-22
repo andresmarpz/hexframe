@@ -60,7 +60,7 @@ Builds the app and renders the scenes with `greyscreen --snap`. The recipe sets 
 
 Vercel project `greyscreen` (team `andresmarpzs-projects`) is connected to `andresmarpz/greyscreen` and publishes https://greyscreen-lake.vercel.app.
 
-- A push to `main` deploys to production. `apps/web/vercel.json` skips the build unless `apps/web/`, `brand/`, `package.json` or `bun.lock` changed in the last commit, so Rust-only pushes show as Canceled.
+- Vercel's Git deployments are off (`git.deploymentEnabled` is false in `apps/web/vercel.json`), so no push creates a deployment by itself. The GitHub workflow `.github/workflows/web.yml` runs on pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock`, and triggers a production deploy through the Vercel deploy hook stored in the `VERCEL_DEPLOY_HOOK` repo secret. Rust-only pushes create nothing on Vercel. The workflow can also be run by hand.
 - Project settings (in Vercel, not in git): root directory `apps/web`, "include source files outside the root directory" on (the site imports `brand/`), Node 24.x. Install, build and output commands live in `apps/web/vercel.json`.
 - `SITE_URL` is set for production only. Preview builds fall back to the production URL in `astro.config.mjs`.
 - `just web-deploy` is the manual path: a local build with a GitHub token, uploaded as a prebuilt production deployment, then a check of five URLs.
