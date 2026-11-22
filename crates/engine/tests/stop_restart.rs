@@ -275,13 +275,16 @@ fn stop_right_after_start_keeps_the_last_packets() {
 
 #[test]
 fn stats_queued_at_stop_reach_the_recording_health() {
-    let media = FakeMediaSource::new().with_speed(20).with_final_torn(7);
+    let mut media = Counting::new(FakeMediaSource::new().with_speed(20).with_final_torn(7));
+    media.hold_after = Some(50);
+    let held = media.held.clone();
     let harness = start_idle(settings("final-stats"), Arc::new(media));
     start_test(&harness, 600);
     recording_since(&harness.ui);
-    thread::sleep(Duration::from_millis(300));
+    thread::sleep(Duration::from_millis(700));
     send(&harness, EngineCmd::StopRecording);
     let entry = wait_saved(&harness);
+    assert!(held.load(Ordering::SeqCst) > 0, "nothing was queued at stop");
     let health = entry.meta.health.as_ref().expect("health");
     assert_eq!(health.frames_torn_dropped, 7);
 }
