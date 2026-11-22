@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use greyscreen_core::media::MediaSource;
+use greyscreen_core::problem::Problem;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{
     Engine, EngineCmd, EngineConfig, EngineStatus, LeagueFactory, NoticeLevel, RecordingEntry,
@@ -176,6 +177,8 @@ struct Soak<'a> {
     clip_saves_failed: u32,
     window: Option<WindowHandle>,
     window_failures: Vec<String>,
+    closing_window: bool,
+    close_failures_seen: u32,
 }
 
 impl<'a> Soak<'a> {
@@ -199,6 +202,8 @@ impl<'a> Soak<'a> {
             clip_saves_failed: 0,
             window: None,
             window_failures: Vec::new(),
+            closing_window: false,
+            close_failures_seen: 0,
         }
     }
 
@@ -335,7 +340,11 @@ impl<'a> Soak<'a> {
                 text,
                 ..
             } => {
-                self.engine_errors.push(text);
+                if self.closing_window && text.starts_with(Problem::LeagueNotFound.title()) {
+                    self.close_failures_seen += 1;
+                } else {
+                    self.engine_errors.push(text);
+                }
                 false
             }
             UiMsg::Notice {
@@ -364,7 +373,13 @@ impl<'a> Soak<'a> {
             }
             None => f64::from(self.args.seconds) * 0.5,
         };
-        let result = judge_recording(index, entry, min_secs);
+        let mut result = judge_recording(index, entry, min_secs);
+        if self.close_failures_seen > 0 {
+            result.capture_errors = result
+                .capture_errors
+                .saturating_sub(self.close_failures_seen);
+            self.close_failures_seen = 0;
+        }
         println!(
             "recording {index}: {:.1} s{}",
             result.video_secs,

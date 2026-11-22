@@ -67,11 +67,14 @@ impl Soak<'_> {
         let Some(window) = &self.window else {
             return;
         };
+        self.closing_window = true;
         if !window.close() {
             self.window_failures
                 .push(format!("recording {index}: the test window did not close"));
         }
-        if self.pump(Instant::now() + CLOSE_GRACE, true) || self.stopped {
+        let ended = self.pump(Instant::now() + CLOSE_GRACE, true) || self.stopped;
+        self.closing_window = false;
+        if ended {
             return;
         }
         self.window_failures.push(format!(

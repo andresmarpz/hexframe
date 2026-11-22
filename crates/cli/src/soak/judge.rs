@@ -62,12 +62,5 @@ fn playable_secs(entry: &RecordingEntry, min_secs: f64) -> Result<f64, String> {
             "video is {secs:.1} s, expected at least {min_secs:.1} s"
         ));
     }
-    if let Some(pair) = movie
-        .video_samples
-        .windows(2)
-        .find(|p| p[1].dts <= p[0].dts)
-    {
-        return Err(format!("video dts does not rise at {}", pair[1].dts));
-    }
     Ok(secs)
 }

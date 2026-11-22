@@ -687,3 +687,79 @@ fn an_audio_trim_after_minute_sixty_fails_and_one_before_does_not() {
             .contains("1 audio trims")
     );
 }
+
+struct ClosingSource {
+    inner: greyscreen_engine::FakeMediaSource,
+    log: WindowLog,
+    reacts: bool,
+}
+
+impl MediaSource for ClosingSource {
+    fn start(
+        &self,
+        target: greyscreen_core::media::CaptureTarget,
+        cfg: greyscreen_core::media::CaptureConfig,
+        out: Sender<greyscreen_core::media::MediaEvent>,
+    ) -> Result<Box<dyn greyscreen_core::media::MediaSession>, String> {
+        let session = self.inner.start(target, cfg, out.clone())?;
+        if self.reacts {
+            let log = Arc::clone(&self.log);
+            std::thread::spawn(move || {
+                for _ in 0..600 {
+                    if log.lock().unwrap().iter().any(|l| l == "close") {
+                        out.send(greyscreen_core::media::MediaEvent::Failed(
+                            "the captured window closed".to_owned(),
+                        ))
+                        .ok();
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+            });
+        }
+        Ok(session)
+    }
+}
+
+fn run_closing(reacts: bool) -> check::Verdict {
+    let dir = std::env::temp_dir().join(format!(
+        "greyscreen-soak-close-{reacts}-{}",
+        std::process::id()
+    ));
+    let mut args = args(1, dir.join("report.json"), Some(dir.join("rec")));
+    args.seconds = 60;
+    args.window_plan = Some(WindowPlan::Closes {
+        min_secs: 1,
+        max_secs: 1,
+    });
+    std::fs::create_dir_all(&dir).unwrap();
+    let (factory, log) = fake_windows();
+    let source = ClosingSource {
+        inner: greyscreen_engine::FakeMediaSource::new(),
+        log,
+        reacts,
+    };
+    let (media, handle) = WindowSource::wrap(Arc::new(source), factory);
+    let verdict = run_with_window(&args, media, default_league(&args), Some(handle)).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    verdict
+}
+
+#[test]
+fn a_noticed_window_close_is_the_expected_result_and_does_not_fail_the_run() {
+    let verdict = run_closing(true);
+    assert!(verdict.passed, "{:?}", verdict.failures);
+}
+
+#[test]
+fn a_recording_that_ignores_its_closed_window_fails_the_run() {
+    let verdict = run_closing(false);
+    assert!(
+        verdict
+            .failures
+            .iter()
+            .any(|f| f.contains("still recording 15 s after its window closed")),
+        "{:?}",
+        verdict.failures
+    );
+}

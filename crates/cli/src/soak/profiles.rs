@@ -166,7 +166,7 @@ pub(crate) const PROFILES: &[Profile] = &[
         setup: "none; needs greyscreen-cli built with --features cloaked-window on Windows; the run fails when a recording keeps running 15 s after its window closed",
         shape: Shape::Window {
             cycles: 200,
-            seconds: 10,
+            seconds: 60,
             plan: Some(WindowPlan::Closes {
                 min_secs: 2,
                 max_secs: 6,
