@@ -1,3 +1,5 @@
+use std::mem::ManuallyDrop;
+
 use windows::Win32::Foundation::E_NOTIMPL;
 use windows::Win32::Media::MediaFoundation::{
     ICodecAPI, IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaEvent,
@@ -8,6 +10,7 @@ use windows::Win32::Media::MediaFoundation::{
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::{GUID, HRESULT, Interface};
 
+use super::reaper::{Parked, park};
 use crate::probe::string_attribute;
 
 pub(crate) type MfResult<T> = windows::core::Result<T>;
@@ -70,10 +73,10 @@ pub(crate) trait Mft: std::fmt::Debug {
 
 #[derive(Debug)]
 pub(super) struct RealMft {
-    transform: IMFTransform,
-    codec: ICodecAPI,
-    events: Option<IMFMediaEventGenerator>,
-    activate: Option<IMFActivate>,
+    transform: ManuallyDrop<IMFTransform>,
+    codec: ManuallyDrop<ICodecAPI>,
+    events: ManuallyDrop<Option<IMFMediaEventGenerator>>,
+    activate: ManuallyDrop<Option<IMFActivate>>,
 }
 
 impl RealMft {
@@ -84,11 +87,33 @@ impl RealMft {
             None => None,
         };
         Ok(Self {
-            transform,
-            codec,
-            events,
-            activate,
+            transform: ManuallyDrop::new(transform),
+            codec: ManuallyDrop::new(codec),
+            events: ManuallyDrop::new(events),
+            activate: ManuallyDrop::new(activate),
         })
+    }
+}
+
+impl Drop for RealMft {
+    fn drop(&mut self) {
+        // SAFETY: drop runs once and no field is used after this point.
+        let (transform, codec, events, activate) = unsafe {
+            (
+                ManuallyDrop::take(&mut self.transform),
+                ManuallyDrop::take(&mut self.codec),
+                ManuallyDrop::take(&mut self.events),
+                ManuallyDrop::take(&mut self.activate),
+            )
+        };
+        if activate.is_some() {
+            park(Parked {
+                _transform: transform,
+                _codec: codec,
+                _events: events,
+                _activate: activate,
+            });
+        }
     }
 }
 
@@ -166,7 +191,7 @@ impl Mft for RealMft {
     }
 
     fn next_event(&self) -> MfResult<IMFMediaEvent> {
-        let Some(events) = &self.events else {
+        let Some(events) = &*self.events else {
             return Err(E_NOTIMPL.into());
         };
         // SAFETY: the event generator is live; NO_WAIT makes the call non-blocking.
@@ -176,7 +201,7 @@ impl Mft for RealMft {
     fn is_supported(&self, property: &GUID) -> HRESULT {
         // SAFETY: the vtable call receives the live interface pointer and a GUID that outlives it.
         unsafe {
-            (Interface::vtable(&self.codec).IsSupported)(Interface::as_raw(&self.codec), property)
+            (Interface::vtable(&*self.codec).IsSupported)(Interface::as_raw(&*self.codec), property)
         }
     }
 
@@ -191,7 +216,7 @@ impl Mft for RealMft {
     }
 
     fn shutdown(&self) {
-        let Some(activate) = &self.activate else {
+        let Some(activate) = &*self.activate else {
             return;
         };
         if let Ok(shutdown) = self.transform.cast::<IMFShutdown>() {
