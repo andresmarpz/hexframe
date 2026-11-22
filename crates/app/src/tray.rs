@@ -47,7 +47,7 @@ pub(crate) struct TrayOwner {
 
 impl TrayOwner {
     pub(crate) fn close(self) {
-        let _ = self.stop.send(());
+        self.stop.send(()).ok();
         if self.thread.join().is_err() {
             tracing::warn!("tray thread panicked");
         }

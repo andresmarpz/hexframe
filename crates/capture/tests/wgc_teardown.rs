@@ -59,8 +59,8 @@ fn log() -> &'static Arc<Mutex<Vec<u8>>> {
 }
 
 fn log_count(needle: &str) -> usize {
-    let text = String::from_utf8_lossy(&log().lock().unwrap_or_else(PoisonError::into_inner))
-        .into_owned();
+    let text =
+        String::from_utf8_lossy(&log().lock().unwrap_or_else(PoisonError::into_inner)).into_owned();
     text.matches(needle).count()
 }
 
@@ -77,8 +77,7 @@ fn rig() -> Rig {
     let window = CloakedWindow::open(640, 360, Reveal::ShownCloaked).expect("cloaked window");
     let target = window.target();
     let gpu = GpuDevice::for_target(&target).expect("GPU for the window");
-    let capture =
-        WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("capture starts");
+    let capture = WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("capture starts");
     Rig {
         _com: com,
         window,
@@ -246,8 +245,7 @@ fn a_failing_frame_callback_logs_once_and_capture_goes_on() {
     let target = window.target();
     let gpu = GpuDevice::for_target(&target).expect("GPU for the window");
     let armed = Armed::new().fail(Point::FrameCopyTexture, E_FAIL);
-    let capture =
-        WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("capture starts");
+    let capture = WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("capture starts");
     std::thread::sleep(FAILING_FOR);
     assert!(!capture.is_closed(), "the failing callback ended capture");
     assert!(!capture.has_frame(), "a failed copy published a frame");

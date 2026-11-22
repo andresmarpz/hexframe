@@ -73,8 +73,11 @@ pub(crate) fn relaunch_if_requested() {
     if !LAUNCH_DURING_QUIT.load(Ordering::SeqCst) {
         return;
     }
-    let spawned = std::env::current_exe()
-        .and_then(|exe| std::process::Command::new(exe).env(RELAUNCH_ENV, "1").spawn());
+    let spawned = std::env::current_exe().and_then(|exe| {
+        std::process::Command::new(exe)
+            .env(RELAUNCH_ENV, "1")
+            .spawn()
+    });
     if let Err(err) = spawned {
         tracing::warn!(%err, "cannot start the copy launched during quit");
     }
