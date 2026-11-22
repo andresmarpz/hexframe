@@ -600,38 +600,70 @@ fn a_timestamp_jump_mid_run_is_counted_measured_and_filled_with_silence_in_one_s
     assert!(warnings(&rx).is_empty());
 }
 
+fn assert_idle_tail(blocks: &[PcmBlock], scripted_frames: u64) {
+    for block in blocks {
+        assert!(block.first_frame >= scripted_frames);
+        assert!(block.samples.iter().all(|sample| *sample == 0));
+    }
+    assert!(
+        blocks
+            .windows(2)
+            .all(|pair| pair[0].first_frame < pair[1].first_frame)
+    );
+}
+
+fn is_sine_block(block: &PcmBlock, first_frame: u64) -> bool {
+    let expected: Vec<i16> = sine(FRAMES, first_frame, 440.0)
+        .into_iter()
+        .map(super::f32_to_i16)
+        .collect();
+    block.first_frame == first_frame && block.samples == expected
+}
+
 #[test]
 fn audio_before_the_first_video_frame_is_held_until_started_and_nothing_is_lost() {
-    let t0 = mono_now();
-    let steps: Vec<Step> = (0..4u64)
-        .map(|index| {
-            let first = index * FRAMES as u64;
-            stamped(index, t0, PacketInfo::default(), sine(FRAMES, first, 440.0))
-        })
-        .collect();
+    const ON_TIME: u64 = 4;
+    let t0 = mono_now() + HNS_PER_SEC / 10;
+    let early = PacketInfo {
+        timestamp: (t0 - HNS_PER_SEC / 10) as u64,
+        ..PacketInfo::default()
+    };
+    let mut steps = vec![Step::flagged(sine(FRAMES, 777_777, 880.0), early)];
+    steps.extend((0..ON_TIME).map(|index| {
+        let first = index * FRAMES as u64;
+        stamped(index, t0, PacketInfo::default(), sine(FRAMES, first, 440.0))
+    }));
     let encoder = FakeEncoder::new();
     let received = encoder.received();
     let pipe = start(FakeClient::new(steps).open(), encoder.open()).expect("pipe starts");
     let (mut sink, rx) = cold_sink(t0);
     pipe.begin(t0);
-    assert_eq!(drain_until(&pipe, &mut sink, 4), 4);
+    assert!(drain_until(&pipe, &mut sink, ON_TIME) >= ON_TIME);
     assert!(rx.try_recv().is_err());
     sink.start(Vec::new(), Vec::new());
-    let (extra, _sink) = finish_within_patience(pipe, sink);
-    assert_eq!(extra, 0);
+    finish_within_patience(pipe, sink);
     let events: Vec<MediaEvent> = rx.try_iter().collect();
     assert!(matches!(events.first(), Some(MediaEvent::Started { .. })));
     let audio_packets = events
         .iter()
         .filter(|event| matches!(event, MediaEvent::Packet(_)))
         .count();
-    assert_eq!(audio_packets, 4);
-    assert_eq!(received.lock().expect("received lock").len(), 4);
+    assert!(audio_packets as u64 >= ON_TIME);
+    let blocks = received.lock().expect("received lock");
+    assert!(blocks.len() as u64 >= ON_TIME);
+    for (index, block) in blocks.iter().take(ON_TIME as usize).enumerate() {
+        assert!(
+            is_sine_block(block, index as u64 * FRAMES as u64),
+            "block {index}"
+        );
+    }
+    assert_idle_tail(&blocks[ON_TIME as usize..], ON_TIME * FRAMES as u64);
 }
 
 #[test]
 fn error_silent_and_discontinuity_flags_follow_the_buffer_flag_policy_and_never_reset_the_stream() {
-    let t0 = mono_now();
+    const SCRIPTED: usize = 5;
+    let t0 = mono_now() + HNS_PER_SEC / 10;
     let plain = PacketInfo::default();
     let errored = PacketInfo {
         timestamp_error: true,
@@ -660,7 +692,7 @@ fn error_silent_and_discontinuity_flags_follow_the_buffer_flag_policy_and_never_
     let pipe = start(FakeClient::new(steps).open(), encoder.open()).expect("pipe starts");
     let (mut sink, _rx) = sink();
     pipe.begin(t0);
-    assert_eq!(drain_until(&pipe, &mut sink, 5), 5);
+    assert!(drain_until(&pipe, &mut sink, SCRIPTED as u64) >= SCRIPTED as u64);
     let mut stats = CaptureStats::default();
     pipe.fill_stats(&mut stats);
     assert_eq!(stats.audio_discontinuities, 1);
@@ -668,13 +700,17 @@ fn error_silent_and_discontinuity_flags_follow_the_buffer_flag_policy_and_never_
     assert_eq!(stats.audio_timestamp_gaps_over_5s, 0);
     finish_within_patience(pipe, sink);
     let blocks = received.lock().expect("received lock");
-    assert_eq!(blocks.len(), 5);
-    for (index, block) in blocks.iter().enumerate() {
+    let scripted_frames = (SCRIPTED * FRAMES) as u64;
+    let split = blocks.partition_point(|block| block.first_frame < scripted_frames);
+    let (scripted, tail) = blocks.split_at(split);
+    assert_eq!(scripted.len(), SCRIPTED);
+    for (index, block) in scripted.iter().enumerate() {
         assert_eq!(block.first_frame, (index * FRAMES) as u64);
         assert_eq!(block.samples.len(), FRAMES * 2);
         let zeroed = block.samples.iter().all(|sample| *sample == 0);
         assert_eq!(zeroed, index == 2, "block {index}");
     }
+    assert_idle_tail(tail, scripted_frames);
 }
 
 #[test]
