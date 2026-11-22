@@ -1,4 +1,4 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::Receiver;
@@ -66,6 +66,17 @@ fn finish_within_patience(pipe: AudioPipe, mut sink: Sink) -> (u64, Sink) {
         tx.send((packets, sink)).ok();
     });
     rx.recv_timeout(PATIENCE).expect("finish hung")
+}
+
+fn wait_until_stopped(stopped: &AtomicBool) {
+    let deadline = Instant::now() + PATIENCE;
+    while !stopped.load(Ordering::Acquire) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        stopped.load(Ordering::Acquire),
+        "capture did not stop by itself"
+    );
 }
 
 fn warnings(rx: &Receiver<MediaEvent>) -> Vec<String> {
@@ -151,16 +162,16 @@ fn slow_encoder_still_delivers_every_packet() {
 #[test]
 fn device_invalidated_ends_capture_and_keeps_earlier_packets() {
     let mut steps = sine_packets(3);
-    steps.push(Step::WaitFails(SourceError::DeviceInvalidated));
+    steps.push(Step::ReadFails(SourceError::DeviceInvalidated));
     let client = FakeClient::new(steps);
     let stopped = client.stopped();
     let pipe = start(client.open(), FakeEncoder::new().open()).expect("pipe starts");
     let (mut sink, _rx) = sink();
     pipe.begin(far_future_t0());
     assert_eq!(drain_until(&pipe, &mut sink, 3), 3);
+    wait_until_stopped(&stopped);
     let (extra, _sink) = finish_within_patience(pipe, sink);
     assert_eq!(extra, 0);
-    assert!(stopped.load(Ordering::Acquire));
 }
 
 #[test]
@@ -169,11 +180,17 @@ fn read_failure_ends_capture_without_hanging() {
     steps.push(Step::ReadFails(SourceError::Failed("scripted".into())));
     steps.extend(sine_packets(2));
     let client = FakeClient::new(steps);
-    let pipe = start(client.open(), FakeEncoder::new().open()).expect("pipe starts");
+    let stopped = client.stopped();
+    let encoder = FakeEncoder::new();
+    let received = encoder.received();
+    let pipe = start(client.open(), encoder.open()).expect("pipe starts");
     let (mut sink, _rx) = sink();
     pipe.begin(far_future_t0());
     assert_eq!(drain_until(&pipe, &mut sink, 2), 2);
-    finish_within_patience(pipe, sink);
+    wait_until_stopped(&stopped);
+    let (extra, _sink) = finish_within_patience(pipe, sink);
+    assert_eq!(extra, 0);
+    assert_eq!(received.lock().expect("received lock").len(), 2);
 }
 
 #[test]
