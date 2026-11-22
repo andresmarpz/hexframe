@@ -17,7 +17,10 @@ impl ProbeResult {
     pub fn into_attempt(self, probe: &Probe) -> Attempt {
         let (result, reason) = match self {
             Self::Passed(detail) => (Ok(detail), Reason::Failed),
-            Self::Failed(error) => (Err(error), Reason::Failed),
+            Self::Failed(error) => {
+                let reason = Reason::of_error(&error);
+                (Err(error), reason)
+            }
             Self::Crashed(error) => (Err(error), Reason::Crashed),
             Self::TimedOut(error) => (Err(error), Reason::TimedOut),
         };
@@ -83,7 +86,7 @@ pub(super) fn run_with_deadline(
     }
     match rx.recv_timeout(deadline) {
         Ok(ProbeResult::Passed(detail)) => Ok(detail),
-        Ok(ProbeResult::Failed(error)) => Err((Reason::Failed, error)),
+        Ok(ProbeResult::Failed(error)) => Err((Reason::of_error(&error), error)),
         Ok(ProbeResult::Crashed(error)) => Err((Reason::Crashed, error)),
         Ok(ProbeResult::TimedOut(error)) => Err((Reason::TimedOut, error)),
         Err(mpsc::RecvTimeoutError::Timeout) => Err((

@@ -1,3 +1,5 @@
+use crate::encoder::{BUSY_HELP, OpenFailure};
+
 pub const FAQ_URL: &str = "https://greyscreen-lake.vercel.app/faq";
 pub const NO_FRAMES: &str = "no frames from the game window";
 pub const DISK_FULL_NOTICE: &str =
@@ -168,6 +170,9 @@ impl Problem {
     pub fn notice(prefix: &str, raw: &str) -> String {
         match Problem::from_error(raw) {
             Problem::Other => format!("{prefix}: {raw}"),
+            Problem::NoEncoder if OpenFailure::from_text(raw) == OpenFailure::Busy => {
+                BUSY_HELP.to_owned()
+            }
             problem => format!("{}. {}", problem.title(), problem.action()),
         }
     }

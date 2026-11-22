@@ -310,6 +310,15 @@ Recommendation: yes, but v2, behind the same trait, as a `Codec` enum value and 
 - Medal offers H.264, H.265 and AV1 (early access) with lower recommended bitrates (1080p: H.265 10-15M, AV1 7-10M vs H.264 15-20M). That is a ~25-50% bitrate saving for the same target quality, which matters for upload, not for local capture.
 - Constraints for later: HEVC/AV1 do not play in every browser or Discord inline, so keep H.264 as default and as the export format.
 
+## Busy encoder and open failures
+
+The NVIDIA Media Foundation encoder has a session limit, and another app (OBS, ShadowPlay, an editor) can use it up. The error it returns at the limit is not measured yet. Out of memory is a guess, and out of memory also means video memory is full.
+
+- Measure: on the PC with no other encoder running, `cargo test -p greyscreen-capture --test encoder_sessions -- --ignored --nocapture`. The first test opens hardware encoders on the NVIDIA adapter one after another until the driver refuses one, and prints the code. The second holds every session, records on the primary monitor and expects the busy warning. Never start OBS or another app for this.
+- Result: **UNMEASURED.** Write the measured codes and the limit here, then put the codes in `BUSY_CODES` in `crates/core/src/encoder.rs`. Until then no code means busy and every failure shows the generic text.
+- Reasons: busy (only the codes in `BUSY_CODES`), start failed (the start-streaming messages), device removed (`DXGI_ERROR_DEVICE_REMOVED`, `DEVICE_HUNG`, `DEVICE_RESET`), unsupported (not asynchronous, not D3D11 aware, the D3D manager refused), input refused (`SetInputType` NV12), other. The error text keeps the step name and the code.
+- A busy result on an NVIDIA hardware candidate shows "Another app is using the video encoder. Close OBS, other recorders and video editors, then try again." The result is never cached as a software outcome, so the next launch checks again.
+
 ## Sources
 
 Microsoft Learn:

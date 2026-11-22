@@ -1,4 +1,4 @@
-use greyscreen_core::encoder::{FAILED_HELP, FAILED_TITLE};
+use greyscreen_core::encoder::FAILED_TITLE;
 use greyscreen_core::problem::Problem;
 use rune::{El, col, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
@@ -7,8 +7,8 @@ use crate::ui::Ui;
 use crate::view::card;
 
 pub(super) fn error_card(s: &Ui, k: &Kit) -> Option<El> {
-    let failed = s.encoder.as_ref().is_some_and(|check| check.failed());
-    failed.then(|| {
+    let check = s.encoder.as_ref().filter(|check| check.failed())?;
+    Some({
         let faq = Button::new("Read the FAQ")
             .variant(ButtonVariant::Neutral)
             .control_size(ControlSize::Large)
@@ -40,7 +40,7 @@ pub(super) fn error_card(s: &Ui, k: &Kit) -> Option<El> {
                             .color(k.c.danger.fg),
                     )
                     .child(
-                        text(FAILED_HELP)
+                        text(check.failed_help())
                             .wrap()
                             .w_full()
                             .font(k.ty.body)

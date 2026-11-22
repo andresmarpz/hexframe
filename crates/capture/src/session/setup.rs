@@ -45,10 +45,11 @@ pub(crate) fn build(
         encoder,
         cfg,
         video_cfg,
+        fallback_warning,
     } = pick::first_working(target, cfg, qpc, &flags)?;
     log_capture_path(frame, client_area.client_size());
     tracing::info!(encoder = %encoder.encoder_name(), "video encoder chosen");
-    let mut warnings = Vec::new();
+    let mut warnings: Vec<String> = fallback_warning.into_iter().collect();
     if !wgc.border_hidden() {
         warnings.push(BORDER_SHOWN.to_owned());
     }

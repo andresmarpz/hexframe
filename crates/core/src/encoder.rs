@@ -8,6 +8,7 @@ pub const SOFTWARE_LABEL: &str = "Windows software encoder";
 pub const SOFTWARE_NOTICE: &str = "Your graphics card's video encoder didn't work, so Greyscreen records with the Windows software encoder. It uses more CPU and records at up to 1080p 30 fps.";
 pub const FAILED_TITLE: &str = "No video encoder works on this PC";
 pub const FAILED_HELP: &str = "Greyscreen can't record games until one works. Update your graphics driver from NVIDIA, AMD or Intel, restart your PC, then open Greyscreen again.";
+pub const BUSY_HELP: &str = "Another app is using the video encoder. Close OBS, other recorders and video editors, then try again.";
 const ENCODER_STOPPED: &str = "the video encoder stopped";
 const DEVICE_LOST: &str = "graphics device";
 
@@ -158,12 +159,111 @@ pub enum Reason {
     Failed,
     Crashed,
     TimedOut,
+    Busy,
 }
 
 impl Reason {
     pub fn is_unsure(self) -> bool {
         self != Reason::Failed
     }
+
+    pub fn of_error(error: &str) -> Reason {
+        if OpenFailure::from_text(error) == OpenFailure::Busy {
+            Reason::Busy
+        } else {
+            Reason::Failed
+        }
+    }
+}
+
+pub const BUSY_CODES: &[u32] = &[];
+const DEVICE_REMOVED_CODES: &[u32] = &[0x887A_0005, 0x887A_0006, 0x887A_0007];
+const FAILURE_TAG: &str = "[open failure: ";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenFailure {
+    Busy,
+    StartFailed,
+    DeviceRemoved,
+    Unsupported,
+    InputRefused,
+    Other,
+}
+
+impl OpenFailure {
+    pub const ALL: [OpenFailure; 6] = [
+        OpenFailure::Busy,
+        OpenFailure::StartFailed,
+        OpenFailure::DeviceRemoved,
+        OpenFailure::Unsupported,
+        OpenFailure::InputRefused,
+        OpenFailure::Other,
+    ];
+
+    pub fn from_code(code: u32, fallback: OpenFailure) -> OpenFailure {
+        Self::from_code_with(code, fallback, BUSY_CODES)
+    }
+
+    pub fn from_code_with(code: u32, fallback: OpenFailure, busy: &[u32]) -> OpenFailure {
+        if busy.contains(&code) {
+            OpenFailure::Busy
+        } else if DEVICE_REMOVED_CODES.contains(&code) {
+            OpenFailure::DeviceRemoved
+        } else {
+            fallback
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            OpenFailure::Busy => "busy",
+            OpenFailure::StartFailed => "start failed",
+            OpenFailure::DeviceRemoved => "device removed",
+            OpenFailure::Unsupported => "unsupported",
+            OpenFailure::InputRefused => "input refused",
+            OpenFailure::Other => "other",
+        }
+    }
+
+    pub fn tag(self, detail: &str) -> String {
+        format!("{detail} {FAILURE_TAG}{}]", self.name())
+    }
+
+    pub fn from_text(text: &str) -> OpenFailure {
+        let found: Vec<OpenFailure> = text
+            .split(FAILURE_TAG)
+            .skip(1)
+            .filter_map(|rest| {
+                let name = rest.split(']').next()?;
+                Self::ALL.into_iter().find(|f| f.name() == name)
+            })
+            .collect();
+        if found.contains(&OpenFailure::Busy) {
+            OpenFailure::Busy
+        } else {
+            found.first().copied().unwrap_or(OpenFailure::Other)
+        }
+    }
+
+    pub fn is_busy_on(self, vendor_id: u32) -> bool {
+        self == OpenFailure::Busy && vendor_id == VENDOR_NVIDIA
+    }
+
+    pub fn help(self, vendor_id: u32) -> &'static str {
+        if self.is_busy_on(vendor_id) {
+            BUSY_HELP
+        } else {
+            FAILED_HELP
+        }
+    }
+}
+
+pub fn fallback_warning(kind: EncoderKind, failed: &[(OpenFailure, u32)]) -> Option<String> {
+    if kind != EncoderKind::Software || failed.is_empty() {
+        return None;
+    }
+    let busy = failed.iter().any(|(f, vendor)| f.is_busy_on(*vendor));
+    Some(if busy { BUSY_HELP } else { SOFTWARE_NOTICE }.to_owned())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -350,6 +450,28 @@ impl EncoderCheck {
 
     pub fn wants_notice(&self) -> bool {
         self.outcome == CheckOutcome::Software && !self.noticed
+    }
+
+    pub fn busy_encoder(&self) -> bool {
+        self.verdicts
+            .iter()
+            .any(|v| v.reason == Some(Reason::Busy) && v.probe.vendor_id == VENDOR_NVIDIA)
+    }
+
+    pub fn notice_text(&self) -> &'static str {
+        if self.busy_encoder() {
+            BUSY_HELP
+        } else {
+            SOFTWARE_NOTICE
+        }
+    }
+
+    pub fn failed_help(&self) -> &'static str {
+        if self.busy_encoder() {
+            BUSY_HELP
+        } else {
+            FAILED_HELP
+        }
     }
 
     pub fn failed(&self) -> bool {

@@ -1,3 +1,4 @@
+use super::open_error::{self, Step};
 use super::rate::{self, RateMode};
 use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, LUID, S_OK};
 use windows::Win32::Media::MediaFoundation::{
@@ -205,7 +206,7 @@ fn describe(activate: &IMFActivate) -> String {
 }
 
 fn rejected(reason: &str) -> H264Error {
-    H264Error::NoHardwareEncoder(reason.to_string())
+    open_error::unsupported(reason)
 }
 
 fn configure(
@@ -215,7 +216,8 @@ fn configure(
 ) -> Result<Configured> {
     fault!(MftActivation)?;
     // SAFETY: the activate object is live.
-    let transform: IMFTransform = unsafe { activate.ActivateObject()? };
+    let transform: IMFTransform =
+        unsafe { activate.ActivateObject() }.map_err(|e| open_error::at(Step::Activate, &e))?;
     // SAFETY: the transform is live.
     let attributes = unsafe { transform.GetAttributes()? };
     // SAFETY: the attribute store is live.
@@ -250,13 +252,14 @@ fn configure(
         output_type.SetUINT32(&MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High.0 as u32)?;
     }
     // SAFETY: the transform and type are live.
-    unsafe { transform.SetOutputType(output_id, &output_type, 0)? };
+    unsafe { transform.SetOutputType(output_id, &output_type, 0) }
+        .map_err(|e| open_error::at(Step::OutputType, &e))?;
     let mut sequence_header = read_sequence_header(&transform, output_id);
     log_input_types(&transform, input_id);
     let input_type = video_type(spec, &MFVideoFormat_NV12)?;
     // SAFETY: the transform and type are live.
     if let Err(error) = unsafe { transform.SetInputType(input_id, &input_type, 0) } {
-        return Err(rejected(&format!("SetInputType(NV12) failed: {error}")));
+        return Err(open_error::at(Step::InputType, &error));
     }
     if sequence_header.is_empty() {
         sequence_header = read_sequence_header(&transform, output_id);
@@ -266,7 +269,10 @@ fn configure(
     }
     log_bind_flags(&transform, input_id);
     let events: IMFMediaEventGenerator = transform.cast()?;
-    start_streaming(&transform)?;
+    start_streaming(&transform).map_err(|error| match error {
+        H264Error::Windows(e) => open_error::at(Step::Start, &e),
+        other => other,
+    })?;
     Ok(Configured {
         transform,
         events,

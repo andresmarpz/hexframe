@@ -2,7 +2,9 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crossbeam_channel::Sender;
-use greyscreen_core::encoder::{Attempt, EncoderKind, PROBE_FLAG, Probe, Reason, Verdict};
+use greyscreen_core::encoder::{
+    Attempt, EncoderKind, PROBE_FLAG, Probe, Reason, SOFTWARE_NOTICE, Verdict,
+};
 use greyscreen_core::media::{CaptureTarget, MediaEvent, MediaSession};
 use greyscreen_core::settings::Settings;
 
@@ -134,6 +136,23 @@ fn the_result_is_cached_until_the_driver_changes() {
     run(&spec(&media, &cache));
     assert_eq!(media.checks(), 1);
     *media.fingerprint.lock().unwrap() = "NVIDIA 2.0".into();
+    run(&spec(&media, &cache));
+    assert_eq!(media.checks(), 2);
+}
+
+#[test]
+fn a_busy_software_outcome_is_not_cached_and_says_who_to_close() {
+    use greyscreen_core::encoder::{BUSY_HELP, OpenFailure};
+    let cache = cache_path();
+    let busy = OpenFailure::Busy.tag("SetOutputType failed");
+    let media = Encoders::new(vec![hardware(Err(&busy)), software(Ok("Microsoft MFT"))]);
+    let (check, msgs) = run(&spec(&media, &cache));
+    let check = check.unwrap();
+    assert_eq!(check.outcome, CheckOutcome::Software);
+    assert_eq!(reasons(&check)[0].1, Some(Reason::Busy));
+    assert!(msgs.iter().any(
+        |m| matches!(m, UiMsg::NoticeWithAction { level: NoticeLevel::Warn, text, .. } if text == BUSY_HELP)
+    ));
     run(&spec(&media, &cache));
     assert_eq!(media.checks(), 2);
 }

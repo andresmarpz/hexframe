@@ -1,4 +1,5 @@
 pub(crate) mod colour;
+mod open_error;
 mod pump;
 mod rate;
 mod readback;

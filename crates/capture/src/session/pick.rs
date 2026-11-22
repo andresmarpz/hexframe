@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use greyscreen_core::crop::CropRect;
-use greyscreen_core::encoder::{self, Candidate, EncoderKind};
+use greyscreen_core::encoder::{self, Candidate, EncoderKind, OpenFailure};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, encode_size};
 use greyscreen_core::problem::NO_FRAMES;
 
@@ -29,6 +29,7 @@ pub(super) struct Stage {
     pub(super) encoder: H264Encoder,
     pub(super) cfg: CaptureConfig,
     pub(super) video_cfg: CaptureConfig,
+    pub(super) fallback_warning: Option<String>,
 }
 
 enum Failure {
@@ -45,9 +46,22 @@ pub(super) fn first_working(
     let groups = adapter_groups(&encoder::plan(&adapters::for_target(target)));
     let mut setup_error = None;
     let mut encoder_errors = Vec::new();
+    let mut hardware_failures = Vec::new();
     for (adapter, kinds) in groups {
-        match build_on(adapter, &kinds, target, cfg, qpc, flags) {
-            Ok(stage) => return Ok(stage),
+        match build_on(
+            adapter,
+            &kinds,
+            target,
+            cfg,
+            qpc,
+            flags,
+            &mut hardware_failures,
+        ) {
+            Ok(mut stage) => {
+                stage.fallback_warning =
+                    encoder::fallback_warning(stage.encoder.kind(), &hardware_failures);
+                return Ok(stage);
+            }
             Err(Failure::Setup(message)) => {
                 tracing::warn!(%message, "capture setup failed on this adapter");
                 setup_error.get_or_insert(message);
@@ -92,6 +106,7 @@ fn build_on(
     cfg: &CaptureConfig,
     qpc: QpcMap,
     flags: &Flags,
+    hardware_failures: &mut Vec<(OpenFailure, u32)>,
 ) -> Result<Stage, Failure> {
     let gpu = match adapter {
         Some(luid) => GpuDevice::for_luid(luid),
@@ -139,11 +154,15 @@ fn build_on(
                     encoder,
                     cfg: kind_cfg,
                     video_cfg,
+                    fallback_warning: None,
                 });
             }
             Err(error) => {
                 let label = encoder::label(kind, gpu.vendor_id, &gpu.adapter_name);
                 tracing::warn!(encoder = %label, %error, "encoder failed, trying the next one");
+                if kind == EncoderKind::Hardware {
+                    hardware_failures.push((OpenFailure::from_text(&error), gpu.vendor_id));
+                }
                 errors.push(format!("{label} on {}: {error}", gpu.adapter_name));
             }
         }

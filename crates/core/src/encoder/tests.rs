@@ -268,3 +268,137 @@ fn probe_request_round_trips_through_an_argument() {
     assert_eq!(ProbeRequest::from_arg(&request.to_arg()), Some(request));
     assert_eq!(ProbeRequest::from_arg("not json"), None);
 }
+
+const BUSY_CODE: u32 = 0x8007_000E;
+
+fn nvidia_probe() -> Probe {
+    Probe {
+        kind: EncoderKind::Hardware,
+        adapter: "NVIDIA GeForce RTX 3070".into(),
+        vendor_id: VENDOR_NVIDIA,
+        driver_version: "1".into(),
+        luid: 1,
+    }
+}
+
+#[test]
+fn every_known_failure_gets_its_own_reason() {
+    let busy = [BUSY_CODE];
+    let cases = [
+        (BUSY_CODE, OpenFailure::Other, OpenFailure::Busy),
+        (0x887A_0005, OpenFailure::Other, OpenFailure::DeviceRemoved),
+        (0x887A_0007, OpenFailure::Other, OpenFailure::DeviceRemoved),
+        (
+            0x8000_4005,
+            OpenFailure::StartFailed,
+            OpenFailure::StartFailed,
+        ),
+        (
+            0xC00D_36B4,
+            OpenFailure::InputRefused,
+            OpenFailure::InputRefused,
+        ),
+        (
+            0xC00D_36B4,
+            OpenFailure::Unsupported,
+            OpenFailure::Unsupported,
+        ),
+        (0x1234_5678, OpenFailure::Other, OpenFailure::Other),
+    ];
+    for (code, fallback, expected) in cases {
+        assert_eq!(
+            OpenFailure::from_code_with(code, fallback, &busy),
+            expected,
+            "{code:#x}"
+        );
+    }
+}
+
+#[test]
+fn only_a_code_the_measurement_saw_means_busy() {
+    assert_eq!(
+        OpenFailure::from_code_with(BUSY_CODE, OpenFailure::Other, &[]),
+        OpenFailure::Other
+    );
+    for code in BUSY_CODES {
+        assert_eq!(
+            OpenFailure::from_code(*code, OpenFailure::Other),
+            OpenFailure::Busy
+        );
+    }
+}
+
+#[test]
+fn a_failure_survives_the_trip_through_error_text() {
+    for failure in OpenFailure::ALL {
+        let text = failure.tag("SetOutputType failed: oops (0x8007000E)");
+        assert_eq!(OpenFailure::from_text(&text), failure);
+    }
+    assert_eq!(OpenFailure::from_text("plain error"), OpenFailure::Other);
+}
+
+#[test]
+fn busy_wins_over_other_candidates_in_a_joined_error() {
+    let joined = format!(
+        "{}; {}",
+        OpenFailure::StartFailed.tag("first"),
+        OpenFailure::Busy.tag("second")
+    );
+    assert_eq!(OpenFailure::from_text(&joined), OpenFailure::Busy);
+    assert_eq!(Reason::of_error(&joined), Reason::Busy);
+    assert_eq!(Reason::of_error("plain"), Reason::Failed);
+}
+
+#[test]
+fn the_busy_text_appears_only_for_busy_on_nvidia() {
+    for failure in OpenFailure::ALL {
+        let expected = failure == OpenFailure::Busy;
+        assert_eq!(
+            failure.help(VENDOR_NVIDIA) == BUSY_HELP,
+            expected,
+            "{failure:?}"
+        );
+    }
+    assert_eq!(OpenFailure::Busy.help(VENDOR_AMD), FAILED_HELP);
+    assert_eq!(OpenFailure::Other.help(VENDOR_NVIDIA), FAILED_HELP);
+}
+
+#[test]
+fn a_busy_nvidia_verdict_changes_the_notice_and_the_help() {
+    let mut check = EncoderCheck::from_attempts(String::new(), &[]);
+    assert_eq!(check.notice_text(), SOFTWARE_NOTICE);
+    assert_eq!(check.failed_help(), FAILED_HELP);
+    check.verdicts.push(Verdict {
+        probe: nvidia_probe(),
+        reason: Some(Reason::Busy),
+    });
+    assert_eq!(check.notice_text(), BUSY_HELP);
+    assert_eq!(check.failed_help(), BUSY_HELP);
+}
+
+#[test]
+fn a_busy_software_outcome_is_not_reusable() {
+    let mut check = EncoderCheck::from_attempts("k".into(), &[]);
+    check.outcome = CheckOutcome::Software;
+    check.verdicts.push(Verdict {
+        probe: nvidia_probe(),
+        reason: Some(Reason::Busy),
+    });
+    assert!(!check.reusable_for("k"));
+}
+
+#[test]
+fn a_software_start_after_a_hardware_failure_warns() {
+    let busy = [(OpenFailure::Busy, VENDOR_NVIDIA)];
+    let other = [(OpenFailure::Other, VENDOR_NVIDIA)];
+    assert_eq!(
+        fallback_warning(EncoderKind::Software, &busy).as_deref(),
+        Some(BUSY_HELP)
+    );
+    assert_eq!(
+        fallback_warning(EncoderKind::Software, &other).as_deref(),
+        Some(SOFTWARE_NOTICE)
+    );
+    assert_eq!(fallback_warning(EncoderKind::Software, &[]), None);
+    assert_eq!(fallback_warning(EncoderKind::Hardware, &busy), None);
+}

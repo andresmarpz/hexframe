@@ -3,9 +3,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use greyscreen_core::encoder::{
-    self, Attempt, CheckOutcome, EncoderCheck, Probe, Reason, SOFTWARE_NOTICE, Verdict,
-};
+use greyscreen_core::encoder::{self, Attempt, CheckOutcome, EncoderCheck, Probe, Reason, Verdict};
 use greyscreen_core::media::{CaptureConfig, MediaSource};
 use greyscreen_core::problem::Problem;
 
@@ -112,7 +110,7 @@ fn run_with_runner(
     if check.wants_notice() {
         sink(UiMsg::NoticeWithAction {
             level: NoticeLevel::Warn,
-            text: SOFTWARE_NOTICE.to_owned(),
+            text: check.notice_text().to_owned(),
             action: NoticeAction::Link(Problem::NoEncoder.help_url()),
         });
         check.noticed = true;
