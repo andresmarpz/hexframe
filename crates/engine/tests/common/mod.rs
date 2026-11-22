@@ -15,8 +15,8 @@ use greyscreen_core::media::{
 use greyscreen_core::settings::Settings;
 use greyscreen_core::time::Hns;
 use greyscreen_engine::{
-    Engine, EngineConfig, EngineHandle, EngineStatus, EngineTiming, FakeMediaSource, FreeSpace,
-    LeagueFactory, RecordingEntry, UiMsg,
+    Engine, EngineCmd, EngineConfig, EngineHandle, EngineStatus, EngineTiming, FakeMediaSource,
+    FreeSpace, LeagueFactory, RecordingEntry, UiMsg,
 };
 use greyscreen_league::LeagueMsg;
 use greyscreen_mp4::fragmented::FragmentedWriter;
@@ -296,4 +296,34 @@ pub(crate) fn library_message(harness: &Harness) -> Vec<RecordingEntry> {
         _ => None,
     })
     .expect("library message")
+}
+
+pub(crate) fn send(harness: &Harness, cmd: EngineCmd) {
+    harness
+        .engine
+        .as_ref()
+        .expect("engine running")
+        .cmd
+        .send(cmd)
+        .expect("engine listening");
+}
+
+pub(crate) fn wait_status(harness: &Harness, want: fn(&EngineStatus) -> bool) {
+    wait_for(&harness.ui, |msg| match msg {
+        UiMsg::Status(status) => want(status).then_some(()),
+        _ => None,
+    })
+    .expect("status reached");
+}
+
+pub(crate) fn wait_saved(harness: &Harness) -> RecordingEntry {
+    wait_for(&harness.ui, |msg| match msg {
+        UiMsg::RecordingSaved(entry) => Some(entry.clone()),
+        _ => None,
+    })
+    .expect("recording saved")
+}
+
+pub(crate) fn inspect_video(entry: &RecordingEntry) -> greyscreen_mp4::inspect::Inspected {
+    greyscreen_mp4::inspect::inspect(&entry.folder.join(&entry.meta.video)).expect("inspect")
 }

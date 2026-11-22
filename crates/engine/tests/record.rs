@@ -1,18 +1,23 @@
 #![allow(clippy::expect_used)]
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
+use greyscreen_core::export::{ExportJob, ExportPreset, ExportRange};
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team, TimedEvent};
+use greyscreen_core::library::VideoInfo;
 use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::settings::Settings;
 use greyscreen_core::time::{Hns, hns_to_secs, mono_now};
 use greyscreen_engine::{
-    Engine, EngineHandle, EngineStatus, FakeMediaSource, LeagueFactory, NoticeLevel, UiMsg,
+    Engine, EngineCmd, EngineHandle, EngineStatus, FakeMediaSource, LeagueFactory, NoticeLevel,
+    UiMsg,
 };
 use greyscreen_league::LeagueMsg;
 
@@ -454,5 +459,68 @@ fn shutdown_during_recording_finalizes_the_video() {
     assert!(folder.join("game.mp4").is_file());
     ffprobe_ok(&folder.join("game.mp4"));
     assert_eq!(status_names(&msgs), ["Finalizing", "Idle"]);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
+fn shutdown_with_a_clip_job_and_an_export_running_neither_panics_nor_hangs() {
+    let (ui_tx, ui_rx) = unbounded();
+    let sink = Box::new(move |msg: UiMsg| {
+        ui_tx.send(msg).ok();
+    });
+    let dir = temp_dir("shutdown-jobs");
+    let source_media = common::media(300);
+    let source = common::leftover_part(&dir, "source", &source_media, true).join("game.mp4.part");
+    let engine = Engine::start(
+        Settings {
+            output_dir: dir.clone(),
+            ..Settings::default()
+        },
+        Arc::new(FakeMediaSource::new().with_speed(20)),
+        Box::new(|_out| Box::new(())),
+        sink,
+    );
+    engine
+        .cmd
+        .send(EngineCmd::StartTestRecording { secs: 600 })
+        .ok();
+    let mut recording = false;
+    while let Ok(msg) = ui_rx.recv_timeout(WAIT) {
+        if matches!(msg, UiMsg::Status(EngineStatus::Recording { .. })) {
+            recording = true;
+            break;
+        }
+    }
+    assert!(recording);
+    thread::sleep(Duration::from_millis(500));
+    engine.cmd.send(EngineCmd::SaveClipNow).ok();
+    engine
+        .cmd
+        .send(EngineCmd::Export(ExportJob {
+            source,
+            source_offset_secs: 0.0,
+            range: ExportRange::new(0.0, 3.0),
+            preset: ExportPreset::Original,
+            video: VideoInfo {
+                width: source_media.video.width,
+                height: source_media.video.height,
+                fps: source_media.video.fps,
+            },
+            dest_dir: dir.join("exports"),
+            stem: "Shutdown_Test".into(),
+        }))
+        .ok();
+    let began = Instant::now();
+    drop(engine);
+    assert!(
+        began.elapsed() < Duration::from_secs(15),
+        "{:?}",
+        began.elapsed()
+    );
+    let msgs: Vec<UiMsg> = ui_rx.try_iter().collect();
+    assert!(
+        msgs.iter().any(|m| matches!(m, UiMsg::RecordingSaved(_))),
+        "the recording was not saved"
+    );
     std::fs::remove_dir_all(dir).ok();
 }
