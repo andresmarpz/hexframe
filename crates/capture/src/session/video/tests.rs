@@ -209,6 +209,15 @@ fn an_encoder_that_reports_an_error_ends_with_the_stopped_reason() {
 }
 
 #[test]
+fn a_removed_device_is_counted_when_the_encoder_stops_first() {
+    let _armed = Armed::new().fail(Point::DeviceRemovedCheck, DXGI_ERROR_DEVICE_REMOVED);
+    let (video, _events) = video();
+    let before = crate::debug_layer::device_removed_count();
+    video.shutdown(Exit::Failed("the video encoder stopped".to_string()));
+    assert!(crate::debug_layer::device_removed_count() > before);
+}
+
+#[test]
 fn an_ordinary_step_error_is_soft_until_it_keeps_repeating() {
     let _armed = Armed::new();
     let (mut video, _events) = video();

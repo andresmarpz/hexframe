@@ -262,7 +262,7 @@ impl Video {
             ..
         } = self;
         power.release();
-        if matches!(exit, Exit::Lost(_)) {
+        if matches!(exit, Exit::Lost(_)) || device_removed(&gpu) {
             crate::debug_layer::record_device_removed();
         }
         let live_debug = crate::debug_layer::attach(&gpu.device);
@@ -312,6 +312,13 @@ fn fill_process_stats(sampler: &mut ProcessSampler, stats: &mut Stats) {
     stats.c.mem_mb = mem;
     stats.c.foreground = sampler.target_in_foreground();
     sampler.fill_gpu(&mut stats.c);
+}
+
+fn device_removed(gpu: &GpuDevice) -> bool {
+    fault!(DeviceRemovedCheck)
+        // SAFETY: the device is live and the call only reads its state.
+        .and_then(|()| unsafe { gpu.device.GetDeviceRemovedReason() })
+        .is_err()
 }
 
 fn is_device_lost(code: HRESULT) -> bool {

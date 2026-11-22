@@ -1,3 +1,4 @@
+mod args;
 mod check;
 mod gpu;
 mod meter;
@@ -9,7 +10,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::settings::Settings;
@@ -21,101 +22,16 @@ use greyscreen_league::LeagueMsg;
 use greyscreen_mp4::demux::Movie;
 use serde::Serialize;
 
-use check::{AvLimits, CycleResult, Limits, Run, Sample, Verdict, evaluate};
+pub(crate) use args::Args;
+use check::{CycleResult, Limits, Run, Sample, Verdict, evaluate};
 use gpu::GpuReport;
 use meter::Meter;
-use profiles::WindowTarget;
 use rng::Rng;
 
 const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
 const SAVE_GRACE: Duration = Duration::from_secs(90);
 const GAME_STOP_GRACE: Duration = Duration::from_secs(60);
 const MIN_GAME_VIDEO_SECS: f64 = 1.0;
-
-#[derive(clap::Args, Debug, Clone)]
-pub(crate) struct Args {
-    #[arg(
-        long,
-        conflicts_with_all = ["cycles", "seconds", "gap_secs", "game_minutes", "warmup_secs", "warmup_cycles", "max_mem_mb_per_min", "max_gpu_mb_per_min", "max_handle_growth", "max_thread_growth"]
-    )]
-    pub(crate) profile: Option<String>,
-    #[arg(long)]
-    pub(crate) list_profiles: bool,
-    #[arg(long, value_enum, default_value = "league")]
-    pub(crate) window: WindowTarget,
-    #[arg(long, default_value_t = 8)]
-    pub(crate) cycles: u32,
-    #[arg(long, default_value_t = 30)]
-    pub(crate) seconds: u32,
-    #[arg(long, default_value_t = 10)]
-    pub(crate) gap_secs: u32,
-    #[arg(long, value_name = "MINUTES")]
-    pub(crate) game_minutes: Option<u32>,
-    #[arg(long)]
-    pub(crate) out: Option<PathBuf>,
-    #[arg(long)]
-    pub(crate) dir: Option<PathBuf>,
-    #[arg(long)]
-    pub(crate) keep: bool,
-    #[arg(long)]
-    pub(crate) d3d_debug: bool,
-    #[arg(long, default_value_t = 60.0)]
-    pub(crate) warmup_secs: f64,
-    #[arg(long, default_value_t = 2)]
-    pub(crate) warmup_cycles: u32,
-    #[arg(long, default_value_t = 2.0, value_name = "MB")]
-    pub(crate) max_mem_mb_per_min: f64,
-    #[arg(long, default_value_t = 2.0, value_name = "MB")]
-    pub(crate) max_gpu_mb_per_min: f64,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) max_handle_growth: u32,
-    #[arg(long, default_value_t = 4)]
-    pub(crate) max_thread_growth: u32,
-    #[arg(skip)]
-    pub(crate) max_dropped_pct: Option<f64>,
-    #[arg(skip)]
-    pub(crate) encoder_contains: Option<&'static str>,
-    #[arg(skip)]
-    pub(crate) min_video_secs: Option<f64>,
-    #[arg(skip)]
-    pub(crate) until_saved: bool,
-    #[arg(skip)]
-    pub(crate) av_limits: Option<AvLimits>,
-    #[arg(skip)]
-    pub(crate) random_secs: Option<(u32, u32)>,
-}
-
-impl Args {
-    fn out_path(&self) -> PathBuf {
-        self.out
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("greyscreen-soak.json"))
-    }
-
-    fn limits(&self) -> Limits {
-        Limits {
-            mem_mb_per_min: self.max_mem_mb_per_min,
-            gpu_mb_per_min: self.max_gpu_mb_per_min,
-            handle_growth: self.max_handle_growth,
-            thread_growth: self.max_thread_growth,
-            warmup_secs: self.warmup_secs,
-            warmup_cycles: self.warmup_cycles,
-            max_dropped_pct: self.max_dropped_pct,
-            encoder_contains: self.encoder_contains,
-            av: self.av_limits,
-        }
-    }
-
-    fn validate(&self) -> Result<()> {
-        if self.game_minutes.is_none() && (self.cycles == 0 || self.seconds == 0) {
-            bail!("--cycles and --seconds must be at least 1");
-        }
-        if self.game_minutes == Some(0) {
-            bail!("--game-minutes must be at least 1");
-        }
-        Ok(())
-    }
-}
 
 #[derive(Serialize)]
 struct Report<'a> {
