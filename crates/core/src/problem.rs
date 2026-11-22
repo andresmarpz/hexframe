@@ -15,18 +15,22 @@ pub enum Problem {
     FolderUnusable,
     LowDisk,
     NoEncoder,
+    NoGpu,
+    ConversionUnsupported,
     WindowsTooOld,
     CaptureBlocked,
     Other,
 }
 
 impl Problem {
-    pub const ALL: [Problem; 8] = [
+    pub const ALL: [Problem; 10] = [
         Problem::ExclusiveFullscreen,
         Problem::LeagueNotFound,
         Problem::FolderUnusable,
         Problem::LowDisk,
         Problem::NoEncoder,
+        Problem::NoGpu,
+        Problem::ConversionUnsupported,
         Problem::WindowsTooOld,
         Problem::CaptureBlocked,
         Problem::Other,
@@ -49,7 +53,11 @@ impl Problem {
             Problem::FolderUnusable
         } else if has(&["graphics capture is not supported"]) {
             Problem::WindowsTooOld
-        } else if has(&["video encoder failed", "h.264 encoder", "no usable gpu"]) {
+        } else if has(&["no usable gpu"]) {
+            Problem::NoGpu
+        } else if has(&["bgra to nv12"]) {
+            Problem::ConversionUnsupported
+        } else if has(&["video encoder failed", "h.264 encoder"]) {
             Problem::NoEncoder
         } else if has(&["window closed", "invalid window handle"]) {
             Problem::LeagueNotFound
@@ -67,6 +75,8 @@ impl Problem {
             Problem::FolderUnusable => "Can't save to the recordings folder",
             Problem::LowDisk => "Not enough disk space",
             Problem::NoEncoder => "No video encoder found",
+            Problem::NoGpu => "No graphics card found",
+            Problem::ConversionUnsupported => "Graphics card cannot convert video",
             Problem::WindowsTooOld => "Windows is too old to record",
             Problem::CaptureBlocked => "Windows blocked screen capture",
             Problem::Other => "Capture failed",
@@ -82,6 +92,8 @@ impl Problem {
             Problem::FolderUnusable => "Choose another recordings folder.",
             Problem::LowDisk => "Free some space or choose another folder, then retry.",
             Problem::NoEncoder => "Update your graphics driver, then restart Greyscreen.",
+            Problem::NoGpu => "Check that your graphics card is enabled and its driver is installed, then restart Greyscreen.",
+            Problem::ConversionUnsupported => "Update your graphics driver, then restart Greyscreen.",
             Problem::WindowsTooOld => "Update to Windows 10 version 1903 or newer.",
             Problem::CaptureBlocked => {
                 "If League runs as administrator, run Greyscreen as administrator too."
@@ -109,6 +121,8 @@ impl Problem {
             Problem::FolderUnusable => "folder-not-writable",
             Problem::LowDisk => "low-disk",
             Problem::NoEncoder => "no-encoder",
+            Problem::NoGpu => "no-gpu",
+            Problem::ConversionUnsupported => "video-conversion",
             Problem::WindowsTooOld => "windows-version",
             Problem::CaptureBlocked => "run-as-admin",
             Problem::Other => "help",
@@ -126,6 +140,8 @@ impl Problem {
             Problem::FolderUnusable => "Folder not usable",
             Problem::LowDisk => "Disk is full",
             Problem::NoEncoder => "No video encoder",
+            Problem::NoGpu => "No graphics card",
+            Problem::ConversionUnsupported => "Conversion failed",
             Problem::WindowsTooOld => "Windows too old",
             Problem::CaptureBlocked => "Capture blocked",
             Problem::Other => "Capture failed",
@@ -139,6 +155,8 @@ impl Problem {
             Problem::FolderUnusable => "Choose another folder",
             Problem::LowDisk => "Free some space",
             Problem::NoEncoder => "Update graphics driver",
+            Problem::NoGpu => "Check your GPU",
+            Problem::ConversionUnsupported => "Update graphics driver",
             Problem::WindowsTooOld => "Update Windows",
             Problem::CaptureBlocked => "Check Windows settings",
             Problem::Other => "Open Home to retry",
@@ -151,6 +169,8 @@ impl Problem {
             Problem::FolderUnusable
                 | Problem::LowDisk
                 | Problem::NoEncoder
+                | Problem::NoGpu
+                | Problem::ConversionUnsupported
                 | Problem::WindowsTooOld
         )
     }

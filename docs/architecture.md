@@ -325,7 +325,9 @@ The website's FAQ page (`https://greyscreen-lake.vercel.app/faq`) needs one sect
 | `window-not-found` | The League window closed or was not found while capture started | Make sure League is running, then retry |
 | `folder-not-writable` | The recordings folder is missing, read-only or cannot be created | Choose another folder in Settings > Storage |
 | `low-disk` | The drive has no space left | Free some space or choose another folder |
-| `no-encoder` | No hardware or software H.264 encoder or GPU was usable (capture start, or the encoder check at start) | Update the graphics driver and restart Greyscreen |
+| `no-encoder` | No hardware or software H.264 encoder was usable (capture start, or the encoder check at start) | Update the graphics driver and restart Greyscreen |
+| `no-gpu` | No usable GPU adapter at capture start | Check the GPU is enabled and its driver installed, then restart Greyscreen |
+| `video-conversion` | The GPU cannot convert BGRA to NV12 with BT.709 | Update the graphics driver and restart Greyscreen |
 | `windows-version` | Windows Graphics Capture is not supported | Update to Windows 10 version 1903 or newer |
 | `run-as-admin` | Windows refused access to the window (access denied) | Run Greyscreen as administrator if League does; check Settings > Privacy & security > Screen capture |
 | `help` | Any other capture failure | The Get help section: send feedback, GitHub Issues, logs |

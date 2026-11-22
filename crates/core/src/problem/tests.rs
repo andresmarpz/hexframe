@@ -16,7 +16,11 @@ fn the_capture_crates_own_messages_are_told_apart() {
             "video encoder failed: no usable hardware H.264 encoder: MFT refused",
             Problem::NoEncoder,
         ),
-        ("no usable GPU: adapter missing", Problem::NoEncoder),
+        ("no usable GPU: adapter missing", Problem::NoGpu),
+        (
+            "video encoder failed: NVIDIA on X: video converter failed: the video processor cannot convert BGRA to NV12 with BT.709",
+            Problem::ConversionUnsupported,
+        ),
         (
             "the captured window closed during startup",
             Problem::LeagueNotFound,

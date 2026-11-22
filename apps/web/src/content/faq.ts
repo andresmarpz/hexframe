@@ -124,6 +124,20 @@ export const faqGroups: FaqGroup[] = [
         ],
       },
       {
+        id: "no-gpu",
+        q: "No graphics card found",
+        a: [
+          "Greyscreen records with your graphics card. Check in Device Manager that the GPU is enabled and its driver is installed, then restart Greyscreen. Virtual machines and remote desktop sessions often have no usable GPU.",
+        ],
+      },
+      {
+        id: "video-conversion",
+        q: "My graphics card cannot convert video",
+        a: [
+          "Greyscreen converts each frame to a video format on the GPU. Your GPU or driver refused that step. Update your graphics driver and restart Greyscreen. If it keeps failing, send feedback with the output of greyscreen-cli doctor.",
+        ],
+      },
+      {
         id: "windows-version",
         q: "Windows is too old to record",
         a: [

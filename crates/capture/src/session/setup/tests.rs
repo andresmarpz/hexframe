@@ -140,7 +140,6 @@ fn a_failed_setup_leaves_the_next_setup_able_to_succeed() {
 }
 
 #[test]
-#[ignore = "the three reasons share one problem today"]
 fn the_three_user_facing_reasons_stay_distinct() {
     let gpu = {
         let _armed = Armed::new().fail(Point::AdapterOpen, E_FAIL);

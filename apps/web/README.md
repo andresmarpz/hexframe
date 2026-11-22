@@ -34,7 +34,7 @@ The build reads the repo's releases and star count from the GitHub API (`src/lib
 
 The app's "Learn more" links open `https://greyscreen-lake.vercel.app/faq#<anchor>`. Each anchor is the `id` of an item in `src/content/faq.ts`. Do not rename them:
 
-`vanguard`, `fps`, `storage`, `low-disk`, `death-review`, `fullscreen`, `window-not-found`, `run-as-admin`, `folder-not-writable`, `no-encoder`, `updates`, `uninstall`, `privacy`, `free`, `help`.
+`vanguard`, `fps`, `storage`, `low-disk`, `death-review`, `fullscreen`, `window-not-found`, `run-as-admin`, `folder-not-writable`, `no-encoder`, `no-gpu`, `video-conversion`, `updates`, `uninstall`, `privacy`, `free`, `help`.
 
 ## Analytics
 
