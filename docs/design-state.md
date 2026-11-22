@@ -151,34 +151,34 @@ Many visible defects are not isolated micro-bugs—they are symptoms of seven st
 ## Part 3 — Complete Issue Checklist
 
 ### Cluster 1 — Review Layout & Spatial Architecture
-- [ ] **C1-1 (Critical):** Right Inspector (`review-panel`) cannot be hidden in normal review mode. Add collapsible toggle (`◫`) + keyboard action + persisted setting. (`view/review.rs`, `view/review/toolbar.rs`, `core/settings.rs`, `core/keybinds/action.rs`)
-- [ ] **C1-2 (High):** Games list (`games-list`) cannot be hidden while reviewing a game. Add collapsible toggle + keyboard action + persisted setting. (`view/screens.rs`, `view/games.rs`, `core/settings.rs`)
-- [ ] **C1-3 (High):** `review.theater` is coupled to OS fullscreen (`tx.toggle_full_screen()`). Decouple **Windowed Theater (`T`)** from **OS Fullscreen (`F`)**. (`ui/keys.rs`, `core/keybinds/action.rs`, `view/review/transport.rs`, `view/review/theater.rs`)
-- [ ] **C1-4 (High):** Default window size (`1180×680`) is narrower than `FOLD_BELOW` (`1200.0`), causing first launch to auto-collapse the sidebar. Raise default window to `1280×760` (or lower `FOLD_BELOW`). (`main.rs`, `view/shell/sidebar.rs`)
-- [ ] **C1-5 (High):** Global sidebar (`nav-recent`, both expanded and collapsed rail) shows the exact same 5 recent games right next to `games-list` on `Screen::Games`. Hide `Recent` when `screen == Screen::Games`. (`view/shell/sidebar.rs`, `view/shell/sidebar/collapsed.rs`)
-- [ ] **C1-6 (Medium):** `review-panel` has floating double-card padding (`16 px` around a bordered card). Make inspector flush to the right edge with a single 1 px vertical divider to reclaim horizontal width. (`view/review.rs`, `view/review/panel.rs`)
-- [ ] **C1-7 (Medium):** `clip-notice` (`Playing clip: ... [Full game]`) lives inside `review-panel`, so hiding the inspector hides the way back to the full game. Move above the video player (or into toolbar). (`view/review/panel.rs`, `view/review.rs`)
+- [x] **C1-1 (Critical):** Right Inspector (`review-panel`) cannot be hidden in normal review mode. Add collapsible toggle (`◫`) + keyboard action + persisted setting. (`view/review.rs`, `view/review/toolbar.rs`, `core/settings.rs`, `core/keybinds/action.rs`) — *done in `82ff5d0`*
+- [x] **C1-2 (High):** Games list (`games-list`) cannot be hidden while reviewing a game. Add collapsible toggle + keyboard action + persisted setting. (`view/screens.rs`, `view/games.rs`, `core/settings.rs`) — *done in `82ff5d0`*
+- [x] **C1-3 (High):** `review.theater` is coupled to OS fullscreen (`tx.toggle_full_screen()`). Decouple **Windowed Theater (`T`)** from **OS Fullscreen (`F`)**. (`ui/keys.rs`, `core/keybinds/action.rs`, `view/review/transport.rs`, `view/review/theater.rs`) — *done in `00d7c24`*
+- [x] **C1-4 (High):** Default window size (`1180×680`) is narrower than `FOLD_BELOW` (`1200.0`), causing first launch to auto-collapse the sidebar. Raise default window to `1280×760` (or lower `FOLD_BELOW`). (`main.rs`, `view/shell/sidebar.rs`) — *done in `82ff5d0`*
+- [x] **C1-5 (High):** Global sidebar (`nav-recent`, both expanded and collapsed rail) shows the exact same 5 recent games right next to `games-list` on `Screen::Games`. Hide `Recent` when `screen == Screen::Games`. (`view/shell/sidebar.rs`, `view/shell/sidebar/collapsed.rs`) — *done in `82ff5d0`*
+- [x] **C1-6 (Medium):** `review-panel` has floating double-card padding (`16 px` around a bordered card). Make inspector flush to the right edge with a single 1 px vertical divider to reclaim horizontal width. (`view/review.rs`, `view/review/panel.rs`) — *done in `82ff5d0`*
+- [x] **C1-7 (Medium):** `clip-notice` (`Playing clip: ... [Full game]`) lives inside `review-panel`, so hiding the inspector hides the way back to the full game. Move above the video player (or into toolbar). (`view/review/panel.rs`, `view/review.rs`) — *done in `82ff5d0`*
 - [ ] **C1-8 (Medium):** `STACK_BELOW = 800.0` creates a perverse inversion where widening the games list makes the video larger. Re-evaluate threshold once inspector is collapsible and flush. (`view/review.rs`)
 - [ ] **C1-9 (Low):** Theater drawer only shows Events, not Clips; allow tab switching or keep it clearly scoped. (`view/review/theater.rs`)
-- [ ] **C1-10 (Low):** Games list stays open during Death Review, squeezing the death clip. Auto-hide Games list while `review.death.is_some()`. (`view/screens.rs`)
+- [x] **C1-10 (Low):** Games list stays open during Death Review, squeezing the death clip. Auto-hide Games list while `review.death.is_some()`. (`view/screens.rs`) — *done in `82ff5d0`*
 
 ### Cluster 2 — Review Toolbar & Action Topology
-- [ ] **C2-1 (Critical):** Top-right toolbar has 5 unrelated items (`Review deaths`, `Export`, `Health`, `Open folder`, `Delete`). Reduce to max 3: `Review deaths`, `•••` overflow menu, and `Inspector` toggle. (`view/review/toolbar.rs`)
-- [ ] **C2-2 (High):** Move `Export this moment` from top-right toolbar into the player transport bar (right next to Speed/Volume/Theater). (`view/review/toolbar.rs`, `view/review/transport.rs`)
-- [ ] **C2-3 (High):** Fold `Recording health`, `Show in folder`, and `Delete…` (separated, danger) into a `•••` overflow menu in the Review toolbar; show subtle amber/red dot on `•••` when health has warnings/errors. (`view/review/toolbar.rs`, `view/review/health.rs`, `view/review/controls.rs`, `ui/review.rs`)
-- [ ] **C2-4 (Medium):** `Review deaths (N)` uses glaring white `ButtonVariant::Submit` next to dark video. Change to `ButtonVariant::Neutral`. (`view/review/toolbar.rs`)
+- [x] **C2-1 (Critical):** Top-right toolbar has 5 unrelated items (`Review deaths`, `Export`, `Health`, `Open folder`, `Delete`). Reduce to max 3: `Review deaths`, `•••` overflow menu, and `Inspector` toggle. (`view/review/toolbar.rs`) — *done in `84faaec`, `82ff5d0`*
+- [x] **C2-2 (High):** Move `Export this moment` from top-right toolbar into the player transport bar (right next to Speed/Volume/Theater). (`view/review/toolbar.rs`, `view/review/transport.rs`) — *done in `84faaec`*
+- [x] **C2-3 (High):** Fold `Recording health`, `Show in folder`, and `Delete…` (separated, danger) into a `•••` overflow menu in the Review toolbar; show subtle amber/red dot on `•••` when health has warnings/errors. (`view/review/toolbar.rs`, `view/review/health.rs`, `view/review/controls.rs`, `ui/review.rs`) — *done in `84faaec`*
+- [x] **C2-4 (Medium):** `Review deaths (N)` uses glaring white `ButtonVariant::Submit` next to dark video. Change to `ButtonVariant::Neutral`. (`view/review/toolbar.rs`) — *done in `84faaec`*
 - [ ] **C2-5 (Medium):** Left toolbar metadata stacks 6 competing styles and repeats selected Games row info. Tighten to `[Icon] Champion · Result · K/D/A · Mode`. (`view/review/toolbar.rs`)
 - [ ] **C2-6 (Low):** `Recording health` popover uses five loud `76 px` green `OK` pills; quiet down `OK` rows and reserve colored pills for `WARNING`/`BAD`. (`view/review/health.rs`)
 - [ ] **C2-7 (Low):** Death Review keeps `Export`/`Health`/`Folder`/`Trash` in the top bar while adding a second header bar (`← Finish`). Clean up toolbar in Death Review mode. (`view/review/toolbar.rs`, `view/review/deaths.rs`)
 
 ### Cluster 3 — Settings IA & Controls
-- [ ] **C3-1 (Critical):** `Recording` tab is a 12-row catch-all containing `Navigation style`, `Sound effects`, `Sound volume`, and `Diagnostics`. Split into `General` and `Recording` with sub-group cards. (`ui/settings_sheet.rs`, `view/settings/*`)
-- [ ] **C3-2 (High):** Merge 2-row `Review` tab into `Clips & Review` (5 balanced tabs total: `General`, `Recording`, `Clips & Review`, `Storage`, `Keybinds`), and fold `Updates & About` into `General`. (`ui/settings_sheet.rs`, `view/settings/catalog.rs`, `view/settings/*`)
-- [ ] **C3-3 (High):** Move `Search settings…` to the top of the left settings nav column and drop the redundant `"Changes are saved automatically."` subtitle to reclaim ~72 px vertical space. (`view/settings.rs`)
+- [x] **C3-1 (Critical):** `Recording` tab is a 12-row catch-all containing `Navigation style`, `Sound effects`, `Sound volume`, and `Diagnostics`. Split into `General` and `Recording` with sub-group cards. (`ui/settings_sheet.rs`, `view/settings/*`) — *done in `97832b5`*
+- [x] **C3-2 (High):** Merge 2-row `Review` tab into `Clips & Review` (5 balanced tabs total: `General`, `Recording`, `Clips & Review`, `Storage`, `Keybinds`), and fold `Updates & About` into `General`. (`ui/settings_sheet.rs`, `view/settings/catalog.rs`, `view/settings/*`) — *done in `97832b5`*
+- [x] **C3-3 (High):** Move `Search settings…` to the top of the left settings nav column and drop the redundant `"Changes are saved automatically."` subtitle to reclaim ~72 px vertical space. (`view/settings.rs`) — *done in `97832b5`*
 - [ ] **C3-4 (Medium):** Keybinds tab has 26 `"Change"` buttons and a `28 px` dead-space `RESET_SLOT` gutter on every row. Replace with direct click-to-record fixed-min-width keycap pills and inline reset only when modified. (`view/settings/keybinds.rs`)
-- [ ] **C3-5 (Medium):** Remove duplicate `Send feedback` row from Settings (already permanently in main sidebar/dock). (`view/settings/catalog.rs`, `view/settings/about.rs`)
-- [ ] **C3-6 (Low):** Move `Reset to default` in `Review` events out of a full `52 px` setting row into a compact header action beside `"Events shown"`. (`view/settings/review.rs`)
-- [ ] **C3-7 (Low):** Hide the 0% `Progress` bar on `Storage` when `storage_limit_gb` is `None`. (`view/settings/storage.rs`)
+- [x] **C3-5 (Medium):** Remove duplicate `Send feedback` row from Settings (already permanently in main sidebar/dock). (`view/settings/catalog.rs`, `view/settings/about.rs`) — *done in `97832b5`*
+- [x] **C3-6 (Low):** Move `Reset to default` in `Review` events out of a full `52 px` setting row into a compact header action beside `"Events shown"`. (`view/settings/review.rs`) — *done in `97832b5`*
+- [x] **C3-7 (Low):** Hide the 0% `Progress` bar on `Storage` when `storage_limit_gb` is `None`. (`view/settings/storage.rs`) — *done in `97832b5`*
 
 ### Cluster 4 — Motion, Layout Stability & Loading States
 - [ ] **C4-1 (Critical):** Dock auto-hide animates `dock-reserve` (`0` ↔ `52 px`), physically bouncing/resizing the video player when the pointer nears the bottom edge. Remove `dock-reserve`; float the dock as a pure overlay. (`view/screens.rs`, `view/shell/dock.rs`)
@@ -212,9 +212,9 @@ Many visible defects are not isolated micro-bugs—they are symptoms of seven st
 - [ ] **C6-8 (Low):** Add `1`–`7` keyboard shortcuts for Death Review tag chips and tooltips on Death Summary timeline dots. (`view/review/deaths.rs`, `view/review/death_summary.rs`)
 
 ### Cluster 7 — Design System, `rune-kit` Discipline & Accessibility
-- [ ] **C7-1 (High):** `review-video` is `focusable(true)` without `.label(...)`, triggering a live Rune a11y warning on every render. Add `.label("Game video")`. (`view/review.rs`)
+- [x] **C7-1 (High):** `review-video` is `focusable(true)` without `.label(...)`, triggering a live Rune a11y warning on every render. Add `.label("Game video")`. (`view/review.rs`) — *done in `84faaec`*
 - [ ] **C7-2 (Medium):** Four competing pill/badge implementations (`rune_kit::Badge`, `review::tone_pill`, `home::pill`, `home/feed::tinted_pill`). Consolidate into `rune_kit::Badge` + one thin tone helper so `Victory` / `Defeat` and event badges are consistent everywhere. (`view/review.rs`, `view/home.rs`, `view/home/feed.rs`, `view/home/last_game.rs`)
 - [ ] **C7-3 (Medium):** Custom `.fill(k.alpha(ink, 0.16))` override on `ButtonVariant::Neutral` in `home/actions.rs` violates `AGENTS.md` kit-discipline rule, and primary CTAs split between `Submit` and `Contrast`. Standardize on stock `rune-kit` button variants. (`view/home/actions.rs`, `view/review/toolbar.rs`, `view/overlays/*`)
 - [ ] **C7-4 (Medium):** `games/rows.rs` sets `.focusable(false)`, preventing keyboard Tab navigation into the games list. (`view/games/rows.rs`)
-- [ ] **C7-5 (Low):** `"Exit (Esc)"` (`theater.rs:75`) and `"Finish (Esc)"` (`deaths.rs:74`) hardcode `(Esc)` inside button text instead of using `.shortcut("Esc")`. (`view/review/theater.rs`, `view/review/deaths.rs`)
+- [x] **C7-5 (Low):** `"Exit (Esc)"` (`theater.rs:75`) and `"Finish (Esc)"` (`deaths.rs:74`) hardcode `(Esc)` inside button text instead of using `.shortcut("Esc")`. (`view/review/theater.rs`, `view/review/deaths.rs`) — *done in `00d7c24`*
 - [ ] **C7-6 (Low):** Panel tab label `"Events 7 of 10"` is verbose for a 280 px panel; tighten to `"Events"` + compact count (`7/10`). (`view/review/panel.rs`)
