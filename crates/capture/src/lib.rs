@@ -37,6 +37,7 @@ pub mod clock;
 pub mod com;
 pub mod crash;
 pub mod d3d;
+pub mod debug_layer;
 pub mod displays;
 #[cfg(any(test, feature = "fault-injection"))]
 pub mod fault;

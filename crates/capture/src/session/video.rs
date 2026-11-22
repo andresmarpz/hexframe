@@ -261,6 +261,10 @@ impl Video {
             ..
         } = self;
         power.release();
+        if matches!(exit, Exit::Lost(_)) {
+            crate::debug_layer::record_device_removed();
+        }
+        let live_debug = crate::debug_layer::attach(&gpu.device);
         let (finish, failure) = match exit {
             Exit::Stopped => (true, None),
             Exit::Closed => (true, Some("the captured window closed".to_string())),
@@ -280,6 +284,9 @@ impl Video {
         wgc.stop();
         drop(converter);
         drop(gpu);
+        if let Some(debug) = live_debug {
+            crate::debug_layer::report_live(&debug);
+        }
         drop(mf);
         drop(com);
         if let Some(reason) = failure {

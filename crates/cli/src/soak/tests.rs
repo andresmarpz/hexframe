@@ -52,6 +52,7 @@ fn verdict(samples: &[Sample], cycles: &[CycleResult], errors: &[String]) -> Ver
             min_saved: 2,
             require_usage: true,
             by_checkpoint: false,
+            device_removed: 0,
         },
         &limits(),
     )
@@ -69,6 +70,7 @@ fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
         out: Some(out),
         dir,
         keep: false,
+        d3d_debug: false,
         warmup_secs: 0.0,
         warmup_cycles: 0,
         max_mem_mb_per_min: 2.0,
@@ -193,6 +195,7 @@ fn recording_phase_sawtooth_is_not_a_leak_but_a_rising_idle_floor_is() {
                     min_saved: 2,
                     require_usage: true,
                     by_checkpoint,
+                    device_removed: 0,
                 },
                 &limits(),
             )
@@ -325,6 +328,7 @@ fn drops_and_the_wrong_encoder_fail_when_the_limits_say_so() {
         min_saved: 2,
         require_usage: true,
         by_checkpoint: false,
+        device_removed: 0,
     };
     let failures = evaluate(&run, &strict).failures;
     assert!(
@@ -342,4 +346,35 @@ fn unknown_profiles_and_the_unbuilt_cloaked_window_are_rejected() {
     assert!(cloaked.resolve().is_err());
     cloaked.profile = Some("smoke".to_owned());
     assert!(cloaked.resolve().is_ok());
+}
+
+#[test]
+fn a_removed_device_fails_the_run_and_the_debug_layer_notes_its_reports() {
+    let samples = samples(60, |_| 100 * MB, |_| 200);
+    let cycles = [good_cycle(1), good_cycle(2)];
+    let run = |device_removed| Run {
+        samples: &samples,
+        cycles: &cycles,
+        engine_errors: &[],
+        min_saved: 2,
+        require_usage: true,
+        by_checkpoint: false,
+        device_removed,
+    };
+    assert!(evaluate(&run(0), &limits()).passed);
+    let failures = evaluate(&run(2), &limits()).failures;
+    assert!(
+        failures.iter().any(|f| f.contains("removed 2 times")),
+        "{failures:?}"
+    );
+
+    let mut gpu = gpu::GpuReport::default();
+    assert!(gpu.notes().is_empty());
+    gpu.debug_layer = true;
+    assert!(gpu.notes()[0].contains("no live object report"));
+    gpu.live_objects = vec![gpu::LiveObjects {
+        count: 3,
+        lines: Vec::new(),
+    }];
+    assert!(gpu.notes()[0].contains(": 3 "));
 }

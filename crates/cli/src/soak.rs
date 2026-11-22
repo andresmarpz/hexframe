@@ -1,4 +1,5 @@
 mod check;
+mod gpu;
 mod meter;
 mod profiles;
 
@@ -20,6 +21,7 @@ use greyscreen_mp4::demux::Movie;
 use serde::Serialize;
 
 use check::{CycleResult, Limits, Run, Sample, Verdict, evaluate};
+use gpu::GpuReport;
 use meter::Meter;
 use profiles::WindowTarget;
 
@@ -53,6 +55,8 @@ pub(crate) struct Args {
     pub(crate) dir: Option<PathBuf>,
     #[arg(long)]
     pub(crate) keep: bool,
+    #[arg(long)]
+    pub(crate) d3d_debug: bool,
     #[arg(long, default_value_t = 60.0)]
     pub(crate) warmup_secs: f64,
     #[arg(long, default_value_t = 2)]
@@ -114,6 +118,7 @@ struct Report<'a> {
     samples: &'a [Sample],
     cycles: &'a [CycleResult],
     engine_errors: &'a [String],
+    gpu: &'a GpuReport,
     verdict: &'a Verdict,
 }
 
@@ -169,6 +174,9 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
         .with_context(|| format!("creating {}", output_dir.display()))?;
     let output_dir = std::path::absolute(&output_dir)
         .with_context(|| format!("resolving {}", output_dir.display()))?;
+    if args.d3d_debug {
+        gpu::enable_debug_layer();
+    }
     let settings = Settings {
         output_dir,
         auto_record: game_mode,
@@ -196,6 +204,7 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
         None => soak.run_cycles(&engine.cmd),
     }
     drop(engine);
+    soak.gpu = gpu::collect(args.d3d_debug);
     soak.discard_saved();
     soak.finish()
 }
@@ -209,6 +218,7 @@ struct Soak<'a> {
     samples: Vec<Sample>,
     cycles: Vec<CycleResult>,
     engine_errors: Vec<String>,
+    gpu: GpuReport,
     pending_folders: Vec<PathBuf>,
     recording: bool,
     stopped: bool,
@@ -226,6 +236,7 @@ impl<'a> Soak<'a> {
             samples: Vec::new(),
             cycles: Vec::new(),
             engine_errors: Vec::new(),
+            gpu: GpuReport::default(),
             pending_folders: Vec::new(),
             recording: false,
             stopped: false,
@@ -384,7 +395,7 @@ impl<'a> Soak<'a> {
             Some(_) => 1,
             None => self.args.cycles,
         };
-        let verdict = evaluate(
+        let mut verdict = evaluate(
             &Run {
                 samples: &self.samples,
                 cycles: &self.cycles,
@@ -392,9 +403,11 @@ impl<'a> Soak<'a> {
                 min_saved,
                 require_usage: cfg!(windows),
                 by_checkpoint: self.args.game_minutes.is_none(),
+                device_removed: self.gpu.device_removed,
             },
             &self.args.limits(),
         );
+        verdict.notes.extend(self.gpu.notes());
         let out = self.args.out_path();
         let report = Report {
             profile: self.args.profile.clone(),
@@ -406,6 +419,7 @@ impl<'a> Soak<'a> {
             samples: &self.samples,
             cycles: &self.cycles,
             engine_errors: &self.engine_errors,
+            gpu: &self.gpu,
             verdict: &verdict,
         };
         std::fs::write(&out, serde_json::to_vec_pretty(&report)?)

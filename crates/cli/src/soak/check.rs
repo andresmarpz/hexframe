@@ -53,6 +53,7 @@ pub(crate) struct Run<'a> {
     pub(crate) min_saved: u32,
     pub(crate) require_usage: bool,
     pub(crate) by_checkpoint: bool,
+    pub(crate) device_removed: u32,
 }
 
 pub(crate) fn slope_per_min(points: &[(f64, f64)]) -> Option<f64> {
@@ -215,6 +216,12 @@ pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
                 cycle.index, cycle.capture_errors
             ));
         }
+    }
+    if run.device_removed > 0 {
+        judge.failures.push(format!(
+            "the graphics device was removed {} times",
+            run.device_removed
+        ));
     }
     if let Some(first) = run.engine_errors.first() {
         judge.failures.push(format!(

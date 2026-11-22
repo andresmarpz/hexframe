@@ -12,12 +12,14 @@ use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
 };
 use windows::Win32::Graphics::Direct3D11::{
-    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_SDK_VERSION,
-    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Multithread,
+    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_CREATE_DEVICE_FLAG,
+    D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_SDK_VERSION, D3D11CreateDevice, ID3D11Device,
+    ID3D11DeviceContext, ID3D11Multithread,
 };
 use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, DXGI_ERROR_NOT_FOUND, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IDXGIAdapter,
-    IDXGIAdapter1, IDXGIDevice, IDXGIFactory1, IDXGIFactory6,
+    CreateDXGIFactory1, DXGI_ERROR_NOT_FOUND, DXGI_ERROR_SDK_COMPONENT_MISSING,
+    DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IDXGIAdapter, IDXGIAdapter1, IDXGIDevice, IDXGIFactory1,
+    IDXGIFactory6,
 };
 use windows::Win32::Graphics::Gdi::{
     HMONITOR, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MonitorFromWindow,
@@ -112,25 +114,12 @@ impl GpuDevice {
             |_| "unknown".to_owned(),
             |v| driver_version_text(v, desc.VendorId),
         );
-        let mut device = None;
-        let mut context = None;
-        // SAFETY: the out pointers refer to live locals and the adapter outlives the call.
-        unsafe {
-            D3D11CreateDevice(
-                &base,
-                D3D_DRIVER_TYPE_UNKNOWN,
-                HMODULE::default(),
-                D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
-                Some(levels),
-                D3D11_SDK_VERSION,
-                Some(&mut device),
-                None,
-                Some(&mut context),
-            )?;
-        }
-        let (device, context) = device
-            .zip(context)
-            .ok_or_else(|| windows::core::Error::from(DXGI_ERROR_NOT_FOUND))?;
+        let base_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT;
+        let (device, context) = if crate::debug_layer::enabled() {
+            create_debug_or_plain(&base, base_flags, levels)?
+        } else {
+            create_raw(&base, base_flags, levels)?
+        };
         let multithread: ID3D11Multithread = context.cast()?;
         // SAFETY: the interface was just obtained from the live immediate context.
         let _previous = unsafe { multithread.SetMultithreadProtected(true) };
@@ -158,6 +147,46 @@ impl GpuDevice {
             scheduling,
         })
     }
+}
+
+fn create_debug_or_plain(
+    adapter: &IDXGIAdapter,
+    flags: D3D11_CREATE_DEVICE_FLAG,
+    levels: &[D3D_FEATURE_LEVEL],
+) -> windows::core::Result<(ID3D11Device, ID3D11DeviceContext)> {
+    match create_raw(adapter, flags | D3D11_CREATE_DEVICE_DEBUG, levels) {
+        Err(error) if error.code() == DXGI_ERROR_SDK_COMPONENT_MISSING => {
+            tracing::warn!("the d3d debug layer is not installed, creating a plain device");
+            create_raw(adapter, flags, levels)
+        }
+        other => other,
+    }
+}
+
+fn create_raw(
+    adapter: &IDXGIAdapter,
+    flags: D3D11_CREATE_DEVICE_FLAG,
+    levels: &[D3D_FEATURE_LEVEL],
+) -> windows::core::Result<(ID3D11Device, ID3D11DeviceContext)> {
+    let mut device = None;
+    let mut context = None;
+    // SAFETY: the out pointers refer to live locals and the adapter outlives the call.
+    unsafe {
+        D3D11CreateDevice(
+            adapter,
+            D3D_DRIVER_TYPE_UNKNOWN,
+            HMODULE::default(),
+            flags,
+            Some(levels),
+            D3D11_SDK_VERSION,
+            Some(&mut device),
+            None,
+            Some(&mut context),
+        )?;
+    }
+    device
+        .zip(context)
+        .ok_or_else(|| windows::core::Error::from(DXGI_ERROR_NOT_FOUND))
 }
 
 const GPU_THREAD_PRIORITY: i32 = 7;
