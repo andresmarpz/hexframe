@@ -12,6 +12,7 @@ fn args() -> Args {
         preset: Preset::High,
         rc: None,
         quality: None,
+        quality_vs_speed: None,
         bitrate_mbps: None,
         peak_mbps: None,
     }
@@ -49,6 +50,17 @@ fn quality_flag_overrides_the_preset_and_vbr_rejects_it() {
         ..args()
     };
     assert!(build_config(&both).is_err());
+}
+
+#[test]
+fn quality_vs_speed_flag_reaches_the_config_and_defaults_to_unset() {
+    assert_eq!(build_config(&args()).unwrap().quality_vs_speed, None);
+    let cfg = build_config(&Args {
+        quality_vs_speed: Some(50),
+        ..args()
+    })
+    .unwrap();
+    assert_eq!(cfg.quality_vs_speed, Some(50));
 }
 
 #[test]

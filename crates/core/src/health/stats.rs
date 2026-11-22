@@ -128,7 +128,6 @@ pub struct CaptureStats {
     pub wake_lateness: WakeLateness,
     pub pacer_spin: SpinShare,
     pub first_output_ms: Option<u32>,
-    pub encoder_stalls_early: u32,
     pub audio_packets: u64,
     pub audio_discontinuities: u64,
     pub audio_gaps: u64,

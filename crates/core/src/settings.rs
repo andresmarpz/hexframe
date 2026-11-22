@@ -287,6 +287,7 @@ impl Settings {
             video_bitrate: mean.round() as u32,
             video_peak: (mean * PEAK_FACTOR).round() as u32,
             quality: Some(self.quality.target_quality()),
+            quality_vs_speed: None,
             gop_frames: self.fps,
             audio: self.audio,
             audio_bitrate: AUDIO_BITRATE,

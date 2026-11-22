@@ -26,7 +26,6 @@ pub struct DiagSample {
     pub spin_pct: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_output_ms: Option<u32>,
-    pub encoder_stalls_early: u32,
     pub torn: u64,
     pub copy_wait_ms_max: f64,
     pub audio_packets: u64,
@@ -203,7 +202,6 @@ impl HealthTracker {
             wake_late_max_us: (stats.wake_lateness.0.max_ms() * 1000.0).round() as u32,
             spin_pct: stats.pacer_spin.pct(),
             first_output_ms: stats.first_output_ms,
-            encoder_stalls_early: stats.encoder_stalls_early,
             torn: stats.torn_dropped.saturating_sub(marks.torn),
             copy_wait_ms_max: round1(f64::from(stats.window_copy_wait_max_us) / 1000.0),
             audio_packets: self.audio.packets,

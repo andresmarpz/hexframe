@@ -145,6 +145,7 @@ mod on_fake {
             mean_bitrate: 8_000_000,
             peak_bitrate: 12_000_000,
             quality: None,
+            quality_vs_speed: None,
             gop_frames: 120,
         }
     }

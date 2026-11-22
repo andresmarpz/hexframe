@@ -58,6 +58,8 @@ pub struct CaptureConfig {
     pub video_bitrate: u32,
     pub video_peak: u32,
     pub quality: Option<u32>,
+    #[serde(default)]
+    pub quality_vs_speed: Option<u32>,
     pub gop_frames: u32,
     pub audio: bool,
     pub audio_bitrate: u32,

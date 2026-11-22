@@ -60,6 +60,8 @@ enum Command {
         rc: Option<RateControl>,
         #[arg(long, value_parser = clap::value_parser!(u32).range(0..=100))]
         quality: Option<u32>,
+        #[arg(long, value_parser = clap::value_parser!(u32).range(0..=100))]
+        quality_vs_speed: Option<u32>,
         #[arg(long, value_name = "MBPS")]
         bitrate: Option<f64>,
         #[arg(long, value_name = "MBPS")]
@@ -120,6 +122,7 @@ fn main() -> ExitCode {
             preset,
             rc,
             quality,
+            quality_vs_speed,
             bitrate,
             peak,
         } => record::run(&record::Args {
@@ -133,6 +136,7 @@ fn main() -> ExitCode {
             preset,
             rc,
             quality,
+            quality_vs_speed,
             bitrate_mbps: bitrate,
             peak_mbps: peak,
         }),

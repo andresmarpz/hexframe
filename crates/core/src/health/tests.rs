@@ -446,12 +446,10 @@ fn diag_sample_reports_pacer_stats() {
     stats.wake_lateness.0.record(120);
     stats.pacer_spin.add(30, 1_000);
     stats.first_output_ms = Some(80);
-    stats.encoder_stalls_early = 1;
     let sample = tracker.on_stats(&stats, Queues::default());
     assert_eq!(sample.wake_late_p99_us, 120);
     assert!((sample.spin_pct - 3.0).abs() < 0.001);
     assert_eq!(sample.first_output_ms, Some(80));
-    assert_eq!(sample.encoder_stalls_early, 1);
 }
 
 #[test]

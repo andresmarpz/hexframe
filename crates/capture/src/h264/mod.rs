@@ -132,6 +132,7 @@ impl H264Encoder {
             mean_bitrate: cfg.video_bitrate,
             peak_bitrate: cfg.video_peak.max(cfg.video_bitrate),
             quality: cfg.quality,
+            quality_vs_speed: cfg.quality_vs_speed,
             gop_frames: cfg.gop_frames,
         };
         let opened = match kind {

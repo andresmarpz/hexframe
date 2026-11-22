@@ -27,6 +27,7 @@ pub(crate) struct Stats {
     log_mark: Mark,
     snapshot_start: Instant,
     first_submit: Option<Instant>,
+    last_wake: Option<Instant>,
 }
 
 impl Stats {
@@ -38,19 +39,29 @@ impl Stats {
             log_mark: Mark::default(),
             snapshot_start: Instant::now(),
             first_submit: None,
+            last_wake: None,
         }
     }
 
-    pub(crate) fn note_wake(&mut self, started: Instant, spin_started: Option<Instant>, late: Hns) {
+    pub(crate) fn note_wake(&mut self, spin_started: Option<Instant>, late: Option<Hns>) {
         let micros = |d: Duration| u64::try_from(d.as_micros()).unwrap_or(u64::MAX);
-        let late_us = u32::try_from(late / 10).unwrap_or(u32::MAX);
-        self.c.wake_lateness.0.record(late_us);
+        if let Some(late) = late {
+            let late_us = u32::try_from(late / 10).unwrap_or(u32::MAX);
+            self.c.wake_lateness.0.record(late_us);
+        }
         let spin = spin_started.map_or(0, |at| micros(at.elapsed()));
-        self.c.pacer_spin.add(spin, micros(started.elapsed()));
+        let wall = self.last_wake.map_or(0, |at| micros(at.elapsed()));
+        self.c.pacer_spin.add(spin, wall);
+        self.last_wake = Some(Instant::now());
     }
 
     pub(crate) fn note_submit(&mut self) {
         self.first_submit.get_or_insert_with(Instant::now);
+    }
+
+    pub(crate) fn ms_since_first_submit(&self) -> Option<u64> {
+        self.first_submit
+            .map(|at| u64::try_from(at.elapsed().as_millis()).unwrap_or(u64::MAX))
     }
 
     pub(crate) fn note_encoded(&mut self, encoded: u64) {
@@ -60,12 +71,6 @@ impl Stats {
         if let Some(at) = self.first_submit {
             self.c.first_output_ms =
                 Some(u32::try_from(at.elapsed().as_millis()).unwrap_or(u32::MAX));
-        }
-    }
-
-    pub(crate) fn note_encoder_stall(&mut self, encoded: u64) {
-        if encoded == 0 {
-            self.c.encoder_stalls_early += 1;
         }
     }
 
@@ -116,7 +121,7 @@ impl Stats {
 }
 
 pub(crate) fn wait_for(pacer: &Pacer, stop: &AtomicBool, stats: &mut Stats) -> bool {
-    let started = Instant::now();
+    let mut waited = false;
     let mut spin_started: Option<Instant> = None;
     loop {
         if stop.load(Ordering::Acquire) {
@@ -124,9 +129,10 @@ pub(crate) fn wait_for(pacer: &Pacer, stop: &AtomicBool, stats: &mut Stats) -> b
         }
         let remaining = pacer.remaining(mono_now());
         if remaining <= 0 {
-            stats.note_wake(started, spin_started, -remaining);
+            stats.note_wake(spin_started, waited.then_some(-remaining));
             return true;
         }
+        waited = true;
         if remaining > SPIN_MARGIN {
             let hns = u64::try_from(remaining - SPIN_MARGIN).unwrap_or(0);
             std::thread::sleep(Duration::from_nanos(hns * 100));

@@ -17,6 +17,7 @@ fn config() -> CaptureConfig {
         video_bitrate: 4_000_000,
         video_peak: 6_000_000,
         quality: None,
+        quality_vs_speed: None,
         gop_frames: 30,
         audio: false,
         audio_bitrate: 128_000,

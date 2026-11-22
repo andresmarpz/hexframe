@@ -33,6 +33,7 @@ fn spec(quality: Option<u32>) -> Spec {
         mean_bitrate: 8_000_000,
         peak_bitrate: 12_000_000,
         quality,
+        quality_vs_speed: None,
         gop_frames: 120,
     }
 }

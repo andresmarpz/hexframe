@@ -26,7 +26,7 @@ use super::{H264Error, Mode, Result};
 use crate::d3d::GpuDevice;
 
 const MAX_LISTED_TYPES: u32 = 64;
-const HARDWARE_QUALITY_VS_SPEED: u32 = 100;
+const DEFAULT_HARDWARE_QUALITY_VS_SPEED: u32 = 100;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Spec {
@@ -36,6 +36,7 @@ pub(super) struct Spec {
     pub(super) mean_bitrate: u32,
     pub(super) peak_bitrate: u32,
     pub(super) quality: Option<u32>,
+    pub(super) quality_vs_speed: Option<u32>,
     pub(super) gop_frames: u32,
 }
 
@@ -242,7 +243,12 @@ fn configure(
         return Err(open_error::at(OpenStep::D3dManager, vendor_id, &error));
     }
     let (input_id, output_id) = stream_ids(&*mft)?;
-    let (mode, mismatches) = apply_codec_properties(&*mft, spec, HARDWARE_QUALITY_VS_SPEED)?;
+    let (mode, mismatches) = apply_codec_properties(
+        &*mft,
+        spec,
+        spec.quality_vs_speed
+            .unwrap_or(DEFAULT_HARDWARE_QUALITY_VS_SPEED),
+    )?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
     // SAFETY: the type is live and not modified after this point.
     unsafe {

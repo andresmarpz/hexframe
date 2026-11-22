@@ -102,8 +102,11 @@ impl Video {
             .watchdog
             .stalled(mono_now(), self.sink.encoded(), submitting)
         {
-            self.stats.note_encoder_stall(self.sink.encoded());
-            self.publish_stats();
+            tracing::error!(
+                encoder = %self.encoder.encoder_name(),
+                since_first_submit_ms = self.stats.ms_since_first_submit(),
+                "the encoder produced no output for too long"
+            );
             return Err(Exit::Failed(encoder::stopped_reason(
                 "no frames came out for too long",
             )));

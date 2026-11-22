@@ -293,6 +293,7 @@ fn bitrate_scales_down_to_a_smaller_encode_size() {
         video_bitrate: 80_000_000,
         video_peak: 120_000_000,
         quality: Some(70),
+        quality_vs_speed: None,
         gop_frames: 60,
         audio: true,
         audio_bitrate: 192_000,

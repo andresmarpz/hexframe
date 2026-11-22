@@ -28,6 +28,7 @@ pub(crate) struct Args {
     pub(crate) preset: Preset,
     pub(crate) rc: Option<RateControl>,
     pub(crate) quality: Option<u32>,
+    pub(crate) quality_vs_speed: Option<u32>,
     pub(crate) bitrate_mbps: Option<f64>,
     pub(crate) peak_mbps: Option<f64>,
 }
@@ -74,6 +75,7 @@ pub(crate) fn build_config(args: &Args) -> Result<CaptureConfig> {
         (_, Some(value)) => cfg.quality = Some(value),
         (Some(RateControl::Quality), None) | (None, None) => {}
     }
+    cfg.quality_vs_speed = args.quality_vs_speed;
     if args.bitrate_mbps.is_some() || args.peak_mbps.is_some() {
         if let Some(mbps) = args.bitrate_mbps {
             cfg.video_bitrate = mbps_to_bits("bitrate", mbps)?;
