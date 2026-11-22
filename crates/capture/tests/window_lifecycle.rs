@@ -22,7 +22,7 @@ const POLL: Duration = Duration::from_millis(5);
 const SAMPLE: Duration = Duration::from_millis(250);
 const RESIZE_SETTLE: Duration = Duration::from_millis(400);
 const LONGEST_RESIZE_GAP: Duration = Duration::from_secs(1);
-const CLOSE_OBSERVE: Duration = Duration::from_secs(10);
+const CLOSE_OBSERVE: Duration = Duration::from_secs(2);
 const MIN_FPS: f64 = 30.0;
 const OPTIONS: WgcOptions = WgcOptions {
     fps: 60,

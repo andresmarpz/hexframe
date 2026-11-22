@@ -16,9 +16,10 @@ use windows::Graphics::Capture::{
 };
 use windows::Graphics::DirectX::DirectXPixelFormat;
 use windows::Graphics::SizeInt32;
-use windows::Win32::Foundation::E_POINTER;
+use windows::Win32::Foundation::{E_POINTER, HWND};
 use windows::Win32::Graphics::Direct3D11::{D3D11_TEXTURE2D_DESC, ID3D11Texture2D};
 use windows::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
+use windows::Win32::UI::WindowsAndMessaging::IsWindow;
 use windows::core::{IInspectable, Interface};
 
 use self::setup::{configure_session, create_item};
@@ -95,6 +96,7 @@ pub struct WgcCapture {
     session: Option<GraphicsCaptureSession>,
     frame_token: Option<i64>,
     closed_token: Option<i64>,
+    window: Option<isize>,
     border_hidden: bool,
 }
 
@@ -167,6 +169,10 @@ impl WgcCapture {
             session: None,
             frame_token: None,
             closed_token: None,
+            window: match target {
+                CaptureTarget::GameWindow { hwnd, .. } => Some(*hwnd),
+                CaptureTarget::PrimaryMonitor => None,
+            },
             border_hidden: true,
         };
         tracing::info!(step = "session", "graphics capture");
@@ -254,7 +260,18 @@ impl WgcCapture {
     }
 
     pub fn is_closed(&self) -> bool {
-        self.shared.closed.load(Ordering::Acquire)
+        if self.shared.closed.load(Ordering::Acquire) {
+            return true;
+        }
+        let gone = self.window.is_some_and(|hwnd| {
+            // SAFETY: IsWindow only reads the handle value and accepts stale handles.
+            !unsafe { IsWindow(Some(HWND(hwnd as *mut core::ffi::c_void))) }.as_bool()
+        });
+        if gone {
+            self.shared.closed.store(true, Ordering::Release);
+            tracing::info!("capture window destroyed");
+        }
+        gone
     }
 
     pub fn probe(&self) -> PublishProbe {
