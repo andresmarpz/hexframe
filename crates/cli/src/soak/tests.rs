@@ -11,6 +11,8 @@ fn limits() -> Limits {
         thread_growth: 4,
         warmup_secs: 10.0,
         warmup_cycles: 1,
+        max_dropped_pct: None,
+        encoder_contains: None,
     }
 }
 
@@ -36,6 +38,7 @@ fn good_cycle(index: u32) -> CycleResult {
         dropped_pct: 0.0,
         capture_errors: 0,
         problem: None,
+        health: None,
         diag_seconds: Vec::new(),
     }
 }
@@ -63,7 +66,7 @@ fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
         seconds: 1,
         gap_secs: 0,
         game_minutes: None,
-        out,
+        out: Some(out),
         dir,
         keep: false,
         warmup_secs: 0.0,
@@ -72,6 +75,10 @@ fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
         max_gpu_mb_per_min: 2.0,
         max_handle_growth: 50,
         max_thread_growth: 4,
+        max_dropped_pct: None,
+        encoder_contains: None,
+        min_video_secs: None,
+        until_saved: false,
     }
 }
 
@@ -240,6 +247,7 @@ fn zero_cycles_are_rejected() {
 fn with_profile(name: &str) -> Args {
     Args {
         profile: Some(name.to_owned()),
+        out: None,
         ..args(8, PathBuf::from("x.json"), None)
     }
 }
@@ -267,10 +275,63 @@ fn every_profile_resolves_to_valid_args_with_unique_names() {
 }
 
 #[test]
-fn a_long_profile_covers_the_three_hour_limit() {
+fn the_three_hour_profile_waits_for_a_recording_that_reaches_the_limit() {
     let resolved = with_profile("av-180").resolve().unwrap();
-    assert!(resolved.game_minutes.unwrap() > 180);
-    assert!(resolved.warmup_secs >= 300.0);
+    assert!(resolved.until_saved);
+    assert!(resolved.game_minutes.unwrap() >= 200);
+    assert!(resolved.min_video_secs.unwrap() > 10_000.0);
+}
+
+#[test]
+fn the_overnight_profile_needs_no_one_at_the_pc() {
+    let resolved = with_profile("long-8h").resolve().unwrap();
+    assert_eq!(resolved.game_minutes, None);
+    assert!(resolved.cycles >= 3);
+    assert!(u64::from(resolved.cycles) * u64::from(resolved.seconds) >= 8 * 3600 - 3600);
+}
+
+#[test]
+fn a_profile_names_its_report_unless_out_is_given() {
+    let resolved = with_profile("smoke").resolve().unwrap();
+    assert_eq!(
+        resolved.out_path(),
+        PathBuf::from("greyscreen-soak-smoke.json")
+    );
+    let mut given = with_profile("smoke");
+    given.out = Some(PathBuf::from("mine.json"));
+    assert_eq!(
+        given.resolve().unwrap().out_path(),
+        PathBuf::from("mine.json")
+    );
+}
+
+#[test]
+fn drops_and_the_wrong_encoder_fail_when_the_limits_say_so() {
+    let mut strict = limits();
+    strict.max_dropped_pct = Some(0.0);
+    strict.encoder_contains = Some("Microsoft H.264");
+    let samples = samples(60, |_| 100 * MB, |_| 200);
+    let mut cycle = good_cycle(1);
+    cycle.dropped_pct = 0.5;
+    cycle.health = Some(greyscreen_core::health::RecordingHealth {
+        encoder: "NVIDIA H.264 Encoder MFT".to_owned(),
+        ..Default::default()
+    });
+    let cycles = [cycle, good_cycle(2)];
+    let run = Run {
+        samples: &samples,
+        cycles: &cycles,
+        engine_errors: &[],
+        min_saved: 2,
+        require_usage: true,
+        by_checkpoint: false,
+    };
+    let failures = evaluate(&run, &strict).failures;
+    assert!(
+        failures.iter().any(|f| f.contains("dropped 0.50%")),
+        "{failures:?}"
+    );
+    assert_eq!(failures.iter().filter(|f| f.contains("encoder")).count(), 2);
 }
 
 #[test]

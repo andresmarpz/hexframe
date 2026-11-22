@@ -1,12 +1,12 @@
 # Soak profiles (S4 session)
 
-`greyscreen-cli soak --profile <name>` runs a named soak through the real engine and writes the JSON report (`--out`, default `greyscreen-soak.json`). `greyscreen-cli soak --list-profiles` prints every profile with its setup. The profiles and their limits live in `crates/cli/src/soak/profiles.rs`. A profile cannot be mixed with the mode and limit flags; `--out`, `--dir` and `--keep` still work.
+`greyscreen-cli soak --profile <name>` runs a named soak through the real engine and writes the JSON report (`--out`; default `greyscreen-soak-<profile>.json`, so profiles run in a row do not overwrite each other; the report names its profile in `profile`). `greyscreen-cli soak --list-profiles` prints every profile with its setup. The profiles and their limits live in `crates/cli/src/soak/profiles.rs`. A profile cannot be mixed with the mode and limit flags; `--out`, `--dir` and `--keep` still work.
 
 Run on the Windows PC with `greyscreen-cli.exe`. The S4 session budgets about 2 hours; the long runs need extra PC time.
 
 ## Window target
 
-Window-driven profiles (`game-*`, `av-*`, `long-8h`) record League: start the soak, then play or replay games in a session Andres has freed. `--window league` is the default. `--window cloaked` is reserved for a cloaked test window if issue #31 allows it; it is rejected until that window exists.
+Window-driven profiles (`game-*`, `av-*`) record League: start the soak, then play live games in a session Andres has freed (Practice Tool works). The League poller skips replays and TFT, so those save nothing and the run fails with "0 recordings saved". `--window league` is the default. `--window cloaked` is reserved for a cloaked test window if issue #31 allows it; it is rejected until that window exists.
 
 ## Profiles
 
@@ -18,19 +18,19 @@ Window-driven profiles (`game-*`, `av-*`, `long-8h`) record League: start the so
 | `game-30` | 30 min of League | memory, GPU memory, handles and threads flat over a game |
 | `game-minimised-30` | 30 min, game minimised | recording with a minimised game |
 | `game-hags-30` | 30 min, HAGS on | recording with hardware-accelerated GPU scheduling |
-| `game-software-30` | 30 min, software encoder | flat allocations with the software encoder (an iGPU or a forced software run) |
-| `game-hdd-40` | 40 min, `--dir` on an HDD or USB stick | no drops: `dropped_pct` stays 0 |
+| `game-software-30` | 30 min, software encoder | flat allocations with the software encoder; fails when the recording's `health.encoder` is not the Microsoft software encoder. Nothing forces it: run on a PC where the hardware encoder is missing or fails to open |
+| `game-hdd-40` | 40 min, `--dir` on an HDD or USB stick | no drops: the run fails when a recording's `dropped_pct` is above 0 |
 | `av-60` | 60 min of game loopback | A/V numbers for #75 |
-| `av-180` | 190 min | one recording that runs into the engine's 3-hour limit and finalises cleanly |
-| `long-8h` | 480 min | back-to-back recordings; only when Andres frees the PC overnight |
+| `av-180` | up to 200 min, ends at the first saved recording | one recording that runs into the engine's 3-hour limit and finalises cleanly; fails when the video is under 10700 s, so start the game in the first 20 minutes |
+| `long-8h` | 3 test recordings of 9600 s on the primary monitor | back-to-back recordings with no one at the PC; only when Andres frees the PC overnight; too few checkpoints for the leak slopes, so they are noted and not judged |
 
 Recordings stop at the engine's 3-hour limit, so there is no single 8-hour recording.
 
 ## Pass limits
 
-The default limits are 2 MB per minute for private bytes and for GPU memory, 50 handles of growth and 4 threads of growth, measured after a warm-up (60 s and 2 cycles; 300 s for `av-180` and `long-8h`). A run also fails on a missing or unplayable recording, an engine error or a dead engine.
+The default limits are 2 MB per minute for private bytes and for GPU memory, 50 handles of growth and 4 threads of growth, measured after a warm-up (60 s and 2 cycles). A run also fails on a missing or unplayable recording, an engine error or a dead engine.
 
-The soak judges leaks, saved files and engine errors. It does not judge A/V skew, clock drift, discontinuities or noise bursts: read them from the per-second diagnostics kept in the report (`cycles[].diag_seconds`), under #75. If `game-hdd-40` shows write stalls, batch small writes as OBS's muxer does (1 MB drain chunks, 64 KB minimum write, 256 MB cap).
+The soak judges leaks, saved files, engine errors, drops (`game-hdd-40`) and the encoder (`game-software-30`). It does not judge A/V skew, clock drift, discontinuities or noise bursts. Where the numbers are: A/V skew is `av_skew_ms` in the per-second lines of `cycles[].diag_seconds`; clock drift, discontinuities and gaps are `drift_ms`, `discontinuities` and `gaps` in `cycles[].health.audio`, copied from the recording's meta, so they survive the folder being deleted without `--keep`. Noise bursts are not measured yet. Read them under #75. If `game-hdd-40` shows write stalls, batch small writes as OBS's muxer does (1 MB drain chunks, 64 KB minimum write, 256 MB cap).
 
 ## Not yet runnable
 

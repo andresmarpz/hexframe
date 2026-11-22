@@ -47,8 +47,8 @@ pub(crate) struct Args {
     pub(crate) gap_secs: u32,
     #[arg(long, value_name = "MINUTES")]
     pub(crate) game_minutes: Option<u32>,
-    #[arg(long, default_value = "greyscreen-soak.json")]
-    pub(crate) out: PathBuf,
+    #[arg(long)]
+    pub(crate) out: Option<PathBuf>,
     #[arg(long)]
     pub(crate) dir: Option<PathBuf>,
     #[arg(long)]
@@ -65,9 +65,23 @@ pub(crate) struct Args {
     pub(crate) max_handle_growth: u32,
     #[arg(long, default_value_t = 4)]
     pub(crate) max_thread_growth: u32,
+    #[arg(skip)]
+    pub(crate) max_dropped_pct: Option<f64>,
+    #[arg(skip)]
+    pub(crate) encoder_contains: Option<&'static str>,
+    #[arg(skip)]
+    pub(crate) min_video_secs: Option<f64>,
+    #[arg(skip)]
+    pub(crate) until_saved: bool,
 }
 
 impl Args {
+    fn out_path(&self) -> PathBuf {
+        self.out
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("greyscreen-soak.json"))
+    }
+
     fn limits(&self) -> Limits {
         Limits {
             mem_mb_per_min: self.max_mem_mb_per_min,
@@ -76,6 +90,8 @@ impl Args {
             thread_growth: self.max_thread_growth,
             warmup_secs: self.warmup_secs,
             warmup_cycles: self.warmup_cycles,
+            max_dropped_pct: self.max_dropped_pct,
+            encoder_contains: self.encoder_contains,
         }
     }
 
@@ -92,6 +108,7 @@ impl Args {
 
 #[derive(Serialize)]
 struct Report<'a> {
+    profile: Option<String>,
     mode: String,
     limits: Limits,
     samples: &'a [Sample],
@@ -263,11 +280,11 @@ impl<'a> Soak<'a> {
 
     fn run_games(&mut self, cmd: &Sender<EngineCmd>, minutes: u32) {
         println!("waiting for games for {minutes} minutes");
-        self.pump(
+        let saved = self.pump(
             self.started + Duration::from_secs(u64::from(minutes) * 60),
-            false,
+            self.args.until_saved,
         );
-        if self.recording && self.send(cmd, EngineCmd::StopRecording) {
+        if !saved && self.recording && self.send(cmd, EngineCmd::StopRecording) {
             self.pump(Instant::now() + GAME_STOP_GRACE, true);
         }
     }
@@ -336,7 +353,7 @@ impl<'a> Soak<'a> {
     fn on_saved(&mut self, entry: &RecordingEntry) {
         let index = self.cycles.len() as u32 + 1;
         let min_secs = match self.args.game_minutes {
-            Some(_) => MIN_GAME_VIDEO_SECS,
+            Some(_) => self.args.min_video_secs.unwrap_or(MIN_GAME_VIDEO_SECS),
             None => f64::from(self.args.seconds) * 0.5,
         };
         let result = judge_recording(index, entry, min_secs);
@@ -376,7 +393,9 @@ impl<'a> Soak<'a> {
             },
             &self.args.limits(),
         );
+        let out = self.args.out_path();
         let report = Report {
+            profile: self.args.profile.clone(),
             mode: match self.args.game_minutes {
                 Some(minutes) => format!("games {minutes} min"),
                 None => format!("{} cycles of {} s", self.args.cycles, self.args.seconds),
@@ -387,9 +406,9 @@ impl<'a> Soak<'a> {
             engine_errors: &self.engine_errors,
             verdict: &verdict,
         };
-        std::fs::write(&self.args.out, serde_json::to_vec_pretty(&report)?)
-            .with_context(|| format!("writing {}", self.args.out.display()))?;
-        print_verdict(&verdict, &self.args.out);
+        std::fs::write(&out, serde_json::to_vec_pretty(&report)?)
+            .with_context(|| format!("writing {}", out.display()))?;
+        print_verdict(&verdict, &out);
         Ok(verdict)
     }
 }
@@ -416,6 +435,7 @@ fn missing_recording(index: u32, waited: Duration) -> CycleResult {
         dropped_pct: 0.0,
         capture_errors: 0,
         diag_seconds: Vec::new(),
+        health: None,
         problem: Some(format!(
             "no saved recording {} s after the start",
             (waited + SAVE_GRACE).as_secs()
@@ -436,6 +456,7 @@ fn judge_recording(index: u32, entry: &RecordingEntry, min_secs: f64) -> CycleRe
         dropped_pct: health.map_or(0.0, |h| h.dropped_pct),
         capture_errors: health.map_or(0, |h| h.capture_errors),
         problem,
+        health: entry.meta.health.clone(),
         diag_seconds: diag_seconds(&entry.folder),
     }
 }

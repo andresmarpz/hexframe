@@ -23,6 +23,8 @@ pub(crate) struct Limits {
     pub(crate) thread_growth: u32,
     pub(crate) warmup_secs: f64,
     pub(crate) warmup_cycles: u32,
+    pub(crate) max_dropped_pct: Option<f64>,
+    pub(crate) encoder_contains: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -33,6 +35,7 @@ pub(crate) struct CycleResult {
     pub(crate) dropped_pct: f64,
     pub(crate) capture_errors: u32,
     pub(crate) problem: Option<String>,
+    pub(crate) health: Option<greyscreen_core::health::RecordingHealth>,
     pub(crate) diag_seconds: Vec<serde_json::Value>,
 }
 
@@ -187,6 +190,24 @@ pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
             judge
                 .failures
                 .push(format!("recording {}: {problem}", cycle.index));
+        }
+        if let Some(max) = limits.max_dropped_pct
+            && cycle.dropped_pct > max
+        {
+            judge.failures.push(format!(
+                "recording {}: dropped {:.2}% of frames, limit {max:.2}%",
+                cycle.index, cycle.dropped_pct
+            ));
+        }
+        if let Some(wanted) = limits.encoder_contains {
+            let used = cycle.health.as_ref().map(|h| h.encoder.as_str());
+            if !used.is_some_and(|e| e.contains(wanted)) {
+                judge.failures.push(format!(
+                    "recording {}: encoder {:?}, expected {wanted:?}",
+                    cycle.index,
+                    used.unwrap_or("unknown")
+                ));
+            }
         }
         if cycle.capture_errors > 0 {
             judge.failures.push(format!(

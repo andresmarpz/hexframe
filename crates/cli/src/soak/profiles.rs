@@ -26,6 +26,8 @@ pub(crate) struct ProfileLimits {
     pub(crate) max_gpu_mb_per_min: f64,
     pub(crate) max_handle_growth: u32,
     pub(crate) max_thread_growth: u32,
+    pub(crate) max_dropped_pct: Option<f64>,
+    pub(crate) encoder_contains: Option<&'static str>,
 }
 
 const DEFAULT_LIMITS: ProfileLimits = ProfileLimits {
@@ -35,12 +37,11 @@ const DEFAULT_LIMITS: ProfileLimits = ProfileLimits {
     max_gpu_mb_per_min: 2.0,
     max_handle_growth: 50,
     max_thread_growth: 4,
+    max_dropped_pct: None,
+    encoder_contains: None,
 };
 
-const LONG_LIMITS: ProfileLimits = ProfileLimits {
-    warmup_secs: 300.0,
-    ..DEFAULT_LIMITS
-};
+const SOFTWARE_ENCODER: &str = "Microsoft H.264 Encoder MFT";
 
 pub(crate) struct Profile {
     pub(crate) name: &'static str,
@@ -49,6 +50,8 @@ pub(crate) struct Profile {
     pub(crate) shape: Shape,
     pub(crate) limits: ProfileLimits,
     pub(crate) uses_window: bool,
+    pub(crate) min_video_secs: Option<f64>,
+    pub(crate) until_saved: bool,
 }
 
 const fn cycles(cycles: u32, seconds: u32, gap_secs: u32) -> Shape {
@@ -67,6 +70,8 @@ pub(crate) const PROFILES: &[Profile] = &[
         shape: cycles(3, 10, 3),
         limits: DEFAULT_LIMITS,
         uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "capture-cycles-200",
@@ -75,6 +80,8 @@ pub(crate) const PROFILES: &[Profile] = &[
         shape: cycles(200, 5, 2),
         limits: DEFAULT_LIMITS,
         uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "encoder-sessions-50",
@@ -83,6 +90,8 @@ pub(crate) const PROFILES: &[Profile] = &[
         shape: cycles(50, 15, 2),
         limits: DEFAULT_LIMITS,
         uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "game-30",
@@ -91,6 +100,8 @@ pub(crate) const PROFILES: &[Profile] = &[
         shape: Shape::Games { minutes: 30 },
         limits: DEFAULT_LIMITS,
         uses_window: true,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "game-minimised-30",
@@ -99,6 +110,8 @@ pub(crate) const PROFILES: &[Profile] = &[
         shape: Shape::Games { minutes: 30 },
         limits: DEFAULT_LIMITS,
         uses_window: true,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "game-hags-30",
@@ -107,46 +120,64 @@ pub(crate) const PROFILES: &[Profile] = &[
         shape: Shape::Games { minutes: 30 },
         limits: DEFAULT_LIMITS,
         uses_window: true,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "game-software-30",
         summary: "30 minutes of software encoding with flat allocations",
-        setup: "a League session Andres has freed, on a PC or iGPU where only the software encoder runs",
+        setup: "a League session Andres has freed, on a PC where the hardware encoder is missing or fails to open; the run fails when another encoder ran",
         shape: Shape::Games { minutes: 30 },
-        limits: DEFAULT_LIMITS,
+        limits: ProfileLimits {
+            encoder_contains: Some(SOFTWARE_ENCODER),
+            ..DEFAULT_LIMITS
+        },
         uses_window: true,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "game-hdd-40",
         summary: "40 minutes to a slow drive with no drops",
-        setup: "a League session Andres has freed; pass --dir on an HDD or USB stick; dropped_pct in the report must stay 0",
+        setup: "a League session Andres has freed; pass --dir on an HDD or USB stick; the run fails when dropped_pct is above 0",
         shape: Shape::Games { minutes: 40 },
-        limits: DEFAULT_LIMITS,
+        limits: ProfileLimits {
+            max_dropped_pct: Some(0.0),
+            ..DEFAULT_LIMITS
+        },
         uses_window: true,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "av-60",
         summary: "60 minutes of game process loopback",
-        setup: "a League session Andres has freed; A/V skew is read from the per-second diagnostics in the report",
+        setup: "a League session Andres has freed; A/V skew is in the per-second diagnostics and drift, discontinuities and gaps are in cycles[].health.audio",
         shape: Shape::Games { minutes: 60 },
         limits: DEFAULT_LIMITS,
         uses_window: true,
+        min_video_secs: None,
+        until_saved: false,
     },
     Profile {
         name: "av-180",
         summary: "3 hours of loopback, one recording up to the engine's 3-hour limit",
-        setup: "a League session Andres has freed for three hours; the recording stops and finalises at the limit",
-        shape: Shape::Games { minutes: 190 },
-        limits: LONG_LIMITS,
+        setup: "a League session Andres has freed for three hours, game started in the first 20 minutes; the run ends at the first saved recording and fails when it is shorter than 10700 s",
+        shape: Shape::Games { minutes: 200 },
+        limits: DEFAULT_LIMITS,
         uses_window: true,
+        min_video_secs: Some(10_700.0),
+        until_saved: true,
     },
     Profile {
         name: "long-8h",
-        summary: "back-to-back recordings for 8 hours",
-        setup: "only when Andres frees the PC overnight",
-        shape: Shape::Games { minutes: 480 },
-        limits: LONG_LIMITS,
-        uses_window: true,
+        summary: "back-to-back test recordings for 8 hours on the primary monitor",
+        setup: "only when Andres frees the PC overnight; no one needs to play; the leak check has few checkpoints, so read the report",
+        shape: cycles(3, 9_600, 10),
+        limits: DEFAULT_LIMITS,
+        uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
     },
 ];
 
@@ -180,6 +211,13 @@ impl super::Args {
         args.max_gpu_mb_per_min = limits.max_gpu_mb_per_min;
         args.max_handle_growth = limits.max_handle_growth;
         args.max_thread_growth = limits.max_thread_growth;
+        args.max_dropped_pct = limits.max_dropped_pct;
+        args.encoder_contains = limits.encoder_contains;
+        args.min_video_secs = profile.min_video_secs;
+        args.until_saved = profile.until_saved;
+        if args.out.is_none() {
+            args.out = Some(format!("greyscreen-soak-{name}.json").into());
+        }
         Ok(args)
     }
 }
