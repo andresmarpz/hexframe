@@ -34,6 +34,8 @@ use ui::Ui;
 static ALLOCATOR: greyscreen_capture::crash::ReportOutOfMemory<std::alloc::System> =
     greyscreen_capture::crash::ReportOutOfMemory(std::alloc::System);
 
+// A stuck engine join must not keep the process alive after Quit.
+const ENGINE_SHUTDOWN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
 const ENCODER_CHECK_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
 fn main() {
@@ -84,7 +86,7 @@ fn main() {
     if std::env::args().any(|arg| arg == HIDDEN_FLAG) {
         app = app.windowless();
     }
-    let (_tray, _engine) = if headless {
+    let (tray, engine) = if headless {
         (None, None)
     } else {
         let handle = app.handle();
@@ -135,7 +137,7 @@ fn main() {
                 auto_record: settings.auto_record,
             },
         );
-        let link = tray.clone();
+        let link = tray.as_ref().map(|(link, _)| link.clone());
         app = app.init(move || {
             let mut ui = Ui::live(settings, cmd);
             ui.sfx = Sfx::rune();
@@ -143,8 +145,18 @@ fn main() {
             ui.tray = link;
             ui
         });
-        (tray, Some(engine))
+        (tray.map(|(_, owner)| owner), Some(engine))
     };
-    app.run();
+    rune::orderly_exit();
+    let result = app.try_run();
+    rune::exit_deadline(ENGINE_SHUTDOWN_DEADLINE);
+    if let Some(tray) = tray {
+        tray.close();
+    }
+    drop(engine);
     greyscreen_engine::abandon_encoder_check(&paths::encoder_check_file());
+    if let Err(err) = result {
+        eprintln!("{err}");
+        std::process::exit(1);
+    }
 }

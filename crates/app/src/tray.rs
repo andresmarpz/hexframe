@@ -2,10 +2,10 @@ mod view;
 
 use std::io::Cursor;
 use std::sync::Arc;
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
+use crossbeam_channel::{Receiver, Sender, never, select, unbounded};
 use greyscreen_core::time::mono_now;
 use greyscreen_engine::EngineCmd;
 use rune::{AppHandle, Tray, TrayEvent, TrayIcon, TraySpec};
@@ -39,16 +39,32 @@ impl Link {
     }
 }
 
-pub(crate) fn start(handle: AppHandle<Ui>, initial: TrayState) -> Option<Link> {
+#[derive(Debug)]
+pub(crate) struct TrayOwner {
+    stop: Sender<()>,
+    thread: JoinHandle<()>,
+}
+
+impl TrayOwner {
+    pub(crate) fn close(self) {
+        let _ = self.stop.send(());
+        if self.thread.join().is_err() {
+            tracing::warn!("tray thread panicked");
+        }
+    }
+}
+
+pub(crate) fn start(handle: AppHandle<Ui>, initial: TrayState) -> Option<(Link, TrayOwner)> {
     let events = events(handle);
     let shown = View::of(&initial, mono_now());
     let tray = build(&shown, &events)?;
     let (tx, rx) = unbounded();
+    let (stop, stop_rx) = unbounded();
     let spawned = thread::Builder::new()
         .name("tray".into())
-        .spawn(move || run(&rx, tray, shown, initial, &events));
+        .spawn(move || run(&rx, &stop_rx, tray, shown, initial, &events));
     match spawned {
-        Ok(_) => Some(Link { tx }),
+        Ok(thread) => Some((Link { tx }, TrayOwner { stop, thread })),
         Err(err) => {
             tracing::warn!(%err, "cannot start the tray thread");
             None
@@ -74,6 +90,7 @@ fn events(handle: AppHandle<Ui>) -> Events {
 
 fn run(
     rx: &Receiver<TrayState>,
+    stop: &Receiver<()>,
     first: Tray,
     mut shown: View,
     mut state: TrayState,
@@ -81,15 +98,18 @@ fn run(
 ) {
     let mut tray = Some(first);
     loop {
-        let next = if state.is_recording() {
-            rx.recv_timeout(TOOLTIP_EVERY)
+        let tick = if state.is_recording() {
+            crossbeam_channel::after(TOOLTIP_EVERY)
         } else {
-            rx.recv().map_err(|_| RecvTimeoutError::Disconnected)
+            never()
         };
-        match next {
-            Ok(next) => state = rx.try_iter().last().unwrap_or(next),
-            Err(RecvTimeoutError::Timeout) => {}
-            Err(RecvTimeoutError::Disconnected) => return,
+        select! {
+            recv(stop) -> _ => return,
+            recv(rx) -> next => match next {
+                Ok(next) => state = rx.try_iter().last().unwrap_or(next),
+                Err(_) => return,
+            },
+            recv(tick) -> _ => {}
         }
         let view = View::of(&state, mono_now());
         if view.recording != shown.recording || tray.is_none() {

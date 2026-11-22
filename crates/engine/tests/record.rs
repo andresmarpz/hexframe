@@ -458,6 +458,10 @@ fn shutdown_during_recording_finalizes_the_video() {
     let folder = recording_folder(&msgs);
     assert!(folder.join("game.mp4").is_file());
     ffprobe_ok(&folder.join("game.mp4"));
+    assert!(!folder.join("game.mp4.part").exists());
+    let meta = read(&folder);
+    assert!(meta.duration_secs > 0.0);
+    assert!(meta.health.is_some());
     assert_eq!(status_names(&msgs), ["Finalizing", "Idle"]);
     std::fs::remove_dir_all(dir).ok();
 }
