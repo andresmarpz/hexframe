@@ -3,6 +3,7 @@ use serde::Serialize;
 const BYTES_PER_MB: f64 = 1024.0 * 1024.0;
 const MIN_POINTS: usize = 6;
 const MAX_WINDOW: usize = 10;
+const MIN_DRIFT_SECS: f64 = 600.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(crate) struct Sample {
@@ -16,6 +17,12 @@ pub(crate) struct Sample {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub(crate) struct AvLimits {
+    pub(crate) max_skew_ms: f64,
+    pub(crate) max_drift_ms_per_hour: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub(crate) struct Limits {
     pub(crate) mem_mb_per_min: f64,
     pub(crate) gpu_mb_per_min: f64,
@@ -25,6 +32,7 @@ pub(crate) struct Limits {
     pub(crate) warmup_cycles: u32,
     pub(crate) max_dropped_pct: Option<f64>,
     pub(crate) encoder_contains: Option<&'static str>,
+    pub(crate) av: Option<AvLimits>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -163,6 +171,34 @@ impl Judge {
     }
 }
 
+fn av_failures(cycle: &CycleResult, av: &AvLimits) -> Vec<String> {
+    let mut failures = Vec::new();
+    let worst_skew = cycle
+        .diag_seconds
+        .iter()
+        .filter_map(|v| v["av_skew_ms"].as_f64())
+        .map(f64::abs)
+        .fold(0.0, f64::max);
+    if worst_skew > av.max_skew_ms {
+        failures.push(format!(
+            "recording {}: A/V skew reached {worst_skew:.1} ms, limit {:.1} ms",
+            cycle.index, av.max_skew_ms
+        ));
+    }
+    if let Some(audio) = cycle.health.as_ref().and_then(|h| h.audio.as_ref())
+        && cycle.video_secs >= MIN_DRIFT_SECS
+    {
+        let per_hour = audio.drift_ms.abs() / (cycle.video_secs / 3600.0);
+        if per_hour > av.max_drift_ms_per_hour {
+            failures.push(format!(
+                "recording {}: clock drift {per_hour:.2} ms per hour, limit {:.2} ms per hour",
+                cycle.index, av.max_drift_ms_per_hour
+            ));
+        }
+    }
+    failures
+}
+
 pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
     let mut judge = Judge::default();
     let picked = judged(run, limits);
@@ -210,6 +246,9 @@ pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
                 ));
             }
         }
+        if let Some(av) = &limits.av {
+            judge.failures.extend(av_failures(cycle, av));
+        }
         if cycle.capture_errors > 0 {
             judge.failures.push(format!(
                 "recording {}: {} capture errors",
@@ -228,6 +267,12 @@ pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
             "engine reported {} errors, first: {first}",
             run.engine_errors.len()
         ));
+    }
+    if limits.av.is_some() {
+        judge.notes.push(
+            "A/V limits: noise bursts after minute 60 are not measured; read them under #75"
+                .to_owned(),
+        );
     }
     Verdict {
         passed: judge.failures.is_empty(),

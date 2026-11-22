@@ -2,6 +2,7 @@ mod check;
 mod gpu;
 mod meter;
 mod profiles;
+mod rng;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -20,10 +21,11 @@ use greyscreen_league::LeagueMsg;
 use greyscreen_mp4::demux::Movie;
 use serde::Serialize;
 
-use check::{CycleResult, Limits, Run, Sample, Verdict, evaluate};
+use check::{AvLimits, CycleResult, Limits, Run, Sample, Verdict, evaluate};
 use gpu::GpuReport;
 use meter::Meter;
 use profiles::WindowTarget;
+use rng::Rng;
 
 const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
 const SAVE_GRACE: Duration = Duration::from_secs(90);
@@ -77,6 +79,10 @@ pub(crate) struct Args {
     pub(crate) min_video_secs: Option<f64>,
     #[arg(skip)]
     pub(crate) until_saved: bool,
+    #[arg(skip)]
+    pub(crate) av_limits: Option<AvLimits>,
+    #[arg(skip)]
+    pub(crate) random_secs: Option<(u32, u32)>,
 }
 
 impl Args {
@@ -96,6 +102,7 @@ impl Args {
             warmup_cycles: self.warmup_cycles,
             max_dropped_pct: self.max_dropped_pct,
             encoder_contains: self.encoder_contains,
+            av: self.av_limits,
         }
     }
 
@@ -222,6 +229,7 @@ struct Soak<'a> {
     pending_folders: Vec<PathBuf>,
     recording: bool,
     stopped: bool,
+    seed: Option<u64>,
 }
 
 impl<'a> Soak<'a> {
@@ -240,6 +248,7 @@ impl<'a> Soak<'a> {
             pending_folders: Vec::new(),
             recording: false,
             stopped: false,
+            seed: None,
         }
     }
 
@@ -268,20 +277,34 @@ impl<'a> Soak<'a> {
     }
 
     fn run_cycles(&mut self, cmd: &Sender<EngineCmd>) {
-        let secs = Duration::from_secs(u64::from(self.args.seconds));
+        let mut rng = Rng::from_clock();
+        if self.args.random_secs.is_some() {
+            println!("random seed {}", rng.seed);
+            self.seed = Some(rng.seed);
+        }
         for index in 1..=self.args.cycles {
             println!("cycle {index} of {}", self.args.cycles);
+            let (run_secs, gap_secs) = match self.args.random_secs {
+                Some((min, max)) => (rng.between(min, max), rng.between(0, 3)),
+                None => (self.args.seconds, self.args.gap_secs),
+            };
+            let secs = Duration::from_secs(u64::from(run_secs));
             let start = EngineCmd::StartTestRecording {
                 secs: self.args.seconds,
             };
-            if !self.send(cmd, start) || !self.pump(Instant::now() + secs + SAVE_GRACE, true) {
+            let mut started = self.send(cmd, start);
+            if started && self.args.random_secs.is_some() {
+                self.pump(Instant::now() + secs, false);
+                started = self.send(cmd, EngineCmd::StopRecording);
+            }
+            if !started || !self.pump(Instant::now() + secs + SAVE_GRACE, true) {
                 if !self.stopped {
                     self.cycles.push(missing_recording(index, secs));
                     cmd.send(EngineCmd::StopRecording).ok();
                 }
                 break;
             }
-            let gap = Duration::from_secs(u64::from(self.args.gap_secs));
+            let gap = Duration::from_secs(u64::from(gap_secs));
             self.pump(Instant::now() + gap, false);
             self.discard_saved();
             self.checkpoint();
@@ -367,6 +390,7 @@ impl<'a> Soak<'a> {
         let index = self.cycles.len() as u32 + 1;
         let min_secs = match self.args.game_minutes {
             Some(_) => self.args.min_video_secs.unwrap_or(MIN_GAME_VIDEO_SECS),
+            None if self.args.random_secs.is_some() => 0.0,
             None => f64::from(self.args.seconds) * 0.5,
         };
         let result = judge_recording(index, entry, min_secs);
@@ -408,6 +432,9 @@ impl<'a> Soak<'a> {
             &self.args.limits(),
         );
         verdict.notes.extend(self.gpu.notes());
+        verdict
+            .notes
+            .extend(self.seed.map(|seed| format!("random seed {seed}")));
         let out = self.args.out_path();
         let report = Report {
             profile: self.args.profile.clone(),

@@ -15,12 +15,14 @@ Window-driven profiles (`game-*`, `av-*`) record League: start the soak, then pl
 | `smoke` | 3 test recordings of 10 s | the engine path works |
 | `capture-cycles-200` | 200 cycles of 5 s | capture start and stop with frames arriving: every cycle leaves a playable file, handles, threads and memory stay flat |
 | `encoder-sessions-50` | 50 cycles of 15 s | encoder session churn: memory and GPU memory flat; run once with `--d3d-debug` and read the live objects |
+| `encoder-opens-1000` | 1000 cycles of 2 s | 1000 encoder opens: handles and memory flat; run once with `--d3d-debug` and read the live objects |
+| `cycles-random-1000` | 1000 cycles, each cut short after a random 1 to 8 s, random 0 to 3 s gaps | start and stop at random moments; the report notes the seed |
 | `game-30` | 30 min of League | memory, GPU memory, handles and threads flat over a game |
 | `game-minimised-30` | 30 min, game minimised | recording with a minimised game |
 | `game-hags-30` | 30 min, HAGS on | recording with hardware-accelerated GPU scheduling |
 | `game-software-30` | 30 min, software encoder | flat allocations with the software encoder; fails when the recording's `health.encoder` is not the Microsoft software encoder. Nothing forces it: run on a PC where the hardware encoder is missing or fails to open |
 | `game-hdd-40` | 40 min, `--dir` on an HDD or USB stick | no drops: the run fails when a recording's `dropped_pct` is above 0 |
-| `av-60` | 60 min of game loopback | A/V numbers for #75 |
+| `av-60` | 60 min of game loopback | A/V limits: skew and drift fail the run; numbers for #75 |
 | `av-180` | up to 200 min, ends at the first saved recording | one recording that runs into the engine's 3-hour limit and finalises cleanly; fails when the video is under 10700 s, so start the game in the first 20 minutes |
 | `long-8h` | 3 test recordings of 9600 s on the primary monitor | back-to-back recordings with no one at the PC; only when Andres frees the PC overnight; too few checkpoints for the leak slopes, so they are noted and not judged |
 
@@ -36,17 +38,16 @@ Recordings stop at the engine's 3-hour limit, so there is no single 8-hour recor
 
 The default limits are 2 MB per minute for private bytes and for GPU memory, 50 handles of growth and 4 threads of growth, measured after a warm-up (60 s and 2 cycles). A run also fails on a missing or unplayable recording, an engine error or a dead engine.
 
-The soak judges leaks, saved files, engine errors, drops (`game-hdd-40`) and the encoder (`game-software-30`). It does not judge A/V skew, clock drift, discontinuities or noise bursts. Where the numbers are: A/V skew is `av_skew_ms` in the per-second lines of `cycles[].diag_seconds`; clock drift, discontinuities and gaps are `drift_ms`, `discontinuities` and `gaps` in `cycles[].health.audio`, copied from the recording's meta, so they survive the folder being deleted without `--keep`. Noise bursts are not measured yet. Read them under #75. If `game-hdd-40` shows write stalls, batch small writes as OBS's muxer does (1 MB drain chunks, 64 KB minimum write, 256 MB cap).
+The soak judges leaks, saved files, engine errors, drops (`game-hdd-40`), the encoder (`game-software-30`) and, in `av-60` and `av-180`, A/V limits: skew above 40 ms in any per-second line (`av_skew_ms` in `cycles[].diag_seconds`) fails, and so does clock drift above 1 ms per hour (`drift_ms` in `cycles[].health.audio`, judged only for recordings of 10 minutes or more). It does not judge discontinuities or noise bursts: `discontinuities` and `gaps` are in `cycles[].health.audio`, and noise bursts after minute 60 are not measured yet. Read them under #75. If `game-hdd-40` shows write stalls, batch small writes as OBS's muxer does (1 MB drain chunks, 64 KB minimum write, 256 MB cap).
 
 ## Not yet runnable
 
-The soak command cannot yet express these cases from the issue. They need new soak modes and, for the first two, a window to drive:
+These cases from issue #83 still need new soak modes (tracked in a follow-up issue):
 
-- 1000 cycles with random delays and window closes.
-- Resize and minimise: 60 s of resizes, 20 minimise and restore cycles, 50 restarts.
-- 1000 encoder opens.
+- Window closes during random cycles, and the resize and minimise run (60 s of resizes, 20 minimise and restore cycles, 50 restarts): they need a window to drive.
+- The encoder session count back to 0 after 1000 opens: the capture crate has no session counter yet.
 - 50 failed clip saves with flat memory.
-- Clock map drift under 1 ms per hour and A/V skew under 40 ms as pass limits.
+- Noise bursts after minute 60.
 
 ## Results
 

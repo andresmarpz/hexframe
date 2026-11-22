@@ -13,6 +13,7 @@ fn limits() -> Limits {
         warmup_cycles: 1,
         max_dropped_pct: None,
         encoder_contains: None,
+        av: None,
     }
 }
 
@@ -81,6 +82,8 @@ fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
         encoder_contains: None,
         min_video_secs: None,
         until_saved: false,
+        av_limits: None,
+        random_secs: None,
     }
 }
 
@@ -267,6 +270,12 @@ fn every_profile_resolves_to_valid_args_with_unique_names() {
                 assert_eq!(resolved.game_minutes, Some(minutes));
                 assert!(profile.uses_window);
             }
+            profiles::Shape::RandomCycles {
+                cycles, max_secs, ..
+            } => {
+                assert_eq!((resolved.cycles, resolved.seconds), (cycles, max_secs));
+                assert!(resolved.random_secs.is_some());
+            }
             profiles::Shape::Cycles {
                 cycles, seconds, ..
             } => {
@@ -377,4 +386,87 @@ fn a_removed_device_fails_the_run_and_the_debug_layer_notes_its_reports() {
         lines: Vec::new(),
     }];
     assert!(gpu.notes()[0].contains(": 3 "));
+}
+
+fn av_cycle(skews: &[f64], video_secs: f64, drift_ms: f64) -> CycleResult {
+    CycleResult {
+        video_secs,
+        health: Some(greyscreen_core::health::RecordingHealth {
+            audio: Some(greyscreen_core::health::AudioHealth {
+                drift_ms,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        diag_seconds: skews
+            .iter()
+            .map(|s| serde_json::json!({"type": "second", "av_skew_ms": s}))
+            .collect(),
+        ..good_cycle(1)
+    }
+}
+
+#[test]
+fn av_limits_judge_skew_and_drift_per_hour() {
+    let mut strict = limits();
+    strict.av = Some(check::AvLimits {
+        max_skew_ms: 40.0,
+        max_drift_ms_per_hour: 1.0,
+    });
+    let samples = samples(60, |_| 100 * MB, |_| 200);
+    let failures = |cycle: CycleResult| {
+        let cycles = [cycle, good_cycle(2)];
+        let run = Run {
+            samples: &samples,
+            cycles: &cycles,
+            engine_errors: &[],
+            min_saved: 2,
+            require_usage: true,
+            by_checkpoint: false,
+            device_removed: 0,
+        };
+        evaluate(&run, &strict).failures
+    };
+    assert!(failures(av_cycle(&[5.0, -39.0], 7200.0, 1.5)).is_empty());
+    let skewed = failures(av_cycle(&[5.0, -41.0], 7200.0, 0.0));
+    assert!(
+        skewed.iter().any(|f| f.contains("skew reached 41.0")),
+        "{skewed:?}"
+    );
+    let drifted = failures(av_cycle(&[], 3600.0, -2.0));
+    assert!(
+        drifted.iter().any(|f| f.contains("2.00 ms per hour")),
+        "{drifted:?}"
+    );
+    assert!(failures(av_cycle(&[], 60.0, 50.0)).is_empty());
+}
+
+#[test]
+fn the_av_profiles_carry_the_limits_and_random_draws_stay_in_range() {
+    assert!(with_profile("av-60").resolve().unwrap().av_limits.is_some());
+    assert!(with_profile("smoke").resolve().unwrap().av_limits.is_none());
+    let mut rng = rng::Rng::new(42);
+    for _ in 0..1000 {
+        assert!((1..=8).contains(&rng.between(1, 8)));
+    }
+    assert_eq!(rng.between(3, 3), 3);
+}
+
+#[test]
+fn random_cycles_cut_recordings_short_and_still_save_each_one() {
+    let dir = std::env::temp_dir().join(format!("greyscreen-soak-rand-{}", std::process::id()));
+    let out = dir.join("report.json");
+    let mut args = args(2, out.clone(), Some(dir.join("rec")));
+    args.seconds = 3;
+    args.random_secs = Some((1, 2));
+    std::fs::create_dir_all(&dir).unwrap();
+    let verdict = run_with(
+        &args,
+        Arc::new(greyscreen_engine::FakeMediaSource::new()),
+        default_league(&args),
+    )
+    .unwrap();
+    assert!(verdict.passed, "{:?}", verdict.failures);
+    assert!(verdict.notes.iter().any(|n| n.starts_with("random seed")));
+    std::fs::remove_dir_all(&dir).ok();
 }
