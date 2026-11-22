@@ -336,3 +336,38 @@ fn capture_interval_without_refresh_rate_is_nine_tenths_of_a_frame() {
 fn capture_interval_never_exceeds_nine_tenths_of_a_frame() {
     assert_eq!(capture_min_update_interval_hns(60, 1000), 150_000);
 }
+
+mod encode_size_properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn encode_size_is_even_for_common_odd_and_capped_inputs() {
+        for native in [(1921, 1081), (1366, 768), (1365, 767), (2561, 1441), (1, 1)] {
+            for cap in [None, Some(1080), Some(720), Some(721), Some(1)] {
+                let (w, h) = encode_size(native, cap);
+                assert_eq!((w % 2, h % 2), (0, 0), "{native:?} {cap:?}");
+            }
+        }
+        assert_eq!(encode_size((1366, 768), None), (1366, 768));
+        assert_eq!(encode_size((1366, 768), Some(720)), (1280, 720));
+    }
+
+    proptest! {
+        #[test]
+        fn encode_size_is_even_and_never_grows(
+            width in 0u32..10_000,
+            height in 0u32..10_000,
+            cap in prop::option::of(1u32..10_000),
+        ) {
+            let (w, h) = encode_size((width, height), cap);
+            prop_assert_eq!(w % 2, 0);
+            prop_assert_eq!(h % 2, 0);
+            prop_assert!(w <= width);
+            prop_assert!(h <= height);
+            if let Some(max) = cap {
+                prop_assert!(h <= max);
+            }
+        }
+    }
+}

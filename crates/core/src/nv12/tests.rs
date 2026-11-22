@@ -133,3 +133,140 @@ fn a_short_buffer_or_bad_crop_is_refused_without_panicking() {
     assert!(!scale(&wide, 8, 4, &mut out));
     assert!(!scale(&source(&data, 16, 8), 0, 0, &mut out));
 }
+
+mod property {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn noise(seed: u64, len: usize) -> Vec<u8> {
+        let mut state = seed | 1;
+        (0..len)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (state >> 24) as u8
+            })
+            .collect()
+    }
+
+    fn padded(tight: &[u8], width: usize, height: usize, pitch: usize, guard: u8) -> Vec<u8> {
+        let mut data = vec![guard; pitch * height * 3 / 2];
+        for row in 0..height {
+            data[row * pitch..row * pitch + width]
+                .copy_from_slice(&tight[row * width..(row + 1) * width]);
+        }
+        let chroma = pitch * height;
+        let tight_chroma = width * height;
+        for row in 0..height / 2 {
+            let from = tight_chroma + row * width;
+            data[chroma + row * pitch..chroma + row * pitch + width]
+                .copy_from_slice(&tight[from..from + width]);
+        }
+        data
+    }
+
+    proptest! {
+        #[test]
+        fn scaling_never_panics_and_sizes_the_output_exactly(
+            width in 1usize..80,
+            height in 1usize..60,
+            pad in 0usize..20,
+            crop in (0usize..90, 0usize..70, 0usize..100, 0usize..80),
+            target in (0usize..100, 0usize..80),
+            seed in any::<u64>(),
+        ) {
+            let pitch = width + pad;
+            let data = noise(seed, pitch * height * 3 / 2);
+            let picture = Nv12Source { data: &data, pitch, rows: height, crop };
+            let mut out = vec![7; 3];
+            if scale(&picture, target.0, target.1, &mut out) {
+                prop_assert_eq!(out.len(), frame_len(target.0 & !1, target.1 & !1));
+            }
+        }
+
+        #[test]
+        fn a_padded_pitch_scales_like_a_tight_one(
+            half_width in 1usize..32,
+            half_height in 1usize..24,
+            pad in 1usize..40,
+            target in (2usize..80, 2usize..60),
+            seed in any::<u64>(),
+            guard in any::<u8>(),
+        ) {
+            let (width, height) = (half_width * 2, half_height * 2);
+            let tight = noise(seed, width * height * 3 / 2);
+            let wide = padded(&tight, width, height, width + pad, guard);
+            let mut expected = Vec::new();
+            let mut actual = Vec::new();
+            prop_assert!(scale(&source(&tight, width, height), target.0, target.1, &mut expected));
+            let wide_picture = Nv12Source {
+                data: &wide,
+                pitch: width + pad,
+                rows: height,
+                crop: (0, 0, width, height),
+            };
+            prop_assert!(scale(&wide_picture, target.0, target.1, &mut actual));
+            prop_assert_eq!(expected, actual);
+        }
+
+        #[test]
+        fn flat_pictures_stay_flat(
+            half_width in 1usize..32,
+            half_height in 1usize..24,
+            pad in 0usize..20,
+            target in (2usize..96, 2usize..72),
+            levels in (any::<u8>(), any::<u8>(), any::<u8>()),
+        ) {
+            let (width, height) = (half_width * 2, half_height * 2);
+            let tight = frame(width, height, levels.0, levels.1, levels.2);
+            let data = padded(&tight, width, height, width + pad, 0);
+            let picture = Nv12Source {
+                data: &data,
+                pitch: width + pad,
+                rows: height,
+                crop: (0, 0, width, height),
+            };
+            let mut out = Vec::new();
+            prop_assert!(scale(&picture, target.0, target.1, &mut out));
+            let (w, h) = (target.0 & !1, target.1 & !1);
+            prop_assert!(out[..w * h].iter().all(|&y| y == levels.0));
+            prop_assert!(out[w * h..].chunks(2).all(|uv| uv == [levels.1, levels.2]));
+        }
+
+        #[test]
+        fn the_last_chroma_row_is_written(
+            half_width in 1usize..40,
+            half_height in 1usize..40,
+            target in (2usize..60, 2usize..60),
+        ) {
+            let (width, height) = (half_width * 2, half_height * 2);
+            let data = frame(width, height, 100, 200, 60);
+            let mut out = vec![0xAB; 5];
+            prop_assert!(scale(&source(&data, width, height), target.0, target.1, &mut out));
+            let (w, h) = (target.0 & !1, target.1 & !1);
+            let last_row = &out[w * h + (h / 2 - 1) * w..];
+            prop_assert_eq!(last_row.len(), w);
+            prop_assert!(last_row.chunks(2).all(|uv| uv == [200, 60]));
+        }
+
+        #[test]
+        fn short_buffers_are_refused(
+            half_width in 1usize..20,
+            half_height in 1usize..20,
+            missing in 1usize..50,
+        ) {
+            let (width, height) = (half_width * 2, half_height * 2);
+            let full = frame(width, height, 1, 2, 3);
+            let cut = full.len().saturating_sub(missing);
+            let mut out = Vec::new();
+            let short = Nv12Source {
+                data: &full[..cut],
+                pitch: width,
+                rows: height,
+                crop: (0, 0, width, height),
+            };
+            prop_assert!(!scale(&short, width, height, &mut out));
+        }
+    }
+}

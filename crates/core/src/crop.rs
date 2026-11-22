@@ -95,6 +95,14 @@ pub fn client_crop(
     }
 }
 
+pub fn fit_crop(crop: CropRect, frame: (u32, u32)) -> CropRect {
+    let fits = crop.width > 0
+        && crop.height > 0
+        && crop.left.saturating_add(crop.width) <= frame.0
+        && crop.top.saturating_add(crop.height) <= frame.1;
+    if fits { crop } else { CropRect::full(frame) }
+}
+
 fn scale(value: i64, numerator: i64, denominator: i64) -> i64 {
     (2 * value * numerator + denominator).div_euclid(2 * denominator)
 }

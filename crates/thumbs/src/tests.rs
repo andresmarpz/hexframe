@@ -240,3 +240,64 @@ mod storyboard {
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
     }
 }
+
+fn gradient_nv12(width: usize, height: usize, pitch: usize, guard: u8) -> Vec<u8> {
+    let mut data = vec![guard; pitch * height * 3 / 2];
+    for row in 0..height {
+        for col in 0..width {
+            data[row * pitch + col] = 16 + ((row * 7 + col * 3) % 200) as u8;
+        }
+    }
+    let chroma = pitch * height;
+    for row in 0..height / 2 {
+        for pair in 0..width / 2 {
+            data[chroma + row * pitch + pair * 2] = 90 + ((row + pair) % 60) as u8;
+            data[chroma + row * pitch + pair * 2 + 1] = 120 + ((row * 3 + pair) % 80) as u8;
+        }
+    }
+    data
+}
+
+#[test]
+fn a_padded_pitch_converts_like_a_tight_buffer() {
+    for (width, height) in [(16, 8), (18, 10), (33, 17), (31, 9), (2, 2)] {
+        let tight = gradient_nv12(width, height, width, 0);
+        let padded = gradient_nv12(width, height, width + 17, 0xEE);
+        let window = (0, 0, width & !1, height & !1);
+        let expected = crate::nv12::nv12_to_rgba(&tight, width, height, window, false);
+        let actual = crate::nv12::nv12_to_rgba(&padded, width + 17, height, window, false);
+        assert_eq!(actual.rgba, expected.rgba, "{width}x{height}");
+        assert_eq!(
+            (actual.width, actual.height),
+            (expected.width, expected.height)
+        );
+    }
+}
+
+#[test]
+fn odd_sizes_use_the_chroma_of_the_last_row_and_column() {
+    let (width, height) = (5, 5);
+    let pitch = width + 17;
+    let mut data = vec![0xEE; pitch * 8];
+    for row in 0..height {
+        data[row * pitch..row * pitch + width].fill(126);
+    }
+    let chroma = pitch * height;
+    for row in 0..3 {
+        for pair in 0..3 {
+            data[chroma + row * pitch + pair * 2] = 128;
+            data[chroma + row * pitch + pair * 2 + 1] = 128;
+        }
+    }
+    data[chroma + 2 * pitch + 4] = 102;
+    data[chroma + 2 * pitch + 5] = 240;
+    let frame = crate::nv12::nv12_to_rgba(&data, pitch, height, (0, 0, width, height), true);
+    let pixel = |col: usize, row: usize| {
+        let at = (row * width + col) * 4;
+        [frame.rgba[at], frame.rgba[at + 1], frame.rgba[at + 2]]
+    };
+    assert_eq!(pixel(0, 0), [126, 126, 126]);
+    assert!(pixel(4, 4)[0] > 200);
+    assert!(pixel(4, 4)[2] < 126);
+    assert_eq!(pixel(3, 4), pixel(2, 4));
+}

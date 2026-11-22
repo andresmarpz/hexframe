@@ -3,7 +3,7 @@ use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use greyscreen_core::crop::CropRect;
+use greyscreen_core::crop::{CropRect, fit_crop};
 use windows::Win32::Foundation::{E_POINTER, RECT};
 use windows::Win32::Graphics::Direct3D11::{
     D3D11_BIND_RENDER_TARGET, D3D11_BIND_VIDEO_ENCODER, D3D11_TEX2D_VPIV, D3D11_TEX2D_VPOV,
@@ -292,14 +292,6 @@ impl VideoConverter {
             );
         }
     }
-}
-
-fn fit_crop(crop: CropRect, frame: (u32, u32)) -> CropRect {
-    let fits = crop.width > 0
-        && crop.height > 0
-        && crop.left.saturating_add(crop.width) <= frame.0
-        && crop.top.saturating_add(crop.height) <= frame.1;
-    if fits { crop } else { CropRect::full(frame) }
 }
 
 fn rect(left: u32, top: u32, right: u32, bottom: u32) -> RECT {
