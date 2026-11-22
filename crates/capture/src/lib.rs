@@ -25,7 +25,6 @@ mod session;
 pub mod transcode;
 pub mod video_log;
 pub mod vproc;
-mod watchdog;
 pub mod wgc;
 pub mod window;
 

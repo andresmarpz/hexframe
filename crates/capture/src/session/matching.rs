@@ -1,28 +1,4 @@
-use std::collections::VecDeque;
-
-use greyscreen_core::time::Hns;
-
 pub(super) const MAX_OUTPUTS_WITHOUT_PARAMETERS: u32 = 120;
-
-pub(super) fn match_tick(
-    in_flight: &mut VecDeque<(u64, Hns)>,
-    output_pts: Hns,
-    first_output: bool,
-) -> Option<u64> {
-    if output_pts == 0 && !first_output {
-        return in_flight.pop_front().map(|(tick, _)| tick);
-    }
-    while in_flight.front().is_some_and(|&(_, pts)| pts < output_pts) {
-        in_flight.pop_front();
-    }
-    match in_flight.front() {
-        Some(&(tick, pts)) if pts == output_pts => {
-            in_flight.pop_front();
-            Some(tick)
-        }
-        _ => None,
-    }
-}
 
 pub(super) fn parameter_fault(
     started: Option<(&[u8], &[u8])>,
@@ -44,49 +20,6 @@ pub(super) fn parameter_fault(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn queue(entries: &[(u64, Hns)]) -> VecDeque<(u64, Hns)> {
-        entries.iter().copied().collect()
-    }
-
-    #[test]
-    fn exact_pts_pops_its_tick() {
-        let mut q = queue(&[(0, 0), (1, 100), (2, 200)]);
-        assert_eq!(match_tick(&mut q, 0, true), Some(0));
-        assert_eq!(match_tick(&mut q, 100, false), Some(1));
-        assert_eq!(q.len(), 1);
-    }
-
-    #[test]
-    fn lost_outputs_are_skipped_by_pts() {
-        let mut q = queue(&[(0, 0), (1, 100), (2, 200), (3, 300)]);
-        assert_eq!(match_tick(&mut q, 200, false), Some(2));
-        assert_eq!(match_tick(&mut q, 300, false), Some(3));
-        assert!(q.is_empty());
-    }
-
-    #[test]
-    fn missing_pts_after_the_first_falls_back_to_fifo() {
-        let mut q = queue(&[(4, 400), (5, 500)]);
-        assert_eq!(match_tick(&mut q, 0, false), Some(4));
-        assert_eq!(match_tick(&mut q, 0, false), Some(5));
-        assert_eq!(match_tick(&mut q, 0, false), None);
-    }
-
-    #[test]
-    fn zero_pts_on_the_first_output_matches_tick_zero() {
-        let mut q = queue(&[(0, 0), (1, 100)]);
-        assert_eq!(match_tick(&mut q, 0, true), Some(0));
-    }
-
-    #[test]
-    fn unknown_pts_matches_nothing() {
-        let mut q = queue(&[(1, 100), (2, 200)]);
-        assert_eq!(match_tick(&mut q, 150, false), None);
-        assert_eq!(q.len(), 1);
-        assert_eq!(match_tick(&mut q, 500, false), None);
-        assert!(q.is_empty());
-    }
 
     #[test]
     fn parameter_sets_never_arriving_fail_after_the_limit() {

@@ -2,12 +2,13 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
+use greyscreen_core::frame_timing::next_tick;
 use greyscreen_core::health::{CaptureSetup, CaptureStats, LatencyHistogram};
 use greyscreen_core::media::{AudioFormat, MediaEvent, Packet, Track, VideoFormat};
 use greyscreen_core::time::{Hns, mono_now};
 use greyscreen_mp4::avc::annexb_to_avcc;
 
-use super::matching::{match_tick, parameter_fault};
+use super::matching::parameter_fault;
 use crate::h264::EncodedVideo;
 
 const MAX_TRACKED_SUBMITS: usize = 256;
@@ -118,9 +119,12 @@ impl Sink {
     }
 
     fn next_tick(&mut self, output_pts: Hns) -> u64 {
-        let fallback = self.last_tick.map_or(0, |last| last + 1);
-        let matched = match_tick(&mut self.in_flight, output_pts, self.out_index == 0);
-        let tick = matched.map_or(fallback, |tick| tick.max(fallback));
+        let tick = next_tick(
+            &mut self.in_flight,
+            self.last_tick,
+            output_pts,
+            self.out_index == 0,
+        );
         self.last_tick = Some(tick);
         tick
     }

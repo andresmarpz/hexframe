@@ -2,6 +2,7 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use greyscreen_core::encoder;
+use greyscreen_core::frame_timing::{Pacer, Watchdog};
 use greyscreen_core::time::mono_now;
 use windows::Win32::Graphics::Dxgi::{DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET};
 use windows::core::HRESULT;
@@ -13,10 +14,9 @@ use crate::client_area::ClientArea;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::GpuDevice;
 use crate::h264::{EncodedVideo, H264Encoder, H264Error};
-use crate::pacer::{Pacer, Stats};
+use crate::pacer::{Stats, wait_for};
 use crate::procstats::ProcessSampler;
 use crate::vproc::{VideoConverter, VprocError};
-use crate::watchdog::Watchdog;
 use crate::wgc::WgcCapture;
 
 const MAX_SOFT_ERRORS: u32 = 120;
@@ -57,7 +57,7 @@ impl Video {
 
     fn drive(&mut self) -> Exit {
         loop {
-            if !self.pacer.wait(&self.flags.stop) {
+            if !wait_for(&self.pacer, &self.flags.stop) {
                 return Exit::Stopped;
             }
             let before = self.pacer.tick();

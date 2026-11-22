@@ -1,4 +1,5 @@
 use crossbeam_channel::Sender;
+use greyscreen_core::frame_timing::{Pacer, Watchdog};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent};
 use greyscreen_core::time::mono_now;
 use greyscreen_mp4::avc::{NAL_PPS, NAL_SPS, nal_type, split_annexb};
@@ -12,9 +13,8 @@ use super::video::Video;
 use crate::clock::QpcMap;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::luid_u64;
-use crate::pacer::{Pacer, Stats};
+use crate::pacer::Stats;
 use crate::procstats::ProcessSampler;
-use crate::watchdog::Watchdog;
 
 const BORDER_SHOWN: &str = "Windows shows a yellow border around the captured window while Greyscreen records. It is not in the video.";
 

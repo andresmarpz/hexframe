@@ -6,6 +6,7 @@ pub mod disk;
 pub mod encoder;
 pub mod export;
 pub mod feedback;
+pub mod frame_timing;
 pub mod game;
 pub mod gamedata;
 pub mod health;
