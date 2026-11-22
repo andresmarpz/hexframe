@@ -111,7 +111,14 @@ pub(crate) fn assemble(
             sample_rate,
         }),
     );
-    let audio = rate.map(|rate| audio::analyze(audio_rows, rate, video.duration_secs));
+    let audio = rate.map(|rate| {
+        audio::analyze(
+            audio_rows,
+            rate,
+            media.audio_start.delay_ms,
+            video.duration_secs,
+        )
+    });
     let (finalized, fragments, trailing_bytes) = match media.layout {
         Layout::Finalized => (true, None, None),
         Layout::Unfinalized {

@@ -349,3 +349,47 @@ fn per_sample_chunks_follow_row_offsets() {
     let v = stbl(&out, &traks(&out, &moov)[0]);
     assert_eq!(table(&out, &v, b"stsc"), [1, 1, 1, 1]);
 }
+
+#[test]
+fn audio_delay_becomes_a_leading_empty_edit() {
+    let (tables, chunking) = sample_tables();
+    let start = AudioStart {
+        delay_ms: 3000,
+        skip_samples: 0,
+    };
+    let out = write_full_moov_with_start(&video(), Some(&audio()), &tables, &chunking, start);
+    let moov = root(&out);
+    let tracks = traks(&out, &moov);
+
+    assert!(tracks[0].find(&out, b"edts").is_none());
+    let edts = child(&out, &tracks[1], b"edts");
+    let elst = child(&out, &edts, b"elst");
+    let payload = elst.payload_bytes(&out);
+    assert_eq!(&payload[..4], [0, 0, 0, 0]);
+    assert_eq!(u32_at(payload, 4), 2);
+    let entry = |n: usize| {
+        let at = 8 + n * 12;
+        (
+            u32_at(payload, at),
+            u32_at(payload, at + 4) as i32,
+            u32_at(payload, at + 8),
+        )
+    };
+    assert_eq!(entry(0), (3000, -1, 0x0001_0000));
+    assert_eq!(entry(1), (64, 0, 0x0001_0000));
+
+    let audio_tkhd = child(&out, &tracks[1], b"tkhd");
+    assert_eq!(u32_at(audio_tkhd.payload_bytes(&out), 20), 3064);
+    let mvhd = child(&out, &moov, b"mvhd");
+    assert_eq!(u32_at(mvhd.payload_bytes(&out), 16), 3064);
+}
+
+#[test]
+fn no_audio_delay_writes_no_edit_list() {
+    let (tables, chunking) = sample_tables();
+    let out = write_full_moov(&video(), Some(&audio()), &tables, &chunking);
+    let moov = root(&out);
+    for trak in traks(&out, &moov) {
+        assert!(trak.find(&out, b"edts").is_none());
+    }
+}

@@ -127,6 +127,20 @@ fn a_clean_ten_second_recording_is_ok_everywhere() {
 }
 
 #[test]
+fn audio_that_starts_late_is_measured_on_the_video_timeline() {
+    let fixture = Fixture::new("lateaudio");
+    let video: Vec<i64> = (0..600).collect();
+    let audio: Vec<i64> = (141..all_audio_for(600).len() as i64).collect();
+    write_media(&fixture.mp4(), &video, &audio, true);
+
+    let report = analyze_path(&fixture.mp4()).expect("analyze");
+    let audio = report.audio.expect("audio");
+    assert!(audio.av_diff_ms.abs() < 25.0, "{}", audio.av_diff_ms);
+    assert_eq!(audio.gap_count, 0);
+    assert_eq!(audio.coverage_pct, 100.0);
+}
+
+#[test]
 fn a_one_second_video_gap_is_found_with_its_timestamp() {
     let fixture = Fixture::new("videogap");
     let video: Vec<i64> = (0..300).chain(360..600).collect();

@@ -23,10 +23,16 @@ pub(crate) struct AudioReport {
     pub av_diff_ms: f64,
 }
 
-pub(crate) fn analyze(rows: &[SampleRow], sample_rate: u32, video_secs: f64) -> AudioReport {
+pub(crate) fn analyze(
+    rows: &[SampleRow],
+    sample_rate: u32,
+    delay_ms: u64,
+    video_secs: f64,
+) -> AudioReport {
     let rate = f64::from(sample_rate.max(1));
+    let delay_samples = delay_ms * u64::from(sample_rate.max(1)) / 1000;
     let mut gaps = Vec::new();
-    let mut at = 0u64;
+    let mut at = delay_samples;
     for row in rows {
         if f64::from(row.duration) > f64::from(AAC_FRAME) * 1.5 {
             gaps.push(AudioGap {
@@ -39,6 +45,7 @@ pub(crate) fn analyze(rows: &[SampleRow], sample_rate: u32, video_secs: f64) -> 
     let packets = rows.len() as u64;
     let samples = packets * u64::from(AAC_FRAME);
     let timeline_secs = at as f64 / rate;
+    let own_secs = (at - delay_samples) as f64 / rate;
     let gap_count = gaps.len();
     let longest_gap_ms = gaps.iter().map(|g| g.length_ms).fold(0.0, f64::max);
     gaps.sort_by(|a, b| b.length_ms.total_cmp(&a.length_ms));
@@ -49,8 +56,8 @@ pub(crate) fn analyze(rows: &[SampleRow], sample_rate: u32, video_secs: f64) -> 
         packets,
         samples,
         timeline_secs,
-        coverage_pct: if timeline_secs > 0.0 {
-            samples as f64 / rate * 100.0 / timeline_secs
+        coverage_pct: if own_secs > 0.0 {
+            samples as f64 / rate * 100.0 / own_secs
         } else {
             0.0
         },
