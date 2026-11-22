@@ -9,6 +9,7 @@ mod tests;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Point {
     AdapterOpen,
+    CaptureStart,
     EncoderCandidate,
     FirstFrameWait,
     GpuCopyWait,

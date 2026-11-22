@@ -20,6 +20,9 @@ use crate::procstats::ProcessSampler;
 use crate::vproc::{VideoConverter, VprocError};
 use crate::wgc::WgcCapture;
 
+#[cfg(test)]
+mod tests;
+
 const MAX_SOFT_ERRORS: u32 = 120;
 
 enum Exit {

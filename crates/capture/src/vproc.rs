@@ -366,18 +366,24 @@ fn create_processor(
 }
 
 fn create_pool(gpu: &GpuDevice, size: (u32, u32)) -> windows::core::Result<Vec<ID3D11Texture2D>> {
+    pool_with(|flags| create_nv12_texture(gpu, size, flags))
+}
+
+fn pool_with<T>(
+    mut make: impl FnMut(u32) -> windows::core::Result<T>,
+) -> windows::core::Result<Vec<T>> {
     let render_flags = D3D11_BIND_RENDER_TARGET.0 as u32;
     let encoder_flags = render_flags | D3D11_BIND_VIDEO_ENCODER.0 as u32;
-    let (first, flags) = match create_nv12_texture(gpu, size, encoder_flags) {
+    let (first, flags) = match make(encoder_flags) {
         Ok(texture) => (texture, encoder_flags),
         Err(error) => {
             tracing::warn!(%error, "NV12 texture with VIDEO_ENCODER bind failed, using RENDER_TARGET");
-            (create_nv12_texture(gpu, size, render_flags)?, render_flags)
+            (make(render_flags)?, render_flags)
         }
     };
     let mut textures = vec![first];
     for _ in 1..POOL_SIZE {
-        textures.push(create_nv12_texture(gpu, size, flags)?);
+        textures.push(make(flags)?);
     }
     Ok(textures)
 }
@@ -439,3 +445,6 @@ fn create_output_views(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests;

@@ -8,7 +8,7 @@ use windows::Wdk::Graphics::Direct3D::{
 };
 use windows::Win32::Foundation::{HMODULE, HWND, LUID};
 use windows::Win32::Graphics::Direct3D::{
-    D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
+    D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
 };
 use windows::Win32::Graphics::Direct3D11::{
     D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_SDK_VERSION,
@@ -81,7 +81,22 @@ impl GpuDevice {
         Self::create(&adapter)
     }
 
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub(crate) fn from_adapter_with_levels(
+        adapter: &IDXGIAdapter1,
+        levels: &[D3D_FEATURE_LEVEL],
+    ) -> windows::core::Result<Self> {
+        Self::create_with_levels(adapter, levels)
+    }
+
     fn create(adapter: &IDXGIAdapter1) -> windows::core::Result<Self> {
+        Self::create_with_levels(adapter, &[D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0])
+    }
+
+    fn create_with_levels(
+        adapter: &IDXGIAdapter1,
+        levels: &[D3D_FEATURE_LEVEL],
+    ) -> windows::core::Result<Self> {
         fault!(AdapterOpen)?;
         // SAFETY: GetDesc1 only writes to the returned value.
         let desc = unsafe { adapter.GetDesc1()? };
@@ -92,7 +107,6 @@ impl GpuDevice {
             |_| "unknown".to_owned(),
             |v| driver_version_text(v, desc.VendorId),
         );
-        let levels = [D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0];
         let mut device = None;
         let mut context = None;
         // SAFETY: the out pointers refer to live locals and the adapter outlives the call.
@@ -102,7 +116,7 @@ impl GpuDevice {
                 D3D_DRIVER_TYPE_UNKNOWN,
                 HMODULE::default(),
                 D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
-                Some(&levels),
+                Some(levels),
                 D3D11_SDK_VERSION,
                 Some(&mut device),
                 None,
@@ -221,3 +235,6 @@ pub(crate) fn wide_to_string(wide: &[u16]) -> String {
     let len = wide.iter().position(|&c| c == 0).unwrap_or(wide.len());
     String::from_utf16_lossy(&wide[..len])
 }
+
+#[cfg(test)]
+mod tests;

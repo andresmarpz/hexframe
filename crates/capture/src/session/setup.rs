@@ -17,6 +17,9 @@ use crate::pacer::Stats;
 use crate::power::SystemPowerGuard;
 use crate::procstats::ProcessSampler;
 
+#[cfg(test)]
+mod tests;
+
 const BORDER_SHOWN: &str = "Windows shows a yellow border around the captured window while Greyscreen records. It is not in the video.";
 
 pub(crate) fn build(

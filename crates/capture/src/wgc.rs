@@ -112,6 +112,7 @@ impl WgcCapture {
         if !GraphicsCaptureSession::IsSupported()? {
             return Err(WgcError::Unsupported);
         }
+        fault!(CaptureStart)?;
         tracing::info!(step = "item", "graphics capture");
         let item = create_item(target)?;
         let item_size = item.Size()?;
