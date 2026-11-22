@@ -6,22 +6,23 @@ use windows::Win32::Foundation::{E_NOTIMPL, E_POINTER, LUID, S_OK};
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncCommonQualityVsSpeed, CODECAPI_AVEncH264CABACEnable,
     CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncMPVGOPSize, CODECAPI_AVLowLatencyMode,
-    ICodecAPI, IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaEventGenerator,
-    IMFMediaType, IMFTransform, MF_LOW_LATENCY, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE,
-    MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_MPEG_SEQUENCE_HEADER,
-    MF_MT_MPEG2_PROFILE, MF_MT_PIXEL_ASPECT_RATIO, MF_MT_SUBTYPE, MF_SA_D3D11_AWARE,
-    MF_SA_D3D11_BINDFLAGS, MF_TRANSFORM_ASYNC, MF_TRANSFORM_ASYNC_UNLOCK, MFCreateAttributes,
-    MFCreateDXGIDeviceManager, MFCreateMediaType, MFMediaType_Video, MFT_CATEGORY_VIDEO_ENCODER,
-    MFT_ENUM_ADAPTER_LUID, MFT_ENUM_FLAG_HARDWARE, MFT_ENUM_FLAG_SORTANDFILTER,
-    MFT_ENUM_HARDWARE_VENDOR_ID_Attribute, MFT_FRIENDLY_NAME_Attribute, MFT_MESSAGE_COMMAND_FLUSH,
-    MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, MFT_MESSAGE_NOTIFY_START_OF_STREAM,
-    MFT_MESSAGE_SET_D3D_MANAGER, MFT_REGISTER_TYPE_INFO, MFTEnum2, MFTEnumEx, MFVideoFormat_H264,
-    MFVideoFormat_NV12, MFVideoInterlace_Progressive, eAVEncH264VProfile_High,
+    IMFActivate, IMFAttributes, IMFDXGIDeviceManager, IMFMediaType, IMFTransform, MF_LOW_LATENCY,
+    MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE,
+    MF_MT_MPEG_SEQUENCE_HEADER, MF_MT_MPEG2_PROFILE, MF_MT_PIXEL_ASPECT_RATIO, MF_MT_SUBTYPE,
+    MF_SA_D3D11_AWARE, MF_SA_D3D11_BINDFLAGS, MF_TRANSFORM_ASYNC, MF_TRANSFORM_ASYNC_UNLOCK,
+    MFCreateAttributes, MFCreateDXGIDeviceManager, MFCreateMediaType, MFMediaType_Video,
+    MFT_CATEGORY_VIDEO_ENCODER, MFT_ENUM_ADAPTER_LUID, MFT_ENUM_FLAG_HARDWARE,
+    MFT_ENUM_FLAG_SORTANDFILTER, MFT_ENUM_HARDWARE_VENDOR_ID_Attribute,
+    MFT_FRIENDLY_NAME_Attribute, MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
+    MFT_MESSAGE_NOTIFY_START_OF_STREAM, MFT_MESSAGE_SET_D3D_MANAGER, MFT_REGISTER_TYPE_INFO,
+    MFTEnum2, MFTEnumEx, MFVideoFormat_H264, MFVideoFormat_NV12, MFVideoInterlace_Progressive,
+    eAVEncH264VProfile_High,
 };
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Variant::VARIANT;
 use windows::core::{GUID, Interface};
 
+use super::transform::{Mft, RealMft};
 use super::{H264Error, Mode, Result};
 use crate::d3d::GpuDevice;
 use crate::probe::string_attribute;
@@ -43,8 +44,7 @@ pub(super) struct Spec {
 #[derive(Debug)]
 pub(super) struct Opened {
     pub(super) mode: Mode,
-    pub(super) transform: IMFTransform,
-    pub(super) codec: ICodecAPI,
+    pub(super) mft: Box<dyn Mft>,
     pub(super) input_id: u32,
     pub(super) output_id: u32,
     pub(super) name: String,
@@ -52,9 +52,7 @@ pub(super) struct Opened {
 }
 
 struct Configured {
-    transform: IMFTransform,
-    events: IMFMediaEventGenerator,
-    codec: ICodecAPI,
+    mft: Box<dyn Mft>,
     input_id: u32,
     output_id: u32,
     sequence_header: Vec<u8>,
@@ -83,13 +81,8 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
             Ok(configured) => {
                 tracing::info!(encoder = %name, "hardware H.264 encoder configured");
                 return Ok(Opened {
-                    mode: Mode::Async {
-                        events: configured.events,
-                        activate,
-                        _manager: manager,
-                    },
-                    transform: configured.transform,
-                    codec: configured.codec,
+                    mode: Mode::Async { _manager: manager },
+                    mft: configured.mft,
                     input_id: configured.input_id,
                     output_id: configured.output_id,
                     name: format!("{name} ({})", configured.mode.label()),
@@ -222,8 +215,8 @@ fn configure(
     // SAFETY: the activate object is live.
     let transform: IMFTransform = unsafe { activate.ActivateObject() }
         .map_err(|e| open_error::at(OpenStep::Activate, vendor_id, &e))?;
-    // SAFETY: the transform is live.
-    let attributes = unsafe { transform.GetAttributes()? };
+    let mft = RealMft::new(transform, Some(activate.clone()))?;
+    let attributes = mft.attributes()?;
     // SAFETY: the attribute store is live.
     let is_async = unsafe { attributes.GetUINT32(&MF_TRANSFORM_ASYNC) }.unwrap_or(0);
     if is_async != 1 {
@@ -240,47 +233,39 @@ fn configure(
     if d3d_aware != 1 {
         return Err(rejected("the encoder is not D3D11 aware"));
     }
-    // SAFETY: the transform and manager are live; the pointer stays valid for the call.
-    let device_set =
-        unsafe { transform.ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize) };
+    let device_set = mft.process_message(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize);
     if let Err(error) = device_set {
         return Err(open_error::at(OpenStep::D3dManager, vendor_id, &error));
     }
-    let (input_id, output_id) = stream_ids(&transform)?;
-    let codec: ICodecAPI = transform.cast()?;
-    let mode = apply_codec_properties(&codec, spec, HARDWARE_QUALITY_VS_SPEED)?;
+    let (input_id, output_id) = stream_ids(&mft)?;
+    let mode = apply_codec_properties(&mft, spec, HARDWARE_QUALITY_VS_SPEED)?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
     // SAFETY: the type is live and not modified after this point.
     unsafe {
         output_type.SetUINT32(&MF_MT_AVG_BITRATE, spec.mean_bitrate)?;
         output_type.SetUINT32(&MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High.0 as u32)?;
     }
-    // SAFETY: the transform and type are live.
-    unsafe { transform.SetOutputType(output_id, &output_type, 0) }
+    mft.set_output_type(output_id, &output_type)
         .map_err(|e| open_error::at(OpenStep::OutputType, vendor_id, &e))?;
-    let mut sequence_header = read_sequence_header(&transform, output_id);
-    log_input_types(&transform, input_id);
+    let mut sequence_header = read_sequence_header(&mft, output_id);
+    log_input_types(&mft, input_id);
     let input_type = video_type(spec, &MFVideoFormat_NV12)?;
-    // SAFETY: the transform and type are live.
-    if let Err(error) = unsafe { transform.SetInputType(input_id, &input_type, 0) } {
+    if let Err(error) = mft.set_input_type(input_id, &input_type) {
         return Err(open_error::at(OpenStep::InputType, vendor_id, &error));
     }
     if sequence_header.is_empty() {
-        sequence_header = read_sequence_header(&transform, output_id);
+        sequence_header = read_sequence_header(&mft, output_id);
     }
     if sequence_header.is_empty() {
         tracing::warn!("encoder did not publish MF_MT_MPEG_SEQUENCE_HEADER");
     }
-    log_bind_flags(&transform, input_id);
-    let events: IMFMediaEventGenerator = transform.cast()?;
-    start_streaming(&transform).map_err(|error| match error {
+    log_bind_flags(&mft, input_id);
+    start_streaming(&mft).map_err(|error| match error {
         H264Error::Windows(e) => open_error::at(OpenStep::Start, vendor_id, &e),
         other => other,
     })?;
     Ok(Configured {
-        transform,
-        events,
-        codec,
+        mft: Box::new(mft),
         input_id,
         output_id,
         sequence_header,
@@ -288,11 +273,10 @@ fn configure(
     })
 }
 
-pub(super) fn stream_ids(transform: &IMFTransform) -> Result<(u32, u32)> {
+pub(super) fn stream_ids(mft: &dyn Mft) -> Result<(u32, u32)> {
     let mut inputs = [0u32; 1];
     let mut outputs = [0u32; 1];
-    // SAFETY: both slices are live and hold one id each.
-    match unsafe { transform.GetStreamIDs(&mut inputs, &mut outputs) } {
+    match mft.stream_ids(&mut inputs, &mut outputs) {
         Ok(()) => Ok((inputs[0], outputs[0])),
         Err(error) if error.code() == E_NOTIMPL => Ok((0, 0)),
         Err(error) => Err(error.into()),
@@ -319,9 +303,8 @@ pub(super) fn video_type(spec: &Spec, subtype: &GUID) -> Result<IMFMediaType> {
     Ok(media_type)
 }
 
-pub(super) fn read_sequence_header(transform: &IMFTransform, output_id: u32) -> Vec<u8> {
-    // SAFETY: the transform is live.
-    let Ok(current) = (unsafe { transform.GetOutputCurrentType(output_id) }) else {
+pub(super) fn read_sequence_header(mft: &dyn Mft, output_id: u32) -> Vec<u8> {
+    let Ok(current) = mft.output_current_type(output_id) else {
         return Vec::new();
     };
     // SAFETY: the type is live.
@@ -336,10 +319,9 @@ pub(super) fn read_sequence_header(transform: &IMFTransform, output_id: u32) -> 
     }
 }
 
-fn log_input_types(transform: &IMFTransform, input_id: u32) {
+fn log_input_types(mft: &dyn Mft, input_id: u32) {
     for index in 0..MAX_LISTED_TYPES {
-        // SAFETY: the transform is live.
-        let Ok(available) = (unsafe { transform.GetInputAvailableType(input_id, index) }) else {
+        let Ok(available) = mft.input_available_type(input_id, index) else {
             break;
         };
         // SAFETY: the type is live.
@@ -348,9 +330,8 @@ fn log_input_types(transform: &IMFTransform, input_id: u32) {
     }
 }
 
-fn log_bind_flags(transform: &IMFTransform, input_id: u32) {
-    // SAFETY: the transform is live.
-    let Ok(attributes) = (unsafe { transform.GetInputStreamAttributes(input_id) }) else {
+fn log_bind_flags(mft: &dyn Mft, input_id: u32) {
+    let Ok(attributes) = mft.input_stream_attributes(input_id) else {
         return;
     };
     // SAFETY: the attribute store is live.
@@ -359,14 +340,13 @@ fn log_bind_flags(transform: &IMFTransform, input_id: u32) {
     }
 }
 
-pub(super) fn start_streaming(transform: &IMFTransform) -> Result<()> {
+pub(super) fn start_streaming(mft: &dyn Mft) -> Result<()> {
     for message in [
         MFT_MESSAGE_COMMAND_FLUSH,
         MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
         MFT_MESSAGE_NOTIFY_START_OF_STREAM,
     ] {
-        // SAFETY: the transform is live and the messages carry no parameter.
-        unsafe { transform.ProcessMessage(message, 0)? };
+        mft.process_message(message, 0)?;
     }
     Ok(())
 }
@@ -407,7 +387,7 @@ fn base_properties(spec: &Spec, quality_vs_speed: u32) -> Vec<Property> {
 }
 
 pub(super) fn apply_codec_properties(
-    codec: &ICodecAPI,
+    codec: &dyn Mft,
     spec: &Spec,
     quality_vs_speed: u32,
 ) -> Result<RateMode> {
@@ -423,14 +403,10 @@ pub(super) struct Applied {
     pub(super) read_back: Option<u32>,
 }
 
-pub(super) fn apply_property(codec: &ICodecAPI, property: &Property) -> Result<Applied> {
-    // SAFETY: the vtable call receives the live interface pointer and a GUID that outlives it.
-    let supported =
-        unsafe { (Interface::vtable(codec).IsSupported)(Interface::as_raw(codec), &property.id) };
-    // SAFETY: the codec interface is live and the value outlives the call.
-    let set = unsafe { codec.SetValue(&property.id, &property.value) };
-    // SAFETY: the codec interface is live.
-    let read_back = unsafe { codec.GetValue(&property.id) };
+pub(super) fn apply_property(codec: &dyn Mft, property: &Property) -> Result<Applied> {
+    let supported = codec.is_supported(&property.id);
+    let set = codec.set_value(&property.id, &property.value);
+    let read_back = codec.get_value(&property.id);
     tracing::info!(
         property = property.name,
         supported = supported == S_OK,

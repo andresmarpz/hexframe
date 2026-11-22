@@ -4,9 +4,8 @@ use greyscreen_mp4::avc::{NAL_IDR, NAL_PREFIX, nal_type, split_annexb};
 use windows::Win32::Media::MediaFoundation::{
     IMFMediaBuffer, IMFSample, MEError, METransformDrainComplete, METransformHaveOutput,
     METransformNeedInput, MF_E_NO_EVENTS_AVAILABLE, MF_E_TRANSFORM_NEED_MORE_INPUT,
-    MF_E_TRANSFORM_STREAM_CHANGE, MF_EVENT_FLAG_NO_WAIT, MF_MT_MPEG_SEQUENCE_HEADER,
-    MFCreateMemoryBuffer, MFCreateSample, MFT_OUTPUT_DATA_BUFFER,
-    MFT_OUTPUT_STREAM_PROVIDES_SAMPLES,
+    MF_E_TRANSFORM_STREAM_CHANGE, MF_MT_MPEG_SEQUENCE_HEADER, MFCreateMemoryBuffer, MFCreateSample,
+    MFT_OUTPUT_DATA_BUFFER, MFT_OUTPUT_STREAM_PROVIDES_SAMPLES,
 };
 
 use super::{EncodedVideo, H264Encoder, H264Error, Mode, Result};
@@ -18,13 +17,11 @@ const MAX_OUTPUT_TYPES: u32 = 64;
 
 impl H264Encoder {
     pub(super) fn pump_events(&mut self) -> Result<()> {
-        let Mode::Async { events, .. } = &self.mode else {
+        if !matches!(self.mode, Mode::Async { .. }) {
             return Ok(());
-        };
-        let events = events.clone();
+        }
         loop {
-            // SAFETY: the event generator is live; NO_WAIT makes the call non-blocking.
-            let event = match unsafe { events.GetEvent(MF_EVENT_FLAG_NO_WAIT) } {
+            let event = match self.mft.next_event() {
                 Ok(event) => event,
                 Err(error) if error.code() == MF_E_NO_EVENTS_AVAILABLE => return Ok(()),
                 Err(error) => return Err(error.into()),
@@ -46,8 +43,7 @@ impl H264Encoder {
     }
 
     pub(super) fn refresh_output_stream(&mut self) -> Result<()> {
-        // SAFETY: the transform is live and the stream id came from the transform.
-        let info = unsafe { self.transform.GetOutputStreamInfo(self.output_id)? };
+        let info = self.mft.output_stream_info(self.output_id)?;
         self.provides_samples = info.dwFlags & (MFT_OUTPUT_STREAM_PROVIDES_SAMPLES.0 as u32) != 0;
         self.scratch = if self.provides_samples {
             None
@@ -65,11 +61,9 @@ impl H264Encoder {
                 ..Default::default()
             };
             let mut status = 0u32;
-            // SAFETY: the transform is live; `buffer` and `status` outlive the call.
-            let result = unsafe {
-                self.transform
-                    .ProcessOutput(0, std::slice::from_mut(&mut buffer), &mut status)
-            };
+            let result = self
+                .mft
+                .process_output(std::slice::from_mut(&mut buffer), &mut status);
             // SAFETY: the buffer owns the sample reference placed or returned by the call and is not used again.
             let sample = unsafe { ManuallyDrop::take(&mut buffer.pSample) };
             // SAFETY: the buffer owns any returned event collection and is not used again.
@@ -94,17 +88,14 @@ impl H264Encoder {
     fn renegotiate_output(&mut self) -> Result<()> {
         let mut last_error = None;
         for index in 0..MAX_OUTPUT_TYPES {
-            // SAFETY: the transform is live.
-            let available =
-                match unsafe { self.transform.GetOutputAvailableType(self.output_id, index) } {
-                    Ok(available) => available,
-                    Err(error) => {
-                        last_error.get_or_insert(error);
-                        break;
-                    }
-                };
-            // SAFETY: the transform and type are live.
-            match unsafe { self.transform.SetOutputType(self.output_id, &available, 0) } {
+            let available = match self.mft.output_available_type(self.output_id, index) {
+                Ok(available) => available,
+                Err(error) => {
+                    last_error.get_or_insert(error);
+                    break;
+                }
+            };
+            match self.mft.set_output_type(self.output_id, &available) {
                 Ok(()) => {
                     tracing::info!(index, "encoder output type renegotiated");
                     self.reload_sequence_header();
@@ -119,8 +110,7 @@ impl H264Encoder {
     }
 
     fn reload_sequence_header(&mut self) {
-        // SAFETY: the transform is live.
-        let Ok(current) = (unsafe { self.transform.GetOutputCurrentType(self.output_id) }) else {
+        let Ok(current) = self.mft.output_current_type(self.output_id) else {
             return;
         };
         // SAFETY: the type is live.

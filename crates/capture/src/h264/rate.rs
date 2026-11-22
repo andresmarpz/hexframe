@@ -1,13 +1,14 @@
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncCommonBufferSize, CODECAPI_AVEncCommonMaxBitRate,
     CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonQuality,
-    CODECAPI_AVEncCommonRateControlMode, ICodecAPI, eAVEncCommonRateControlMode_PeakConstrainedVBR,
+    CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_PeakConstrainedVBR,
     eAVEncCommonRateControlMode_Quality,
 };
 use windows::Win32::System::Variant::VARIANT;
 
 use super::Result;
 use super::setup::{Property, Spec, apply_property};
+use super::transform::Mft;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) enum RateMode {
@@ -26,7 +27,7 @@ impl RateMode {
     }
 }
 
-pub(super) fn apply(codec: &ICodecAPI, spec: &Spec) -> Result<RateMode> {
+pub(super) fn apply(codec: &dyn Mft, spec: &Spec) -> Result<RateMode> {
     if let Some(quality) = spec.quality {
         match try_quality(codec, quality) {
             Ok(()) => {
@@ -44,7 +45,7 @@ pub(super) fn apply(codec: &ICodecAPI, spec: &Spec) -> Result<RateMode> {
     })
 }
 
-fn try_quality(codec: &ICodecAPI, quality: u32) -> std::result::Result<(), String> {
+fn try_quality(codec: &dyn Mft, quality: u32) -> std::result::Result<(), String> {
     let mode = eAVEncCommonRateControlMode_Quality.0 as u32;
     let mode_property = Property {
         name: "AVEncCommonRateControlMode",
@@ -81,14 +82,14 @@ fn try_quality(codec: &ICodecAPI, quality: u32) -> std::result::Result<(), Strin
     Ok(())
 }
 
-fn apply_caps(codec: &ICodecAPI, spec: &Spec) -> Result<()> {
+fn apply_caps(codec: &dyn Mft, spec: &Spec) -> Result<()> {
     for property in caps(spec) {
         apply_property(codec, &property)?;
     }
     Ok(())
 }
 
-fn apply_vbr(codec: &ICodecAPI, spec: &Spec) -> Result<()> {
+fn apply_vbr(codec: &dyn Mft, spec: &Spec) -> Result<()> {
     let mode = eAVEncCommonRateControlMode_PeakConstrainedVBR.0 as u32;
     let leading = [
         Property {

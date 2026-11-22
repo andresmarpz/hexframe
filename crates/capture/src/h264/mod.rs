@@ -7,6 +7,7 @@ mod setup;
 mod software;
 #[cfg(test)]
 mod tests;
+mod transform;
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -16,9 +17,8 @@ use greyscreen_core::encoder::{EncoderKind, label};
 use greyscreen_core::media::CaptureConfig;
 use windows::Win32::Graphics::Direct3D11::ID3D11Texture2D;
 use windows::Win32::Media::MediaFoundation::{
-    CODECAPI_AVEncVideoForceKeyFrame, ICodecAPI, IMFActivate, IMFDXGIDeviceManager, IMFMediaBuffer,
-    IMFMediaEventGenerator, IMFSample, IMFShutdown, IMFTransform, MF_E_NOTACCEPTING,
-    MFCreateDXGISurfaceBuffer, MFCreateSample, MFT_MESSAGE_COMMAND_DRAIN,
+    CODECAPI_AVEncVideoForceKeyFrame, IMFDXGIDeviceManager, IMFMediaBuffer, IMFSample,
+    MF_E_NOTACCEPTING, MFCreateDXGISurfaceBuffer, MFCreateSample, MFT_MESSAGE_COMMAND_DRAIN,
     MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_END_STREAMING,
 };
 use windows::Win32::System::Variant::VARIANT;
@@ -27,6 +27,7 @@ use windows::core::Interface;
 use crate::d3d::GpuDevice;
 use crate::vproc::{Nv12Frame, SlotReleaser};
 use readback::Readback;
+use transform::Mft;
 
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(3);
 const DRAIN_POLL: Duration = Duration::from_millis(2);
@@ -64,22 +65,15 @@ pub struct EncodedVideo {
 
 #[derive(Debug)]
 enum Mode {
-    Async {
-        events: IMFMediaEventGenerator,
-        activate: IMFActivate,
-        _manager: IMFDXGIDeviceManager,
-    },
-    Sync {
-        readback: Readback,
-    },
+    Async { _manager: IMFDXGIDeviceManager },
+    Sync { readback: Readback },
 }
 
 #[derive(Debug)]
 pub struct H264Encoder {
     scratch: Option<IMFSample>,
     mode: Mode,
-    codec: ICodecAPI,
-    transform: IMFTransform,
+    mft: Box<dyn Mft>,
     kind: EncoderKind,
     name: String,
     sequence_header: Vec<u8>,
@@ -136,8 +130,7 @@ impl H264Encoder {
         let mut encoder = Self {
             scratch: None,
             mode: opened.mode,
-            codec: opened.codec,
-            transform: opened.transform,
+            mft: opened.mft,
             kind,
             name,
             sequence_header: opened.sequence_header,
@@ -186,8 +179,7 @@ impl H264Encoder {
         fault!(EncoderSubmit)?;
         if let Mode::Sync { readback } = &self.mode {
             let sample = readback.sample(&frame.texture, pts_hns, dur_hns)?;
-            // SAFETY: the transform is live and the sample outlives the call.
-            match unsafe { self.transform.ProcessInput(self.input_id, &sample, 0) } {
+            match self.mft.process_input(self.input_id, &sample) {
                 Err(error) if error.code() == MF_E_NOTACCEPTING => {
                     return Err(H264Error::NotAccepting);
                 }
@@ -201,8 +193,7 @@ impl H264Encoder {
             return Err(H264Error::NotAccepting);
         }
         let sample = self.build_sample(&frame.texture, pts_hns, dur_hns)?;
-        // SAFETY: the transform is live and the sample outlives the call.
-        unsafe { self.transform.ProcessInput(self.input_id, &sample, 0)? };
+        self.mft.process_input(self.input_id, &sample)?;
         self.pending_need_input -= 1;
         self.inflight.push_back((frame.slot, pts_hns));
         Ok(())
@@ -210,11 +201,8 @@ impl H264Encoder {
 
     pub fn force_keyframe(&mut self) -> Result<()> {
         let value = VARIANT::from(1u32);
-        // SAFETY: the codec interface is live and `value` outlives the call.
-        unsafe {
-            self.codec
-                .SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &value)?;
-        }
+        self.mft
+            .set_value(&CODECAPI_AVEncVideoForceKeyFrame, &value)?;
         Ok(())
     }
 
@@ -245,11 +233,7 @@ impl H264Encoder {
     }
 
     fn drain_to_end(&mut self, out: &mut Vec<EncodedVideo>) -> Result<()> {
-        // SAFETY: the transform is live and the message carries no parameter.
-        unsafe {
-            self.transform
-                .ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0)?;
-        }
+        self.mft.process_message(MFT_MESSAGE_COMMAND_DRAIN, 0)?;
         if matches!(self.mode, Mode::Sync { .. }) {
             return self.drain_output(out);
         }
@@ -305,25 +289,12 @@ impl H264Encoder {
             MFT_MESSAGE_NOTIFY_END_STREAMING,
             MFT_MESSAGE_COMMAND_FLUSH,
         ] {
-            // SAFETY: the transform is live and the messages carry no parameter.
-            if let Err(error) = unsafe { self.transform.ProcessMessage(message, 0) } {
+            if let Err(error) = self.mft.process_message(message, 0) {
                 tracing::debug!(%error, "encoder shutdown message failed");
             }
         }
         self.release_inflight();
-        let Mode::Async { activate, .. } = &self.mode else {
-            return;
-        };
-        if let Ok(shutdown) = self.transform.cast::<IMFShutdown>() {
-            // SAFETY: the interface is live; Shutdown ends the event queue.
-            if let Err(error) = unsafe { shutdown.Shutdown() } {
-                tracing::debug!(%error, "encoder IMFShutdown failed");
-            }
-        }
-        // SAFETY: the activate object created this transform and is still live.
-        if let Err(error) = unsafe { activate.ShutdownObject() } {
-            tracing::debug!(%error, "encoder activate shutdown failed");
-        }
+        self.mft.shutdown();
     }
 }
 
