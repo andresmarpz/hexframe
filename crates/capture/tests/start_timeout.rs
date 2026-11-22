@@ -1,16 +1,16 @@
 #![cfg(windows)]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crossbeam_channel::unbounded;
 use greyscreen_capture::fault::{Armed, Point};
 use greyscreen_capture::{WindowsMediaSource, live_sessions};
 use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaSource};
 
-const STALL: Duration = Duration::from_secs(12);
-const EXIT_BOUND: Duration = Duration::from_secs(30);
+const STALL: Duration = Duration::from_secs(13);
+static SERIAL: Mutex<()> = Mutex::new(());
 
 fn config() -> CaptureConfig {
     CaptureConfig {
@@ -34,30 +34,25 @@ fn start() -> Result<Box<dyn greyscreen_core::media::MediaSession>, String> {
     WindowsMediaSource::new().start(CaptureTarget::PrimaryMonitor, config(), tx)
 }
 
-fn wait_until_idle() {
-    let deadline = Instant::now() + EXIT_BOUND;
-    while live_sessions() > 0 {
-        assert!(Instant::now() < deadline, "the stalled thread never exited");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
 #[test]
 #[ignore = "needs the PC: stalls capture setup past its 10 s bound"]
 fn a_timed_out_setup_exits_when_it_wakes_and_the_next_start_works() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
     let armed = Armed::new().stall(Point::CaptureStart, STALL);
     let error = start().err().expect("setup must time out");
     assert!(error.contains("timed out"), "{error}");
     assert_eq!(live_sessions(), 1, "the stalled thread is still running");
     drop(armed);
-    wait_until_idle();
-    start().expect("the next start works").stop();
+    let session = start().expect("the next start works");
+    assert_eq!(live_sessions(), 1, "the next start overlapped the stalled thread");
+    session.stop();
     assert_eq!(live_sessions(), 0);
 }
 
 #[test]
 #[ignore = "needs the PC: stalls capture setup past its 10 s bound"]
 fn two_starts_in_a_row_never_have_two_live_sessions() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
     let armed = Armed::new().stall(Point::CaptureStart, STALL);
     start().err().expect("setup must time out");
     drop(armed);
