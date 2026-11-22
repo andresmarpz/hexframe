@@ -9,7 +9,7 @@ use crate::ui::{Ui, format_clock};
 use crate::view::TABULAR;
 use crate::view::champion::champion_icon;
 use crate::view::thumb;
-use crate::view::widgets::pulsing_dot;
+use crate::view::widgets::dot;
 
 const ICON_SIZE: f32 = 32.0;
 const THUMB_WIDTH: f32 = 72.0;
@@ -171,7 +171,7 @@ pub(super) fn live(s: &Ui, k: &Kit) -> El {
     let status = row()
         .gap(6.0)
         .center_y()
-        .child(pulsing_dot(color))
+        .child(dot(color))
         .child(text(word).font(k.ty.small_medium).color(color));
     base(
         k,

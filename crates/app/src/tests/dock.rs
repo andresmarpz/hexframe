@@ -160,24 +160,30 @@ fn the_dock_stays_while_a_game_is_open_and_paused() {
 }
 
 #[test]
-fn the_review_keeps_clear_of_the_dock() {
+fn the_dock_overlays_review_without_reserving_layout_space() {
     let rt = reviewing();
-    let dock = nav_rect_of(&rt, "dock");
-    let play = nav_rect_of(&rt, "review-play");
-    assert!(
-        play[1] + play[3] <= dock[1],
-        "play {play:?} sits under dock {dock:?}"
-    );
+    assert!(rt.find("dock").is_some());
+    assert!(rt.find("dock-reserve").is_none());
 }
 
 #[test]
-fn the_dock_slides_away_while_the_video_plays_and_the_review_takes_the_room() {
+fn the_dock_slides_away_while_playing_without_moving_the_video() {
     let mut rt = reviewing();
     let before = nav_rect_of(&rt, "review-play")[1];
+    let video_height = nav_rect_of(&rt, "review-video")[3];
     play_for_a_while(&mut rt);
     assert!(rt.find("dock").is_none(), "hidden while playing");
     assert!(rt.find("dock-zone").is_some());
-    assert!(nav_rect_of(&rt, "review-play")[1] > before);
+    assert_eq!(nav_rect_of(&rt, "review-play")[1], before);
+    assert_eq!(nav_rect_of(&rt, "review-video")[3], video_height);
+}
+
+#[test]
+fn the_dock_shows_loading_while_waiting_for_league() {
+    let mut rt = docked();
+    rt.update(|ui, _| ui.status = EngineStatus::Waiting);
+    settle(&mut rt);
+    assert!(visible_texts(&rt).iter().any(|t| t == "Loading"));
 }
 
 #[test]

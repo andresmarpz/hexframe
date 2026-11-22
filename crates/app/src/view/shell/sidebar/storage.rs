@@ -1,7 +1,7 @@
-use rune::{El, Side, TextStyle, col, row, text};
+use rune::{Cursor, El, Side, TextStyle, col, row, text};
 use rune_kit::{Kit, Progress, ProgressCircle};
 
-use crate::ui::{LibraryTotals, Ui, format_size};
+use crate::ui::{LibraryTotals, SettingsSection, Ui, format_size};
 
 const RING_SIZE: f32 = 22.0;
 
@@ -30,11 +30,18 @@ pub(super) fn block(s: &Ui, k: &Kit) -> El {
     };
     let mut block = col()
         .key("nav-storage")
+        .role("button")
         .label(description(s, &totals))
+        .help("Open storage settings")
+        .focusable(true)
         .w_full()
         .px(8.0)
-        .pb(4.0)
+        .py(4.0)
         .gap(6.0)
+        .radius(k.radius.md)
+        .hover(k.c.hover)
+        .cursor(Cursor::Pointer)
+        .on_press(|ui: &mut Ui| ui.open_settings(SettingsSection::Storage))
         .child(
             row()
                 .w_full()
@@ -70,11 +77,17 @@ pub(super) fn ring(s: &Ui, k: &Kit) -> Option<El> {
     Some(
         row()
             .key("nav-storage")
+            .role("button")
             .label(tip.clone())
-            .help(tip)
+            .help(format!("{tip} — click for settings"))
             .help_side(Side::Right)
+            .focusable(true)
             .size(40.0, 28.0)
             .center()
+            .radius(k.radius.md)
+            .hover(k.c.hover)
+            .cursor(Cursor::Pointer)
+            .on_press(|ui: &mut Ui| ui.open_settings(SettingsSection::Storage))
             .child(ProgressCircle::new(used).size(RING_SIZE).build(k)),
     )
 }

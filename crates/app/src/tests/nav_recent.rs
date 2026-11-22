@@ -1,6 +1,6 @@
 use super::{nav_rect_of, runtime, settle, tap, visible_texts};
 use crate::ui::library::format::recent_games;
-use crate::ui::{Detail, Screen};
+use crate::ui::{Detail, Screen, SettingsSection};
 
 fn newest_ids(rt: &rune::Runtime<crate::ui::Ui>) -> Vec<String> {
     recent_games(&rt.state.recordings, 5)
@@ -89,4 +89,13 @@ fn the_storage_block_names_the_size_and_the_limit() {
             .iter()
             .any(|t| t.starts_with("Storage: ") && t.ends_with("of 50 GB used"))
     );
+}
+
+#[test]
+fn clicking_the_storage_block_opens_storage_settings() {
+    let mut rt = runtime();
+    assert!(!rt.state.settings_open);
+    tap(&mut rt, "nav-storage");
+    assert!(rt.state.settings_open);
+    assert_eq!(rt.state.settings_section, SettingsSection::Storage);
 }

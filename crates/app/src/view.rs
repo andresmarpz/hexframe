@@ -91,4 +91,5 @@ fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
             .children(shell::dock::hover_zone(s))
             .child(shell::dock::layer(s, k)),
     }
+    .instant_changes()
 }

@@ -12,13 +12,10 @@ const HEIGHT: f32 = 44.0;
 const BOTTOM_GAP: f32 = 16.0;
 pub(in crate::view) const CLEARANCE: f32 = HEIGHT + BOTTOM_GAP * 2.0;
 const PAD: f32 = 4.0;
-const IDLE_WIDTH: f32 = 112.0;
+const IDLE_WIDTH: f32 = 128.0;
 const RECORDING_WIDTH: f32 = 252.0;
 const SLIDE: f32 = HEIGHT + BOTTOM_GAP + 8.0;
 const HOVER_ZONE: f32 = 104.0;
-const FRAME: f32 = 8.0;
-const REVIEW_PADDING: f32 = 16.0;
-pub(in crate::view) const REVIEW_ROOM: f32 = CLEARANCE - FRAME - REVIEW_PADDING;
 const BLUR: f32 = 18.0;
 const GLASS_ALPHA: f32 = 0.78;
 
@@ -26,7 +23,8 @@ pub(in crate::view) fn layer(s: &Ui, k: &Kit) -> El {
     let mut layer = row()
         .key("dock-layer")
         .pin(Some(0.0), None, Some(0.0), Some(BOTTOM_GAP))
-        .justify_center();
+        .justify_center()
+        .animated_changes();
     if s.dock.visible {
         layer = layer.child(dock(s, k));
     }
@@ -58,6 +56,7 @@ fn dock(s: &Ui, k: &Kit) -> El {
         .backdrop_blur(BLUR)
         .fill(k.alpha(k.c.bg_base, GLASS_ALPHA))
         .width_leads()
+        .animated_changes()
         .transition(Transition::offset(0.0, SLIDE).combined(Transition::opacity()))
         .child(record_segment(s, k))
         .child(divider(k))
@@ -162,7 +161,7 @@ fn armed(s: &Ui, k: &Kit) -> El {
     };
     let label = match &s.status {
         EngineStatus::Finalizing => "Saving",
-        EngineStatus::Waiting => "Wait",
+        EngineStatus::Waiting => "Loading",
         EngineStatus::Error(_) => "Error",
         _ => "Rec",
     };

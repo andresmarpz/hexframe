@@ -9,7 +9,7 @@ mod tone;
 mod volume_slider;
 
 pub(crate) use clearable::clear_when_filled;
-pub(crate) use dot::{dot, pulsing_dot};
+pub(crate) use dot::dot;
 pub(crate) use export_icon::EXPORT;
 pub(crate) use grip::grip;
 pub(crate) use stable_button::{busy_label_content, stable_label_content};

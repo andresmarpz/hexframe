@@ -142,7 +142,14 @@ fn drawer(review: &ReviewState, k: &Kit) -> El {
         .clip_rounded(10.0)
         .on_background_press(|_: &mut Ui| {})
         .transition(Transition::offset(DRAWER_SLIDE, 0.0).combined(Transition::opacity()))
-        .child(tabs(review, k))
-        .child(hairline(k))
-        .child(tab_body(review, k))
+        .child(
+            col()
+                .w_full()
+                .grow(1.0)
+                .min_h(0.0)
+                .instant_changes()
+                .child(tabs(review, k))
+                .child(hairline(k))
+                .child(tab_body(review, k)),
+        )
 }

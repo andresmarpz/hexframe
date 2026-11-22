@@ -1,6 +1,6 @@
 use greyscreen_core::problem::Problem;
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{Color, Cursor, El, LoopSpec, Side, TextStyle, col, el, row, text};
+use rune::{Color, Cursor, El, Side, TextStyle, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::{Screen, Ui, format_clock};
@@ -8,14 +8,11 @@ use crate::ui::{Screen, Ui, format_clock};
 const BLOCK_HEIGHT: f32 = 52.0;
 const DOT_SIZE: f32 = 8.0;
 const DOT_TARGET: f32 = 36.0;
-const PULSE_SECS: f64 = 1.6;
-const PULSE_LOW: f32 = 0.4;
 
 struct Status {
     title: String,
     detail: String,
     dot: Color,
-    pulse: bool,
     clock: Option<String>,
 }
 
@@ -24,7 +21,6 @@ fn status(s: &Ui, k: &Kit) -> Status {
         title: title.to_owned(),
         detail: detail.to_owned(),
         dot,
-        pulse: false,
         clock: None,
     };
     match &s.status {
@@ -50,24 +46,17 @@ fn status(s: &Ui, k: &Kit) -> Status {
                 None => "Test recording".to_owned(),
             },
             dot: k.c.danger.icon,
-            pulse: true,
             clock: Some(format_clock(s.elapsed_secs)),
         },
     }
 }
 
 fn dot(st: &Status) -> El {
-    let dot = el()
-        .key("nav-status-dot")
+    el().key("nav-status-dot")
         .size(DOT_SIZE, DOT_SIZE)
         .radius(DOT_SIZE / 2.0)
         .fill(st.dot)
-        .a11y_hidden();
-    if st.pulse {
-        dot.looping(LoopSpec::opacity(PULSE_SECS, 0.0, PULSE_LOW, 1.0))
-    } else {
-        dot
-    }
+        .a11y_hidden()
 }
 
 fn summary(st: &Status) -> String {
