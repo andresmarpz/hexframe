@@ -237,8 +237,8 @@ fn configure(
     if let Err(error) = mft.set_d3d_manager(manager) {
         return Err(open_error::at(OpenStep::D3dManager, vendor_id, &error));
     }
-    let (input_id, output_id) = stream_ids(&mft)?;
-    let mode = apply_codec_properties(&mft, spec, HARDWARE_QUALITY_VS_SPEED)?;
+    let (input_id, output_id) = stream_ids(&*mft)?;
+    let mode = apply_codec_properties(&*mft, spec, HARDWARE_QUALITY_VS_SPEED)?;
     let output_type = video_type(spec, &MFVideoFormat_H264)?;
     // SAFETY: the type is live and not modified after this point.
     unsafe {
@@ -247,20 +247,20 @@ fn configure(
     }
     mft.set_output_type(output_id, &output_type)
         .map_err(|e| open_error::at(OpenStep::OutputType, vendor_id, &e))?;
-    let mut sequence_header = read_sequence_header(&mft, output_id);
-    log_input_types(&mft, input_id);
+    let mut sequence_header = read_sequence_header(&*mft, output_id);
+    log_input_types(&*mft, input_id);
     let input_type = video_type(spec, &MFVideoFormat_NV12)?;
     if let Err(error) = mft.set_input_type(input_id, &input_type) {
         return Err(open_error::at(OpenStep::InputType, vendor_id, &error));
     }
     if sequence_header.is_empty() {
-        sequence_header = read_sequence_header(&mft, output_id);
+        sequence_header = read_sequence_header(&*mft, output_id);
     }
     if sequence_header.is_empty() {
         tracing::warn!("encoder did not publish MF_MT_MPEG_SEQUENCE_HEADER");
     }
-    log_bind_flags(&mft, input_id);
-    start_streaming(&mft).map_err(|error| match error {
+    log_bind_flags(&*mft, input_id);
+    start_streaming(&*mft).map_err(|error| match error {
         H264Error::Windows(e) => open_error::at(OpenStep::Start, vendor_id, &e),
         other => other,
     })?;
