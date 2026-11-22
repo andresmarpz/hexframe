@@ -1,4 +1,5 @@
 use super::check::{Limits, Run, evaluate, growth, slope_per_min};
+use super::profiles::WindowTarget;
 use super::*;
 
 const MB: u64 = 1024 * 1024;
