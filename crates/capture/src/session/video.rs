@@ -62,7 +62,7 @@ impl Video {
 
     fn drive(&mut self) -> Exit {
         loop {
-            if !wait_for(&self.pacer, &self.flags.stop) {
+            if !wait_for(&self.pacer, &self.flags.stop, &mut self.stats) {
                 return Exit::Stopped;
             }
             let before = self.pacer.tick();
@@ -75,6 +75,7 @@ impl Video {
                 return exit;
             }
             self.stats.step_done(started);
+            self.stats.note_encoded(self.sink.encoded());
             self.pacer.advance();
             self.stats.c.ticks += 1;
             self.stats.report_if_due(self.sink.encoded());
@@ -101,6 +102,8 @@ impl Video {
             .watchdog
             .stalled(mono_now(), self.sink.encoded(), submitting)
         {
+            self.stats.note_encoder_stall(self.sink.encoded());
+            self.publish_stats();
             return Err(Exit::Failed(encoder::stopped_reason(
                 "no frames came out for too long",
             )));
@@ -173,6 +176,7 @@ impl Video {
             return self.encoder_error("encoder submit", &error).map(|()| true);
         }
         self.sink.submitted(self.pacer.tick(), pts);
+        self.stats.note_submit();
         if seq == self.last_seq {
             self.stats.c.repeated += 1;
         }

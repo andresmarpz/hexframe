@@ -4,10 +4,12 @@ use crate::time::Hns;
 
 const BUCKETS: usize = 100;
 const BUCKET_US: u32 = 500;
+const FINE_BUCKET_US: u32 = 50;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LatencyHistogram {
     buckets: [u32; BUCKETS],
+    bucket_us: u32,
     count: u64,
     sum_us: u64,
     max_us: u32,
@@ -17,6 +19,7 @@ impl Default for LatencyHistogram {
     fn default() -> Self {
         Self {
             buckets: [0; BUCKETS],
+            bucket_us: BUCKET_US,
             count: 0,
             sum_us: 0,
             max_us: 0,
@@ -25,8 +28,15 @@ impl Default for LatencyHistogram {
 }
 
 impl LatencyHistogram {
+    pub fn fine() -> Self {
+        Self {
+            bucket_us: FINE_BUCKET_US,
+            ..Self::default()
+        }
+    }
+
     pub fn record(&mut self, us: u32) {
-        let index = ((us / BUCKET_US) as usize).min(BUCKETS - 1);
+        let index = ((us / self.bucket_us) as usize).min(BUCKETS - 1);
         self.buckets[index] = self.buckets[index].saturating_add(1);
         self.count += 1;
         self.sum_us += u64::from(us);
@@ -44,6 +54,10 @@ impl LatencyHistogram {
         self.sum_us as f64 / self.count as f64 / 1000.0
     }
 
+    pub fn percentile_us(&self, p: f64) -> u32 {
+        (self.percentile_ms(p) * 1000.0).round() as u32
+    }
+
     pub fn max_ms(&self) -> f64 {
         f64::from(self.max_us) / 1000.0
     }
@@ -57,11 +71,40 @@ impl LatencyHistogram {
         for (index, &n) in self.buckets.iter().enumerate() {
             seen += u64::from(n);
             if seen >= target {
-                let upper = (index as u32 + 1) * BUCKET_US;
+                let upper = (index as u32 + 1) * self.bucket_us;
                 return f64::from(upper.min(self.max_us.max(1))) / 1000.0;
             }
         }
         self.max_ms()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WakeLateness(pub LatencyHistogram);
+
+impl Default for WakeLateness {
+    fn default() -> Self {
+        Self(LatencyHistogram::fine())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SpinShare {
+    spin_us: u64,
+    wall_us: u64,
+}
+
+impl SpinShare {
+    pub fn add(&mut self, spin_us: u64, wall_us: u64) {
+        self.spin_us = self.spin_us.saturating_add(spin_us);
+        self.wall_us = self.wall_us.saturating_add(wall_us.max(spin_us));
+    }
+
+    pub fn pct(&self) -> f32 {
+        if self.wall_us == 0 {
+            return 0.0;
+        }
+        (self.spin_us as f64 * 100.0 / self.wall_us as f64) as f32
     }
 }
 
@@ -82,6 +125,10 @@ pub struct CaptureStats {
     pub encode: LatencyHistogram,
     pub window_encode_max_us: u32,
     pub window_step_max_us: u32,
+    pub wake_lateness: WakeLateness,
+    pub pacer_spin: SpinShare,
+    pub first_output_ms: Option<u32>,
+    pub encoder_stalls_early: u32,
     pub audio_packets: u64,
     pub audio_discontinuities: u64,
     pub audio_gaps: u64,

@@ -9,7 +9,9 @@ mod tracker;
 pub mod verdict;
 
 pub use caps::{BufferUnit, CapMismatch, buffer_size, cap_mismatch, cap_warning};
-pub use stats::{CaptureSetup, CaptureStats, LatencyHistogram, driver_version_text};
+pub use stats::{
+    CaptureSetup, CaptureStats, LatencyHistogram, SpinShare, WakeLateness, driver_version_text,
+};
 pub use tracker::{DiagSample, HealthTracker, Queues};
 pub use verdict::{Area, Finding, Level, audio_level};
 

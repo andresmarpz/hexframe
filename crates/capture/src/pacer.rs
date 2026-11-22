@@ -26,6 +26,7 @@ pub(crate) struct Stats {
     log_start: Instant,
     log_mark: Mark,
     snapshot_start: Instant,
+    first_submit: Option<Instant>,
 }
 
 impl Stats {
@@ -36,6 +37,35 @@ impl Stats {
             log_start: Instant::now(),
             log_mark: Mark::default(),
             snapshot_start: Instant::now(),
+            first_submit: None,
+        }
+    }
+
+    pub(crate) fn note_wake(&mut self, started: Instant, spin_started: Option<Instant>, late: Hns) {
+        let micros = |d: Duration| u64::try_from(d.as_micros()).unwrap_or(u64::MAX);
+        let late_us = u32::try_from(late / 10).unwrap_or(u32::MAX);
+        self.c.wake_lateness.0.record(late_us);
+        let spin = spin_started.map_or(0, |at| micros(at.elapsed()));
+        self.c.pacer_spin.add(spin, micros(started.elapsed()));
+    }
+
+    pub(crate) fn note_submit(&mut self) {
+        self.first_submit.get_or_insert_with(Instant::now);
+    }
+
+    pub(crate) fn note_encoded(&mut self, encoded: u64) {
+        if encoded == 0 || self.c.first_output_ms.is_some() {
+            return;
+        }
+        if let Some(at) = self.first_submit {
+            self.c.first_output_ms =
+                Some(u32::try_from(at.elapsed().as_millis()).unwrap_or(u32::MAX));
+        }
+    }
+
+    pub(crate) fn note_encoder_stall(&mut self, encoded: u64) {
+        if encoded == 0 {
+            self.c.encoder_stalls_early += 1;
         }
     }
 
@@ -85,20 +115,24 @@ impl Stats {
     }
 }
 
-pub(crate) fn wait_for(pacer: &Pacer, stop: &AtomicBool) -> bool {
+pub(crate) fn wait_for(pacer: &Pacer, stop: &AtomicBool, stats: &mut Stats) -> bool {
     let deadline = pacer.deadline();
+    let started = Instant::now();
+    let mut spin_started: Option<Instant> = None;
     loop {
         if stop.load(Ordering::Acquire) {
             return false;
         }
         let remaining = deadline - mono_now();
         if remaining <= 0 {
+            stats.note_wake(started, spin_started, -remaining);
             return true;
         }
         if remaining > SPIN_MARGIN {
             let hns = u64::try_from(remaining - SPIN_MARGIN).unwrap_or(0);
             std::thread::sleep(Duration::from_nanos(hns * 100));
         } else {
+            spin_started.get_or_insert_with(Instant::now);
             std::thread::yield_now();
         }
     }

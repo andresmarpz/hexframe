@@ -413,3 +413,43 @@ fn setup_warnings_reach_the_health_once() {
     tracker.add_warnings(&warnings);
     assert_eq!(tracker.finish(None).warnings, warnings);
 }
+
+#[test]
+fn wake_lateness_p99_uses_fine_buckets() {
+    let mut late = WakeLateness::default();
+    for _ in 0..98 {
+        late.0.record(40);
+    }
+    late.0.record(250);
+    late.0.record(1_200);
+    assert_eq!(late.0.count(), 100);
+    assert_eq!(late.0.percentile_us(0.5), 50);
+    assert_eq!(late.0.percentile_us(0.99), 300);
+    assert_eq!(late.0.max_ms(), 1.2);
+}
+
+#[test]
+fn spin_share_is_spin_over_wall() {
+    let mut share = SpinShare::default();
+    assert_eq!(share.pct(), 0.0);
+    share.add(100, 1_000);
+    share.add(100, 1_000);
+    assert!((share.pct() - 10.0).abs() < 0.001);
+    share.add(500, 100);
+    assert!(share.pct() <= 100.0);
+}
+
+#[test]
+fn diag_sample_reports_pacer_stats() {
+    let mut tracker = HealthTracker::new(0, &format(), "x", None);
+    let mut stats = CaptureStats::default();
+    stats.wake_lateness.0.record(120);
+    stats.pacer_spin.add(30, 1_000);
+    stats.first_output_ms = Some(80);
+    stats.encoder_stalls_early = 1;
+    let sample = tracker.on_stats(&stats, Queues::default());
+    assert_eq!(sample.wake_late_p99_us, 120);
+    assert!((sample.spin_pct - 3.0).abs() < 0.001);
+    assert_eq!(sample.first_output_ms, Some(80));
+    assert_eq!(sample.encoder_stalls_early, 1);
+}
