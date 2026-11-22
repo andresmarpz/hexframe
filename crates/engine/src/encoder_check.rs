@@ -146,6 +146,7 @@ fn record_leftover_crash(
         outcome: CheckOutcome::Failed,
         encoder: String::new(),
         detail: String::new(),
+        first_failure: String::new(),
         noticed: false,
         verdicts: Vec::new(),
     });

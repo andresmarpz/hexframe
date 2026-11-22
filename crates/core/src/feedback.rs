@@ -11,6 +11,8 @@ use scrub::scrub_logs;
 
 pub const MAX_MESSAGE_CHARS: usize = 5000;
 pub const LOG_TAIL_LINES: usize = 300;
+const ENCODER_LINE_PREFIX: &str = "Encoder check: ";
+const MAX_ENCODER_LINE_CHARS: usize = 300;
 const LOG_FILE_PREFIX: &str = "greyscreen.log.";
 const MAX_LOG_READ_BYTES: u64 = 1024 * 1024;
 
@@ -59,6 +61,7 @@ pub struct FeedbackDraft {
     pub email: String,
     pub include_logs: bool,
     pub client_id: String,
+    pub encoder_failure: Option<String>,
 }
 
 impl FeedbackDraft {
@@ -129,13 +132,29 @@ pub fn build_report(
     };
     FeedbackReport {
         kind: draft.kind,
-        message: draft.message.trim().to_owned(),
+        message: with_encoder_line(draft, context.home_dirs),
         email: (!email.is_empty()).then(|| email.to_owned()),
         app_version: context.app_version.to_owned(),
         os: context.os.to_owned(),
         log_tail,
         client_id: draft.client_id.clone(),
     }
+}
+
+fn with_encoder_line(draft: &FeedbackDraft, home_dirs: &[String]) -> String {
+    let message = draft.message.trim();
+    let Some(raw) = draft.encoder_failure.as_deref() else {
+        return message.to_owned();
+    };
+    let line = scrub_logs(&raw.replace(['\r', '\n'], " "), home_dirs);
+    let room = MAX_MESSAGE_CHARS
+        .saturating_sub(message.chars().count() + ENCODER_LINE_PREFIX.len() + 2)
+        .min(MAX_ENCODER_LINE_CHARS);
+    let line: String = line.trim().chars().take(room).collect();
+    if line.is_empty() {
+        return message.to_owned();
+    }
+    format!("{message}\n\n{ENCODER_LINE_PREFIX}{line}")
 }
 
 pub fn read_newest_log(dir: &Path) -> Option<String> {

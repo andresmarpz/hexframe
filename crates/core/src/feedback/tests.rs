@@ -10,6 +10,7 @@ fn draft() -> FeedbackDraft {
         email: " me@example.com ".into(),
         include_logs: true,
         client_id: "client-1".into(),
+        encoder_failure: None,
     }
 }
 
@@ -201,4 +202,25 @@ fn client_ids_are_random_version_4_uuids() {
     assert!(parts[2].starts_with('4'));
     assert!(matches!(parts[3].as_bytes()[0], b'8' | b'9' | b'a' | b'b'));
     assert!(a.bytes().all(|c| c == b'-' || c.is_ascii_hexdigit()));
+}
+
+#[test]
+fn the_encoder_failure_line_is_scrubbed_and_added_to_the_message() {
+    let mut with_line = draft();
+    with_line.encoder_failure = Some("NVIDIA NVENC: failed opening /Users/ana/x summoner=Faker".into());
+    let home = vec!["/Users/ana".to_owned()];
+    let report = build_report(&with_line, context(&home), || None);
+    assert!(report.message.starts_with("The clip button does nothing."));
+    assert!(report.message.contains("Encoder check: NVIDIA NVENC: failed opening ~/x"));
+    assert!(!report.message.contains("ana"));
+    assert!(!report.message.contains("Faker"));
+}
+
+#[test]
+fn the_encoder_failure_line_never_pushes_the_message_past_the_limit() {
+    let mut full = draft();
+    full.message = "a".repeat(MAX_MESSAGE_CHARS - 10);
+    full.encoder_failure = Some("b".repeat(500));
+    let report = build_report(&full, context(&[]), || None);
+    assert!(report.message.chars().count() <= MAX_MESSAGE_CHARS);
 }

@@ -407,6 +407,8 @@ pub struct EncoderCheck {
     pub encoder: String,
     pub detail: String,
     #[serde(default)]
+    pub first_failure: String,
+    #[serde(default)]
     pub noticed: bool,
     #[serde(default)]
     pub verdicts: Vec<Verdict>,
@@ -414,7 +416,7 @@ pub struct EncoderCheck {
 
 impl EncoderCheck {
     pub fn from_attempts(key: String, attempts: &[Attempt]) -> Self {
-        let failures = attempts
+        let lines = attempts
             .iter()
             .filter_map(|a| {
                 a.result
@@ -422,8 +424,8 @@ impl EncoderCheck {
                     .err()
                     .map(|e| format!("{}: {e}", a.label()))
             })
-            .collect::<Vec<_>>()
-            .join("; ");
+            .collect::<Vec<_>>();
+        let failures = lines.join("; ");
         let chosen = attempts.iter().find(|a| a.result.is_ok());
         let (outcome, encoder) = match chosen {
             Some(a) if a.kind == EncoderKind::Hardware => (CheckOutcome::Hardware, a.label()),
@@ -435,6 +437,7 @@ impl EncoderCheck {
             outcome,
             encoder,
             detail: failures,
+            first_failure: lines.into_iter().next().unwrap_or_default(),
             noticed: false,
             verdicts: Vec::new(),
         }
@@ -493,6 +496,10 @@ impl EncoderCheck {
         } else {
             FAILED_HELP
         }
+    }
+
+    pub fn failure_line(&self) -> Option<&str> {
+        Some(self.first_failure.as_str()).filter(|line| !line.is_empty())
     }
 
     pub fn failed(&self) -> bool {

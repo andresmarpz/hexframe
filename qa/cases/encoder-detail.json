@@ -1,0 +1,9 @@
+{
+  "about": "On the no-encoder card, Details opens the first failure line: the encoder and its error text.",
+  "scene": "home-no-encoder",
+  "steps": [
+    {"check": "home", "has": ["encoder-error", "encoder-detail"], "lacks": ["encoder-detail-line"], "snap": false},
+    {"tap": "encoder-detail"},
+    {"check": "open", "has": ["encoder-detail-line"], "text": ["NVIDIA NVENC (hardware): the encoder could not start (0x8000FFFF)"]}
+  ]
+}

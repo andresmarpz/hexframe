@@ -42,6 +42,7 @@ fn draft(include_logs: bool) -> FeedbackDraft {
         email: "me@example.com".into(),
         include_logs,
         client_id: "client-1".into(),
+        encoder_failure: None,
     }
 }
 

@@ -132,6 +132,7 @@ fn a_failed_hardware_encoder_falls_back_to_software_once_noticed() {
         "Windows software encoder — uses more CPU"
     );
     assert_eq!(check.detail, "AMD AMF (hardware): E_FAIL");
+    assert_eq!(check.failure_line(), Some("AMD AMF (hardware): E_FAIL"));
     assert!(check.wants_notice());
     check.noticed = true;
     assert!(!check.wants_notice());

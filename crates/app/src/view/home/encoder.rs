@@ -1,7 +1,7 @@
 use greyscreen_core::encoder::FAILED_TITLE;
 use greyscreen_core::problem::Problem;
 use rune::{El, col, row, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
+use rune_kit::{Button, ButtonVariant, Collapsible, ControlSize, Kit};
 
 use crate::ui::Ui;
 use crate::view::card;
@@ -25,6 +25,20 @@ pub(super) fn error_card(s: &Ui, k: &Kit) -> Option<El> {
             .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.open_feedback(tx))
             .build(k)
             .key("encoder-feedback");
+        let detail = check.failure_line().map(|line| {
+            Collapsible::new("Details", s.encoder_detail_open)
+                .child(
+                    text(line)
+                        .key("encoder-detail-line")
+                        .wrap()
+                        .w_full()
+                        .font(k.ty.small)
+                        .color(k.c.text_muted),
+                )
+                .on_toggle(|ui: &mut Ui| ui.encoder_detail_open = !ui.encoder_detail_open)
+                .build(k)
+                .key("encoder-detail")
+        });
         card(k)
             .key("encoder-error")
             .padding(20.0)
@@ -47,6 +61,7 @@ pub(super) fn error_card(s: &Ui, k: &Kit) -> Option<El> {
                             .color(k.c.text_muted),
                     ),
             )
+            .children(detail)
             .child(row().gap(8.0).child(faq).child(feedback))
     })
 }

@@ -132,6 +132,12 @@ impl Ui {
             email: self.feedback.email.text.clone(),
             include_logs: self.feedback.include_logs,
             client_id: self.settings.client_id.clone().unwrap_or_default(),
+            encoder_failure: self
+                .encoder
+                .as_ref()
+                .filter(|check| check.failed())
+                .and_then(|check| check.failure_line())
+                .map(str::to_owned),
         };
         if let Some(problem) = draft.problem() {
             self.feedback.problem = Some(problem);

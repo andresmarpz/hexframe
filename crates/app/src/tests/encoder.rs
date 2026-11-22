@@ -14,6 +14,7 @@ fn check(outcome: CheckOutcome, encoder: &str) -> EncoderCheck {
         outcome,
         encoder: encoder.into(),
         detail: String::new(),
+        first_failure: String::new(),
         noticed: false,
         verdicts: Vec::new(),
     }
@@ -38,6 +39,25 @@ fn a_failed_check_shows_what_to_try_on_home() {
     assert!(visible_texts(&rt).contains(&FAILED_TITLE.to_owned()));
     tap(&mut rt, "encoder-faq");
     assert_eq!(rt.take_url_requests(), vec![Problem::NoEncoder.help_url()]);
+}
+
+#[test]
+fn the_failed_card_opens_the_first_failure_line() {
+    let (mut rt, _rx) = live_runtime();
+    let mut failed = check(CheckOutcome::Failed, "");
+    failed.first_failure = "NVIDIA NVENC (hardware): E_FAIL".into();
+    receive(&mut rt, UiMsg::Encoder(failed));
+    assert!(rt.find("encoder-detail").is_some());
+    assert!(rt.find("encoder-detail-line").is_none());
+    tap(&mut rt, "encoder-detail");
+    assert!(visible_texts(&rt).contains(&"NVIDIA NVENC (hardware): E_FAIL".to_owned()));
+}
+
+#[test]
+fn a_failed_card_without_a_failure_line_has_no_details() {
+    let (mut rt, _rx) = live_runtime();
+    receive(&mut rt, UiMsg::Encoder(check(CheckOutcome::Failed, "")));
+    assert!(rt.find("encoder-detail").is_none());
 }
 
 #[test]
