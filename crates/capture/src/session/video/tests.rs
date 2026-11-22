@@ -403,9 +403,17 @@ fn run_built(flags: Flags) -> (std::thread::JoinHandle<()>, Receiver<MediaEvent>
 fn a_panic_in_the_video_loop_unwinds_and_the_next_start_works() {
     let armed = Armed::new().panic(Point::VideoLoopStep);
     let (doomed, _events) = run_built(Flags::default());
+    let payload = doomed
+        .join()
+        .expect_err("the injected panic did not reach the loop");
+    let message = payload
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| payload.downcast_ref::<&str>().copied())
+        .unwrap_or_default();
     assert!(
-        doomed.join().is_err(),
-        "the injected panic did not reach the loop"
+        message.contains("fault injected at VideoLoopStep"),
+        "{message}"
     );
     drop(armed);
     let _armed = Armed::new();
@@ -415,5 +423,8 @@ fn a_panic_in_the_video_loop_unwinds_and_the_next_start_works() {
     let first = events.recv_timeout(Duration::from_secs(20));
     stop.store(true, std::sync::atomic::Ordering::Release);
     next.join().unwrap();
-    assert!(first.is_ok(), "the next start produced nothing");
+    assert!(
+        matches!(first, Ok(MediaEvent::Started { .. })),
+        "the next start did not start: {first:?}"
+    );
 }

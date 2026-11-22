@@ -331,6 +331,20 @@ fn close_errors_on_the_session_and_the_pool_log_once_each_and_clear_the_handles(
     assert_eq!(log_count(CLOSE_FAILED[1]) - before.1, 1, "pool close");
     assert_eq!(log_count("capture stopped") - before.2, 1, "stop logs once");
     assert!(!probe.has_frame(), "a frame survived the failed close");
+    let counted = probe.frames_counted();
+    let started = Instant::now();
+    let mut delivered = false;
+    while !delivered && started.elapsed() < FIRST_FRAME_WAIT {
+        delivered = probe.deliver_frame(&pool).expect("deliver");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(delivered, "the pool gave no frame after teardown");
+    assert_eq!(
+        probe.frames_counted(),
+        counted,
+        "a frame counted after teardown"
+    );
+    assert!(!probe.has_frame(), "a frame published after teardown");
     drop(pool);
     assert!(rig.window.close());
 }
@@ -364,7 +378,6 @@ fn a_panic_that_unwinds_through_the_capture_still_closes_it_and_the_next_start_w
     assert!(wait_for_frame(&rig.capture));
     let before = log_count("capture stopped");
     let probe = rig.capture.probe();
-    let pool = rig.capture.frame_pool().expect("a live pool");
     let Rig {
         _com,
         window,
@@ -380,14 +393,6 @@ fn a_panic_that_unwinds_through_the_capture_still_closes_it_and_the_next_start_w
     assert!(unwound.is_err());
     assert_eq!(log_count("capture stopped") - before, 1, "no teardown ran");
     assert!(!probe.has_frame());
-    let counted = probe.frames_counted();
-    let _ = probe.deliver_frame(&pool);
-    assert_eq!(
-        probe.frames_counted(),
-        counted,
-        "a frame counted after teardown"
-    );
-    assert!(!probe.has_frame(), "a frame published after teardown");
     let target = window.target();
     let next = WgcCapture::start(&gpu, &target, QpcMap::now(), OPTIONS).expect("next start");
     assert!(wait_for_frame(&next), "the next capture gave no frame");

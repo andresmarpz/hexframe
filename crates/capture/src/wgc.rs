@@ -1,3 +1,5 @@
+#[cfg(any(test, feature = "fault-injection"))]
+mod seams;
 mod setup;
 #[cfg(test)]
 mod tests;
@@ -110,17 +112,6 @@ impl PublishProbe {
     }
 }
 
-#[cfg(any(test, feature = "fault-injection"))]
-impl PublishProbe {
-    pub fn deliver_frame(&self, pool: &Direct3D11CaptureFramePool) -> windows::core::Result<()> {
-        self.0.on_frame(pool)
-    }
-
-    pub fn frames_counted(&self) -> u64 {
-        self.0.frames.load(Ordering::Relaxed)
-    }
-}
-
 impl std::fmt::Debug for WgcCapture {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WgcCapture")
@@ -142,16 +133,6 @@ impl WgcCapture {
         let (width, height) = lock(&capture.shared.worker).pool_size;
         tracing::info!(width, height, "capture started");
         Ok(capture)
-    }
-
-    #[cfg(any(test, feature = "fault-injection"))]
-    pub fn start_without_session(
-        gpu: &GpuDevice,
-        target: &CaptureTarget,
-        qpc: QpcMap,
-        options: WgcOptions,
-    ) -> Result<Self> {
-        Self::unattached(gpu, target, qpc, options)
     }
 
     fn unattached(
@@ -236,7 +217,7 @@ impl WgcCapture {
                 return Ok(());
             };
             match frame_shared.on_frame(pool) {
-                Ok(()) => lock(&frame_shared.frame_errors).success(),
+                Ok(_) => lock(&frame_shared.frame_errors).success(),
                 Err(error) => {
                     if lock(&frame_shared.frame_errors).failure() {
                         tracing::warn!(%error, "capture frame failed");
@@ -307,11 +288,6 @@ impl WgcCapture {
         PublishProbe(Arc::clone(&self.shared))
     }
 
-    #[cfg(any(test, feature = "fault-injection"))]
-    pub fn frame_pool(&self) -> Option<Direct3D11CaptureFramePool> {
-        self.pool.clone()
-    }
-
     pub fn border_hidden(&self) -> bool {
         self.border_hidden
     }
@@ -368,15 +344,15 @@ impl Drop for WgcCapture {
 }
 
 impl Shared {
-    fn on_frame(&self, pool: &Direct3D11CaptureFramePool) -> windows::core::Result<()> {
+    fn on_frame(&self, pool: &Direct3D11CaptureFramePool) -> windows::core::Result<bool> {
         let Ok(frame) = pool.TryGetNextFrame() else {
-            return Ok(());
+            return Ok(false);
         };
         let content = frame.ContentSize()?;
         let at = self.qpc.to_mono(frame.SystemRelativeTime()?.Duration);
         let mut worker = lock(&self.worker);
         if worker.stopped {
-            return Ok(());
+            return Ok(true);
         }
         let copy = if content.Width > 0 && content.Height > 0 {
             let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
@@ -397,7 +373,7 @@ impl Shared {
         if count.is_multiple_of(LOG_EVERY_FRAMES) {
             tracing::debug!(count, "capture frames");
         }
-        Ok(())
+        Ok(true)
     }
 
     fn publish(&self, worker: &mut Worker, copy: Taken, at: Hns) {
