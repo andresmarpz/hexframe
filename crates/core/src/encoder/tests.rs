@@ -450,3 +450,149 @@ fn a_software_start_after_a_hardware_failure_warns() {
     assert_eq!(fallback_warning(EncoderKind::Software, &[]), None);
     assert_eq!(fallback_warning(EncoderKind::Hardware, &busy), None);
 }
+
+mod planning {
+    use super::*;
+    use proptest::prelude::*;
+    use std::collections::BTreeSet;
+
+    const VENDORS: [u32; 5] = [
+        VENDOR_NVIDIA,
+        VENDOR_AMD,
+        VENDOR_INTEL,
+        VENDOR_MICROSOFT,
+        0xbeef,
+    ];
+    const NAMES: [&str; 3] = ["Intel(R) Arc(TM) A370M", "Intel UHD Graphics", "Unknown"];
+
+    fn adapters() -> impl Strategy<Value = Vec<Adapter>> {
+        let one = (
+            0..VENDORS.len(),
+            0..NAMES.len(),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>(),
+        );
+        proptest::collection::btree_map(1u64..40, one, 1..7).prop_map(|map| {
+            map.into_iter()
+                .map(|(luid, (vendor, name, display, high, saving))| Adapter {
+                    luid,
+                    name: NAMES[name].to_owned(),
+                    vendor_id: VENDORS[vendor],
+                    display,
+                    high_performance: high,
+                    power_saving: saving,
+                    ..Adapter::default()
+                })
+                .collect()
+        })
+    }
+
+    fn hardware_luids(candidates: &[Candidate]) -> Vec<u64> {
+        candidates
+            .iter()
+            .filter(|c| c.kind == EncoderKind::Hardware)
+            .map(|c| c.adapter)
+            .collect()
+    }
+
+    proptest! {
+        #[test]
+        fn the_plan_ends_with_one_software_candidate_and_tries_each_gpu_once(list in adapters()) {
+            let candidates = plan(&list);
+            let software: Vec<usize> = candidates
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.kind == EncoderKind::Software)
+                .map(|(i, _)| i)
+                .collect();
+            prop_assert_eq!(software, vec![candidates.len() - 1]);
+            let hardware = hardware_luids(&candidates);
+            let unique: BTreeSet<u64> = hardware.iter().copied().collect();
+            prop_assert_eq!(unique.len(), hardware.len());
+            let expected: BTreeSet<u64> =
+                list.iter().filter(|a| !a.is_software()).map(|a| a.luid).collect();
+            prop_assert_eq!(unique, expected);
+        }
+
+        #[test]
+        fn the_game_gpu_comes_first_on_a_hybrid_laptop(list in adapters()) {
+            let mut sorted = list.clone();
+            sorted.sort_by_key(|a| a.luid);
+            let hardware: Vec<&Adapter> = sorted.iter().filter(|a| !a.is_software()).collect();
+            let display = hardware.iter().find(|a| a.display);
+            if let Some(display) = display.filter(|d| d.power_saving && !d.high_performance)
+                && hardware.iter().any(|a| a.high_performance && a.luid != display.luid)
+            {
+                let first = plan(&list)[0];
+                let chosen = hardware.iter().find(|a| a.luid == first.adapter).unwrap();
+                prop_assert!(chosen.high_performance && chosen.luid != display.luid);
+            }
+        }
+
+        #[test]
+        fn the_plan_ignores_names_and_list_order(list in adapters(), turn in 0usize..7, flip in any::<bool>()) {
+            let mut other = list.clone();
+            for a in &mut other {
+                a.name = format!("renamed {}", a.luid);
+            }
+            let len = other.len();
+            other.rotate_left(turn % len);
+            if flip {
+                other.reverse();
+            }
+            prop_assert_eq!(plan(&list), plan(&other));
+        }
+    }
+
+    #[test]
+    fn an_integrated_gpu_and_an_arc_gpu_try_the_arc_first_on_a_hybrid_laptop() {
+        let laptop = [
+            Adapter {
+                display: true,
+                power_saving: true,
+                ..adapter(10, "Intel(R) Iris(R) Xe Graphics", VENDOR_INTEL)
+            },
+            Adapter {
+                high_performance: true,
+                ..adapter(20, "Intel(R) Arc(TM) A370M Graphics", VENDOR_INTEL)
+            },
+        ];
+        assert_eq!(plan(&laptop), vec![hw(20), hw(10), sw(10)]);
+    }
+
+    #[test]
+    fn two_gpus_with_the_same_name_are_told_apart_by_id() {
+        let twins = [
+            adapter(7, "Intel(R) UHD Graphics", VENDOR_INTEL),
+            adapter(3, "Intel(R) UHD Graphics", VENDOR_INTEL),
+        ];
+        assert_eq!(plan(&twins), vec![hw(3), hw(7), sw(3)]);
+    }
+
+    #[test]
+    fn a_gpu_that_fails_device_creation_is_skipped_for_the_next_one() {
+        let failed = Attempt {
+            adapter: "Intel(R) UHD Graphics".to_owned(),
+            ..attempt(
+                EncoderKind::Hardware,
+                VENDOR_INTEL,
+                Err("device creation failed"),
+            )
+        };
+        let worked = Attempt {
+            adapter: "NVIDIA GeForce RTX 3070".to_owned(),
+            ..attempt(EncoderKind::Hardware, VENDOR_NVIDIA, Ok("ok"))
+        };
+        let check = EncoderCheck::from_attempts("key".to_owned(), &[failed, worked]);
+        assert_eq!(check.outcome, CheckOutcome::Hardware);
+        assert_eq!(check.encoder, "NVIDIA NVENC (hardware)");
+    }
+
+    #[test]
+    fn worker_threads_follow_the_core_count() {
+        for (cores, threads) in [(0, 2), (1, 2), (2, 2), (4, 2), (8, 4), (64, 4)] {
+            assert_eq!(worker_threads(cores), threads, "{cores} cores");
+        }
+    }
+}

@@ -7,6 +7,8 @@ pub use check::{Attempt, CheckOutcome, EncoderCheck};
 
 pub const SOFTWARE_MAX_HEIGHT: u32 = 1080;
 pub const SOFTWARE_MAX_FPS: u32 = 30;
+const MIN_WORKER_THREADS: u32 = 2;
+const MAX_WORKER_THREADS: u32 = 4;
 pub const SOFTWARE_LABEL: &str = "Windows software encoder";
 pub const SOFTWARE_NOTICE: &str = "Your graphics card's video encoder didn't work, so Greyscreen records with the Windows software encoder. It uses more CPU and records at up to 1080p 30 fps.";
 pub const FAILED_TITLE: &str = "No video encoder works on this PC";
@@ -56,7 +58,13 @@ pub struct Candidate {
 }
 
 pub fn plan(adapters: &[Adapter]) -> Vec<Candidate> {
-    let hardware: Vec<&Adapter> = adapters.iter().filter(|a| !a.is_software()).collect();
+    let mut sorted: Vec<&Adapter> = adapters.iter().collect();
+    sorted.sort_by_key(|a| a.luid);
+    let hardware: Vec<&Adapter> = sorted
+        .iter()
+        .filter(|a| !a.is_software())
+        .copied()
+        .collect();
     let display = hardware.iter().find(|a| a.display).copied();
     let mut order: Vec<u64> = Vec::new();
     let mut push = |luid: u64| {
@@ -81,8 +89,8 @@ pub fn plan(adapters: &[Adapter]) -> Vec<Candidate> {
         })
         .collect();
     let software_adapter = display
-        .or_else(|| adapters.iter().find(|a| a.display))
-        .or_else(|| adapters.first());
+        .or_else(|| sorted.iter().find(|a| a.display).copied())
+        .or_else(|| sorted.first().copied());
     if let Some(adapter) = software_adapter {
         candidates.push(Candidate {
             adapter: adapter.luid,
@@ -144,6 +152,10 @@ pub fn software_config(cfg: &CaptureConfig) -> CaptureConfig {
         max_height: Some(max_height),
         ..cfg.clone()
     }
+}
+
+pub fn worker_threads(cpu_cores: u32) -> u32 {
+    (cpu_cores / 2).clamp(MIN_WORKER_THREADS, MAX_WORKER_THREADS)
 }
 
 pub fn check_key(fingerprint: &str, cfg: &CaptureConfig, version: &str) -> String {

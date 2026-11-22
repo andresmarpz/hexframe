@@ -6,6 +6,8 @@ use windows::Win32::Media::MediaFoundation::{
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::System::Variant::VARIANT;
 
+use greyscreen_core::encoder;
+
 use super::readback::Readback;
 use super::setup::{
     Opened, Property, Spec, apply_codec_properties, apply_property, cap_warnings,
@@ -17,8 +19,6 @@ use crate::d3d::GpuDevice;
 
 const NAME: &str = "Microsoft H.264 Encoder MFT";
 const QUALITY_VS_SPEED: u32 = 0;
-const MAX_WORKER_THREADS: u32 = 4;
-const MIN_WORKER_THREADS: u32 = 2;
 
 pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
     // SAFETY: the class id is a valid constant and no outer object is passed.
@@ -55,11 +55,11 @@ pub(super) fn open(gpu: &GpuDevice, spec: &Spec) -> Result<Opened> {
 }
 
 fn worker_threads() -> Property {
-    let cores = std::thread::available_parallelism().map_or(MIN_WORKER_THREADS, |n| n.get() as u32);
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
     Property {
         name: "AVEncNumWorkerThreads",
         id: CODECAPI_AVEncNumWorkerThreads,
-        value: VARIANT::from((cores / 2).clamp(MIN_WORKER_THREADS, MAX_WORKER_THREADS)),
+        value: VARIANT::from(encoder::worker_threads(cores)),
         required: false,
     }
 }

@@ -728,3 +728,88 @@ fn an_absolute_output_folder_loads_unchanged() {
     fs::write(&path, serde_json::json!({ "output_dir": dir }).to_string()).unwrap();
     assert_eq!(Settings::load(&path).output_dir, dir);
 }
+
+mod encoder_numbers {
+    use super::*;
+    use crate::encoder::software_config;
+    use crate::health::{BufferUnit, buffer_size};
+    use crate::media::encode_size;
+    use proptest::prelude::*;
+
+    fn quality() -> impl Strategy<Value = Quality> {
+        prop_oneof![
+            Just(Quality::Balanced),
+            Just(Quality::High),
+            Just(Quality::Max)
+        ]
+    }
+
+    fn resolution() -> impl Strategy<Value = Resolution> {
+        prop_oneof![
+            Just(Resolution::Native),
+            (1u32..9000).prop_map(Resolution::Height)
+        ]
+    }
+
+    proptest! {
+        #[test]
+        fn no_rate_is_zero_and_the_encode_size_is_even(
+            quality in quality(),
+            resolution in resolution(),
+            fps in 0u32..200,
+            native in 144u32..4320,
+            width in 144u32..7680,
+        ) {
+            let mut settings = Settings { quality, resolution, fps, ..Settings::default() };
+            settings.validate();
+            for cfg in [
+                settings.capture_config(native),
+                software_config(&settings.capture_config(native)),
+            ] {
+                let (w, h) = encode_size((width, native), cfg.max_height);
+                let sized = cfg.for_encode_size(w, h);
+                prop_assert!(cfg.gop_frames > 0 && cfg.fps > 0);
+                prop_assert!(sized.video_bitrate > 0 && sized.video_peak > 0);
+                prop_assert!(buffer_size(sized.video_peak, BufferUnit::Bytes) > 0);
+                prop_assert!(buffer_size(sized.video_peak, BufferUnit::Bits) > 0);
+                prop_assert_eq!(sized.audio_bitrate, 192_000);
+                prop_assert!(w > 0 && h > 0 && w % 2 == 0 && h % 2 == 0);
+                if cfg.max_height.is_none_or(|cap| native <= cap) {
+                    prop_assert_eq!((w, h), (width & !1, native & !1));
+                }
+            }
+        }
+
+        #[test]
+        fn the_software_config_stays_inside_its_caps(
+            quality in quality(),
+            resolution in resolution(),
+            fps in 0u32..200,
+            native in 144u32..4320,
+        ) {
+            let mut settings = Settings { quality, resolution, fps, ..Settings::default() };
+            settings.validate();
+            let cfg = software_config(&settings.capture_config(native));
+            prop_assert!(cfg.gop_frames <= cfg.fps && cfg.fps <= 30);
+            prop_assert!(cfg.max_height.is_some_and(|h| h <= 1080));
+        }
+    }
+
+    #[test]
+    fn a_file_from_an_older_version_loads_with_defaults_for_new_fields() {
+        let dir = scratch_dir();
+        let path = dir.join("settings.json");
+        fs::write(
+            &path,
+            r#"{"quality":"Balanced","fps":30,"resolution":"P720"}"#,
+        )
+        .unwrap();
+        let loaded = Settings::load(&path);
+        let defaults = Settings::default();
+        assert_eq!(loaded.resolution, Resolution::Height(720));
+        assert_eq!(loaded.capture_cursor, defaults.capture_cursor);
+        assert_eq!(loaded.recording_diagnostics, defaults.recording_diagnostics);
+        assert_eq!(loaded.clips, defaults.clips);
+        assert_eq!(loaded.keybinds, defaults.keybinds);
+    }
+}
