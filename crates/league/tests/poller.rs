@@ -238,6 +238,35 @@ fn window_lost_while_waiting_emits_gone() {
     assert_eq!(recv(&rx), LeagueMsg::Gone);
 }
 
+struct Counting(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl greyscreen_league::locator::GameLocator for Counting {
+    fn find(&mut self) -> Option<(isize, u32)> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        None
+    }
+}
+
+#[test]
+fn a_missing_game_is_searched_for_at_most_once_per_interval() {
+    let server = FakeServer::start();
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let (tx, _rx) = unbounded();
+    let handle = Poller::spawn_with_interval(
+        LiveClient::new(&server.base),
+        Box::new(Counting(calls.clone())),
+        tx,
+        Duration::from_millis(100),
+    );
+    std::thread::sleep(Duration::from_millis(1050));
+    drop(handle);
+    let searches = calls.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        (5..=11).contains(&searches),
+        "searched {searches} times in 1.05 s"
+    );
+}
+
 #[test]
 fn dropping_the_handle_stops_the_thread() {
     let server = FakeServer::start();
