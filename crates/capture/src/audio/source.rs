@@ -14,7 +14,7 @@ pub struct PacketInfo {
     pub timestamp: u64,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum SourceError {
     #[error("audio device invalidated")]
     DeviceInvalidated,

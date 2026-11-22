@@ -13,6 +13,7 @@ pub(crate) enum Step {
     Packet { pcm: Vec<f32>, info: PacketInfo },
     Idle,
     ReadFails(SourceError),
+    SilentLoss(SourceError),
 }
 
 impl Step {
@@ -58,6 +59,10 @@ impl CaptureClient for FakeClient {
     fn wait(&mut self, _timeout_ms: u32) -> Result<bool, SourceError> {
         match self.steps.front() {
             Some(Step::Packet { .. } | Step::ReadFails(_)) => Ok(true),
+            Some(Step::SilentLoss(_)) => {
+                std::thread::sleep(IDLE_SLEEP);
+                Ok(false)
+            }
             Some(Step::Idle) => {
                 self.steps.pop_front();
                 Ok(false)
@@ -70,6 +75,9 @@ impl CaptureClient for FakeClient {
     }
 
     fn next_packet_size(&mut self) -> Result<Option<u32>, SourceError> {
+        if let Some(Step::SilentLoss(error)) = self.steps.front() {
+            return Err(error.clone());
+        }
         Ok(Some(match self.steps.front() {
             Some(Step::Packet { pcm, .. }) => (pcm.len() / CHANNELS) as u32,
             Some(Step::ReadFails(_)) => 1,

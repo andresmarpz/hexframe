@@ -319,27 +319,20 @@ fn capture_loop(
     while !stop.load(Ordering::Acquire) {
         match stream.wait(TICK_MS) {
             Ok(true) => {}
-            Ok(false) => {
-                if let Some(Span::Silence(frames)) = timeline.on_timeout(mono_now()) {
-                    counters.idle(frames);
-                    let chunk = (RATE as usize).max(1);
-                    let mut first_frame = timeline.frames_out() - frames as u64;
-                    let mut left = frames;
-                    while left > 0 {
-                        let n = left.min(chunk);
-                        let block = PcmBlock {
-                            first_frame,
-                            samples: vec![0; n * CHANNELS],
-                        };
-                        if !send_block(out, block, stop, counters) {
-                            return;
-                        }
-                        first_frame += n as u64;
-                        left -= n;
+            Ok(false) => match stream.next_packet_size() {
+                Ok(Some(frames)) if frames > 0 => {}
+                Ok(_) => {
+                    if !fill_idle(&mut timeline, out, counters, stop) {
+                        return;
                     }
+                    continue;
                 }
-                continue;
-            }
+                Err(error) => {
+                    tracing::warn!(%error, "audio probe failed");
+                    report_loss(&error, counters, stop);
+                    return;
+                }
+            },
             Err(error) => {
                 tracing::warn!(%error, "audio wait failed");
                 report_loss(&error, counters, stop);
@@ -364,6 +357,34 @@ fn capture_loop(
             }
         }
     }
+}
+
+fn fill_idle(
+    timeline: &mut AudioTimeline,
+    out: &Sender<PcmBlock>,
+    counters: &AudioCounters,
+    stop: &AtomicBool,
+) -> bool {
+    let Some(Span::Silence(frames)) = timeline.on_timeout(mono_now()) else {
+        return true;
+    };
+    counters.idle(frames);
+    let chunk = (RATE as usize).max(1);
+    let mut first_frame = timeline.frames_out() - frames as u64;
+    let mut left = frames;
+    while left > 0 {
+        let n = left.min(chunk);
+        let block = PcmBlock {
+            first_frame,
+            samples: vec![0; n * CHANNELS],
+        };
+        if !send_block(out, block, stop, counters) {
+            return false;
+        }
+        first_frame += n as u64;
+        left -= n;
+    }
+    true
 }
 
 fn report_loss(error: &SourceError, counters: &AudioCounters, stop: &AtomicBool) {

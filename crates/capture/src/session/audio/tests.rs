@@ -496,6 +496,26 @@ fn device_invalidated_sends_one_warning_to_the_session() {
 }
 
 #[test]
+fn device_loss_while_the_event_never_fires_sends_one_warning() {
+    let mut steps = sine_packets(3);
+    steps.push(Step::SilentLoss(SourceError::DeviceInvalidated));
+    let pipe =
+        start(FakeClient::new(steps).open(), FakeEncoder::new().open()).expect("pipe starts");
+    let (mut sink, rx) = sink();
+    pipe.begin(far_future_t0());
+    drain_until(&pipe, &mut sink, 3);
+    let deadline = Instant::now() + PATIENCE;
+    let mut texts = Vec::new();
+    while texts.is_empty() && Instant::now() < deadline {
+        pipe.drain(&mut sink);
+        texts = warnings(&rx);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(texts.len(), 1);
+    finish_within_patience(pipe, sink);
+}
+
+#[test]
 fn a_failed_mmcss_registration_still_captures_audio() {
     let _armed = Armed::new().fail(Point::Mmcss, E_FAIL);
     let pipe = start(
