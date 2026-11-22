@@ -286,7 +286,7 @@ impl Probe {
 
 pub const PROBE_FLAG: &str = "--greyscreen-probe";
 pub const PROBE_CRASH_FLAG: &str = "--crash";
-pub const PROBE_SELF_DEADLINE_MS: u64 = 2500;
+pub const PROBE_SELF_DEADLINE_MS: u64 = 9000;
 const PROBE_PREFIX: &str = "result=";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
