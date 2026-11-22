@@ -195,7 +195,9 @@ impl Mmcss {
     fn enter() -> Self {
         let mut task = 0u32;
         // SAFETY: the task index pointer refers to a live local u32 and the name is a static wide string.
-        match unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut task) } {
+        match fault!(Mmcss)
+            .and_then(|()| unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut task) })
+        {
             Ok(handle) => Self(Some(handle)),
             Err(error) => {
                 tracing::warn!(%error, "MMCSS registration failed");

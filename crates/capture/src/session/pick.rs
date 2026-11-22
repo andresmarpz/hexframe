@@ -158,6 +158,7 @@ fn open_encoder(
     cfg: &CaptureConfig,
     native: (u32, u32),
 ) -> Result<((u32, u32), VideoConverter, H264Encoder, CaptureConfig), String> {
+    fault!(EncoderCandidate).map_err(|error| error.to_string())?;
     let size = encode_size(native, cfg.max_height);
     tracing::info!(
         step = "video converter",
@@ -184,6 +185,7 @@ fn open_encoder(
 }
 
 fn first_frame_size(wgc: &WgcCapture, flags: &Flags) -> Result<(u32, u32), String> {
+    fault!(FirstFrameWait).map_err(|error| error.to_string())?;
     let deadline = Instant::now() + FIRST_FRAME_TIMEOUT;
     loop {
         if let Some((_, size, _)) = wgc.latest() {

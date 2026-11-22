@@ -89,7 +89,7 @@ impl Readback {
         loop {
             let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
             // SAFETY: the staging texture is CPU readable and `mapped` outlives the call.
-            let result = unsafe {
+            let result = fault!(StagingMap).and_then(|()| unsafe {
                 self.context.Map(
                     &self.staging,
                     0,
@@ -97,7 +97,7 @@ impl Readback {
                     D3D11_MAP_FLAG_DO_NOT_WAIT.0 as u32,
                     Some(&mut mapped),
                 )
-            };
+            });
             match result {
                 Ok(()) => return Ok(mapped),
                 Err(error)

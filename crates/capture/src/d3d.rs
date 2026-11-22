@@ -66,6 +66,11 @@ impl GpuDevice {
         inspectable.cast()
     }
 
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub(crate) fn from_adapter(adapter: &IDXGIAdapter1) -> windows::core::Result<Self> {
+        Self::create(adapter)
+    }
+
     fn for_monitor(monitor: HMONITOR) -> windows::core::Result<Self> {
         // SAFETY: CreateDXGIFactory1 has no pointer arguments.
         let factory: IDXGIFactory1 = unsafe { CreateDXGIFactory1()? };
@@ -77,6 +82,7 @@ impl GpuDevice {
     }
 
     fn create(adapter: &IDXGIAdapter1) -> windows::core::Result<Self> {
+        fault!(AdapterOpen)?;
         // SAFETY: GetDesc1 only writes to the returned value.
         let desc = unsafe { adapter.GetDesc1()? };
         let adapter_name = wide_to_string(&desc.Description);
@@ -127,7 +133,9 @@ fn raise_gpu_priority(device: &ID3D11Device) {
     match device.cast::<IDXGIDevice>() {
         Ok(dxgi) => {
             // SAFETY: `dxgi` is a live DXGI device and the call only takes an integer.
-            match unsafe { dxgi.SetGPUThreadPriority(GPU_THREAD_PRIORITY) } {
+            let result = fault!(GpuPriority)
+                .and_then(|()| unsafe { dxgi.SetGPUThreadPriority(GPU_THREAD_PRIORITY) });
+            match result {
                 Ok(()) => tracing::info!(priority = GPU_THREAD_PRIORITY, "gpu thread priority set"),
                 Err(error) => tracing::warn!(%error, "set gpu thread priority failed"),
             }

@@ -42,13 +42,14 @@ pub(super) fn configure_session(session: &GraphicsCaptureSession, options: WgcOp
     }
     tracing::info!(step = "borderless access", "graphics capture");
     request_borderless();
-    let border_hidden = match session.SetIsBorderRequired(false) {
-        Ok(()) => true,
-        Err(error) => {
-            tracing::warn!(%error, "disable capture border failed");
-            false
-        }
-    };
+    let border_hidden =
+        match fault!(CaptureBorder).and_then(|()| session.SetIsBorderRequired(false)) {
+            Ok(()) => true,
+            Err(error) => {
+                tracing::warn!(%error, "disable capture border failed");
+                false
+            }
+        };
     let interval = TimeSpan {
         Duration: capture_min_update_interval_hns(fps, display_hz),
     };
@@ -57,7 +58,9 @@ pub(super) fn configure_session(session: &GraphicsCaptureSession, options: WgcOp
         display_hz,
         "graphics capture update interval"
     );
-    if let Err(error) = session.SetMinUpdateInterval(interval) {
+    if let Err(error) =
+        fault!(CaptureMinUpdateInterval).and_then(|()| session.SetMinUpdateInterval(interval))
+    {
         tracing::warn!(%error, "set minimum update interval failed");
     }
     border_hidden

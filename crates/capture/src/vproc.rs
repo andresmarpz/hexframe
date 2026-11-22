@@ -86,6 +86,7 @@ pub struct VideoConverter {
 
 impl VideoConverter {
     pub fn new(gpu: &GpuDevice, out_w: u32, out_h: u32, fps: u32) -> Result<Self> {
+        fault!(ConverterSetup)?;
         let video_device: ID3D11VideoDevice = gpu.device.cast()?;
         let video_context: ID3D11VideoContext1 = gpu.context.cast()?;
         let out_size = (out_w, out_h);

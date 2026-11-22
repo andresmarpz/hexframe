@@ -21,7 +21,9 @@ pub enum Claim {
 pub fn claim(name: &str) -> Claim {
     let show_name = HSTRING::from(instance_event_name(name, "show"));
     // SAFETY: the name outlives the call and no security attributes are passed.
-    let event = match unsafe { CreateEventW(None, false, false, &show_name) } {
+    let event = match fault!(SingleInstanceEvent)
+        .and_then(|()| unsafe { CreateEventW(None, false, false, &show_name) })
+    {
         Ok(event) => event,
         Err(error) => {
             tracing::warn!(%error, "cannot create the single-instance event");

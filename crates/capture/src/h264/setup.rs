@@ -216,6 +216,7 @@ fn configure(
     manager: &IMFDXGIDeviceManager,
     spec: &Spec,
 ) -> Result<Configured> {
+    fault!(MftActivation)?;
     // SAFETY: the activate object is live.
     let transform: IMFTransform = unsafe { activate.ActivateObject()? };
     // SAFETY: the transform is live.

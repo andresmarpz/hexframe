@@ -81,6 +81,7 @@ impl FrameCopier {
             context.End(&self.query);
             context.Flush();
         }
+        fault!(GpuCopyWait)?;
         let started = Instant::now();
         let wait = tear::wait_bounded(
             COPY_WAIT_BUDGET,
@@ -98,6 +99,7 @@ impl FrameCopier {
             .ok_or_else(|| windows::core::Error::from(E_POINTER))?;
         let context = &self.gpu.context;
         let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+        fault!(StagingMap)?;
         // SAFETY: the staging texture is live, CPU readable and used only by this thread.
         unsafe { context.Map(&thumb.staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))? };
         let (width, height) = (thumb.size.0 as usize, thumb.size.1 as usize);
@@ -269,6 +271,7 @@ fn plain_desc(size: (u32, u32), usage: D3D11_USAGE) -> D3D11_TEXTURE2D_DESC {
 }
 
 fn texture(gpu: &GpuDevice, desc: D3D11_TEXTURE2D_DESC) -> windows::core::Result<ID3D11Texture2D> {
+    fault!(FrameCopyTexture)?;
     let mut texture = None;
     // SAFETY: `desc` and the out pointer refer to live locals.
     unsafe {
