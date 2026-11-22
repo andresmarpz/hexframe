@@ -287,7 +287,7 @@ mod on_fake {
     }
 
     #[test]
-    fn a_flush_that_blocks_still_returns_the_packets_that_arrived() {
+    fn a_slow_flush_keeps_the_packets_that_were_drained() {
         let block = Duration::from_millis(300);
         let mut rig = rig(FakeTransform::new().blocking_flush(block));
         let mut packets = Vec::new();
@@ -328,6 +328,7 @@ mod on_fake {
             first.encoder.need_input().unwrap_err(),
             H264Error::Stopped(_)
         ));
+        drop(first);
         let mut second = rig(FakeTransform::new().failing_at(Step::NextEvent, 0, E_FAIL));
         let mut packets = Vec::new();
         assert!(matches!(

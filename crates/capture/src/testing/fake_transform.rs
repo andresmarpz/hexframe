@@ -77,6 +77,7 @@ pub(crate) type Calls = Arc<Mutex<Vec<Call>>>;
 #[derive(Debug, Default)]
 struct Script {
     fail: Option<(Step, usize, HRESULT)>,
+    fail_from: Option<(Step, usize, HRESULT)>,
     never_need_input: bool,
     never_drain_complete: bool,
     never_output: bool,
@@ -118,6 +119,11 @@ impl FakeTransform {
 
     pub(crate) fn failing_at(mut self, step: Step, nth: usize, code: HRESULT) -> Self {
         self.script.fail = Some((step, nth, code));
+        self
+    }
+
+    pub(crate) fn failing_from(mut self, step: Step, nth: usize, code: HRESULT) -> Self {
+        self.script.fail_from = Some((step, nth, code));
         self
     }
 
@@ -193,7 +199,11 @@ impl FakeTransform {
         let nth = state.counts[step as usize];
         state.counts[step as usize] += 1;
         match self.script.fail {
-            Some((at, when, code)) if at == step && when == nth => Err(code.into()),
+            Some((at, when, code)) if at == step && when == nth => return Err(code.into()),
+            _ => {}
+        }
+        match self.script.fail_from {
+            Some((at, from, code)) if at == step && nth >= from => Err(code.into()),
             _ => Ok(()),
         }
     }

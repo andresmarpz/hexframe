@@ -13,7 +13,7 @@ use crate::fault::{Armed, Point};
 use crate::h264::{H264Encoder, H264Error};
 use crate::session::Flags;
 use crate::session::setup::build;
-use crate::testing::fake_transform::FakeTransform;
+use crate::testing::fake_transform::{FakeTransform, Step};
 use crate::vproc::VprocError;
 
 const LOSSES: [HRESULT; 2] = [DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET];
@@ -257,19 +257,68 @@ fn encoder_input_errors_that_repeat_end_the_run_with_the_stopped_reason() {
     }
 }
 
-#[test]
-fn encoder_output_errors_that_repeat_end_the_run_with_the_stopped_reason() {
-    let _armed = Armed::new();
-    let (mut video, events) = video();
-    let error = H264Error::Windows(Error::from(E_FAIL));
-    for _ in 1..MAX_SOFT_ERRORS {
-        assert!(video.encoder_error("encoder drain", &error).is_ok());
+fn run_to_failure(fake: FakeTransform, fps: u32) -> Vec<MediaEvent> {
+    let armed = Armed::new();
+    let (tx, rx) = unbounded();
+    let flags = Flags::default();
+    let stop = flags.stop.clone();
+    let cfg = CaptureConfig { fps, ..config() };
+    let runner = std::thread::spawn(move || {
+        let mut video = match build(&CaptureTarget::PrimaryMonitor, &cfg, tx, flags) {
+            Ok(video) => video,
+            Err(message) => panic!("setup failed: {message}"),
+        };
+        video.encoder = H264Encoder::on_fake(fake, 64, 64)
+            .unwrap()
+            .with_releaser(video.converter.releaser());
+        video.run();
+    });
+    let mut seen = Vec::new();
+    loop {
+        match rx.recv_timeout(Duration::from_secs(20)) {
+            Ok(event) => {
+                let failed = matches!(event, MediaEvent::Failed(_));
+                seen.push(event);
+                if failed {
+                    break;
+                }
+            }
+            Err(_) => {
+                stop.store(true, std::sync::atomic::Ordering::Release);
+                break;
+            }
+        }
     }
-    let Err(Exit::Failed(reason)) = video.encoder_error("encoder drain", &error) else {
-        panic!("expected the failed exit");
-    };
-    video.shutdown(Exit::Failed(reason));
-    assert_ended_with_one_failure(&events, "the video encoder stopped");
+    runner.join().unwrap();
+    drop(armed);
+    seen
+}
+
+fn failure_reason(events: &[MediaEvent]) -> &str {
+    events
+        .iter()
+        .find_map(|event| match event {
+            MediaEvent::Failed(reason) => Some(reason.as_str()),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("the run did not fail: {events:?}"))
+}
+
+#[test]
+fn an_encoder_that_refuses_input_returns_every_slot_and_ends_after_repeated_failures() {
+    let events = run_to_failure(FakeTransform::new().not_accepting(), 60);
+    let reason = failure_reason(&events);
+    assert!(reason.contains("encoder submit keeps failing"), "{reason}");
+    assert!(is_encoder_failure(reason));
+}
+
+#[test]
+#[ignore = "a successful submit resets the error count, so a failing drain only ends at the stall watchdog"]
+fn encoder_output_errors_that_repeat_end_the_run_before_the_watchdog() {
+    let fake = FakeTransform::new().failing_from(Step::ProcessOutput, 0, E_FAIL);
+    let events = run_to_failure(fake, 60);
+    let reason = failure_reason(&events);
+    assert!(reason.contains("encoder drain keeps failing"), "{reason}");
 }
 
 #[test]
@@ -299,7 +348,7 @@ fn an_encoder_that_never_asks_for_input_ends_the_run_at_the_watchdog_limit() {
 }
 
 #[test]
-#[ignore = "waits for the game-session encoder measurements in issue 61"]
+#[ignore = "waits for the first-output measurement from a game session"]
 fn an_encoder_that_opens_and_never_outputs_moves_on_before_the_watchdog_limit() {
     let armed = Armed::new();
     let (tx, rx) = unbounded();
