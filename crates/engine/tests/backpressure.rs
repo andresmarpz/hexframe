@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use greyscreen_core::settings::Settings;
+use greyscreen_core::keybinds::Action;
+use greyscreen_core::settings::{ClipSettings, Settings};
 use greyscreen_engine::{EngineCmd, FakeMediaSource, NoticeLevel, UiMsg, set_write_delay};
 
 use common::{
@@ -193,4 +194,143 @@ fn a_clip_to_an_unwritable_folder_warns_and_leaves_no_clip_behind() {
     assert!(saved.meta.clips.is_empty());
     assert!(folder.join("clips").is_file());
     assert!(error_texts(&harness.ui).is_empty());
+}
+
+fn clip_settings(tag: &str) -> Settings {
+    Settings {
+        clips: ClipSettings {
+            enabled: true,
+            pre_secs: 1,
+            post_secs: 1,
+            ..ClipSettings::default()
+        },
+        ..settings(tag)
+    }
+}
+
+#[test]
+fn clips_still_save_while_the_game_writer_is_stalled() {
+    let _serial = serial();
+    set_write_delay(Some(Duration::from_secs(60)));
+    let harness = start_idle(
+        clip_settings("clip-stalled"),
+        Arc::new(FakeMediaSource::new().with_speed(4)),
+    );
+    send(&harness, EngineCmd::StartTestRecording { secs: 600 });
+    recording_since(&harness.ui);
+    thread::sleep(Duration::from_millis(1500));
+    send(&harness, EngineCmd::SaveClipNow);
+    let clip = wait_for(&harness.ui, |msg| match msg {
+        UiMsg::ClipSaved(clip) => Some(clip.clone()),
+        _ => None,
+    });
+    set_write_delay(None);
+    let clip = clip.expect("no clip while the writer was stalled");
+    assert!(clip.folder.join(&clip.clip.file).is_file());
+}
+
+fn clips_after(harness: &Harness, trigger: EngineCmd) -> usize {
+    recording_since(&harness.ui);
+    thread::sleep(Duration::from_millis(1500));
+    send(harness, trigger);
+    let first = wait_for(&harness.ui, |msg| {
+        matches!(msg, UiMsg::ClipSaved(_)).then_some(())
+    });
+    assert!(first.is_some(), "no clip");
+    send(harness, EngineCmd::StopRecording);
+    let mut clips = 1;
+    while let Ok(msg) = harness.ui.recv_timeout(WAIT) {
+        match msg {
+            UiMsg::ClipSaved(_) => clips += 1,
+            UiMsg::RecordingSaved(entry) => {
+                assert_eq!(entry.meta.clips.len(), clips);
+                return clips;
+            }
+            _ => {}
+        }
+    }
+    panic!("recording never saved");
+}
+
+#[test]
+fn the_save_now_command_and_the_hotkey_each_give_exactly_one_clip() {
+    let _serial = serial();
+    for trigger in [
+        EngineCmd::SaveClipNow,
+        EngineCmd::GlobalAction(Action::SaveClip),
+    ] {
+        let harness = start_idle(
+            clip_settings("clip-once"),
+            Arc::new(FakeMediaSource::new().with_speed(4)),
+        );
+        send(&harness, EngineCmd::StartTestRecording { secs: 600 });
+        let name = format!("{trigger:?}");
+        assert_eq!(clips_after(&harness, trigger), 1, "{name}");
+    }
+}
+
+#[test]
+fn a_stalled_writer_never_grows_the_media_queue_past_its_cap() {
+    let _serial = serial();
+    const ARRIVALS: u64 = 10_000;
+    const MEDIA_QUEUE_CAP: u64 = 1024;
+    const WRITER_QUEUE_CAP: u64 = 4096;
+    set_write_delay(Some(Duration::from_secs(120)));
+    let media = FakeMediaSource::fast();
+    let probe = media.probe();
+    let harness = start_idle(
+        Settings {
+            recording_diagnostics: true,
+            ..settings("queue-cap")
+        },
+        Arc::new(media),
+    );
+    send(&harness, EngineCmd::StartTestRecording { secs: 600 });
+    recording_since(&harness.ui);
+    let began = Instant::now();
+    while probe.packets_sent() < ARRIVALS && began.elapsed() < WAIT {
+        thread::sleep(Duration::from_millis(20));
+    }
+    set_write_delay(None);
+    assert!(probe.packets_sent() >= ARRIVALS, "{}", probe.packets_sent());
+    send(&harness, EngineCmd::StopRecording);
+    let mut too_slow = 0;
+    let saved = wait_for(&harness.ui, |msg| match msg {
+        UiMsg::Notice {
+            level: NoticeLevel::Error,
+            text,
+        } => {
+            too_slow += usize::from(text.contains(DISK_TOO_SLOW));
+            None
+        }
+        UiMsg::RecordingSaved(entry) => Some(entry.clone()),
+        _ => None,
+    })
+    .expect("recording saved");
+    assert_eq!(too_slow, 1);
+
+    let lines = fs::read_to_string(saved.folder.join("diagnostics.jsonl")).expect("diagnostics");
+    let samples: Vec<(u64, u64)> = lines
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|value| value["type"] == "second")
+        .map(|value| {
+            (
+                value["queue_media"].as_u64().expect("queue_media"),
+                value["queue_writer"].as_u64().expect("queue_writer"),
+            )
+        })
+        .collect();
+    assert!(samples.len() > 10, "{} samples", samples.len());
+    assert!(samples.iter().all(|(media, _)| *media <= MEDIA_QUEUE_CAP));
+    assert!(
+        samples
+            .iter()
+            .all(|(_, writer)| *writer <= WRITER_QUEUE_CAP)
+    );
+    let tail = &samples[samples.len() - 5..];
+    assert!(
+        tail.iter().all(|(_, writer)| *writer == 0),
+        "writer queue still counted after Full: {tail:?}"
+    );
 }

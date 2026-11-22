@@ -166,6 +166,22 @@ fn highlights_become_merged_clips_before_recording_saved() {
 }
 
 #[test]
+fn one_highlight_gives_exactly_one_clip() {
+    let harness = game(
+        clip_settings("one-highlight", true),
+        vec![(1.0, kill("Hero", "Villain"))],
+        LeagueMsg::Ended(GameResult::Win),
+    );
+    let msgs = collect_until_saved(&harness.ui);
+    let announced = msgs
+        .iter()
+        .filter(|m| matches!(m, UiMsg::ClipSaved(_)))
+        .count();
+    assert_eq!(announced, 1);
+    assert_eq!(saved_meta(&msgs).clips.len(), 1);
+}
+
+#[test]
 fn clips_disabled_writes_nothing() {
     let harness = game(
         clip_settings("noclips", false),

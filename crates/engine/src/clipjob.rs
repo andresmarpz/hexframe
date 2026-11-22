@@ -19,6 +19,14 @@ pub(crate) struct ClipJob {
 }
 
 pub(crate) fn spawn(job: ClipJob, on_done: impl FnOnce(ClipResult) + Send + 'static) -> bool {
+    spawn_with(job, write, on_done)
+}
+
+fn spawn_with(
+    job: ClipJob,
+    write: impl FnOnce(&ClipJob) -> ClipResult + Send + 'static,
+    on_done: impl FnOnce(ClipResult) + Send + 'static,
+) -> bool {
     let spawned = thread::Builder::new()
         .name("clip-writer".into())
         .spawn(move || {
@@ -42,3 +50,6 @@ fn write(job: &ClipJob) -> ClipResult {
         .map_err(|e| format!("{}: {e}", job.entry.file))?;
     Ok(job.entry.clone())
 }
+
+#[cfg(test)]
+mod tests;

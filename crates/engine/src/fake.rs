@@ -278,11 +278,15 @@ struct Link<'a> {
 impl Link<'_> {
     fn send(&self, event: MediaEvent) -> bool {
         let began = Instant::now();
+        let is_packet = matches!(event, MediaEvent::Packet(_));
         let sent = select! {
             send(self.out, event) -> sent => sent.is_ok(),
             recv(self.stop) -> _ => false,
         };
         self.probe.record_send_wait(began.elapsed());
+        if sent && is_packet {
+            self.probe.record_packet();
+        }
         sent
     }
 }

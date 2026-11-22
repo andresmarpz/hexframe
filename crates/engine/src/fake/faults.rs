@@ -24,6 +24,7 @@ pub struct FakeProbe {
     live: AtomicUsize,
     peak: AtomicUsize,
     max_send_wait_nanos: AtomicU64,
+    packets: AtomicU64,
 }
 
 impl FakeProbe {
@@ -37,6 +38,14 @@ impl FakeProbe {
 
     pub fn max_send_wait(&self) -> Duration {
         Duration::from_nanos(self.max_send_wait_nanos.load(Ordering::SeqCst))
+    }
+
+    pub fn packets_sent(&self) -> u64 {
+        self.packets.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn record_packet(&self) {
+        self.packets.fetch_add(1, Ordering::SeqCst);
     }
 
     pub(super) fn record_send_wait(&self, wait: Duration) {

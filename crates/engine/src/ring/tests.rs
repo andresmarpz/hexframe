@@ -107,3 +107,21 @@ fn range_is_empty_without_idr() {
     ring.push(video(1, false));
     assert!(ring.range(0, HNS_PER_SEC).is_empty());
 }
+
+#[test]
+fn ten_thousand_packets_leave_the_ring_at_a_steady_size() {
+    let mut ring = ClipRing::new(1_000, 4 * HNS_PER_SEC, RATE);
+    let mut sizes = Vec::new();
+    for n in 0..10_000 {
+        let key = n % 60 == 0;
+        ring.push(video(n, key));
+        if key {
+            ring.prune();
+            sizes.push(ring.packets.len());
+        }
+    }
+    let settled = &sizes[sizes.len() / 2..];
+    let largest = settled.iter().max().copied().unwrap_or(0);
+    assert!(largest <= 6 * 60, "{largest}");
+    assert_eq!(settled.last(), settled.first());
+}
