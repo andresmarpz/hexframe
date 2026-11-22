@@ -18,6 +18,7 @@ use windows::core::{GUID, HSTRING};
 
 use super::reader::AudioInfo;
 use super::{TranscodeError, failed};
+use crate::h264::colour;
 
 const AAC_LC_PROFILE_LEVEL: u32 = 0x29;
 const RAW_PAYLOAD: u32 = 0;
@@ -72,7 +73,8 @@ fn video_type(
                 }
             })
     };
-    set.map_err(|e| failed("video type", &e))?;
+    set.and_then(|()| colour::apply(&media))
+        .map_err(|e| failed("video type", &e))?;
     Ok(media)
 }
 

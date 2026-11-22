@@ -6,6 +6,7 @@ pub const NAL_SPS: u8 = 7;
 pub const NAL_PPS: u8 = 8;
 pub const NAL_AUD: u8 = 9;
 pub const NAL_PREFIX: u8 = 14;
+const ASPECT_RATIO_EXTENDED: u32 = 255;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AvcInfo {
@@ -84,6 +85,15 @@ struct SpsFields {
     chroma_format: u32,
     bit_depth_luma: u32,
     bit_depth_chroma: u32,
+    colour: Option<VuiColour>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VuiColour {
+    pub primaries: u8,
+    pub transfer: u8,
+    pub matrix: u8,
+    pub full_range: bool,
 }
 
 struct BitReader {
@@ -111,6 +121,14 @@ impl BitReader {
         let bit = (byte >> (7 - self.pos % 8)) & 1;
         self.pos += 1;
         Some(u32::from(bit))
+    }
+
+    fn bits(&mut self, count: u32) -> Option<u32> {
+        let mut value = 0u32;
+        for _ in 0..count {
+            value = (value << 1) | self.bit()?;
+        }
+        Some(value)
     }
 
     fn unsigned_exp(&mut self) -> Option<u32> {
@@ -208,6 +226,7 @@ fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
         top = r.unsigned_exp()?;
         bottom = r.unsigned_exp()?;
     }
+    let colour = read_vui_colour(&mut r);
     let chroma_array_type = if separate_planes { 0 } else { chroma_format };
     let (sub_w, sub_h) = match chroma_array_type {
         1 => (2, 2),
@@ -227,7 +246,38 @@ fn parse_sps(sps: &[u8]) -> Option<SpsFields> {
         chroma_format,
         bit_depth_luma,
         bit_depth_chroma,
+        colour,
     })
+}
+
+fn read_vui_colour(r: &mut BitReader) -> Option<VuiColour> {
+    if r.bit()? == 0 {
+        return None;
+    }
+    if r.bit()? == 1 && r.bits(8)? == ASPECT_RATIO_EXTENDED {
+        r.bits(32)?;
+    }
+    if r.bit()? == 1 {
+        r.bit()?;
+    }
+    if r.bit()? == 0 {
+        return None;
+    }
+    r.bits(3)?;
+    let full_range = r.bit()? == 1;
+    if r.bit()? == 0 {
+        return None;
+    }
+    Some(VuiColour {
+        primaries: r.bits(8)? as u8,
+        transfer: r.bits(8)? as u8,
+        matrix: r.bits(8)? as u8,
+        full_range,
+    })
+}
+
+pub fn parse_sps_colour(sps: &[u8]) -> Option<VuiColour> {
+    parse_sps(sps)?.colour
 }
 
 pub fn parse_sps_dims(sps: &[u8]) -> Option<(u32, u32, u8, u8)> {

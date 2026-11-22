@@ -133,3 +133,55 @@ fn avcc_box_for_baseline_has_no_extension() {
     write_avcc_box(&mut w, &[0x67, 0x42, 0xC0, 0x1E, 0xAA], &[0x68, 0xCE]);
     assert_eq!(w.len(), 8 + 6 + 2 + 5 + 1 + 2 + 2);
 }
+
+fn baseline_sps_with_vui(vui: &[bool]) -> Vec<u8> {
+    let mut bits = vec![
+        true, true, false, true, true, false, true, false, false, true, true, true, true, false,
+    ];
+    bits.extend_from_slice(vui);
+    bits.push(true);
+    while bits.len() % 8 != 0 {
+        bits.push(false);
+    }
+    let mut sps = vec![0x67, 66, 0xC0, 30];
+    sps.extend(
+        bits.chunks(8)
+            .map(|byte| byte.iter().fold(0, |a, &b| a << 1 | u8::from(b))),
+    );
+    sps
+}
+
+fn byte_bits(value: u8) -> impl Iterator<Item = bool> {
+    (0..8).rev().map(move |i| value >> i & 1 == 1)
+}
+
+#[test]
+fn vui_colour_is_read_from_the_sps() {
+    let mut vui = vec![true, false, false, true, true, false, true, false, true];
+    vui.extend(byte_bits(1).chain(byte_bits(1)).chain(byte_bits(1)));
+    assert_eq!(
+        parse_sps_colour(&baseline_sps_with_vui(&vui)),
+        Some(VuiColour {
+            primaries: 1,
+            transfer: 1,
+            matrix: 1,
+            full_range: false
+        })
+    );
+    vui[7] = true;
+    assert_eq!(
+        parse_sps_colour(&baseline_sps_with_vui(&vui)).map(|c| c.full_range),
+        Some(true)
+    );
+}
+
+#[test]
+fn sps_without_colour_description_has_none() {
+    assert_eq!(parse_sps_colour(&baseline_sps_with_vui(&[false])), None);
+    let no_description = [true, false, false, true, false, false, false, false, false];
+    assert_eq!(
+        parse_sps_colour(&baseline_sps_with_vui(&no_description)),
+        None
+    );
+    assert_eq!(parse_sps_colour(&first_nal(NAL_SPS)), None);
+}

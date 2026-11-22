@@ -1,3 +1,4 @@
+pub(crate) mod colour;
 mod pump;
 mod rate;
 mod readback;
