@@ -1,5 +1,6 @@
 use super::*;
 
+mod bounds;
 mod limits;
 
 #[test]

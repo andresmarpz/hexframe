@@ -249,6 +249,95 @@ mod properties {
         }
 
         #[test]
+        fn pts_is_the_exact_grid_whatever_the_wake_delays(
+            fps in 24u32..=240,
+            t0 in 0i64..HNS_PER_SEC,
+            delays in proptest::collection::vec(0u64..=3, 10_000),
+        ) {
+            let mut pacer = Pacer::new(t0, fps);
+            let frame = HNS_PER_SEC as f64 / f64::from(fps);
+            let mut now = t0;
+            for delay in delays {
+                prop_assert_eq!(
+                    pacer.pts(),
+                    (u128::from(pacer.tick()) * HNS_PER_SEC as u128 / u128::from(fps)) as Hns
+                );
+                prop_assert_eq!(pacer.deadline(), t0 + pacer.pts());
+                now = now.max(pacer.deadline()) + (delay as f64 * frame) as Hns;
+                let before = pacer.tick();
+                pacer.resync(now);
+                prop_assert!(pacer.tick() >= before);
+                pacer.advance();
+            }
+        }
+
+        #[test]
+        fn pts_stays_exact_at_huge_ticks(fps in 24u32..=240, tick in 0u64..(1u64 << 40)) {
+            let mut pacer = Pacer::new(0, fps);
+            pacer.tick = tick;
+            let expected = (u128::from(tick) * HNS_PER_SEC as u128 / u128::from(fps)) as Hns;
+            prop_assert_eq!(pacer.pts(), expected);
+            pacer.advance();
+            prop_assert!(pacer.pts() > expected);
+        }
+
+        #[test]
+        fn the_wait_is_over_only_at_or_after_the_deadline(
+            fps in 24u32..=240,
+            ticks in 0u64..100_000,
+            now in 0i64..(2000 * HNS_PER_SEC),
+        ) {
+            let mut pacer = Pacer::new(0, fps);
+            pacer.tick = ticks;
+            let remaining = pacer.deadline() - now;
+            prop_assert_eq!(remaining <= 0, now >= pacer.deadline());
+        }
+
+        #[test]
+        fn output_ticks_follow_the_pts_kinds(
+            kinds in proptest::collection::vec(0u8..6, 1..120),
+        ) {
+            let mut in_flight: VecDeque<(u64, Hns)> =
+                (0..200).map(|i| (i, 40 * (i as Hns + 1))).collect();
+            let mut next_input = 0u64;
+            let mut last: Option<u64> = None;
+            for (index, kind) in kinds.into_iter().enumerate() {
+                let front = in_flight.front().copied();
+                let (pts, exact) = match (kind, front) {
+                    (0 | 1, Some((tick, pts))) => (pts, Some(tick)),
+                    (2, Some((_, pts))) => (pts + 1, None),
+                    (3, Some((_, pts))) => (pts - 1, None),
+                    (4, _) => (0, None),
+                    (_, Some((_, pts))) => (pts.saturating_sub(40 * (next_input as Hns)), None),
+                    (_, None) => (0, None),
+                };
+                next_input += 1;
+                let tick = next_tick(&mut in_flight, last, pts, false);
+                if let Some(previous) = last {
+                    prop_assert!(tick > previous, "step {}: {} after {}", index, tick, previous);
+                }
+                if let (Some(exact), None) = (exact, last) {
+                    prop_assert_eq!(tick, exact);
+                }
+                if let (Some(exact), Some(previous)) = (exact, last) {
+                    prop_assert_eq!(tick, exact.max(previous + 1));
+                }
+                last = Some(tick);
+            }
+        }
+
+        #[test]
+        fn lost_outputs_fall_back_in_order(count in 1usize..200) {
+            let mut in_flight: VecDeque<(u64, Hns)> = VecDeque::new();
+            let mut last = None;
+            for expected in 0..count as u64 {
+                let tick = next_tick(&mut in_flight, last, 12_345, false);
+                prop_assert_eq!(tick, expected);
+                last = Some(tick);
+            }
+        }
+
+        #[test]
         fn watchdog_only_stalls_while_submitting_and_idle_long_enough(
             gap in 0i64..(20 * HNS_PER_SEC),
             submitting in any::<bool>(),

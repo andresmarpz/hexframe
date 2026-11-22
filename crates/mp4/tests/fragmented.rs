@@ -663,6 +663,38 @@ fn a_non_increasing_dts_is_refused_while_the_other_track_keeps_writing() {
     assert_decodes_cleanly(file.path());
 }
 
+#[test]
+fn bad_dts_kinds_are_refused_and_the_part_file_still_recovers() {
+    let media = media();
+    let mut all = packets(&media, 1, false);
+    by_time(&mut all);
+    for (name, shift) in [("repeat", 0), ("back", -VIDEO_STEP), ("zero", i64::MIN)] {
+        let dir =
+            std::env::temp_dir().join(format!("greyscreen-baddts-{}-{name}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap_or_else(|e| panic!("dir: {e}"));
+        let part = dir.join("game.mp4.part");
+        let mut writer =
+            FragmentedWriter::create(&part, &media.video_format, Some(&media.audio_format))
+                .unwrap_or_else(|e| panic!("create: {e}"));
+        for (index, packet) in all.iter().enumerate().take(200) {
+            writer.push(packet).unwrap_or_else(|e| panic!("push: {e}"));
+            if index == 150 {
+                let mut bad = packet.clone();
+                bad.dts = if shift == i64::MIN {
+                    0
+                } else {
+                    packet.dts + shift
+                };
+                assert!(writer.push(&bad).is_err(), "{name} accepted");
+            }
+        }
+        drop(writer);
+        let out = greyscreen_mp4::recover::recover(&part).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(out.exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
+
 fn finished_bytes(media: &Media, packets: &[Packet], name: &str) -> (Vec<u8>, usize, usize) {
     let file = TempPath::new(name);
     write_file(file.path(), media, packets, true, true);

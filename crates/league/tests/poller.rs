@@ -286,6 +286,27 @@ fn dropping_the_handle_stops_the_thread() {
     }
 }
 
+#[test]
+fn a_sixty_second_interval_poller_joins_in_under_a_second() {
+    let server = FakeServer::start();
+    let switch = Switch::on();
+    let (tx, rx) = unbounded();
+    let handle = Poller::spawn_with_interval(
+        LiveClient::new(&server.base),
+        Box::new(switch.clone()),
+        tx,
+        Duration::from_secs(60),
+    );
+    assert!(matches!(recv(&rx), LeagueMsg::WindowFound { .. }));
+    let started = std::time::Instant::now();
+    drop(handle);
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "stop took {:?}",
+        started.elapsed()
+    );
+}
+
 fn secs(hns: i64) -> f64 {
     hns as f64 / HNS_PER_SEC as f64
 }

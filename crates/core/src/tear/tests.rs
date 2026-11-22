@@ -3,6 +3,8 @@ use std::time::Duration;
 
 use super::*;
 
+mod model;
+
 const WIDTH: usize = 48;
 const CELLS: usize = WIDTH * 27;
 
