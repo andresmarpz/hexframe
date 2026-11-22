@@ -14,7 +14,7 @@ use windows::core::GUID;
 
 use super::setup::{Opened, Spec, open_candidates};
 use super::transform::{Candidate, Mft};
-use super::{H264Encoder, H264Error};
+use super::{H264Encoder, H264Error, take_property_log};
 use crate::com::MfGuard;
 use crate::fault::Armed;
 use crate::testing::fake_transform::{
@@ -269,9 +269,11 @@ fn falls_back_to_vbr(fake: FakeTransform, reason: &str) {
 
 #[test]
 fn refused_quality_mode_falls_back_to_vbr_with_a_logged_reason() {
-    let fake = FakeTransform::new()
-        .echoing_values()
-        .refusing(CODECAPI_AVEncCommonRateControlMode, E_FAIL);
+    let fake = FakeTransform::new().echoing_values().refusing_value(
+        CODECAPI_AVEncCommonRateControlMode,
+        quality_mode(),
+        E_FAIL,
+    );
     falls_back_to_vbr(fake, "rejected Quality rate control mode");
 }
 
@@ -322,11 +324,24 @@ fn every_codec_property_is_set_once_and_only_force_keyframe_follows_streaming() 
         let _mf = MfGuard::start().unwrap();
         let fake = FakeTransform::new().echoing_values();
         let calls = fake.calls();
-        let mut encoder = encoder(open_one(fake, quality).unwrap()).unwrap();
+        take_property_log();
+        let opened = open_one(fake, quality).unwrap();
+        let logged = take_property_log();
+        let mut encoder = encoder(opened).unwrap();
         encoder.force_keyframe().unwrap();
         let calls = recorded(&calls);
         let streaming = position(&calls, begin_streaming());
         let before = set_properties(&calls[..streaming]);
+        let names: HashSet<&str> = logged
+            .iter()
+            .map(|line| line.split_once(':').unwrap().0)
+            .collect();
+        assert_eq!(
+            names.len(),
+            logged.len(),
+            "{quality:?}: duplicate names {logged:?}"
+        );
+        assert_eq!(logged.len(), before.len(), "{quality:?}: {logged:?}");
         let unique: HashSet<GUID> = before.iter().copied().collect();
         assert_eq!(unique.len(), before.len(), "{quality:?}: set twice");
         assert!(!unique.contains(&CODECAPI_AVEncVideoForceKeyFrame));

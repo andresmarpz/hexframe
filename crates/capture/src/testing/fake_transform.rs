@@ -82,7 +82,7 @@ struct Script {
     never_output: bool,
     flush_block: Duration,
     not_accepting: bool,
-    refused: Vec<(GUID, HRESULT)>,
+    refused: Vec<(GUID, Option<u32>, HRESULT)>,
     echo_values: bool,
     read_back: Vec<(GUID, u32)>,
 }
@@ -148,7 +148,12 @@ impl FakeTransform {
     }
 
     pub(crate) fn refusing(mut self, property: GUID, code: HRESULT) -> Self {
-        self.script.refused.push((property, code));
+        self.script.refused.push((property, None, code));
+        self
+    }
+
+    pub(crate) fn refusing_value(mut self, property: GUID, value: u32, code: HRESULT) -> Self {
+        self.script.refused.push((property, Some(value), code));
         self
     }
 
@@ -375,7 +380,11 @@ impl Mft for FakeTransform {
             .or_else(|| bool::try_from(value).ok().map(u32::from));
         self.record_property(CallKind::SetValue, Some(*property), number);
         self.scripted_failure(Step::SetValue)?;
-        if let Some((_, code)) = self.script.refused.iter().find(|(id, _)| id == property) {
+        let refusal =
+            self.script.refused.iter().find(|(id, only, _)| {
+                id == property && only.is_none_or(|only| Some(only) == number)
+            });
+        if let Some((_, _, code)) = refusal {
             return Err((*code).into());
         }
         if let Some(number) = number {
