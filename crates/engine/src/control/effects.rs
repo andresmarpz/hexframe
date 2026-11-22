@@ -198,6 +198,7 @@ impl Control {
             Internal::ClipDone(result) => self.on_clip_done(result),
             Internal::MediaStart { id, result, rx } => self.on_media_start(id, result, rx),
             Internal::UnwantedStopped => self.on_unwanted_stopped(),
+            Internal::DiskFree(free) => self.on_disk_free(free),
             Internal::StartFailed(reason) => self.feed(Input::MediaFailed(reason)),
             Internal::WriterFailed(err) => self.on_writer_failed(&err),
             Internal::WriterDone(report) => {

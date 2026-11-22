@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::thread;
 use std::time::Instant;
 
 use greyscreen_core::disk::{self, START_FLOOR_BYTES};
@@ -42,11 +44,27 @@ impl Control {
             return;
         }
         let every = self.free_space.check_every();
-        if self.disk_checked.is_some_and(|at| at.elapsed() < every) {
+        if self.disk_check_running || self.disk_checked.is_some_and(|at| at.elapsed() < every) {
             return;
         }
         self.disk_checked = Some(Instant::now());
-        let Some(free) = self.free_bytes().filter(|free| disk::must_stop(*free)) else {
+        self.disk_check_running = true;
+        let space = Arc::clone(&self.free_space);
+        let dir = self.settings.output_dir.clone();
+        let tx = self.internal_tx.clone();
+        let spawned = thread::Builder::new()
+            .name("disk-check".to_owned())
+            .spawn(move || send_internal(&tx, Internal::DiskFree(space.free_bytes(&dir))));
+        if spawned.is_err() {
+            self.disk_check_running = false;
+        }
+    }
+
+    pub(super) fn on_disk_free(&mut self, free: Option<u64>) {
+        self.disk_check_running = false;
+        let recording = self.recording.is_some()
+            && matches!(self.session.state(), SessionState::Recording { .. });
+        let Some(free) = free.filter(|free| recording && disk::must_stop(*free)) else {
             return;
         };
         let free = self.make_room(free, START_FLOOR_BYTES);

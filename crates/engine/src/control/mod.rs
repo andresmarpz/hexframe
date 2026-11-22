@@ -46,6 +46,7 @@ pub(crate) enum Internal {
     ClipDone(ClipResult),
     StartFailed(String),
     UnwantedStopped,
+    DiskFree(Option<u64>),
     MediaStart {
         id: u64,
         result: Result<Box<dyn MediaSession>, String>,
@@ -106,6 +107,7 @@ struct Control {
     free_space: Arc<dyn FreeSpace>,
     shutdown_grace: Duration,
     disk_checked: Option<Instant>,
+    disk_check_running: bool,
     disk_refused: bool,
     export: ExportHandle,
 }
@@ -172,6 +174,7 @@ impl Control {
             storyboards,
             free_space,
             disk_checked: None,
+            disk_check_running: false,
             disk_refused: false,
             export: ExportHandle::new(default_reencoder()),
             test_stop_at: None,

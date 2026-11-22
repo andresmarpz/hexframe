@@ -99,7 +99,6 @@ fn a_disk_that_stalls_ends_the_game_video_once_and_never_blocks_capture() {
 }
 
 #[test]
-#[ignore = "fails: capture waits 2.5 s when the control thread blocks for 12 s"]
 fn a_control_thread_stuck_in_a_slow_drive_does_not_stall_capture() {
     let _serial = serial();
     let space = BlockingFreeSpace::new(Duration::from_secs(12));
