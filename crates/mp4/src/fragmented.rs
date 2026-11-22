@@ -105,6 +105,7 @@ pub struct FragmentedWriter<S: Sink = File> {
     synced_video_ticks: u64,
     origin: Option<i64>,
     audio_started: bool,
+    audio_delay_ms: u64,
     audio_backlog: Vec<Packet>,
 }
 
@@ -142,6 +143,7 @@ impl<S: Sink> FragmentedWriter<S> {
             synced_video_ticks: 0,
             origin: None,
             audio_started: false,
+            audio_delay_ms: 0,
             audio_backlog: Vec::new(),
         })
     }
@@ -173,6 +175,7 @@ impl<S: Sink> FragmentedWriter<S> {
                 return Ok(());
             }
             self.audio_started = true;
+            self.audio_delay_ms = delay_ms(packet.dts, rate, origin);
         }
         self.audio.accept(packet)?;
         self.audio.pending = Some(packet.clone());
@@ -221,6 +224,7 @@ impl<S: Sink> FragmentedWriter<S> {
             self.audio_format.as_ref(),
             &tables,
             &chunking,
+            self.audio_delay_ms,
         )
     }
 
@@ -287,6 +291,14 @@ impl<S: Sink> FragmentedWriter<S> {
         });
         w.into_inner()
     }
+}
+
+fn delay_ms(audio_dts: i64, sample_rate: u32, origin: i64) -> u64 {
+    let rate = i128::from(sample_rate);
+    let ticks =
+        i128::from(audio_dts) * i128::from(VideoFormat::TIMESCALE) - i128::from(origin) * rate;
+    let ms = ticks * 1000 / (i128::from(VideoFormat::TIMESCALE) * rate);
+    u64::try_from(ms).unwrap_or(0)
 }
 
 fn record(track: &mut TrackState, mut offset: u64) {

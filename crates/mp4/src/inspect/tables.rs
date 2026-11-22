@@ -6,11 +6,19 @@ use crate::{Mp4Error, Result};
 pub(super) struct Track {
     pub(super) track_id: u32,
     pub(super) rows: Vec<SampleRow>,
+    pub(super) delay_ms: u64,
 }
 
 pub(super) struct Tracks(Vec<Track>);
 
 impl Tracks {
+    pub(super) fn delay_ms(&self, track_id: u32) -> u64 {
+        self.0
+            .iter()
+            .find(|t| t.track_id == track_id)
+            .map_or(0, |t| t.delay_ms)
+    }
+
     pub(super) fn rows(&self, track_id: u32) -> Vec<SampleRow> {
         self.0
             .iter()
@@ -38,14 +46,33 @@ pub(super) fn parse_tracks(moov: &[u8]) -> Result<Tracks> {
     for trak in root.children(moov).filter(|b| &b.fourcc == b"trak") {
         let tkhd = trak.find(moov, b"tkhd").ok_or_else(|| invalid("no tkhd"))?;
         let track_id = track_id(tkhd.payload_bytes(moov)).ok_or_else(|| invalid("short tkhd"))?;
+        let delay_ms = trak
+            .find(moov, b"edts")
+            .and_then(|edts| edts.find(moov, b"elst"))
+            .and_then(|elst| leading_empty_edit(elst.payload_bytes(moov)))
+            .unwrap_or(0);
         let stbl =
             path(moov, trak, &[b"mdia", b"minf", b"stbl"]).ok_or_else(|| invalid("no stbl"))?;
         tracks.push(Track {
             track_id,
             rows: rows(moov, &stbl)?,
+            delay_ms,
         });
     }
     Ok(Tracks(tracks))
+}
+
+fn leading_empty_edit(payload: &[u8]) -> Option<u64> {
+    let mut cur = Cursor::new(payload);
+    if cur.u8()? != 0 {
+        return None;
+    }
+    cur.take(3)?;
+    if cur.u32()? == 0 {
+        return None;
+    }
+    let duration = cur.u32()?;
+    (cur.u32()? == u32::MAX).then_some(u64::from(duration))
 }
 
 fn track_id(payload: &[u8]) -> Option<u32> {

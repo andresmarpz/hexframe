@@ -24,6 +24,7 @@ pub struct Inspected {
     pub video: VideoFormat,
     pub audio: Option<AudioFormat>,
     pub tables: SampleTables,
+    pub audio_delay_ms: u64,
 }
 
 pub fn inspect(path: &Path) -> Result<Inspected> {
@@ -40,6 +41,7 @@ pub fn inspect(path: &Path) -> Result<Inspected> {
             bytes,
             video,
             audio,
+            audio_delay_ms: tracks.delay_ms(AUDIO_TRACK_ID),
             tables: SampleTables {
                 video: video_rows,
                 audio: tracks.rows(AUDIO_TRACK_ID),
@@ -58,6 +60,7 @@ pub fn inspect(path: &Path) -> Result<Inspected> {
         video,
         audio,
         tables,
+        audio_delay_ms: 0,
     })
 }
 

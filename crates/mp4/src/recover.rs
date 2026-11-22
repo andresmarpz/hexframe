@@ -88,6 +88,7 @@ fn rebuild(part: &Path) -> Result<()> {
         audio.as_ref(),
         &tables,
         &chunking,
+        0,
     )?;
     Ok(())
 }

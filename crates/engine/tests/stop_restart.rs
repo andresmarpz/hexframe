@@ -233,7 +233,8 @@ fn counted_recording(tag: &str, run_for: Duration, hold_after: Option<usize>) ->
 
 fn assert_tracks_match(entry: &RecordingEntry) {
     let inspected = inspect_video(entry);
-    let audio = sample_secs(&inspected.tables.audio, SAMPLE_RATE);
+    let audio = sample_secs(&inspected.tables.audio, SAMPLE_RATE)
+        + inspected.audio_delay_ms as f64 / 1000.0;
     let video = sample_secs(&inspected.tables.video, VideoFormat::TIMESCALE);
     assert!(
         (audio - video).abs() < 0.05,
@@ -323,9 +324,14 @@ fn a_late_audio_source_shows_up_in_the_health_numbers() {
 }
 
 #[test]
-#[ignore = "the finished file loses the audio start offset"]
 fn an_audio_source_that_starts_late_keeps_audio_and_video_in_step() {
     let (_harness, entry) = late_audio_recording("late-audio-sync");
+    let inspected = inspect_video(&entry);
+    assert!(
+        (inspected.audio_delay_ms as f64 - 3000.0).abs() < 50.0,
+        "audio delay {} ms",
+        inspected.audio_delay_ms
+    );
     assert_tracks_match(&entry);
 }
 

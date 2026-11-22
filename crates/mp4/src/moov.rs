@@ -63,7 +63,7 @@ pub fn write_ftyp(major: &[u8; 4], compatible: &[[u8; 4]]) -> Vec<u8> {
 }
 
 pub fn write_init_moov(video: &VideoFormat, audio: Option<&AudioFormat>) -> Vec<u8> {
-    build_moov(video, audio, None)
+    build_moov(video, audio, None, 0)
 }
 
 pub fn write_full_moov(
@@ -72,7 +72,17 @@ pub fn write_full_moov(
     tables: &SampleTables,
     chunking: &Chunking,
 ) -> Vec<u8> {
-    build_moov(video, audio, Some((tables, chunking)))
+    write_full_moov_delayed(video, audio, tables, chunking, 0)
+}
+
+pub fn write_full_moov_delayed(
+    video: &VideoFormat,
+    audio: Option<&AudioFormat>,
+    tables: &SampleTables,
+    chunking: &Chunking,
+    audio_delay_ms: u64,
+) -> Vec<u8> {
+    build_moov(video, audio, Some((tables, chunking)), audio_delay_ms)
 }
 
 enum Media<'a> {
@@ -86,6 +96,7 @@ struct Track<'a> {
     media: Media<'a>,
     samples: &'a [SampleRow],
     chunks: &'a [Chunk],
+    delay_ms: u64,
 }
 
 impl Track<'_> {
@@ -93,8 +104,12 @@ impl Track<'_> {
         self.samples.iter().map(|s| u64::from(s.duration)).sum()
     }
 
-    fn movie_duration(&self) -> u64 {
+    fn media_movie_duration(&self) -> u64 {
         self.duration_ticks() * u64::from(MOVIE_TIMESCALE) / u64::from(self.timescale)
+    }
+
+    fn movie_duration(&self) -> u64 {
+        self.delay_ms + self.media_movie_duration()
     }
 }
 
@@ -102,6 +117,7 @@ fn build_moov(
     video: &VideoFormat,
     audio: Option<&AudioFormat>,
     full: Option<(&SampleTables, &Chunking)>,
+    audio_delay_ms: u64,
 ) -> Vec<u8> {
     let empty = (&SampleTables::default(), &Chunking::default());
     let (tables, chunking) = full.unwrap_or(empty);
@@ -111,6 +127,7 @@ fn build_moov(
         media: Media::Video(video),
         samples: &tables.video,
         chunks: &chunking.video,
+        delay_ms: 0,
     }];
     if let Some(audio) = audio {
         tracks.push(Track {
@@ -119,6 +136,7 @@ fn build_moov(
             media: Media::Audio(audio),
             samples: &tables.audio,
             chunks: &chunking.audio,
+            delay_ms: audio_delay_ms,
         });
     }
     let movie_duration = tracks.iter().map(Track::movie_duration).max().unwrap_or(0);
@@ -178,6 +196,9 @@ fn write_mvex(w: &mut BoxWriter, with_audio: bool) {
 fn write_trak(w: &mut BoxWriter, track: &Track, full: bool) {
     w.boxed(b"trak", |w| {
         write_tkhd(w, track, track.movie_duration());
+        if track.delay_ms > 0 {
+            write_delay_edits(w, track);
+        }
         w.boxed(b"mdia", |w| {
             w.full_boxed(b"mdhd", 0, 0, |w| {
                 w.u32(0);
@@ -201,6 +222,22 @@ fn write_trak(w: &mut BoxWriter, track: &Track, full: bool) {
                 });
                 write_stbl(w, track, full);
             });
+        });
+    });
+}
+
+fn write_delay_edits(w: &mut BoxWriter, track: &Track) {
+    w.boxed(b"edts", |w| {
+        w.full_boxed(b"elst", 0, 0, |w| {
+            w.u32(2);
+            w.u32(clamp32(track.delay_ms));
+            w.i32(-1);
+            w.u16(1);
+            w.u16(0);
+            w.u32(clamp32(track.media_movie_duration()));
+            w.i32(0);
+            w.u16(1);
+            w.u16(0);
         });
     });
 }

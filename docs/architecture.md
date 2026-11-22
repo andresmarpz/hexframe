@@ -357,6 +357,8 @@ Capture counts what it already knows. The video thread sends `MediaEvent::Stats(
 
 No frame is allocated or logged for this: the counters are integer adds on the capture thread, the histogram is a fixed array, and the snapshot is one boxed copy per second. The 10-second log line stays.
 
+When the first kept audio packet starts after the first video frame, the finished MP4 keeps that offset as a leading empty edit (`edts`/`elst`) on the audio track, so players start the audio late instead of at 0. A recovered `.part` file does not carry it yet.
+
 The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and every `Stats`. It derives from the packets: encoded frames, missing frames (the dts holes, so `dropped` is exactly what the file lacks), the longest gap between video packets, audio dts gaps, the audio start offset against the first video frame (the writer drops audio that ends before the first key frame), and the audio minus video duration at the end (drift). `finish` builds `RecordingHealth`, which `game.json` stores as `health` (all fields `#[serde(default)]`, so partial or older files read):
 
 | Field | Meaning |
