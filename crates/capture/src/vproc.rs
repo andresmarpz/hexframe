@@ -449,3 +449,6 @@ fn create_output_views(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod pixels;

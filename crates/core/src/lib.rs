@@ -1,6 +1,7 @@
 pub mod api;
 pub mod categories;
 pub mod clips;
+pub mod colour;
 pub mod crop;
 pub mod disk;
 pub mod encoder;
