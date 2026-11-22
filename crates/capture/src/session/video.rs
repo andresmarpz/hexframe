@@ -256,6 +256,7 @@ impl Video {
             mut power,
             ..
         } = self;
+        power.release();
         let (finish, failure) = match exit {
             Exit::Stopped => (true, None),
             Exit::Closed => (true, Some("the captured window closed".to_string())),
@@ -277,7 +278,6 @@ impl Video {
         drop(gpu);
         drop(mf);
         drop(com);
-        power.release();
         if let Some(reason) = failure {
             sink.failed(reason);
         }
