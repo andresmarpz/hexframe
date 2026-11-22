@@ -9,9 +9,9 @@ fn each_support_value_maps_to_its_label() {
         labels,
         [
             "always off",
-            "always on",
             "experimental",
             "stable",
+            "always on",
             "unknown"
         ]
     );

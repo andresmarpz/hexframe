@@ -85,13 +85,18 @@ pub enum HagsSupport {
     Unknown,
 }
 
+const DXGK_FEATURE_SUPPORT_ALWAYS_OFF: u32 = 0;
+const DXGK_FEATURE_SUPPORT_EXPERIMENTAL: u32 = 1;
+const DXGK_FEATURE_SUPPORT_STABLE: u32 = 2;
+const DXGK_FEATURE_SUPPORT_ALWAYS_ON: u32 = 3;
+
 impl HagsSupport {
     pub fn from_state(state: u32) -> Self {
         match state {
-            0 => Self::AlwaysOff,
-            1 => Self::AlwaysOn,
-            2 => Self::Experimental,
-            3 => Self::Stable,
+            DXGK_FEATURE_SUPPORT_ALWAYS_OFF => Self::AlwaysOff,
+            DXGK_FEATURE_SUPPORT_EXPERIMENTAL => Self::Experimental,
+            DXGK_FEATURE_SUPPORT_STABLE => Self::Stable,
+            DXGK_FEATURE_SUPPORT_ALWAYS_ON => Self::AlwaysOn,
             _ => Self::Unknown,
         }
     }
