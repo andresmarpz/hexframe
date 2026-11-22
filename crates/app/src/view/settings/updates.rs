@@ -1,15 +1,14 @@
 use greyscreen_core::update::{UpdateInfo, UpdateState};
-use rune::{El, row, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Spinner};
+use rune::El;
+use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
 use super::{setting_row, toggle_row};
 use crate::ui::Ui;
+use crate::view::widgets::busy_label_content;
 
 const CHECK_WIDTH: f32 = 92.0;
 const INSTALL_WIDTH: f32 = 156.0;
 const OPEN_RELEASE_WIDTH: f32 = 120.0;
-const SPINNER_SIZE: f32 = 14.0;
-const SPINNER_GAP: f32 = 6.0;
 
 pub(super) fn auto_row(s: &Ui, k: &Kit) -> El {
     toggle_row(
@@ -67,27 +66,19 @@ impl Action {
 }
 
 fn check_button(k: &Kit, enabled: bool, busy: bool) -> El {
-    let button = Button::new("Check")
+    let kit = k.clone();
+    Button::new("Check")
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Large)
-        .disabled(!enabled);
-    let button = if busy {
-        let spinner = Spinner::new()
-            .size(SPINNER_SIZE)
-            .build(k)
-            .key("check-updates-spinner");
-        button.label_with(move |font, ink| {
-            row()
-                .gap(SPINNER_GAP)
-                .center_y()
-                .child(spinner)
-                .child(text("Check").font(font).color(ink))
+        .disabled(!enabled && !busy)
+        .label_with(move |font, ink| {
+            busy_label_content(&kit, "Check", busy, "check-updates-spinner", font, ink)
         })
-    } else {
-        button
-    };
-    button
-        .on_press(Ui::check_for_updates)
+        .on_press(move |ui: &mut Ui| {
+            if !busy {
+                ui.check_for_updates();
+            }
+        })
         .build(k)
         .key("check-updates-button")
         .w(CHECK_WIDTH)

@@ -188,12 +188,13 @@ fn while_sending_the_buttons_are_disabled_and_a_spinner_shows() {
     let (mut rt, rx) = live_runtime();
     open(&mut rt);
     write(&mut rt, "It crashed");
+    let before = nav_rect_of(&rt, "feedback-send")[2];
     tap(&mut rt, "feedback-send");
     settle(&mut rt);
     assert_eq!(sent_commands(&rx).len(), 1);
     assert!(rt.state.feedback.sending());
     assert!(rt.find("feedback-spinner").is_some());
-    assert!(has_text(&rt, "Sending…"));
+    assert_eq!(nav_rect_of(&rt, "feedback-send")[2], before);
     tap(&mut rt, "feedback-send");
     tap(&mut rt, "feedback-cancel");
     assert!(sent_commands(&rx).is_empty());

@@ -3,7 +3,7 @@ use greyscreen_core::update::{UpdateInfo, UpdateState};
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::Runtime;
 
-use super::{live_runtime, settle, tap, visible_texts};
+use super::{live_runtime, nav_rect_of, settle, tap, visible_texts};
 use crate::ui::{Screen, Ui};
 
 fn info(tag: &str) -> UpdateInfo {
@@ -134,4 +134,18 @@ fn the_banner_does_not_cover_a_nav_button() {
     ready(&mut rt, "v0.2.0");
     tap(&mut rt, "nav-settings");
     assert!(rt.state.settings_open);
+}
+
+#[test]
+fn the_banner_does_not_overlap_home_state_card() {
+    let (mut rt, _rx) = live_runtime();
+    ready(&mut rt, "v0.2.0");
+    let banner = nav_rect_of(&rt, "update-banner");
+    let card = nav_rect_of(&rt, "state-card");
+    let overlaps_x = banner[0] < card[0] + card[2] && banner[0] + banner[2] > card[0];
+    let overlaps_y = banner[1] < card[1] + card[3] && banner[1] + banner[3] > card[1];
+    assert!(
+        !(overlaps_x && overlaps_y),
+        "update-banner {banner:?} overlaps state-card {card:?}"
+    );
 }

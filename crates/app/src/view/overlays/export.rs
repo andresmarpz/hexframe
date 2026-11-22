@@ -7,8 +7,10 @@ use rune_kit::{
 };
 
 use crate::ui::{CopyState, Destination, ExportPhase, ExportUi, Ui, format_clock};
+use crate::view::widgets::stable_label_content;
 
 const DIALOG_WIDTH: f32 = 480.0;
+const MIN_BODY_HEIGHT: f32 = 220.0;
 const PADDING: f32 = 16.0;
 const NO_RE_ENCODE: &str = "Re-encoding needs Windows, so only Original quality works here.";
 
@@ -63,13 +65,18 @@ fn file_name(done: &ExportDone) -> String {
         .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
 }
 
-fn body() -> El {
+fn body(content: El, footer: El) -> El {
     col()
         .key("export-body")
         .w_full()
+        .min_h(MIN_BODY_HEIGHT)
         .px(PADDING)
         .pb(PADDING)
         .gap(PADDING)
+        .justify_between()
+        .instant_changes()
+        .child(content)
+        .child(footer)
 }
 
 fn note(key: &'static str, message: String, k: &Kit) -> El {
@@ -122,7 +129,9 @@ fn form(export: &ExportUi, k: &Kit) -> El {
         save_to = save_to.segment_state(1, State::Disabled);
     }
     let can_start = export.can_start();
-    body()
+    let content = col()
+        .w_full()
+        .gap(PADDING)
         .child(
             col()
                 .w_full()
@@ -150,8 +159,10 @@ fn form(export: &ExportUi, k: &Kit) -> El {
             export
                 .plan_problem()
                 .map(|why| problem("export-problem", why, k)),
-        )
-        .child(buttons(vec![
+        );
+    body(
+        content,
+        buttons(vec![
             action("Cancel", ButtonVariant::Neutral)
                 .on_press(|ui: &mut Ui| ui.close_export())
                 .build(k)
@@ -161,7 +172,8 @@ fn form(export: &ExportUi, k: &Kit) -> El {
                 .on_press(|ui: &mut Ui| ui.start_export())
                 .build(k)
                 .key("export-start"),
-        ]))
+        ]),
+    )
 }
 
 fn working(fraction: f32, shrinking: bool, cancelling: bool, k: &Kit) -> El {
@@ -172,21 +184,20 @@ fn working(fraction: f32, shrinking: bool, cancelling: bool, k: &Kit) -> El {
     } else {
         "Exporting…"
     };
-    body()
-        .child(
-            Progress::new(Some(fraction))
-                .label(label)
-                .show_value()
-                .build(k)
-                .key("export-progress"),
-        )
-        .child(buttons(vec![
+    body(
+        Progress::new(Some(fraction))
+            .label(label)
+            .show_value()
+            .build(k)
+            .key("export-progress"),
+        buttons(vec![
             action("Cancel", ButtonVariant::Neutral)
                 .disabled(cancelling)
                 .on_press(|ui: &mut Ui| ui.cancel_export())
                 .build(k)
                 .key("export-cancel"),
-        ]))
+        ]),
+    )
 }
 
 pub(crate) fn size_label(bytes: u64) -> String {
@@ -253,26 +264,33 @@ fn finished(done: &ExportDone, wanted_start: f64, copy: &CopyState, k: &Kit) -> 
     if let Some(early) = early_note(done, wanted_start) {
         lines = lines.child(note("export-early", early, k));
     }
-    body().child(lines).children(status).child(buttons(vec![
-        action("Show in folder", ButtonVariant::Neutral)
-            .on_press(|ui: &mut Ui| ui.export_reveal())
-            .build(k)
-            .key("export-reveal"),
-        action(copy_label, ButtonVariant::Neutral)
-            .on_press(|ui: &mut Ui| ui.export_copy())
-            .build(k)
-            .key("export-copy"),
-        action("Done", ButtonVariant::Contrast)
-            .on_press(|ui: &mut Ui| ui.close_export())
-            .build(k)
-            .key("export-close"),
-    ]))
+    let content = col().w_full().gap(PADDING).child(lines).children(status);
+    body(
+        content,
+        buttons(vec![
+            action("Show in folder", ButtonVariant::Neutral)
+                .on_press(|ui: &mut Ui| ui.export_reveal())
+                .build(k)
+                .key("export-reveal"),
+            action(copy_label, ButtonVariant::Neutral)
+                .label_with(move |font, ink| {
+                    stable_label_content("Copy file", copy_label, font, ink)
+                })
+                .on_press(|ui: &mut Ui| ui.export_copy())
+                .build(k)
+                .key("export-copy"),
+            action("Done", ButtonVariant::Contrast)
+                .on_press(|ui: &mut Ui| ui.close_export())
+                .build(k)
+                .key("export-close"),
+        ]),
+    )
 }
 
 fn failed(why: &str, k: &Kit) -> El {
-    body()
-        .child(problem("export-error", why.to_owned(), k))
-        .child(buttons(vec![
+    body(
+        problem("export-error", why.to_owned(), k),
+        buttons(vec![
             action("Close", ButtonVariant::Neutral)
                 .on_press(|ui: &mut Ui| ui.close_export())
                 .build(k)
@@ -281,5 +299,6 @@ fn failed(why: &str, k: &Kit) -> El {
                 .on_press(|ui: &mut Ui| ui.export_again())
                 .build(k)
                 .key("export-again"),
-        ]))
+        ]),
+    )
 }

@@ -1,14 +1,14 @@
 use greyscreen_core::feedback::{DraftProblem, FeedbackKind, LOG_TAIL_LINES, MAX_MESSAGE_CHARS};
 use rune::{El, ScrollSpec, Tx, col, row, text};
 use rune_kit::{
-    Button, ButtonVariant, Checkbox, ControlSize, Dialog, Field, Kit, SegmentedControl, Spinner,
-    State, TextArea, TextInput,
+    Button, ButtonVariant, Checkbox, ControlSize, Dialog, Field, Kit, SegmentedControl, State,
+    TextArea, TextInput,
 };
 
 use crate::ui::{FEEDBACK_MESSAGE_KEY, FeedbackPhase, FeedbackUi, Ui};
+use crate::view::widgets::{busy_label_content, stable_label_content};
 
 const DIALOG_WIDTH: f32 = 480.0;
-const COPY_WIDTH: f32 = 112.0;
 const DIALOG_CHROME: f32 = 190.0;
 const MIN_FIELDS_HEIGHT: f32 = 120.0;
 const MESSAGE_ROWS: usize = 5;
@@ -41,6 +41,7 @@ fn thanks(k: &Kit) -> El {
         .px(16.0)
         .pb(16.0)
         .gap(16.0)
+        .instant_changes()
         .child(
             text(THANKS)
                 .key("feedback-thanks")
@@ -65,6 +66,7 @@ fn form(f: &FeedbackUi, k: &Kit, window_height: Option<f32>) -> El {
     col()
         .key("feedback-body")
         .w_full()
+        .instant_changes()
         .child(
             col()
                 .key("feedback-fields")
@@ -179,18 +181,8 @@ fn status(f: &FeedbackUi, k: &Kit) -> Option<El> {
 
 fn footer(f: &FeedbackUi, k: &Kit) -> El {
     let sending = f.sending();
+    let kit = k.clone();
     let mut buttons = row().w_full().gap(8.0).center_y().justify_end();
-    if sending {
-        buttons = buttons
-            .child(Spinner::new().size(16.0).build(k).key("feedback-spinner"))
-            .child(
-                text("Sending…")
-                    .key("feedback-sending")
-                    .font(k.ty.body)
-                    .color(k.c.text_muted),
-            )
-            .child(col().grow(1.0).a11y_hidden());
-    }
     if let FeedbackPhase::Failed { report, copied, .. } = &f.phase
         && !report.is_empty()
     {
@@ -199,10 +191,10 @@ fn footer(f: &FeedbackUi, k: &Kit) -> El {
             Button::new(label)
                 .variant(ButtonVariant::Neutral)
                 .control_size(ControlSize::Large)
+                .label_with(move |font, ink| stable_label_content("Copy report", label, font, ink))
                 .on_press_tx(|ui: &mut Ui, tx: &mut Tx| ui.copy_feedback_report(tx))
                 .build(k)
-                .key("feedback-copy")
-                .w(COPY_WIDTH),
+                .key("feedback-copy"),
         );
     }
     buttons = buttons
@@ -220,6 +212,9 @@ fn footer(f: &FeedbackUi, k: &Kit) -> El {
                 .variant(ButtonVariant::Contrast)
                 .control_size(ControlSize::Large)
                 .disabled(sending)
+                .label_with(move |font, ink| {
+                    busy_label_content(&kit, "Send", sending, "feedback-spinner", font, ink)
+                })
                 .on_press(|ui: &mut Ui| ui.submit_feedback())
                 .build(k)
                 .key("feedback-send"),

@@ -3,7 +3,7 @@ use greyscreen_core::export::{ExportDone, ExportEvent, ExportPreset, ExportRange
 use greyscreen_engine::EngineCmd;
 use rune::Runtime;
 
-use super::{live_runtime, settle, tap, visible_texts};
+use super::{live_runtime, nav_rect_of, settle, tap, visible_texts};
 use crate::ui::fake_player;
 use crate::ui::{ExportPhase, Ui, review_entry};
 
@@ -115,6 +115,11 @@ fn working_shows_progress_and_cancel_asks_the_engine() {
     export_commands(&rx);
     assert!(has_text(&rt, "Exporting…"));
     assert!(rt.find("export-start").is_none());
+    let dialog_height = nav_rect_of(&rt, "export-dialog")[3];
+    assert!(
+        dialog_height >= 220.0,
+        "export-dialog height collapsed to {dialog_height}"
+    );
     tap(&mut rt, "export-cancel");
     settle(&mut rt);
     assert_eq!(export_commands(&rx), vec![EngineCmd::CancelExport]);
@@ -146,9 +151,11 @@ fn a_finished_export_offers_show_in_folder_copy_and_done() {
         &rt,
         "It starts 0.6 s early, at the nearest keyframe, so no re-encoding was needed."
     ));
+    let before = nav_rect_of(&rt, "export-copy")[2];
     tap(&mut rt, "export-copy");
     settle(&mut rt);
     assert!(has_text(&rt, "Copied"));
+    assert_eq!(nav_rect_of(&rt, "export-copy")[2], before);
     assert!(has_text(&rt, "Copied. Paste it into Discord or a folder."));
     tap(&mut rt, "export-reveal");
     tap(&mut rt, "export-close");

@@ -35,12 +35,14 @@ pub(crate) fn volume_slider(k: &Kit, name: &str, value: f32) -> El {
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .pr(THUMB)
         .center_y()
+        .instant_changes()
         .child(
             el().key(format!("{name}-fill"))
                 .w_frac(value)
                 .h(TRACK_HEIGHT)
                 .radius(TRACK_HEIGHT / 2.0)
-                .fill(k.c.bg_accent),
+                .fill(k.c.bg_accent)
+                .instant_changes(),
         )
         .child(
             el().key(format!("{name}-thumb"))
