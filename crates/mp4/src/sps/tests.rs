@@ -15,7 +15,7 @@ impl Bits {
 
     fn put(&mut self, value: u64, count: u32) {
         for i in (0..count).rev() {
-            if self.used % 8 == 0 {
+            if self.used.is_multiple_of(8) {
                 self.bytes.push(0);
             }
             let bit = ((value >> i) & 1) as u8;

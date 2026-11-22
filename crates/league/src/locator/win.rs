@@ -39,7 +39,7 @@ impl GameLocator for WindowLocator {
         let param = LPARAM(&mut search as *mut Search as isize);
         // SAFETY: the callback only uses `search`, which outlives this synchronous call.
         // EnumWindows reports an error when the callback stops the walk, so the result is unused.
-        let _ = unsafe { EnumWindows(Some(visit), param) };
+        unsafe { EnumWindows(Some(visit), param) }.unwrap_or(());
         let elapsed = started.elapsed();
         if search.found.is_none() && elapsed > SLOW_SEARCH {
             tracing::debug!(?elapsed, "window search without a match was slow");

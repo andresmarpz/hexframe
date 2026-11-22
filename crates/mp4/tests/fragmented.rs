@@ -653,7 +653,7 @@ fn a_non_increasing_dts_is_refused_while_the_other_track_keeps_writing() {
             audio_seen += 1;
             if audio_seen == 5 {
                 let mut again = packet.clone();
-                again.dts -= i64::from(AUDIO_STEP);
+                again.dts -= AUDIO_STEP;
                 assert!(writer.push(&again).is_err());
             }
         }

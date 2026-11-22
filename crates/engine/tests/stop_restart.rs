@@ -284,7 +284,10 @@ fn stats_queued_at_stop_reach_the_recording_health() {
     thread::sleep(Duration::from_millis(700));
     send(&harness, EngineCmd::StopRecording);
     let entry = wait_saved(&harness);
-    assert!(held.load(Ordering::SeqCst) > 0, "nothing was queued at stop");
+    assert!(
+        held.load(Ordering::SeqCst) > 0,
+        "nothing was queued at stop"
+    );
     let health = entry.meta.health.as_ref().expect("health");
     assert_eq!(health.frames_torn_dropped, 7);
 }

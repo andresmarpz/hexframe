@@ -1,4 +1,5 @@
 #![cfg(windows)]
+#![allow(clippy::expect_used)]
 
 use std::env;
 use std::fs;
@@ -73,7 +74,7 @@ fn run_hidden_window(title_units: usize) {
     while unsafe { GetMessageW(&mut message, None, 0, 0) }.as_bool() {
         // SAFETY: `message` was filled by GetMessageW above.
         unsafe {
-            let _ = TranslateMessage(&message);
+            TranslateMessage(&message).ok().unwrap_or(());
             DispatchMessageW(&message);
         }
     }
@@ -93,8 +94,8 @@ struct Helper {
 
 impl Drop for Helper {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        self.child.kill().unwrap_or(());
+        self.child.wait().map(drop).unwrap_or(());
     }
 }
 

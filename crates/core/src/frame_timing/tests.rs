@@ -302,7 +302,6 @@ mod properties {
         ) {
             let mut in_flight: VecDeque<(u64, Hns)> =
                 (0..200).map(|i| (i, 40 * (i as Hns + 1))).collect();
-            let mut next_input = 0u64;
             let mut last: Option<u64> = None;
             for (index, kind) in kinds.into_iter().enumerate() {
                 let front = in_flight.front().copied();
@@ -311,10 +310,9 @@ mod properties {
                     (2, Some((_, pts))) => (pts + 1, None),
                     (3, Some((_, pts))) => (pts - 1, None),
                     (4, _) => (0, None),
-                    (_, Some((_, pts))) => (pts.saturating_sub(40 * (next_input as Hns)), None),
+                    (_, Some((_, pts))) => (pts.saturating_sub(40 * (index as Hns)), None),
                     (_, None) => (0, None),
                 };
-                next_input += 1;
                 let tick = next_tick(&mut in_flight, last, pts, false);
                 if let Some(previous) = last {
                     prop_assert!(tick > previous, "step {}: {} after {}", index, tick, previous);
@@ -387,7 +385,7 @@ fn reordered_output_reports_a_step_back_for_one_to_three_b_frames() {
             let mut guard = OrderGuard::new();
             let first_error = pts.iter().map(|&p| guard.check(p)).find_map(Result::err);
             let mut guard = OrderGuard::new();
-            pts.iter().for_each(|&p| drop(guard.check(p)));
+            pts.iter().for_each(|&p| guard.check(p).unwrap_or(()));
             let anchor = (b_frames + 1) as Hns * step;
             assert_eq!(
                 first_error,

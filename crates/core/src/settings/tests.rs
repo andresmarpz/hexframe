@@ -9,6 +9,7 @@ fn scratch_dir() -> PathBuf {
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
+    fs::remove_dir_all(&dir).unwrap_or(());
     fs::create_dir_all(&dir).unwrap();
     dir
 }
