@@ -302,4 +302,33 @@ fn one_hour_backward_jump_is_counted_and_never_rewinds() {
     assert_eq!(timeline.frames_out(), out);
     assert!(timeline.largest_gap() >= HOUR - 20 * MS);
     assert_eq!(timeline.big_gaps(), 1);
+    for i in 1..400i64 {
+        timeline.on_packet(Some(i * 10 * MS), frames(10), false);
+    }
+    assert_eq!(timeline.big_gaps(), 1);
+}
+
+#[test]
+fn forward_jump_then_normal_packets_is_one_count() {
+    let mut timeline = timeline(0);
+    timeline.on_packet(Some(0), frames(10), false);
+    let jumped = timeline.expected() + HOUR;
+    timeline.on_packet(Some(jumped), frames(10), false);
+    for _ in 0..400 {
+        let ts = timeline.expected();
+        timeline.on_packet(Some(ts), frames(10), false);
+    }
+    assert_eq!(timeline.big_gaps(), 1);
+}
+
+#[test]
+fn forward_jump_then_back_is_one_count_per_jump() {
+    let mut timeline = timeline(0);
+    timeline.on_packet(Some(0), frames(10), false);
+    let jumped = timeline.expected() + HOUR;
+    timeline.on_packet(Some(jumped), frames(10), false);
+    for i in 1..400i64 {
+        timeline.on_packet(Some(i * 10 * MS), frames(10), false);
+    }
+    assert_eq!(timeline.big_gaps(), 2);
 }

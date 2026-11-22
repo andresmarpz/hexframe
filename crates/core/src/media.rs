@@ -147,6 +147,7 @@ pub struct AudioTimeline {
     seen_first: bool,
     big_gaps: u32,
     largest_gap: Hns,
+    last_gap: Hns,
 }
 
 impl AudioTimeline {
@@ -165,6 +166,7 @@ impl AudioTimeline {
             seen_first: false,
             big_gaps: 0,
             largest_gap: 0,
+            last_gap: 0,
         })
     }
 
@@ -184,10 +186,13 @@ impl AudioTimeline {
 
     fn note_gap(&mut self, gap: Hns) {
         let size = gap.saturating_abs();
-        if size > Self::BIG_GAP {
+        if size > Self::BIG_GAP
+            && gap.saturating_sub(self.last_gap).saturating_abs() > Self::BIG_GAP
+        {
             self.big_gaps = self.big_gaps.saturating_add(1);
         }
         self.largest_gap = self.largest_gap.max(size);
+        self.last_gap = gap;
     }
 
     fn push_silence(&self, spans: &mut Vec<Span>, mut frames: usize) {

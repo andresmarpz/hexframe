@@ -311,12 +311,20 @@ fn capture_loop(
             Ok(false) => {
                 if let Some(Span::Silence(frames)) = timeline.on_timeout(mono_now()) {
                     counters.idle(frames);
-                    let block = PcmBlock {
-                        first_frame: timeline.frames_out() - frames as u64,
-                        samples: vec![0; frames * CHANNELS],
-                    };
-                    if !send_block(out, block, stop, counters) {
-                        return;
+                    let chunk = (RATE as usize).max(1);
+                    let mut first_frame = timeline.frames_out() - frames as u64;
+                    let mut left = frames;
+                    while left > 0 {
+                        let n = left.min(chunk);
+                        let block = PcmBlock {
+                            first_frame,
+                            samples: vec![0; n * CHANNELS],
+                        };
+                        if !send_block(out, block, stop, counters) {
+                            return;
+                        }
+                        first_frame += n as u64;
+                        left -= n;
                     }
                 }
                 continue;
@@ -381,40 +389,40 @@ fn drain(
         } else if missing > 0 {
             counters.gap(missing);
         }
-        let samples = render(&spans, &buffer[..read as usize * BYTES_PER_FRAME]);
-        if samples.is_empty() {
-            continue;
-        }
-        let block = PcmBlock {
-            first_frame,
-            samples,
-        };
-        if !send_block(out, block, stop, counters) {
-            return Ok(false);
+        let mut start = first_frame;
+        for span in &spans {
+            let samples = render(span, &buffer[..read as usize * BYTES_PER_FRAME]);
+            if samples.is_empty() {
+                continue;
+            }
+            let frames = (samples.len() / CHANNELS) as u64;
+            let block = PcmBlock {
+                first_frame: start,
+                samples,
+            };
+            if !send_block(out, block, stop, counters) {
+                return Ok(false);
+            }
+            start += frames;
         }
     }
     Ok(true)
 }
 
-fn render(spans: &[Span], bytes: &[u8]) -> Vec<i16> {
-    let mut samples = Vec::new();
-    for span in spans {
-        match *span {
-            Span::Silence(n) => samples.resize(samples.len() + n * CHANNELS, 0),
-            Span::Data { skip, take } => {
-                let start = skip * BYTES_PER_FRAME;
-                let end = start + take * BYTES_PER_FRAME;
-                samples.extend(
-                    bytes[start..end]
-                        .as_chunks::<4>()
-                        .0
-                        .iter()
-                        .map(|chunk| f32_to_i16(f32::from_le_bytes(*chunk))),
-                );
-            }
+fn render(span: &Span, bytes: &[u8]) -> Vec<i16> {
+    match *span {
+        Span::Silence(n) => vec![0; n * CHANNELS],
+        Span::Data { skip, take } => {
+            let start = skip * BYTES_PER_FRAME;
+            let end = start + take * BYTES_PER_FRAME;
+            bytes[start..end]
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|chunk| f32_to_i16(f32::from_le_bytes(*chunk)))
+                .collect()
         }
     }
-    samples
 }
 
 fn f32_to_i16(sample: f32) -> i16 {
