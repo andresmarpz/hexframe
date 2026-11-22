@@ -61,3 +61,26 @@ fn a_final_write_is_never_overwritten_by_an_older_queued_write() {
     drop(writer);
     assert_eq!(library::read_meta(dir.path()).unwrap().duration_secs, 99.0);
 }
+
+#[test]
+fn queueing_never_waits_for_a_blocked_write() {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let (started_tx, started_rx) = mpsc::channel::<()>();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = Mutex::new(release_rx);
+    let writer = SidecarWriter::spawn_with(Arc::new(move |_, _| {
+        started_tx.send(()).ok();
+        release_rx.lock().unwrap().recv().ok();
+    }));
+    let folder = PathBuf::from("blocked");
+    writer.queue(folder.clone(), meta(1.0));
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let began = Instant::now();
+    writer.queue(folder, meta(2.0));
+    assert!(began.elapsed() < Duration::from_millis(500));
+    release_tx.send(()).unwrap();
+    release_tx.send(()).ok();
+    drop(writer);
+}
