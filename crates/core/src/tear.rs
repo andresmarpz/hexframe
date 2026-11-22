@@ -11,6 +11,11 @@ const MIN_CELLS: usize = 4;
 const NEIGHBOUR_RATIO: usize = 4;
 const TILE: usize = 8;
 const TILE_SHARE: usize = 4;
+const HUD_ZONES: [[usize; 4]; 3] = [
+    [750, 650, 1001, 1001],
+    [240, 780, 760, 1001],
+    [850, 0, 1001, 100],
+];
 const SPIN_FOR: Duration = Duration::from_micros(500);
 const SLEEP_STEP: Duration = Duration::from_micros(100);
 
@@ -80,6 +85,8 @@ impl HoldBack {
             )
         });
         if torn {
+            self.published = Some(slot);
+            self.pending = None;
             Arrival::Dropped(candidate)
         } else {
             self.published = Some(candidate);
@@ -151,6 +158,9 @@ pub fn has_torn_tile([prev, cur, next]: [&[u8]; 3], width: usize) -> bool {
         let rows = top..(top + TILE).min(height);
         (0..width).step_by(TILE).any(|left| {
             let cols = left..(left + TILE).min(width);
+            if !over_hud(&cols, &rows, width, height) {
+                return false;
+            }
             let (mut a, mut b, mut c) = (0, 0, 0);
             for y in rows.clone() {
                 let row = y * width;
@@ -163,6 +173,19 @@ pub fn has_torn_tile([prev, cur, next]: [&[u8]; 3], width: usize) -> bool {
             is_torn_tile(a, b, c, rows.len() * cols.len())
         })
     })
+}
+
+fn over_hud(
+    cols: &std::ops::Range<usize>,
+    rows: &std::ops::Range<usize>,
+    width: usize,
+    height: usize,
+) -> bool {
+    let x = (cols.start + cols.end) * 500 / width;
+    let y = (rows.start + rows.end) * 500 / height;
+    HUD_ZONES
+        .iter()
+        .any(|[x0, y0, x1, y1]| (*x0..*x1).contains(&x) && (*y0..*y1).contains(&y))
 }
 
 fn is_torn_tile(prev_cur: usize, cur_next: usize, prev_next: usize, cells: usize) -> bool {

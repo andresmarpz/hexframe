@@ -433,9 +433,11 @@ impl Shared {
                 }
             }
             Arrival::Dropped(_) => {
+                published.current = Some(entry);
                 published.pending = None;
                 let torn = self.torn.fetch_add(1, Ordering::Relaxed) + 1;
-                tracing::debug!(torn, "torn capture frame replaced by the previous one");
+                tracing::debug!(torn, "torn capture frame dropped, next frame published");
+                return;
             }
         }
         published.pending = Some(entry);

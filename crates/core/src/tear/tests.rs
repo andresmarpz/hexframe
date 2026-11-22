@@ -58,8 +58,26 @@ fn a_frame_unlike_both_matching_neighbours_is_dropped() {
     assert_eq!(arrival, Arrival::Published(good));
     let (next, arrival) = arrive(&mut guard, clean.clone());
     assert_eq!(arrival, Arrival::Dropped(torn));
-    assert_eq!(guard.published(), Some(good));
-    assert_eq!(guard.pending(), Some(next));
+    assert_eq!(guard.published(), Some(next));
+    assert_eq!(guard.pending(), None);
+    assert_ne!(guard.write_slot(), next);
+}
+
+#[test]
+fn the_frame_after_a_dropped_one_is_published_at_once() {
+    let mut guard = HoldBack::default();
+    let clean = scene(30);
+    arrive(&mut guard, clean.clone());
+    arrive(&mut guard, clean.clone());
+    let (torn, _) = arrive(&mut guard, torn_from(&clean, 300));
+    let (next, arrival) = arrive(&mut guard, clean.clone());
+    assert_eq!(arrival, Arrival::Dropped(torn));
+    assert_eq!(guard.published(), Some(next));
+    assert_eq!(guard.promote(), None);
+    let (following, arrival) = arrive(&mut guard, clean.clone());
+    assert_eq!(arrival, Arrival::Held);
+    let (_, arrival) = arrive(&mut guard, clean);
+    assert_eq!(arrival, Arrival::Published(following));
 }
 
 #[test]
@@ -448,4 +466,45 @@ fn a_still_world_with_a_hud_blink_is_dropped() {
     let still = with_hud(world(0), minimap);
     let frames = (0..12).map(|step| if step == 6 { world(0) } else { still.clone() });
     assert_eq!(feed(frames), vec![6]);
+}
+
+fn flash_at(rows: std::ops::Range<usize>, cols: std::ops::Range<usize>) -> Vec<usize> {
+    let still = world(0);
+    let frames = (0..12).map(|step| {
+        let mut frame = still.clone();
+        if step == 6 {
+            for y in rows.clone() {
+                frame[y * GAME_WIDTH + cols.start..y * GAME_WIDTH + cols.end].fill(255);
+            }
+        }
+        frame
+    });
+    feed(frames)
+}
+
+#[test]
+fn a_one_frame_flash_in_the_middle_of_the_screen_is_kept() {
+    assert_eq!(flash_at(20..28, 40..48), Vec::<usize>::new());
+    assert_eq!(flash_at(20..28, 8..16), Vec::<usize>::new());
+}
+
+#[test]
+fn a_one_frame_flash_in_the_bottom_corners_outside_the_hud_is_kept() {
+    assert_eq!(flash_at(40..48, 8..16), Vec::<usize>::new());
+    assert_eq!(flash_at(8..16, 80..88), Vec::<usize>::new());
+}
+
+#[test]
+fn a_one_frame_flash_over_the_minimap_is_dropped() {
+    assert_eq!(flash_at(40..48, 80..88), vec![6]);
+}
+
+#[test]
+fn a_one_frame_flash_over_the_ability_bar_is_dropped() {
+    assert_eq!(flash_at(40..48, 40..48), vec![6]);
+}
+
+#[test]
+fn a_one_frame_flash_over_the_score_corner_is_dropped() {
+    assert_eq!(flash_at(0..8, 80..88), vec![6]);
 }
