@@ -61,7 +61,7 @@ fn push_line(out: &mut String, line: String) {
     out.push('\n');
 }
 
-fn windows_build() -> String {
+pub fn windows_build() -> String {
     let mut info = OSVERSIONINFOW {
         dwOSVersionInfoSize: size_of::<OSVERSIONINFOW>() as u32,
         ..Default::default()
