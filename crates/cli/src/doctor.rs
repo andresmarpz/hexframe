@@ -1,3 +1,9 @@
+#[cfg_attr(not(windows), allow(dead_code))]
+mod deep;
+#[cfg(test)]
+mod tests;
+
+use std::path::Path;
 use std::process::ExitCode;
 
 use greyscreen_core::paths;
@@ -5,9 +11,17 @@ use greyscreen_core::paths;
 use greyscreen_core::settings::NATIVE_HEIGHT_CEILING;
 use greyscreen_core::settings::Settings;
 
-pub(crate) fn run() -> ExitCode {
+pub(crate) fn run(deep: bool, out: &Path) -> ExitCode {
     print_environment();
-    capture_checks()
+    let basic = capture_checks();
+    if !deep {
+        return basic;
+    }
+    if deep_checks(out) {
+        basic
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 fn print_environment() {
@@ -140,6 +154,100 @@ fn capture_test() -> Result<(u64, u32, u32, String), String> {
         return Err("no frames received".into());
     }
     Ok((frames, width, height, encoder))
+}
+
+#[cfg(windows)]
+fn deep_checks(out: &Path) -> bool {
+    use greyscreen_capture::selftest;
+    use greyscreen_core::encoder::EncoderKind;
+
+    println!("deep check: encoding 300 frames per adapter, this takes a minute");
+    let cfg = Settings::load(&paths::settings_file()).capture_config(NATIVE_HEIGHT_CEILING);
+    let observations: Vec<_> = selftest::deep(&cfg)
+        .into_iter()
+        .map(|found| {
+            let blank = deep::Observation {
+                adapter: found.adapter,
+                vendor_id: found.vendor_id,
+                luid: found.luid,
+                driver_version: found.driver_version,
+                hardware: found.kind == EncoderKind::Hardware,
+                is_capture_adapter: found.is_capture_adapter,
+                encoder: String::new(),
+                properties: Vec::new(),
+                cpu_readback: false,
+                size: (0, 0),
+                fps: 0,
+                frames_in: 0,
+                packets: Vec::new(),
+                nv12: None,
+                error: None,
+            };
+            match found.run {
+                Err(error) => deep::Observation {
+                    error: Some(error),
+                    ..blank
+                },
+                Ok(run) => deep::Observation {
+                    encoder: run.encoder,
+                    properties: run.properties,
+                    cpu_readback: run.cpu_readback,
+                    size: run.size,
+                    fps: run.fps,
+                    frames_in: run.frames_in,
+                    packets: run
+                        .packets
+                        .into_iter()
+                        .map(|p| deep::Packet {
+                            annexb: p.annexb,
+                            pts_hns: p.pts_hns,
+                            key: p.key,
+                        })
+                        .collect(),
+                    nv12: run.nv12.map(|m| deep::Nv12Means {
+                        luma: m.luma,
+                        luma_left: m.luma_left,
+                        luma_right: m.luma_right,
+                        chroma_u: m.chroma_u,
+                        chroma_v: m.chroma_v,
+                    }),
+                    ..blank
+                },
+            }
+        })
+        .collect();
+    let os = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
+    let report = deep::build(&observations, env!("CARGO_PKG_VERSION"), &os);
+    for adapter in &report.adapters {
+        let verdict = if adapter.pass { "OK" } else { "FAILED" };
+        println!(
+            "  {} ({}): {verdict}, {} B-frames, nv12 {}",
+            adapter.adapter, adapter.kind, adapter.b_frames, adapter.nv12.status
+        );
+        for failure in &adapter.failures {
+            println!("    {failure}");
+        }
+    }
+    if report.open_bframe_bug {
+        println!("an encoder reordered frames: file the B-frame bug and send the report");
+    }
+    match write_report(&report, out) {
+        Ok(()) => println!("deep report: {}", out.display()),
+        Err(error) => println!("deep report: FAILED to write {}: {error}", out.display()),
+    }
+    report.pass
+}
+
+#[cfg(windows)]
+fn write_report(report: &deep::Report, out: &Path) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(report).map_err(|e| e.to_string())?;
+    std::fs::write(out, json).map_err(|e| e.to_string())
+}
+
+#[cfg(not(windows))]
+fn deep_checks(_out: &Path) -> bool {
+    println!("deep checks run on Windows only");
+    true
 }
 
 #[cfg(not(windows))]

@@ -15,8 +15,12 @@ use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITORINFO};
 use crate::adapters;
 use crate::com::{ComGuard, MfGuard};
 use crate::d3d::{GpuDevice, target_monitor};
-use crate::h264::{EncodedVideo, H264Encoder};
+use crate::h264::{EncodedVideo, H264Encoder, PlaneMeans, nv12_plane_means, take_property_log};
 use crate::vproc::{VideoConverter, VprocError};
+
+mod deep;
+
+pub use deep::{DeepAdapter, DeepRun, deep};
 
 const FRAMES: i64 = 10;
 const INPUT_WAIT: Duration = Duration::from_secs(2);
@@ -109,6 +113,30 @@ fn encode_test_frames(
     native: (u32, u32),
 ) -> Result<String, String> {
     let started = Instant::now();
+    let run = encode_frames(candidate, cfg, native, FRAMES)?;
+    if !run.packets.first().is_some_and(|p| p.key) {
+        return Err(format!(
+            "{} packets, none starts with a key frame",
+            run.packets.len()
+        ));
+    }
+    Ok(format!(
+        "{}, {} of {FRAMES} frames at {}x{} {} fps in {} ms",
+        run.encoder,
+        run.packets.len(),
+        run.size.0,
+        run.size.1,
+        run.fps,
+        started.elapsed().as_millis()
+    ))
+}
+
+fn encode_frames(
+    candidate: Candidate,
+    cfg: &CaptureConfig,
+    native: (u32, u32),
+    frames: i64,
+) -> Result<DeepRun, String> {
     let gpu = GpuDevice::for_luid(candidate.adapter).map_err(|e| format!("no device: {e}"))?;
     let cfg = match candidate.kind {
         EncoderKind::Hardware => cfg.clone(),
@@ -119,13 +147,15 @@ fn encode_test_frames(
     let source = test_pattern(&gpu, size).map_err(|e| format!("test frame: {e}"))?;
     let mut converter = VideoConverter::new(&gpu, size.0, size.1, cfg.fps)
         .map_err(|e| format!("video converter: {e}"))?;
+    take_property_log();
     let mut encoder = H264Encoder::new(&gpu, candidate.kind, size.0, size.1, cfg.fps, &video_cfg)
         .map_err(|e| e.to_string())?
         .with_releaser(converter.releaser());
-    let name = encoder.encoder_name();
+    let properties = take_property_log();
+    let nv12 = plane_check(&gpu, &mut converter, size);
     let frame_hns = HNS_PER_SEC / i64::from(cfg.fps);
     let mut packets = Vec::new();
-    for index in 0..FRAMES {
+    for index in 0..frames {
         wait_for_input(&mut encoder, &mut packets)?;
         let frame = loop {
             match converter.convert(&source, size, CropRect::full(size)) {
@@ -147,21 +177,39 @@ fn encode_test_frames(
             .drain_output(&mut packets)
             .map_err(|e| e.to_string())?;
     }
+    let (encoder_name, cpu_readback) = (encoder.encoder_name(), encoder.uses_cpu_readback());
     encoder.finish(&mut packets).map_err(|e| e.to_string())?;
-    if !packets.first().is_some_and(|p| p.key) {
-        return Err(format!(
-            "{} packets, none starts with a key frame",
-            packets.len()
-        ));
+    Ok(DeepRun {
+        encoder: encoder_name,
+        properties,
+        cpu_readback,
+        size,
+        fps: cfg.fps,
+        frames_in: frames,
+        packets,
+        nv12,
+    })
+}
+
+fn plane_check(
+    gpu: &GpuDevice,
+    converter: &mut VideoConverter,
+    size: (u32, u32),
+) -> Option<PlaneMeans> {
+    let ramp = ramp_pattern(gpu, size).ok()?;
+    let frame = converter.convert(&ramp, size, CropRect::full(size)).ok()?;
+    let means = nv12_plane_means(gpu, &frame.texture, size.0, size.1);
+    converter.release(frame.slot);
+    match means {
+        Ok(means) => {
+            tracing::info!(?means, "NV12 plane check through the converter");
+            Some(means)
+        }
+        Err(error) => {
+            tracing::warn!(%error, "NV12 plane check could not read the frame back");
+            None
+        }
     }
-    Ok(format!(
-        "{name}, {} of {FRAMES} frames at {}x{} {} fps in {} ms",
-        packets.len(),
-        size.0,
-        size.1,
-        cfg.fps,
-        started.elapsed().as_millis()
-    ))
 }
 
 fn wait_for_input(
@@ -183,10 +231,28 @@ fn wait_for_input(
 
 fn test_pattern(gpu: &GpuDevice, size: (u32, u32)) -> windows::core::Result<ID3D11Texture2D> {
     let (width, height) = (size.0 as usize, size.1 as usize);
+    pattern(gpu, size, |x, y| {
+        [(x * 255 / width) as u8, (y * 255 / height) as u8, 96, 255]
+    })
+}
+
+fn ramp_pattern(gpu: &GpuDevice, size: (u32, u32)) -> windows::core::Result<ID3D11Texture2D> {
+    let width = size.0 as usize;
+    pattern(gpu, size, |x, _| {
+        let grey = (x * 255 / width) as u8;
+        [grey, grey, grey, 255]
+    })
+}
+
+fn pattern(
+    gpu: &GpuDevice,
+    size: (u32, u32),
+    pixel_at: impl Fn(usize, usize) -> [u8; 4],
+) -> windows::core::Result<ID3D11Texture2D> {
+    let (width, height) = (size.0 as usize, size.1 as usize);
     let mut pixels = vec![0u8; width * height * 4];
     for (index, pixel) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-        let (x, y) = (index % width, index / width);
-        *pixel = [(x * 255 / width) as u8, (y * 255 / height) as u8, 96, 255];
+        *pixel = pixel_at(index % width, index / width);
     }
     let desc = D3D11_TEXTURE2D_DESC {
         Width: size.0,

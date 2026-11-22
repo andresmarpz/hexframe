@@ -2,6 +2,8 @@ pub(crate) mod colour;
 mod open_error;
 mod pump;
 pub(crate) use pump::DrainClock;
+pub use readback::PlaneMeans;
+pub(crate) use setup::take_property_log;
 mod rate;
 mod readback;
 mod setup;
@@ -54,6 +56,15 @@ pub enum H264Error {
     Stopped(windows::core::Error),
     #[error("media foundation call failed: {0}")]
     Windows(#[from] windows::core::Error),
+}
+
+pub fn nv12_plane_means(
+    gpu: &GpuDevice,
+    texture: &ID3D11Texture2D,
+    width: u32,
+    height: u32,
+) -> Result<PlaneMeans> {
+    Readback::new(gpu, width, height)?.plane_means(texture)
 }
 
 pub type Result<T> = std::result::Result<T, H264Error>;
@@ -171,6 +182,10 @@ impl H264Encoder {
     pub fn with_releaser(mut self, releaser: SlotReleaser) -> Self {
         self.releaser = releaser;
         self
+    }
+
+    pub fn uses_cpu_readback(&self) -> bool {
+        matches!(self.mode, Mode::Sync { .. })
     }
 
     pub fn encoder_name(&self) -> String {

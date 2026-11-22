@@ -24,7 +24,12 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    Doctor,
+    Doctor {
+        #[arg(long)]
+        deep: bool,
+        #[arg(long, default_value = "greyscreen-doctor-deep.json")]
+        out: PathBuf,
+    },
     Analyze {
         target: PathBuf,
         #[arg(long)]
@@ -102,7 +107,7 @@ fn main() -> ExitCode {
             script,
         } => finish(run_fake_league(port, speed, script)),
         Command::Demo { action } => finish(demo::run(action)),
-        Command::Doctor => doctor::run(),
+        Command::Doctor { deep, out } => doctor::run(deep, &out),
         Command::Analyze { target, json } => finish(analyze::run(&analyze::Args { target, json })),
         Command::Record {
             seconds,

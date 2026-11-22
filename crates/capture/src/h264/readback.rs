@@ -18,6 +18,45 @@ mod tests;
 const MAP_TIMEOUT: Duration = Duration::from_millis(100);
 const MAP_POLL: Duration = Duration::from_micros(250);
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlaneMeans {
+    pub luma: f64,
+    pub luma_left: f64,
+    pub luma_right: f64,
+    pub chroma_u: f64,
+    pub chroma_v: f64,
+}
+
+fn mean(values: impl Iterator<Item = u8>) -> f64 {
+    let (sum, count) = values.fold((0u64, 0u64), |(sum, count), v| {
+        (sum + u64::from(v), count + 1)
+    });
+    if count == 0 {
+        0.0
+    } else {
+        sum as f64 / count as f64
+    }
+}
+
+fn plane_means_of(data: &[u8], pitch: usize, width: usize, height: usize) -> PlaneMeans {
+    let (luma, chroma) = data.split_at(pitch * height);
+    let luma_rows = || luma.chunks(pitch).take(height).map(|row| &row[..width]);
+    let chroma_rows = || {
+        chroma
+            .chunks(pitch)
+            .take(height / 2)
+            .map(|row| &row[..width])
+    };
+    let edge = (width / 8).max(1);
+    PlaneMeans {
+        luma: mean(luma_rows().flatten().copied()),
+        luma_left: mean(luma_rows().flat_map(|row| row[..edge].iter().copied())),
+        luma_right: mean(luma_rows().flat_map(|row| row[width - edge..].iter().copied())),
+        chroma_u: mean(chroma_rows().flat_map(|row| row.iter().copied().step_by(2))),
+        chroma_v: mean(chroma_rows().flat_map(|row| row.iter().copied().skip(1).step_by(2))),
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Readback {
     context: ID3D11DeviceContext,
@@ -84,6 +123,29 @@ impl Readback {
             sample.SetSampleDuration(dur_hns)?;
         }
         Ok(sample)
+    }
+
+    pub(super) fn plane_means(&self, texture: &ID3D11Texture2D) -> Result<PlaneMeans> {
+        // SAFETY: both textures are live NV12 textures of the same size on this context's device.
+        unsafe { self.context.CopyResource(&self.staging, texture) };
+        let mapped = self.map()?;
+        let pitch = mapped.RowPitch as usize;
+        if mapped.pData.is_null() || pitch < self.width {
+            // SAFETY: balances the successful Map above.
+            unsafe { self.context.Unmap(&self.staging, 0) };
+            return Err(windows::core::Error::from(E_POINTER).into());
+        }
+        // SAFETY: an NV12 mapping holds `height * 3 / 2` rows of `pitch` bytes and stays valid until Unmap.
+        let data = unsafe {
+            std::slice::from_raw_parts(
+                mapped.pData.cast::<u8>().cast_const(),
+                pitch * self.height * 3 / 2,
+            )
+        };
+        let means = plane_means_of(data, pitch, self.width, self.height);
+        // SAFETY: balances the successful Map above; `data` is not used after this point.
+        unsafe { self.context.Unmap(&self.staging, 0) };
+        Ok(means)
     }
 
     // A waiting Map holds the device lock, which would stall the capture callback, so it polls instead.

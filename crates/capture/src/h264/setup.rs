@@ -414,6 +414,14 @@ pub(super) fn cap_warnings(encoder: &str, mismatches: &[CapMismatch]) -> Vec<Str
         .collect()
 }
 
+thread_local! {
+    static PROPERTY_LOG: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+pub(crate) fn take_property_log() -> Vec<String> {
+    PROPERTY_LOG.with(|log| std::mem::take(&mut *log.borrow_mut()))
+}
+
 pub(super) struct Applied {
     pub(super) set: bool,
     pub(super) read_back: Option<u32>,
@@ -423,6 +431,20 @@ pub(super) fn apply_property(codec: &dyn Mft, property: &Property) -> Result<App
     let supported = codec.is_supported(&property.id);
     let set = codec.set_value(&property.id, &property.value);
     let read_back = codec.get_value(&property.id);
+    let read_text = read_back
+        .as_ref()
+        .map_or_else(|e| format!("error {:#010x}", e.code().0), describe_variant);
+    let set_text = set.as_ref().map_or_else(
+        |e| format!("failed {:#010x}", e.code().0),
+        |()| "ok".to_owned(),
+    );
+    PROPERTY_LOG.with(|log| {
+        log.borrow_mut().push(format!(
+            "{}: supported {}, set {set_text}, read back {read_text}",
+            property.name,
+            supported == S_OK
+        ));
+    });
     tracing::info!(
         property = property.name,
         supported = supported == S_OK,
