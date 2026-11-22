@@ -62,7 +62,7 @@ pub(super) fn parse_tracks(moov: &[u8]) -> Result<Tracks> {
     Ok(Tracks(tracks))
 }
 
-fn edit_start(payload: &[u8]) -> Option<AudioStart> {
+pub(crate) fn edit_start(payload: &[u8]) -> Option<AudioStart> {
     let mut cur = Cursor::new(payload);
     if cur.u8()? != 0 {
         return None;

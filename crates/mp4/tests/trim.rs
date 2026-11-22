@@ -371,3 +371,76 @@ fn trim_reports_the_key_frame_it_snapped_to_without_decoding() {
     assert!(movie.video_samples[0].key);
     assert_eq!(movie.video_samples.len(), 60);
 }
+
+fn early_audio_source(dir: &TempDir, name: &str) -> PathBuf {
+    let media = media();
+    let all: Vec<Arc<Packet>> = packets(&media, 2, true)
+        .into_iter()
+        .map(|mut p| {
+            if p.track == Track::Video {
+                p.dts += 3000;
+                p.pts += 3000;
+            }
+            Arc::new(p)
+        })
+        .collect();
+    let path = dir.join(name);
+    write_clip(&path, &media.video_format, Some(&media.audio_format), &all)
+        .unwrap_or_else(|e| panic!("write source: {e}"));
+    path
+}
+
+fn stream_start_secs(path: &Path, selector: &str) -> f64 {
+    let out = ffprobe(
+        path,
+        &[
+            "-select_streams",
+            selector,
+            "-show_entries",
+            "stream=start_time",
+        ],
+    );
+    field(&out, "streams.stream.0.start_time")
+        .parse()
+        .unwrap_or_else(|e| panic!("start_time: {e}"))
+}
+
+fn skip_samples(path: &Path) -> u32 {
+    let out = ffprobe(
+        path,
+        &[
+            "-select_streams",
+            "a",
+            "-read_intervals",
+            "%+#1",
+            "-show_entries",
+            "packet_side_data=skip_samples",
+        ],
+    );
+    out.lines()
+        .find_map(|l| l.split_once("skip_samples="))
+        .and_then(|(_, v)| v.trim_matches('"').parse().ok())
+        .unwrap_or(0)
+}
+
+#[test]
+fn trim_keeps_the_audio_start_of_a_source_with_early_audio() {
+    require_ffmpeg!();
+    let dir = TempDir::new("trim-early-audio");
+    let from = early_audio_source(&dir, "source.mp4");
+    let movie = Movie::open(&from).unwrap_or_else(|e| panic!("open: {e}"));
+    assert!(movie.audio_samples[0].dts < 0);
+    assert!(skip_samples(&from) > 0);
+
+    let path = dir.join("cut.mp4");
+    trim(&from, &path, 0.0, 100.0).unwrap_or_else(|e| panic!("trim: {e}"));
+    assert_decodes_cleanly(&path);
+
+    assert_eq!(skip_samples(&path), skip_samples(&from));
+    let source_gap = stream_start_secs(&from, "a") - stream_start_secs(&from, "v");
+    let cut_gap = stream_start_secs(&path, "a") - stream_start_secs(&path, "v");
+    assert!(
+        (source_gap - cut_gap).abs() < 0.001,
+        "source {source_gap} cut {cut_gap}"
+    );
+}

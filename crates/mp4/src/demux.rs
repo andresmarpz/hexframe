@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use greyscreen_core::media::{AudioFormat, VideoFormat};
 
+use crate::inspect::tables::edit_start;
 use crate::reader::{BoxRef, boxes};
 use crate::{Mp4Error, Result};
 
@@ -179,7 +180,20 @@ fn parse_trak(data: &[u8], trak: &BoxRef) -> Result<RawTrack> {
     let minf = mdia.find(data, b"minf").ok_or_else(|| invalid("no minf"))?;
     let stbl = minf.find(data, b"stbl").ok_or_else(|| invalid("no stbl"))?;
     let entry = sample_entry(data, &stbl)?;
-    let samples = samples(data, &stbl)?;
+    let mut samples = samples(data, &stbl)?;
+    if &kind == b"soun" {
+        let start = trak
+            .find(data, b"edts")
+            .and_then(|edts| edts.find(data, b"elst"))
+            .and_then(|elst| edit_start(elst.payload_bytes(data)))
+            .unwrap_or_default();
+        let shift = i64::try_from(u128::from(start.delay_ms) * u128::from(timescale) / 1000)
+            .unwrap_or(i64::MAX)
+            .saturating_sub(i64::from(start.skip_samples));
+        for sample in &mut samples {
+            sample.dts += shift;
+        }
+    }
     Ok(RawTrack {
         kind,
         timescale,

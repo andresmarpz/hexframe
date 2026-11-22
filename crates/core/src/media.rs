@@ -145,6 +145,7 @@ pub struct AudioTimeline {
     frames_out: u64,
     trust_device_clock: bool,
     seen_first: bool,
+    placed_first: bool,
     big_gaps: u32,
     largest_gap: Hns,
     last_gap: Hns,
@@ -164,6 +165,7 @@ impl AudioTimeline {
             frames_out: 0,
             trust_device_clock: true,
             seen_first: false,
+            placed_first: false,
             big_gaps: 0,
             largest_gap: 0,
             last_gap: 0,
@@ -234,14 +236,20 @@ impl AudioTimeline {
     }
 
     fn place(&mut self, ts: Option<Hns>, frames: usize, silent: bool) -> Vec<Span> {
-        let first = !self.seen_first;
+        let first = !self.placed_first;
         self.seen_first = true;
         let mut spans = Vec::new();
         let mut skip = 0usize;
         if let Some(ts) = ts {
             let gap = ts.saturating_sub(self.expected());
             self.note_gap(gap);
-            if gap > Self::RESYNC || (first && self.frames_for_hns(gap) >= 1) {
+            if first {
+                if gap > 0 {
+                    self.push_silence(&mut spans, self.frames_for_hns(gap));
+                } else {
+                    skip = self.frames_for_hns(gap.saturating_neg()).min(frames);
+                }
+            } else if gap > Self::RESYNC {
                 self.push_silence(&mut spans, self.frames_for_hns(gap));
             } else if gap < -Self::RESYNC {
                 skip = self.frames_for_hns(gap.saturating_neg()).min(frames);
@@ -255,6 +263,7 @@ impl AudioTimeline {
                 Span::Data { skip, take }
             });
         }
+        self.placed_first |= !spans.is_empty();
         self.frames_out += spans.iter().map(Self::span_frames).sum::<u64>();
         spans
     }
@@ -270,6 +279,7 @@ impl AudioTimeline {
         if frames == 0 {
             return None;
         }
+        self.placed_first = true;
         self.frames_out += frames as u64;
         Some(Span::Silence(frames))
     }

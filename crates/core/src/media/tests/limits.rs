@@ -359,3 +359,36 @@ fn later_packets_keep_the_deadband() {
     let next = timeline.on_packet(Some(30 * MS), len, false);
     assert!(silence_spans(&next).is_empty());
 }
+
+#[test]
+fn first_packet_before_t0_is_trimmed_by_its_offset() {
+    for rate in [44_100u32, 48_000] {
+        for offset_ms in [5i64, 20, 29] {
+            let mut timeline = at(rate, 0);
+            let len = frames_at(rate, 50);
+            let spans = timeline.on_packet(Some(-offset_ms * MS), len, false);
+            let expected = frames_at(rate, offset_ms);
+            assert!(silence_spans(&spans).is_empty());
+            let Some(Span::Data { skip, take }) = spans.first().copied() else {
+                panic!("{rate} Hz {offset_ms} ms: no data in {spans:?}");
+            };
+            assert!(
+                skip.abs_diff(expected) <= 1,
+                "{rate} Hz {offset_ms} ms: {skip}"
+            );
+            assert_eq!(skip + take, len);
+        }
+    }
+}
+
+#[test]
+fn packet_fully_before_t0_does_not_count_as_the_first() {
+    let mut timeline = at(48_000, 1_000 * MS);
+    let len = frames_at(48_000, 10);
+    let before = timeline.on_packet(Some(900 * MS), len, false);
+    assert!(before.is_empty());
+    let next = timeline.on_packet(Some(1_020 * MS), len, false);
+    let silence: usize = silence_spans(&next).iter().sum();
+    assert!(silence.abs_diff(frames_at(48_000, 20)) <= 1, "{next:?}");
+    assert_eq!(data_frames(&next), len);
+}

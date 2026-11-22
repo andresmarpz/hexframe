@@ -9,7 +9,7 @@ use crate::recover::fragments::{build_tables, first_video_duration};
 use crate::recover::{already_finalized, header_at, read_exact_at, scan};
 use crate::{Mp4Error, Result};
 
-mod tables;
+pub(crate) mod tables;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {
