@@ -65,9 +65,19 @@ fn body(health: Option<&RecordingHealth>, k: &Kit) -> El {
 }
 
 fn finding_row(finding: &Finding, index: usize, k: &Kit) -> El {
-    let pill = tone_pill(k, finding.level.label(), tone(k, finding.level))
-        .w(PILL_WIDTH)
-        .key(format!("health-level-{index}"));
+    let pill = if finding.level == Level::Ok {
+        row()
+            .w(PILL_WIDTH)
+            .h(22.0)
+            .center_y()
+            .px(4.0)
+            .key(format!("health-level-{index}"))
+            .child(text("OK").font(k.ty.small_medium).color(k.c.text_muted))
+    } else {
+        tone_pill(k, finding.level.label(), tone(k, finding.level))
+            .w(PILL_WIDTH)
+            .key(format!("health-level-{index}"))
+    };
     row()
         .key(format!("health-finding-{index}"))
         .w_full()

@@ -3,8 +3,9 @@ mod rebind;
 
 use greyscreen_core::keybinds::{Action, Scope};
 use greyscreen_core::library::EventEntry;
+use greyscreen_core::review::DeathTag;
 use greyscreen_core::settings::NavStyle;
-use rune::{KeyEvent, Tx};
+use rune::{Key, KeyEvent, Tx};
 
 use super::review::jump::{next_target, previous_target};
 use super::{Detail, PanelTab, Screen, Source, Ui, VolumeHover};
@@ -18,6 +19,22 @@ impl Ui {
     pub(crate) fn on_key(&mut self, ev: &KeyEvent, tx: &mut Tx) -> bool {
         if self.rebinding.is_some() {
             return self.capture_binding(ev);
+        }
+        if !self.settings_open
+            && self.review.as_ref().is_some_and(|r| r.death_active())
+            && !ev.mods.ctrl
+            && !ev.mods.cmd
+            && !ev.mods.alt
+            && let Key::Text(ref t) = ev.key
+            && t.len() == 1
+            && let Some(idx) = t
+                .bytes()
+                .next()
+                .and_then(|b| b.checked_sub(b'1'))
+                .filter(|&i| (i as usize) < DeathTag::ALL.len())
+        {
+            self.death_toggle_tag(DeathTag::ALL[idx as usize], tx);
+            return true;
         }
         let Some(combo) = combo_of(ev) else {
             return false;

@@ -3,12 +3,12 @@ use greyscreen_core::game::GameResult;
 use greyscreen_core::health::Level;
 use rune::{El, el, row, text};
 use rune_kit::{
-    Badge, BadgeVariant, Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit,
-    Menu, MenuItem, Placement, Toolbar,
+    Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, Menu, MenuItem,
+    Placement, Toolbar,
 };
 
 use super::{health, icons, tabular, tone_pill};
-use crate::ui::library::format::{kda, mode_label, total_time, when};
+use crate::ui::library::format::{kda, mode_label, total_time};
 use crate::ui::{ReviewState, Ui, format_clock};
 use crate::view::widgets::champion::champion_icon;
 
@@ -50,20 +50,13 @@ pub(crate) fn toolbar(s: &Ui, review: &ReviewState, k: &Kit) -> Toolbar {
     if review.death.is_none() {
         line = line.child(games_list_toggle(s, k));
     }
-    line = line
-        .child(champion_icon(k, champion, CHAMPION_ICON))
-        .child(
-            text(champion.to_owned())
-                .font(k.ty.ui_medium)
-                .color(k.c.text_base)
-                .truncate()
-                .min_w(CHAMPION_MIN_WIDTH),
-        )
-        .child(
-            Badge::new(mode_label(&meta.game.info.mode))
-                .variant(BadgeVariant::Neutral)
-                .build(k),
-        );
+    line = line.child(champion_icon(k, champion, CHAMPION_ICON)).child(
+        text(champion.to_owned())
+            .font(k.ty.ui_medium)
+            .color(k.c.text_base)
+            .truncate()
+            .min_w(CHAMPION_MIN_WIDTH),
+    );
     if let Some(label) = result_label(meta.game.result) {
         let colors = match meta.game.result {
             GameResult::Win => k.c.success,
@@ -71,28 +64,24 @@ pub(crate) fn toolbar(s: &Ui, review: &ReviewState, k: &Kit) -> Toolbar {
         };
         line = line.child(tone_pill(k, label, colors).key("review-result"));
     }
-    let when = when(&meta.started_at, &crate::qa::now());
-    let line = line
-        .child(
-            text(when.label())
-                .key("review-when")
-                .font(k.ty.body)
-                .color(k.c.text_muted)
-                .truncate(),
-        )
-        .child(
-            text(stats_line(review))
-                .key("review-stats")
-                .font(tabular(k.ty.body))
-                .color(k.c.text_muted)
-                .truncate(),
-        );
-    let mut bar = Toolbar::new()
-        .leading(line)
-        .trailing(deaths_button(review, k))
-        .trailing(more_trigger(review, k));
+    let meta_line = format!(
+        "{} · {}",
+        stats_line(review),
+        mode_label(&meta.game.info.mode)
+    );
+    let line = line.child(
+        text(meta_line)
+            .key("review-stats")
+            .font(tabular(k.ty.body))
+            .color(k.c.text_muted)
+            .truncate(),
+    );
+    let mut bar = Toolbar::new().leading(line);
     if review.death.is_none() {
-        bar = bar.trailing(inspector_toggle(s, k));
+        bar = bar
+            .trailing(deaths_button(review, k))
+            .trailing(more_trigger(review, k))
+            .trailing(inspector_toggle(s, k));
     }
     bar
 }

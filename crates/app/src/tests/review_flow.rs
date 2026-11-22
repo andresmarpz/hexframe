@@ -333,12 +333,7 @@ fn the_review_toolbar_never_runs_the_title_under_the_buttons() {
         rt.set_viewport((width, 600.0), 1.0);
         super::settle(&mut rt);
         let trailing = super::nav_rect_of(&rt, "trailing");
-        for key in [
-            "review-header",
-            "review-stats",
-            "review-when",
-            "review-result",
-        ] {
+        for key in ["review-header", "review-stats", "review-result"] {
             assert!(
                 right_edge(&rt, key) <= trailing[0] + 0.5,
                 "{key} at {width}: {} over {}",
@@ -401,13 +396,36 @@ fn toggling_the_games_list_hides_and_restores_it_and_persists() {
 fn death_review_hides_the_games_list_and_restores_it_when_done() {
     let mut rt = key_review_runtime();
     assert!(rt.find("games-list").is_some());
+    assert!(rt.find("review-more").is_some());
     assert!(!rt.state.settings.games_list_hidden);
     press_char(&mut rt, "d");
     assert!(rt.find("games-list").is_none());
     assert!(rt.find("review-toggle-games-list").is_none());
     assert!(rt.find("review-toggle-inspector").is_none());
+    assert!(rt.find("review-more").is_none());
     assert!(!rt.state.settings.games_list_hidden);
     press(&mut rt, Key::Escape);
     press(&mut rt, Key::Escape);
     assert!(rt.find("games-list").is_some());
+    assert!(rt.find("review-more").is_some());
+}
+
+#[test]
+fn theater_drawer_switches_between_events_and_clips() {
+    let mut rt = key_review_runtime();
+    press_char(&mut rt, "t");
+    tap(&mut rt, "theater-events");
+    rt.frame(1.0);
+    assert!(rt.find("tab-clips").is_some());
+    assert!(rt.find("event-1").is_some());
+    tap(&mut rt, "tab-clips");
+    assert_eq!(
+        rt.state.review.as_ref().map(|r| r.tab),
+        Some(PanelTab::Clips)
+    );
+    assert!(rt.find("clip-0").is_some());
+    assert!(rt.find("event-1").is_none());
+    tap(&mut rt, "tab-events");
+    assert!(rt.find("event-1").is_some());
+    assert!(rt.find("clip-0").is_none());
 }

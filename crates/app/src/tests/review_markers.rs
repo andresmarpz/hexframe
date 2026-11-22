@@ -76,7 +76,7 @@ fn dragging_from_a_marker_scrubs_like_the_track() {
     let mut rt = review_with(10.0, 0.0);
     let (x, y) = rt.find("marker-9").expect("marker-9 is drawn");
     let [left, _, width, _] = rect(&rt, "timeline");
-    let target = left + width * 0.8;
+    let target = left + width * 0.5;
     fake_player::clear_calls();
     rt.pointer_down(x, y);
     rt.pointer_move((x + target) / 2.0, y);
@@ -84,7 +84,7 @@ fn dragging_from_a_marker_scrubs_like_the_track() {
     rt.pointer_up(target, y);
     rt.frame(1.0 / 60.0);
     match fake_player::calls().last() {
-        Some(fake_player::Call::Seek(at)) => assert!((at - 8.0).abs() < 0.2, "sought {at}"),
+        Some(fake_player::Call::Seek(at)) => assert!((at - 5.0).abs() < 0.2, "sought {at}"),
         other => panic!("unexpected calls {other:?}"),
     }
 }

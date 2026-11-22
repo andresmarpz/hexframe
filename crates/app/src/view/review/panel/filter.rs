@@ -1,9 +1,8 @@
-use rune::{El, row};
-use rune_kit::{
-    Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit, Menu, MenuItem, Placement,
-};
+use rune::{El, el, row, text};
+use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Menu, MenuItem, Placement};
 
 use crate::ui::{ReviewState, Ui};
+use crate::view::review::tabular;
 
 const MENU_WIDTH: f32 = 224.0;
 
@@ -15,17 +14,10 @@ fn menu(open: bool) -> Menu {
         .on_close(|ui: &mut Ui| ui.review_filter_menu(false))
 }
 
-pub(crate) fn button_label(hidden: usize) -> String {
-    if hidden == 0 {
-        "Filter".to_owned()
-    } else {
-        format!("Filter · {hidden} hidden")
-    }
-}
-
 pub(super) fn bar(review: &ReviewState, k: &Kit) -> El {
     let open = review.filter_menu;
-    let button = Button::new(button_label(review.hidden_events()))
+    let hidden = review.hidden_events();
+    let button = Button::new("Filter")
         .variant(ButtonVariant::Neutral)
         .control_size(ControlSize::Small)
         .help("Choose which events to show")
@@ -41,10 +33,21 @@ pub(super) fn bar(review: &ReviewState, k: &Kit) -> El {
         .gap(8.0)
         .center_y()
         .child(menu(open).trigger(button).build(k, &mut Vec::new()));
+    if hidden > 0 {
+        line = line.child(
+            text(format!("{hidden} hidden"))
+                .key("event-filter-hidden")
+                .font(tabular(k.ty.small))
+                .color(k.c.text_muted),
+        );
+    }
+    line = line.child(el().grow(1.0));
     if review.filter_differs_from_default() {
         line = line.child(
-            Badge::new("Not your default")
-                .variant(BadgeVariant::Subtle)
+            Button::new("Reset")
+                .variant(ButtonVariant::Ghost)
+                .control_size(ControlSize::Small)
+                .on_press_tx(|ui: &mut Ui, tx: &mut rune::Tx| ui.review_use_default_filter(tx))
                 .build(k)
                 .key("event-filter-custom"),
         );

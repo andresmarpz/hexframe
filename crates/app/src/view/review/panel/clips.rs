@@ -33,7 +33,7 @@ fn clip_row(index: usize, clip: &ClipEntry, active: bool, review: &ReviewState, 
         .on_press(move |ui: &mut Ui| ui.open_export_clip(&id, index))
         .build(k)
         .key(format!("export-clip-{index}"))
-        .group_opacity(0.0, 1.0);
+        .group_opacity(0.55, 1.0);
     let line = row()
         .key(format!("clip-{index}"))
         .w_full()

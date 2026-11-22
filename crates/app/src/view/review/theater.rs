@@ -3,10 +3,11 @@ use std::f32::consts::PI;
 use rune::{Color, El, Transition, Tx, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
-use super::panel::{PANEL_WIDTH, events_body};
+use super::panel::{PANEL_WIDTH, tab_body, tabs};
 use super::{icons, result_label, transport, video_frame};
 use crate::ui::library::format::mode_label;
 use crate::ui::{ReviewState, Ui};
+use crate::view::hairline;
 
 const BAR_PAD_X: f32 = 24.0;
 const BAR_PAD_TOP: f32 = 64.0;
@@ -42,13 +43,13 @@ pub(crate) fn screen(review: &ReviewState) -> El {
                 .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
                 .fill(Color::BLACK),
         ));
-    if review.drawer {
-        root = root.child(drawer(review, &k));
-    }
     if review.controls_visible || !review.is_playing() {
         root = root
             .child(top_bar(review, &k))
             .child(bottom_bar(review, &k));
+    }
+    if review.drawer {
+        root = root.child(drawer(review, &k));
     }
     root
 }
@@ -141,5 +142,7 @@ fn drawer(review: &ReviewState, k: &Kit) -> El {
         .clip_rounded(10.0)
         .on_background_press(|_: &mut Ui| {})
         .transition(Transition::offset(DRAWER_SLIDE, 0.0).combined(Transition::opacity()))
-        .child(events_body(review, k))
+        .child(tabs(review, k))
+        .child(hairline(k))
+        .child(tab_body(review, k))
 }

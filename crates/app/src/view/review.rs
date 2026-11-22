@@ -22,7 +22,7 @@ use crate::ui::library::format::clip_title;
 use crate::ui::{ReviewState, Source, Ui, format_clock};
 
 const PAGE_PADDING: f32 = 16.0;
-const STACK_BELOW: f32 = 800.0;
+const STACK_BELOW: f32 = 660.0;
 const VIDEO_ASPECT: f32 = 16.0 / 9.0;
 const COLUMN_GAP: f32 = 16.0;
 const NO_VIDEO: &str = "No video for this game";

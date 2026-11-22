@@ -315,10 +315,29 @@ fn the_note_follows_the_death_it_belongs_to() {
 fn typing_in_the_note_does_not_trigger_the_keys() {
     let mut rt = entered();
     tap(&mut rt, "death-note");
-    let typed = ["n", "d"];
+    let typed = ["n", "d", "1"];
     typed.iter().for_each(|key| press_char(&mut rt, key));
     assert_eq!(index(&rt), Some(0));
+    assert!(
+        !review(&rt)
+            .entry
+            .meta
+            .review
+            .has_tag(2, DeathTag::OutOfPosition)
+    );
     assert_eq!(rt.state.death_note.text, typed.concat());
+}
+
+#[test]
+fn number_keys_toggle_death_tags() {
+    let mut rt = entered();
+    for (i, tag) in DeathTag::ALL.into_iter().enumerate() {
+        let key = (i + 1).to_string();
+        press_char(&mut rt, &key);
+        assert!(review(&rt).entry.meta.review.has_tag(2, tag), "on {key}");
+        press_char(&mut rt, &key);
+        assert!(!review(&rt).entry.meta.review.has_tag(2, tag), "off {key}");
+    }
 }
 
 #[test]

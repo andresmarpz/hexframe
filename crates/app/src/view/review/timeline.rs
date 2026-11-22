@@ -14,7 +14,6 @@ const DOT: f32 = 6.0;
 const MARKER_WIDTH: f32 = 14.0;
 const MARKER_HEIGHT: f32 = 16.0;
 const THUMB: f32 = 12.0;
-const THUMB_HOVER: f32 = 14.0;
 const BAND_ALPHA: f32 = 0.22;
 pub(super) const PREVIEW_ANCHOR: &str = "timeline-preview-anchor";
 
@@ -174,14 +173,10 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
     if let Some(secs) = review.seek_preview() {
         line = line.child(preview_anchor(fraction(secs, duration)));
     }
-    let hover = thumb(THUMB_HOVER, k)
-        .key("timeline-thumb-hover")
-        .group_opacity(0.0, 1.0);
     line.child(thumb_rail(
         thumb(THUMB, k).key("timeline-thumb"),
         THUMB,
         HEIGHT,
         progress,
     ))
-    .child(thumb_rail(hover, THUMB_HOVER, HEIGHT, progress))
 }

@@ -247,29 +247,29 @@ fn controls(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {
         .child(slow)
 }
 
-fn tag_chip(tag: DeathTag, on: bool, k: &Kit) -> El {
+fn tag_chip(index: usize, tag: DeathTag, on: bool, k: &Kit) -> El {
     let chip = row()
         .key(format!("death-tag-{}", tag.id()))
         .role("button")
         .label(tag.label())
+        .help(format!("Press {} to toggle", index + 1))
         .h(CHIP_HEIGHT)
         .px(12.0)
+        .gap(6.0)
         .center()
         .radius(CHIP_HEIGHT / 2.0)
         .fill(if on {
-            k.c.layer_03
+            k.c.bg_accent.alpha(0.18)
         } else {
             rune::Color::BLACK.alpha(0.0)
         })
-        .border(
-            1.0,
-            if on {
-                k.c.border_strong
-            } else {
-                k.c.border_base
-            },
-        )
+        .border(1.0, if on { k.c.bg_accent } else { k.c.border_base })
         .on_press_tx(move |ui: &mut Ui, tx: &mut Tx| ui.death_toggle_tag(tag, tx))
+        .child(
+            text(format!("{}", index + 1))
+                .font(tabular(k.ty.small))
+                .color(if on { k.c.text_accent } else { k.c.text_muted }),
+        )
         .child(
             text(tag.label())
                 .font(if on { k.ty.small_medium } else { k.ty.small })
@@ -289,7 +289,8 @@ fn coach(review: &ReviewState, state: &DeathReviewState, note: &TextEdit, k: &Ki
         .children(
             DeathTag::ALL
                 .into_iter()
-                .map(|tag| tag_chip(tag, data.has_tag(id, tag), k)),
+                .enumerate()
+                .map(|(i, tag)| tag_chip(i, tag, data.has_tag(id, tag), k)),
         );
     let saved = if data.is_reviewed(id) {
         Badge::new("Saved").variant(BadgeVariant::Neutral).build(k)

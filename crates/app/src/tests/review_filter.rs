@@ -82,11 +82,35 @@ fn the_default_hides_other_players_kills_and_minor_flow_events() {
 #[test]
 fn the_tab_and_the_button_count_what_is_hidden() {
     let rt = recommended();
-    assert!(card_text(&rt).contains("Events 7 of 10"));
-    assert!(card_text(&rt).contains("Filter · 3 hidden"));
+    assert!(card_text(&rt).contains("Events 7/10"));
+    assert!(card_text(&rt).contains("3 hidden"));
     let all = review_runtime();
     assert!(card_text(&all).contains("Events 10"));
     assert!(!card_text(&all).contains("hidden"));
+}
+
+#[test]
+fn filter_button_keeps_its_width_and_reset_restores_the_default() {
+    let mut rt = recommended();
+    let initial_width = super::rect(&rt, "event-filter")[2];
+    tap(&mut rt, "event-filter");
+    tap(&mut rt, &item(TEAMMATE_KILLS_ITEM));
+    press(&mut rt, Key::Escape);
+    let changed_width = super::rect(&rt, "event-filter")[2];
+    assert!(
+        (changed_width - initial_width).abs() < 0.5,
+        "{initial_width} -> {changed_width}"
+    );
+    assert!(rt.find("event-filter-custom").is_some());
+    tap(&mut rt, "event-filter-custom");
+    assert_eq!(override_of(&rt), None);
+    assert_eq!(shown_ids(&rt), vec![3, 4, 5, 6, 8, 9, 10]);
+    assert!(rt.find("event-filter-custom").is_none());
+    let reset_width = super::rect(&rt, "event-filter")[2];
+    assert!(
+        (reset_width - initial_width).abs() < 0.5,
+        "{initial_width} -> {reset_width}"
+    );
 }
 
 #[test]

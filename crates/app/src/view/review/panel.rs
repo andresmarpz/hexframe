@@ -10,7 +10,7 @@ use crate::view::{card, hairline};
 
 #[cfg(test)]
 pub(super) use events::event_title;
-pub(super) use events::events_body;
+use events::events_body;
 
 pub(super) const PANEL_WIDTH: f32 = 280.0;
 const STACKED_HEIGHT: f32 = 360.0;
@@ -28,7 +28,7 @@ fn tab_label(review: &ReviewState, tab: PanelTab) -> String {
             if review.hidden_events() == 0 {
                 format!("Events {total}")
             } else {
-                format!("Events {} of {total}", total - review.hidden_events())
+                format!("Events {}/{total}", total - review.hidden_events())
             }
         }
         PanelTab::Clips => format!("Clips {}", review.entry.meta.clips.len()),
@@ -64,12 +64,19 @@ fn tab(review: &ReviewState, which: PanelTab, key: &str, k: &Kit) -> El {
     k.interactive(button)
 }
 
-fn tabs(review: &ReviewState, k: &Kit) -> El {
+pub(super) fn tabs(review: &ReviewState, k: &Kit) -> El {
     row()
         .key("panel-tabs")
         .w_full()
         .child(tab(review, PanelTab::Events, "tab-events", k))
         .child(tab(review, PanelTab::Clips, "tab-clips", k))
+}
+
+pub(super) fn tab_body(review: &ReviewState, k: &Kit) -> El {
+    match review.tab {
+        PanelTab::Events => events_body(review, k),
+        PanelTab::Clips => clips::clips_list(review, k),
+    }
 }
 
 fn accent_bar(key: String, k: &Kit) -> El {
@@ -117,10 +124,6 @@ pub(super) fn muted_note(message: &str, k: &Kit) -> El {
 }
 
 pub(super) fn panel(review: &ReviewState, k: &Kit, stacked: bool) -> El {
-    let body = match review.tab {
-        PanelTab::Events => events_body(review, k),
-        PanelTab::Clips => clips::clips_list(review, k),
-    };
     let sized = if stacked {
         card(k).key("review-panel").w_full().h(STACKED_HEIGHT)
     } else {
@@ -131,5 +134,8 @@ pub(super) fn panel(review: &ReviewState, k: &Kit, stacked: bool) -> El {
             .min_h(0.0)
             .fill(k.c.bg_base)
     };
-    sized.child(tabs(review, k)).child(hairline(k)).child(body)
+    sized
+        .child(tabs(review, k))
+        .child(hairline(k))
+        .child(tab_body(review, k))
 }

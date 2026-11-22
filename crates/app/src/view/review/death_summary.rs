@@ -1,4 +1,4 @@
-use greyscreen_core::review::ReviewSummary;
+use greyscreen_core::review::{Death, ReviewSummary};
 use rune::{Color, El, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
@@ -149,16 +149,36 @@ fn by_tag(summary: &ReviewSummary, k: &Kit) -> El {
         .child(body)
 }
 
-fn dot(index: usize, reviewed: bool, x: f32, k: &Kit) -> El {
+fn dot(index: usize, death: &Death, review: &ReviewState, x: f32, k: &Kit) -> El {
+    let reviewed = review.entry.meta.review.is_reviewed(death.event_id);
     let fill = if reviewed {
         k.c.danger.icon
     } else {
         Color::BLACK.alpha(0.0)
     };
+    let tags: Vec<&str> = review
+        .entry
+        .meta
+        .review
+        .get(death.event_id)
+        .map(|d| d.tags.iter().map(|t| t.label()).collect())
+        .unwrap_or_default();
+    let tags_suffix = if tags.is_empty() {
+        String::new()
+    } else {
+        format!(" · {}", tags.join(", "))
+    };
+    let tip = format!(
+        "Death {} · {}{}",
+        index + 1,
+        format_clock(death.rec_secs as u32),
+        tags_suffix
+    );
     let dot = el()
         .key(format!("death-dot-{index}"))
         .role("button")
         .label(format!("Review death {}", index + 1))
+        .help(tip)
         .size(DOT, DOT)
         .absolute(x, (AXIS_HEIGHT - DOT) / 2.0)
         .radius(DOT / 2.0)
@@ -196,10 +216,10 @@ fn timeline(review: &ReviewState, state: &DeathReviewState, k: &Kit) -> El {
                 .a11y_hidden(),
         );
     for (index, death) in state.deaths.iter().enumerate() {
-        let reviewed = review.entry.meta.review.is_reviewed(death.event_id);
         axis = axis.child(dot(
             index,
-            reviewed,
+            death,
+            review,
             dot_x(death.rec_secs, duration, width),
             k,
         ));
