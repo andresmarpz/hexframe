@@ -17,6 +17,7 @@ Window-driven profiles (`game-*`, `av-*`) record League: start the soak, then pl
 | `encoder-sessions-50` | 50 cycles of 15 s | encoder session churn: memory and GPU memory flat; run once with `--d3d-debug` and read the live objects |
 | `encoder-opens-1000` | 1000 cycles of 2 s | 1000 encoder opens: handles and memory flat; run once with `--d3d-debug` and read the live objects |
 | `cycles-random-1000` | 1000 cycles, each cut short after a random 1 to 8 s, random 0 to 3 s gaps | start and stop at random moments; the report notes the seed |
+| `clip-saves-fail-50` | 50 cycles of 8 s, each with one clip save made to fail | failed clip saves: each cycle plants a file where the clips folder goes and asks for a clip; the run fails unless every save reports a failure, and memory and handles stay flat |
 | `game-30` | 30 min of League | memory, GPU memory, handles and threads flat over a game |
 | `game-minimised-30` | 30 min, game minimised | recording with a minimised game |
 | `game-hags-30` | 30 min, HAGS on | recording with hardware-accelerated GPU scheduling |
@@ -42,12 +43,14 @@ The soak judges leaks, saved files, engine errors, drops (`game-hdd-40`), the en
 
 ## Not yet runnable
 
-These cases from issue #83 still need new soak modes (tracked in a follow-up issue):
+These cases from issue #83 still need new soak modes (tracked in #90):
 
 - Window closes during random cycles, and the resize and minimise run (60 s of resizes, 20 minimise and restore cycles, 50 restarts): they need a window to drive.
-- The encoder session count back to 0 after 1000 opens: the capture crate has no session counter yet.
-- 50 failed clip saves with flat memory.
 - Noise bursts after minute 60.
+
+## Encoder session count
+
+`greyscreen_capture::h264::live_sessions()` counts open encoder sessions. Every run reads it after the engine stops and fails when it is above 0, and the report has it in `gpu.encoder_sessions_live`. `encoder-opens-1000` therefore covers the count back to 0 after 1000 opens.
 
 ## Results
 

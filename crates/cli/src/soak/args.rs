@@ -56,6 +56,8 @@ pub(crate) struct Args {
     pub(crate) av_limits: Option<AvLimits>,
     #[arg(skip)]
     pub(crate) random_secs: Option<(u32, u32)>,
+    #[arg(skip)]
+    pub(crate) failed_clip_saves: bool,
 }
 
 impl Args {

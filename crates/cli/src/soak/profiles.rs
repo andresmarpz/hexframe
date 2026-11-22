@@ -14,6 +14,10 @@ pub(crate) enum Shape {
         min_secs: u32,
         max_secs: u32,
     },
+    FailedClips {
+        cycles: u32,
+        seconds: u32,
+    },
     Games {
         minutes: u32,
     },
@@ -125,6 +129,19 @@ pub(crate) const PROFILES: &[Profile] = &[
             cycles: 1000,
             min_secs: 1,
             max_secs: 8,
+        },
+        limits: DEFAULT_LIMITS,
+        uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
+    },
+    Profile {
+        name: "clip-saves-fail-50",
+        summary: "50 recordings that each try one clip save that fails: memory and handles stay flat",
+        setup: "none; each cycle plants a file where the clips folder goes, then asks for a clip",
+        shape: Shape::FailedClips {
+            cycles: 50,
+            seconds: 8,
         },
         limits: DEFAULT_LIMITS,
         uses_window: false,
@@ -257,6 +274,13 @@ impl super::Args {
                 args.random_secs = Some((min_secs, max_secs));
                 args.game_minutes = None;
             }
+            Shape::FailedClips { cycles, seconds } => {
+                args.cycles = cycles;
+                args.seconds = seconds;
+                args.gap_secs = 1;
+                args.failed_clip_saves = true;
+                args.game_minutes = None;
+            }
             Shape::Games { minutes } => args.game_minutes = Some(minutes),
         }
         let limits = profile.limits;
@@ -305,6 +329,9 @@ pub(crate) fn describe() -> String {
                     min_secs,
                     max_secs,
                 } => format!("{cycles} random cycles of {min_secs} to {max_secs} s"),
+                Shape::FailedClips { cycles, seconds } => {
+                    format!("{cycles} cycles of {seconds} s with a failed clip save")
+                }
                 Shape::Games { minutes } => format!("games for {minutes} min"),
             };
             format!(

@@ -85,6 +85,7 @@ fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
         until_saved: false,
         av_limits: None,
         random_secs: None,
+        failed_clip_saves: false,
     }
 }
 
@@ -276,6 +277,10 @@ fn every_profile_resolves_to_valid_args_with_unique_names() {
             } => {
                 assert_eq!((resolved.cycles, resolved.seconds), (cycles, max_secs));
                 assert!(resolved.random_secs.is_some());
+            }
+            profiles::Shape::FailedClips { cycles, seconds } => {
+                assert_eq!((resolved.cycles, resolved.seconds), (cycles, seconds));
+                assert!(resolved.failed_clip_saves);
             }
             profiles::Shape::Cycles {
                 cycles, seconds, ..
@@ -477,5 +482,26 @@ fn random_cycles_cut_recordings_short_and_still_save_each_one() {
         let secs = cycle["video_secs"].as_f64().unwrap();
         assert!(secs > 0.0 && secs < f64::from(args.seconds), "{secs}");
     }
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn failed_clip_saves_are_counted_and_the_run_still_saves_each_recording() {
+    let dir = std::env::temp_dir().join(format!("greyscreen-soak-clips-{}", std::process::id()));
+    let out = dir.join("report.json");
+    let mut args = args(2, out.clone(), Some(dir.join("rec")));
+    args.seconds = 6;
+    args.failed_clip_saves = true;
+    std::fs::create_dir_all(&dir).unwrap();
+    let verdict = run_with(
+        &args,
+        Arc::new(greyscreen_engine::FakeMediaSource::new()),
+        default_league(&args),
+    )
+    .unwrap();
+    assert!(verdict.passed, "{:?}", verdict.failures);
+    let report: serde_json::Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+    assert_eq!(report["clip_saves_failed"], 2);
+    assert_eq!(report["cycles"].as_array().unwrap().len(), 2);
     std::fs::remove_dir_all(&dir).ok();
 }

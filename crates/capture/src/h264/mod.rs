@@ -16,6 +16,7 @@ pub(crate) mod transform;
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use greyscreen_core::encoder::{EncoderKind, label};
@@ -82,6 +83,12 @@ pub struct EncodedVideo {
 enum Mode {
     Async { _manager: IMFDXGIDeviceManager },
     Sync { readback: Readback },
+}
+
+static LIVE_SESSIONS: AtomicU32 = AtomicU32::new(0);
+
+pub fn live_sessions() -> u32 {
+    LIVE_SESSIONS.load(Ordering::Acquire)
 }
 
 #[derive(Debug)]
@@ -174,6 +181,7 @@ impl H264Encoder {
             shut_down: false,
             _thread_bound: PhantomData,
         };
+        LIVE_SESSIONS.fetch_add(1, Ordering::AcqRel);
         encoder.refresh_output_stream()?;
         Ok(encoder)
     }
@@ -365,5 +373,6 @@ impl H264Encoder {
 impl Drop for H264Encoder {
     fn drop(&mut self) {
         self.shutdown();
+        LIVE_SESSIONS.fetch_sub(1, Ordering::AcqRel);
     }
 }

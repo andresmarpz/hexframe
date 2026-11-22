@@ -1,5 +1,6 @@
 mod args;
 mod check;
+mod clips;
 mod gpu;
 mod meter;
 mod profiles;
@@ -42,6 +43,7 @@ struct Report<'a> {
     cycles: &'a [CycleResult],
     engine_errors: &'a [String],
     gpu: &'a GpuReport,
+    clip_saves_failed: u32,
     verdict: &'a Verdict,
 }
 
@@ -101,7 +103,7 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
         gpu::enable_debug_layer();
     }
     let settings = Settings {
-        output_dir,
+        output_dir: output_dir.clone(),
         auto_record: game_mode,
         recording_diagnostics: true,
         ..Settings::default()
@@ -122,6 +124,7 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
         timing: None,
     });
     let mut soak = Soak::new(args, rx);
+    soak.output_dir = output_dir;
     match args.game_minutes {
         Some(minutes) => soak.run_games(&engine.cmd, minutes),
         None => soak.run_cycles(&engine.cmd),
@@ -146,6 +149,8 @@ struct Soak<'a> {
     recording: bool,
     stopped: bool,
     seed: Option<u64>,
+    output_dir: PathBuf,
+    clip_saves_failed: u32,
 }
 
 impl<'a> Soak<'a> {
@@ -165,6 +170,8 @@ impl<'a> Soak<'a> {
             recording: false,
             stopped: false,
             seed: None,
+            output_dir: PathBuf::new(),
+            clip_saves_failed: 0,
         }
     }
 
@@ -209,6 +216,9 @@ impl<'a> Soak<'a> {
                 secs: self.args.seconds,
             };
             let mut started = self.send(cmd, start);
+            if started && self.args.failed_clip_saves {
+                self.fail_a_clip(cmd);
+            }
             if started && self.args.random_secs.is_some() {
                 self.pump(Instant::now() + secs, false);
                 started = self.send(cmd, EngineCmd::StopRecording);
@@ -294,6 +304,13 @@ impl<'a> Soak<'a> {
                 self.engine_errors.push(text);
                 false
             }
+            UiMsg::Notice {
+                level: NoticeLevel::Warn,
+                text,
+            } if text.starts_with(clips::CLIP_FAILED_NOTICE) => {
+                self.clip_saves_failed += 1;
+                false
+            }
             UiMsg::RecordingSaved(entry) => {
                 self.on_saved(&entry);
                 true
@@ -348,6 +365,7 @@ impl<'a> Soak<'a> {
             &self.args.limits(),
         );
         verdict.notes.extend(self.gpu.notes());
+        self.judge_extras(&mut verdict);
         verdict
             .notes
             .extend(self.seed.map(|seed| format!("random seed {seed}")));
@@ -363,6 +381,7 @@ impl<'a> Soak<'a> {
             cycles: &self.cycles,
             engine_errors: &self.engine_errors,
             gpu: &self.gpu,
+            clip_saves_failed: self.clip_saves_failed,
             verdict: &verdict,
         };
         std::fs::write(&out, serde_json::to_vec_pretty(&report)?)

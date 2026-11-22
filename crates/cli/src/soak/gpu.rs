@@ -10,6 +10,7 @@ pub(crate) struct LiveObjects {
 pub(crate) struct GpuReport {
     pub(crate) debug_layer: bool,
     pub(crate) device_removed: u32,
+    pub(crate) encoder_sessions_live: u32,
     pub(crate) live_objects: Vec<LiveObjects>,
 }
 
@@ -51,6 +52,7 @@ pub(crate) fn collect(debug_layer: bool) -> GpuReport {
     GpuReport {
         debug_layer,
         device_removed: greyscreen_capture::debug_layer::device_removed_count(),
+        encoder_sessions_live: greyscreen_capture::h264::live_sessions(),
         live_objects: greyscreen_capture::debug_layer::take_live_reports()
             .into_iter()
             .map(|r| LiveObjects {
