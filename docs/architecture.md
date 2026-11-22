@@ -91,13 +91,13 @@ pub struct CaptureConfig {
     pub audio: bool,
     pub audio_bitrate: u32,      // 192_000
     pub cursor: bool,
-    pub diagnostics: bool,       // Settings.recording_diagnostics: capture also sends Setup and samples CPU and memory
+    pub diagnostics: bool,       // Settings.recording_diagnostics: capture samples CPU and memory and the engine writes diagnostics.jsonl
 }
 pub enum MediaEvent {
     Started { t0: Hns, video: VideoFormat, audio: Option<AudioFormat>, encoder: String },
     Packet(Packet),
     Stats(Box<CaptureStats>),    // about once a second: cumulative counters, see Recording health
-    Setup(Box<CaptureSetup>),    // once after Started, only with diagnostics on
+    Setup(Box<CaptureSetup>),    // once after Started, always
     Warning(String),
     Failed(String),  // the session is dead; the engine stops it
 }
@@ -374,6 +374,7 @@ The engine's `HealthTracker` (`greyscreen-core::health`) sees every packet and e
 | `encode_ms` (`avg`, `p95`, `max`) | the encode latency above, left out when capture sent no timing |
 | `audio` (`packets`, `gaps`, `longest_gap_ms`, `discontinuities`, `idle_silence_ms`, `start_offset_ms`, `drift_ms`, `timestamp_gaps_over_5s`, `largest_timestamp_gap_ms`) | `gaps` counts audio dts holes plus filled gaps; `drift_ms` is audio minus video track length; `start_offset_ms` is the first kept audio packet against the first video frame; `timestamp_gaps_over_5s` and `largest_timestamp_gap_ms` count jumps of the device timestamp against the audio timeline, in either direction; left out without an audio track |
 | `file_bytes`, `avg_bitrate_kbps` | the finalized file size and its average bitrate (video and audio) |
+| `warnings` | encoder setup warnings from `Setup`, such as a bitrate cap the encoder did not keep |
 | `capture_errors`, `capture_soft_errors` | `MediaEvent::Failed` count while recording, and recovered capture step failures |
 | `frames_torn_dropped`, `copy_wait_slow`, `copy_wait_timeouts` | the capture frame counters above; a Capture finding shows when frames were dropped (OK) or copies timed out (WARNING) |
 
@@ -381,9 +382,9 @@ Verdicts (`greyscreen-core::health::verdict`, shared by the popover and the anal
 
 ### Detailed diagnostics (`diagnostics.jsonl`)
 
-With `Settings.recording_diagnostics` on, `CaptureConfig.diagnostics` is true. Capture then sends one `MediaEvent::Setup(CaptureSetup)` after `Started`, and fills the CPU and memory gauges. The engine opens `diagnostics.jsonl` in the game folder. A `diag-writer` thread owns the file behind a `BufWriter` and a bounded channel: the control thread only does `try_send`, and a full queue drops the line, so a slow disk never stalls recording. Every line is one JSON object with a `type`:
+Capture always sends one `MediaEvent::Setup(CaptureSetup)` after `Started`. With `Settings.recording_diagnostics` on, `CaptureConfig.diagnostics` is true: capture fills the CPU and memory gauges and the engine writes the setup line. The engine opens `diagnostics.jsonl` in the game folder. A `diag-writer` thread owns the file behind a `BufWriter` and a bounded channel: the control thread only does `try_send`, and a full queue drops the line, so a slow disk never stalls recording. Every line is one JSON object with a `type`:
 
-- `setup` (first line): `adapter`, `driver_version` (the DXGI user-mode driver version, with the NVIDIA panel number in brackets), `device_id`, `subsystem_id`, `revision` (the adapter's PCI ids), `hags` (`on`, `off` or `unknown`: hardware GPU scheduling for the capture adapter, read through `D3DKMTQueryAdapterInfo` WDDM 2.7 caps in `capture/src/hags.rs`, ported from OBS) and `hags_support` (`always off`, `always on`, `experimental`, `stable` or `unknown`: the driver's WDDM 2.9 support level; any failed query is `unknown`), `display_width`, `display_height`, `display_hz` (the monitor's current mode), `window_width`, `window_height` (the game's client area), `frame_width`, `frame_height` (the captured frame), `crop_left`, `crop_top`, `crop_width`, `crop_height`, `encode_width`, `encode_height`, `fps`, `encoder`, `bitrate`, `peak`, `quality`, `gop_frames`, `audio`.
+- `setup` (first line): `adapter`, `driver_version` (the DXGI user-mode driver version, with the NVIDIA panel number in brackets), `device_id`, `subsystem_id`, `revision` (the adapter's PCI ids), `hags` (`on`, `off` or `unknown`: hardware GPU scheduling for the capture adapter, read through `D3DKMTQueryAdapterInfo` WDDM 2.7 caps in `capture/src/hags.rs`, ported from OBS) and `hags_support` (`always off`, `always on`, `experimental`, `stable` or `unknown`: the driver's WDDM 2.9 support level; any failed query is `unknown`), `display_width`, `display_height`, `display_hz` (the monitor's current mode), `window_width`, `window_height` (the game's client area), `frame_width`, `frame_height` (the captured frame), `crop_left`, `crop_top`, `crop_width`, `crop_height`, `encode_width`, `encode_height`, `fps`, `encoder`, `bitrate`, `peak`, `quality`, `gop_frames`, `audio`, `warnings` (encoder setup warnings, such as a bitrate cap the encoder did not keep).
 - `second` (one per second): `t` (seconds since capture start), `captured`, `encoded`, `dropped`, `repeated` (all counts for that second), `encode_ms_max`, `step_ms_max`, `torn` (frames dropped by the torn frame check), `copy_wait_ms_max`, `audio_packets` (total), `av_skew_ms` (audio end minus video end as the engine has received them), `queue_writer` (packets waiting for the file writer, of 4096), `queue_media` (events waiting for the engine), `queue_encoder`, `queue_pcm`, `cpu_pct`, `mem_mb` (both absent when Windows refuses the read), `foreground` (true when the captured game window, or a window with the same root owner, is the foreground window when the second is sampled; absent for monitor capture), `gpu_3d_pct`, `gpu_3d_self_pct`, `gpu_encode_pct`, `gpu_copy_pct` (absent when the counter is unavailable).
 
 GPU load comes from the PDH counter `\GPU Engine(*)\Utilization Percentage`, read once per second by a `gpu-usage` thread that only publishes the latest values; capture reads them without waiting, so PDH never runs on the capture or encode path. Only engines of the capture adapter's LUID count (`core::health::gpu` parses the `pid_..._luid_..._engtype_...` instance names). Per engine, utilisation is summed across processes (the Task Manager method): `gpu_3d_pct` is the busiest 3D engine, `gpu_3d_self_pct` is Greyscreen's own share of it, `gpu_encode_pct` the busiest VideoEncode engine, `gpu_copy_pct` all Copy engines together; each is capped at 100. If the query cannot open, capture logs one warning and the fields stay absent.
@@ -397,8 +398,9 @@ GPU load comes from the PDH counter `\GPU Engine(*)\Utilization Percentage`, rea
 - Video gaps: every gap above two frame intervals, with its timestamp and the frames it lost (the 20 longest are listed).
 - Keyframes: count and interval (min, average, max), bad without any, warning above 5 s.
 - Bitrate: average, min and max over 10 s windows (all windows in `--json`).
+- Bitrate cap: peak over any 1 s window, WARNING above 1.1 x diagnostics `peak`, shown only when diagnostics.jsonl has the cap.
 - Audio continuity: packets, samples against the timeline, gaps with timestamps. A/V duration: audio minus video at the end.
-- From `game.json`: every `health` finding. From `diagnostics.jsonl`: seconds with drops, slowest encode and capture step, deepest queues, CPU and memory peaks, the seconds the game was not the foreground window and how many of the seconds with drops fell in the background against the foreground (also in `--json`; omitted from the text when the log has no `foreground`), GPU 3D busy (average, peak, seconds at 95% or more), Greyscreen's own 3D share, encoder engine load, and how many of the seconds with drops had 3D at 95% or more (also in `--json` as `gpu`; omitted when the log has no GPU fields), the setup facts.
+- From `game.json`: every `health` finding, including the Health: Setup warnings. From `diagnostics.jsonl`: seconds with drops, slowest encode and capture step, deepest queues, CPU and memory peaks, the seconds the game was not the foreground window and how many of the seconds with drops fell in the background against the foreground (also in `--json`; omitted from the text when the log has no `foreground`), GPU 3D busy (average, peak, seconds at 95% or more), Greyscreen's own 3D share, encoder engine load, and how many of the seconds with drops had 3D at 95% or more (also in `--json` as `gpu`; omitted when the log has no GPU fields), the setup facts.
 
 The analysis is one pass over about 400 thousand sample rows, well under a second for a one-hour file; a test checks that.
 

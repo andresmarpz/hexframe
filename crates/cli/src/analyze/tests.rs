@@ -372,7 +372,7 @@ fn rows_with_a_burst() -> Vec<greyscreen_mp4::moov::SampleRow> {
     (0..120)
         .map(|index| greyscreen_mp4::moov::SampleRow {
             offset: 0,
-            size: if index < 60 { 1_000 } else { 5_000 },
+            size: if (30..90).contains(&index) { 5_000 } else { 1_000 },
             duration: VIDEO_STEP as u32,
             sync: index % 60 == 0,
         })
@@ -384,7 +384,7 @@ fn the_peak_over_any_one_second_window_is_found() {
     let report = video::analyze(&rows_with_a_burst(), 60, None);
     assert_eq!(report.vbv.peak_kbps, 2_400);
     assert!(
-        (report.vbv.at_secs - 1.0).abs() < 1e-9,
+        (report.vbv.at_secs - 0.5).abs() < 1e-9,
         "{}",
         report.vbv.at_secs
     );
