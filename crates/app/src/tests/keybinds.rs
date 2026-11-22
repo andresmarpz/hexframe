@@ -534,3 +534,27 @@ fn the_fixed_escape_key_still_leaves_fullscreen_and_closes_the_game() {
     press_key(&mut rt, Key::Escape);
     assert_eq!(rt.state.detail(), Detail::Pick);
 }
+
+#[test]
+fn entering_capture_keeps_button_width_and_row_height_stable() {
+    let (mut rt, _rx) = keybinds_runtime();
+    settle(&mut rt);
+    let btn_before = super::rect(&rt, "bind-btn-mute");
+    let row_before = super::rect(&rt, "bind-mute");
+    start_rebind(&mut rt, Action::Mute);
+    settle(&mut rt);
+    let btn_after = super::rect(&rt, "bind-btn-mute");
+    let row_after = super::rect(&rt, "bind-mute");
+    assert!(
+        (btn_after[2] - btn_before[2]).abs() < 1.0,
+        "button width changed from {} to {}",
+        btn_before[2],
+        btn_after[2]
+    );
+    assert!(
+        (row_after[3] - row_before[3]).abs() < 1.0,
+        "row height changed from {} to {}",
+        row_before[3],
+        row_after[3]
+    );
+}

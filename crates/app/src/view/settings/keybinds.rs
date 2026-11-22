@@ -1,5 +1,5 @@
 use greyscreen_core::keybinds::{Action, Keymap, Scope};
-use rune::{El, Icon, el, row, text};
+use rune::{El, Icon, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Keybind, Kit};
 
 use super::setting_row;
@@ -8,8 +8,9 @@ use crate::ui::Ui;
 
 const PRESS_KEYS: &str = "Press keys…";
 const CAPTURE_HELP: &str = "Press the keys to use. Esc cancels, Backspace clears.";
-const RESET_SLOT: f32 = 28.0;
+const IDLE_HELP: &str = "Click any shortcut, then press the new keys.";
 const GLOBAL_HINT: &str = "Works in game";
+const PILL_MIN_WIDTH: f32 = 108.0;
 
 static RESET: Icon = Icon {
     name: "greyscreen-reset",
@@ -27,15 +28,16 @@ pub(super) fn header(s: &Ui, k: &Kit) -> El {
         .on_press(|ui: &mut Ui| ui.reset_all_bindings())
         .build(k)
         .key("bind-reset-all");
+    let (hint, color) = if s.rebinding.is_some() {
+        (CAPTURE_HELP, k.c.text_base)
+    } else {
+        (IDLE_HELP, k.c.text_muted)
+    };
     row()
         .w_full()
         .center_y()
         .justify_between()
-        .child(
-            text("Click Change, then press the new keys.")
-                .font(k.ty.small)
-                .color(k.c.text_muted),
-        )
+        .child(text(hint).font(k.ty.small).color(color))
         .child(button)
 }
 
@@ -46,24 +48,19 @@ pub(super) fn bind_row(s: &Ui, k: &Kit, action: Action) -> El {
 fn action_row(s: &Ui, k: &Kit, keymap: &Keymap, action: Action) -> El {
     let spec = action.spec();
     let capturing = s.rebinding == Some(action);
-    let mut control = row().gap(10.0).center_y();
-    if !capturing {
-        control = control.child(chips(k, keymap, action));
-    }
+    let mut control = row().gap(8.0).center_y();
     if spec.fixed {
-        control = control.child(
+        control = control.child(chips(k, keymap, action)).child(
             text("Fixed")
                 .font(k.ty.small)
                 .color(k.c.text_faint)
                 .key(format!("bind-fixed-{}", spec.id)),
         );
     } else {
-        control = control.child(rebind_button(k, action, capturing));
-        control = control.child(if keymap.is_default(action) {
-            el().w(RESET_SLOT).h(RESET_SLOT).a11y_hidden()
-        } else {
-            reset_button(k, action)
-        });
+        if !keymap.is_default(action) {
+            control = control.child(reset_button(k, action));
+        }
+        control = control.child(rebind_button(k, keymap, action, capturing));
     }
     let note = note(s, keymap, action);
     setting_row(
@@ -79,9 +76,6 @@ fn note(s: &Ui, keymap: &Keymap, action: Action) -> Option<String> {
     if let Some((_, hint)) = s.bind_hint.as_ref().filter(|(a, _)| *a == action) {
         return Some(hint.clone());
     }
-    if s.rebinding == Some(action) {
-        return Some(CAPTURE_HELP.to_owned());
-    }
     if let Some((_, error)) = s.hotkey_errors.iter().find(|(a, _)| *a == action) {
         return Some(error.clone());
     }
@@ -91,6 +85,18 @@ fn note(s: &Ui, keymap: &Keymap, action: Action) -> Option<String> {
         return Some(format!("Also used by {}.", names.join(", ")));
     }
     (action.scope() == Scope::Global).then(|| GLOBAL_HINT.to_owned())
+}
+
+fn binding_label(keymap: &Keymap, action: Action) -> String {
+    let bindings = keymap.bindings(action);
+    if bindings.is_empty() {
+        return "Not set".to_owned();
+    }
+    bindings
+        .iter()
+        .map(|combo| combo.keycaps(MAC).join(" "))
+        .collect::<Vec<_>>()
+        .join(" or ")
 }
 
 fn chips(k: &Kit, keymap: &Keymap, action: Action) -> El {
@@ -112,20 +118,30 @@ fn chips(k: &Kit, keymap: &Keymap, action: Action) -> El {
     keys
 }
 
-fn rebind_button(k: &Kit, action: Action, capturing: bool) -> El {
-    let label = if capturing { PRESS_KEYS } else { "Change" };
-    Button::new(label)
-        .variant(ButtonVariant::Neutral)
-        .control_size(ControlSize::Large)
-        .on_press_tx(move |ui: &mut Ui, tx: &mut rune::Tx| ui.toggle_rebind(action, tx))
+fn rebind_button(k: &Kit, keymap: &Keymap, action: Action, capturing: bool) -> El {
+    let (variant, label) = if capturing {
+        (ButtonVariant::Outline, PRESS_KEYS.to_owned())
+    } else {
+        (ButtonVariant::Neutral, binding_label(keymap, action))
+    };
+    let mut button = Button::new(label)
+        .variant(variant)
+        .control_size(ControlSize::Regular)
+        .on_press_tx(move |ui: &mut Ui, tx: &mut rune::Tx| ui.toggle_rebind(action, tx));
+    if !capturing {
+        let body = chips(k, keymap, action);
+        button = button.label_with(move |_, _| body);
+    }
+    button
         .build(k)
+        .min_w(PILL_MIN_WIDTH)
         .key(format!("bind-btn-{}", action.id()))
 }
 
 fn reset_button(k: &Kit, action: Action) -> El {
     IconButton::new(&RESET)
         .variant(IconButtonVariant::Ghost)
-        .control_size(ControlSize::Large)
+        .control_size(ControlSize::Small)
         .label(format!("Reset {} to default", action.label()))
         .help("Reset to default")
         .on_press(move |ui: &mut Ui| ui.reset_binding(action))
