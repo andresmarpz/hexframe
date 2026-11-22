@@ -226,59 +226,136 @@ fn outcome() -> impl Strategy<Value = Outcome> {
     prop_oneof![fault().prop_map(Outcome::Fail), Just(Outcome::Silent)]
 }
 
+struct Start {
+    at: Hns,
+    user: bool,
+}
+
 struct Run {
     driver: Driver,
-    starts: Vec<Hns>,
-    outcome: Outcome,
+    starts: Vec<Start>,
+    outcomes: Vec<Outcome>,
+    cursor: usize,
+    blocked: bool,
+    auto_after_unsupported: bool,
+    autos_in_segment: u32,
+    most_autos_in_segment: u32,
 }
 
 impl Run {
     fn new(outcome: Outcome) -> Self {
+        Self::mixed(vec![outcome])
+    }
+
+    fn mixed(outcomes: Vec<Outcome>) -> Self {
         let mut driver = Driver::new(true);
         driver.apply(&Op::Found(42));
         let effects = driver.apply(&Op::Ready);
         let mut run = Self {
             driver,
             starts: Vec::new(),
-            outcome,
+            outcomes,
+            cursor: 0,
+            blocked: false,
+            auto_after_unsupported: false,
+            autos_in_segment: 0,
+            most_autos_in_segment: 0,
         };
-        run.react(&effects);
+        run.react(&effects, true);
         run
     }
 
-    fn react(&mut self, effects: &[Effect]) {
-        let mut pending = game_starts(effects);
-        while pending > 0 {
-            pending -= 1;
-            self.starts.push(self.driver.now);
-            if let Outcome::Fail(fault) = self.outcome {
+    fn next_outcome(&mut self) -> Outcome {
+        let outcome = self.outcomes[self.cursor % self.outcomes.len()].clone();
+        self.cursor += 1;
+        outcome
+    }
+
+    fn record_start(&mut self, user: bool) {
+        self.starts.push(Start {
+            at: self.driver.now,
+            user,
+        });
+        if user {
+            self.blocked = false;
+            self.autos_in_segment = 0;
+        } else {
+            self.auto_after_unsupported |= self.blocked;
+            self.autos_in_segment += 1;
+            self.most_autos_in_segment = self.most_autos_in_segment.max(self.autos_in_segment);
+        }
+    }
+
+    fn react(&mut self, effects: &[Effect], user: bool) {
+        let mut pending = vec![user; game_starts(effects)];
+        while let Some(user) = pending.pop() {
+            self.record_start(user);
+            if let Outcome::Fail(fault) = self.next_outcome() {
+                self.blocked |= matches!(fault, Fault::Unsupported);
                 let more = self.driver.apply(&Op::Failed(fault));
-                pending += game_starts(&more);
+                pending.extend(vec![false; game_starts(&more)]);
             }
         }
     }
 
     fn tick(&mut self, dt: Hns) -> Vec<Effect> {
         let effects = self.driver.apply(&Op::Tick(dt));
-        self.react(&effects);
+        self.react(&effects, false);
+        effects
+    }
+
+    fn user_retry(&mut self) -> Vec<Effect> {
+        let effects = self.driver.apply(&Op::Retry);
+        self.react(&effects, true);
         effects
     }
 }
 
+#[derive(Debug, Clone)]
+enum Step {
+    Tick(i64),
+    Retry,
+}
+
+fn step() -> impl Strategy<Value = Step> {
+    prop_oneof![
+        6 => (1i64..12_000).prop_map(Step::Tick),
+        1 => Just(Step::Retry),
+    ]
+}
+
 proptest! {
     #[test]
-    fn automatic_starts_are_spaced_and_capped(
-        outcome in outcome(),
-        dts in proptest::collection::vec(1i64..12_000, 1..400),
+    fn mixed_failures_and_retries_stay_spaced_capped_and_honest(
+        outcomes in proptest::collection::vec(outcome(), 1..12),
+        steps in proptest::collection::vec(step(), 1..300),
     ) {
-        let mut run = Run::new(outcome);
-        for dt in dts {
-            run.tick(dt * SEC / 1000);
+        let mut run = Run::mixed(outcomes);
+        for step in steps {
+            match step {
+                Step::Tick(ms) => {
+                    run.tick(ms * SEC / 1000);
+                }
+                Step::Retry => {
+                    let state = run.driver.session.state().clone();
+                    let effects = run.user_retry();
+                    if matches!(state, SessionState::Cooldown | SessionState::Idle) {
+                        prop_assert_eq!(game_starts(&effects), 1, "retry from {:?} did not start", state);
+                    }
+                }
+            }
         }
         for pair in run.starts.windows(2) {
-            prop_assert!(pair[1] - pair[0] >= TIMING.retry_delay, "starts {pair:?} too close");
+            if !pair[1].user {
+                prop_assert!(
+                    pair[1].at - pair[0].at >= TIMING.retry_delay,
+                    "automatic start {:?} too close to the one before",
+                    pair[1].at
+                );
+            }
         }
-        prop_assert!(run.starts.len() <= 1 + MAX_START_RETRIES as usize);
+        prop_assert!(run.most_autos_in_segment <= MAX_START_RETRIES, "too many automatic retries");
+        prop_assert!(!run.auto_after_unsupported, "automatic start after an unsupported failure");
     }
 
     #[test]
@@ -288,19 +365,6 @@ proptest! {
             run.tick(dt * SEC / 1000);
         }
         prop_assert_eq!(run.starts.len(), 1);
-    }
-
-    #[test]
-    fn starts_per_simulated_hour_stay_bounded(
-        outcome in outcome(),
-        step_ms in 1i64..5_000,
-    ) {
-        let mut run = Run::new(outcome);
-        let end = SEC + 3600 * SEC;
-        while run.driver.now < end {
-            run.tick(step_ms * SEC / 1000);
-        }
-        prop_assert!(run.starts.len() <= 1 + MAX_START_RETRIES as usize);
     }
 
     #[test]
@@ -316,7 +380,7 @@ proptest! {
         let before = run.starts.len();
         let retried = run.driver.apply(&Op::Retry);
         prop_assert_eq!(game_starts(&retried), 1);
-        run.react(&retried);
+        run.react(&retried, true);
         prop_assert!(run.starts.len() > before);
 
         let mut run = Run::new(Outcome::Fail(Fault::Unsupported));
