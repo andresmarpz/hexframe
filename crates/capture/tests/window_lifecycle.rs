@@ -23,7 +23,6 @@ const SAMPLE: Duration = Duration::from_millis(250);
 const RESIZE_SETTLE: Duration = Duration::from_millis(400);
 const LONGEST_RESIZE_GAP: Duration = Duration::from_secs(1);
 const CLOSE_OBSERVE: Duration = Duration::from_secs(10);
-const STOPPED_FOR: Duration = Duration::from_secs(3);
 const MIN_FPS: f64 = 30.0;
 const OPTIONS: WgcOptions = WgcOptions {
     fps: 60,
@@ -182,7 +181,7 @@ fn twenty_resizes_across_three_sizes_keep_frames_arriving() {
 
 #[test]
 #[ignore = "needs the PC: opens a cloaked window and captures it"]
-fn closing_the_window_is_noticed_without_the_closed_event_and_a_relaunch_captures() {
+fn closing_the_window_is_reported_closed_and_a_relaunch_captures() {
     let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
     let _com = ComGuard::mta().expect("COM");
     let window = open();
@@ -191,27 +190,14 @@ fn closing_the_window_is_noticed_without_the_closed_event_and_a_relaunch_capture
     run.run_for(&capture, WARM);
     assert!(window.close(), "the window thread did not finish");
     let closed_at = Instant::now();
-    let mut seen = seq(&capture);
-    let mut last_new = Instant::now();
-    let noticed = loop {
-        if capture.is_closed() {
-            break "closed event";
-        }
-        std::thread::sleep(POLL);
-        let now = seq(&capture);
-        if now != seen {
-            seen = now;
-            last_new = Instant::now();
-        }
-        if last_new.elapsed() >= STOPPED_FOR {
-            break "frames stopped";
-        }
+    while !capture.is_closed() {
         assert!(
             closed_at.elapsed() < CLOSE_OBSERVE,
-            "the close went unnoticed"
+            "the capture never reported the closed window"
         );
-    };
-    eprintln!("CLOSE noticed by {noticed} after {:?}", closed_at.elapsed());
+        std::thread::sleep(POLL);
+    }
+    eprintln!("CLOSE reported after {:?}", closed_at.elapsed());
     capture.stop();
 
     let again = open();

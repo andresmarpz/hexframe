@@ -29,6 +29,10 @@ name = "cloaked_window"
 required-features = ["fault-injection"]
 
 [[test]]
+name = "window_lifecycle"
+required-features = ["fault-injection"]
+
+[[test]]
 name = "wgc_teardown"
 required-features = ["fault-injection"]
 
