@@ -50,7 +50,10 @@ fn the_failed_card_opens_the_first_failure_line() {
     assert!(rt.find("encoder-detail").is_some());
     assert!(rt.find("encoder-detail-line").is_none());
     tap(&mut rt, "encoder-detail");
-    assert!(visible_texts(&rt).contains(&"NVIDIA NVENC (hardware) on NVIDIA GeForce GT 1030: E_FAIL".to_owned()));
+    assert!(
+        visible_texts(&rt)
+            .contains(&"NVIDIA NVENC (hardware) on NVIDIA GeForce GT 1030: E_FAIL".to_owned())
+    );
 }
 
 #[test]

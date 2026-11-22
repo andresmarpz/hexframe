@@ -4,6 +4,6 @@
   "steps": [
     {"check": "home", "has": ["encoder-error", "encoder-detail"], "lacks": ["encoder-detail-line"], "snap": false},
     {"tap": "encoder-detail"},
-    {"check": "open", "has": ["encoder-detail-line"], "text": ["NVIDIA NVENC (hardware): the encoder could not start (0x8000FFFF)"]}
+    {"check": "open", "has": ["encoder-detail-line"], "text": ["NVIDIA NVENC (hardware) on NVIDIA GeForce GT 1030: the encoder could not start (0x8000FFFF)"]}
   ]
 }
