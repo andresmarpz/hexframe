@@ -476,7 +476,6 @@ fn a_stalled_encoder_fills_the_queue_to_its_bound_and_audio_resumes_in_place_by_
 }
 
 #[test]
-#[ignore = "lost device sends no warning: issue 80"]
 fn device_invalidated_sends_one_warning_to_the_session() {
     let mut steps = sine_packets(3);
     steps.push(Step::ReadFails(SourceError::DeviceInvalidated));

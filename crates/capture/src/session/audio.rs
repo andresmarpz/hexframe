@@ -111,6 +111,7 @@ impl AudioPipe {
         while let Ok(message) = self.rx.try_recv() {
             packets += forward(message, sink);
         }
+        self.forward_failure(sink);
         packets
     }
 
@@ -125,7 +126,14 @@ impl AudioPipe {
         if let Some(worker) = self.worker.take() {
             join(worker);
         }
+        self.forward_failure(sink);
         packets
+    }
+
+    fn forward_failure(&self, sink: &mut Sink) {
+        if let Some(text) = self.counters.take_failure() {
+            sink.warning(text);
+        }
     }
 }
 

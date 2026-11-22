@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -36,6 +36,7 @@ pub struct AudioCounters {
     timestamp_gaps_over_5s: AtomicU32,
     largest_timestamp_gap_ms: AtomicU64,
     queue_depth: AtomicU32,
+    failure: Mutex<Option<String>>,
 }
 
 impl AudioCounters {
@@ -57,6 +58,16 @@ impl AudioCounters {
             .store(timeline.big_gaps(), Ordering::Relaxed);
         let ms = u64::try_from(timeline.largest_gap() / 10_000).unwrap_or(0);
         self.largest_timestamp_gap_ms.store(ms, Ordering::Relaxed);
+    }
+
+    fn fail(&self, text: String) {
+        if let Ok(mut slot) = self.failure.lock() {
+            slot.get_or_insert(text);
+        }
+    }
+
+    pub fn take_failure(&self) -> Option<String> {
+        self.failure.lock().ok().and_then(|mut slot| slot.take())
     }
 
     pub fn fill(&self, stats: &mut CaptureStats) {
@@ -331,6 +342,7 @@ fn capture_loop(
             }
             Err(error) => {
                 tracing::warn!(%error, "audio wait failed");
+                report_loss(&error, counters, stop);
                 return;
             }
         }
@@ -347,10 +359,22 @@ fn capture_loop(
             Ok(false) => return,
             Err(error) => {
                 tracing::warn!(%error, "audio read failed");
+                report_loss(&error, counters, stop);
                 return;
             }
         }
     }
+}
+
+fn report_loss(error: &SourceError, counters: &AudioCounters, stop: &AtomicBool) {
+    if stop.load(Ordering::Acquire) {
+        return;
+    }
+    let text = match error {
+        SourceError::DeviceInvalidated => "audio device was lost, audio stopped".to_string(),
+        SourceError::Failed(reason) => format!("audio capture stopped: {reason}"),
+    };
+    counters.fail(text);
 }
 
 fn drain(
