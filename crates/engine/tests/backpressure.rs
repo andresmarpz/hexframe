@@ -5,7 +5,7 @@ mod common;
 use std::fs;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineCmd, FakeMediaSource, NoticeLevel, UiMsg, set_write_delay};
@@ -126,16 +126,20 @@ fn a_control_thread_stuck_in_a_slow_drive_does_not_stall_capture() {
 #[test]
 fn an_encoder_failure_racing_a_stop_gives_one_recording_and_at_most_one_failure() {
     let _serial = serial();
-    for packets in [3, 30, 60, 120] {
-        let media = FakeMediaSource::new().failing_after_packets(packets, "encoder died");
+    const FAIL_AFTER: Duration = Duration::from_millis(300);
+    let mut failure_notices = 0;
+    for stop_ms in (270..=330_u64).step_by(6) {
+        let media = FakeMediaSource::new().failing_after(FAIL_AFTER, "encoder died");
         let harness = start_idle(settings("fail-stop-race"), Arc::new(media));
+        let began = Instant::now();
         send(&harness, EngineCmd::StartTestRecording { secs: 600 });
         recording_since(&harness.ui);
-        thread::sleep(Duration::from_millis(u64::from(packets) * 4));
+        let stop_at = Duration::from_millis(stop_ms);
+        thread::sleep(stop_at.saturating_sub(began.elapsed()));
         send(&harness, EngineCmd::StopRecording);
         let mut saved = 0;
         let mut errors = Vec::new();
-        while let Ok(msg) = harness.ui.recv_timeout(Duration::from_secs(3)) {
+        while let Ok(msg) = harness.ui.recv_timeout(Duration::from_secs(1)) {
             match msg {
                 UiMsg::RecordingSaved(_) => saved += 1,
                 UiMsg::Notice {
@@ -145,9 +149,11 @@ fn an_encoder_failure_racing_a_stop_gives_one_recording_and_at_most_one_failure(
                 _ => {}
             }
         }
-        assert_eq!(saved, 1, "after {packets} packets");
-        assert!(errors.len() <= 1, "{errors:?}");
+        assert_eq!(saved, 1, "stop at {stop_ms} ms");
+        assert!(errors.len() <= 1, "stop at {stop_ms} ms: {errors:?}");
+        failure_notices += errors.len();
     }
+    assert!(failure_notices > 0, "the encoder failure never arrived");
 }
 
 #[test]
