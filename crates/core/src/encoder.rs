@@ -90,6 +90,7 @@ pub fn plan(adapters: &[Adapter]) -> Vec<Candidate> {
         .collect();
     let software_adapter = display
         .or_else(|| sorted.iter().find(|a| a.display).copied())
+        .or_else(|| hardware.first().copied())
         .or_else(|| sorted.first().copied());
     if let Some(adapter) = software_adapter {
         candidates.push(Candidate {

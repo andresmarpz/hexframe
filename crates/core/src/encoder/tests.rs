@@ -49,6 +49,13 @@ fn a_single_gpu_tries_its_hardware_encoder_then_the_software_one() {
 }
 
 #[test]
+fn software_runs_on_a_gpu_not_the_render_driver_when_no_adapter_owns_the_display() {
+    let gpu = adapter(0x2000, "NVIDIA GeForce RTX 3070", VENDOR_NVIDIA);
+    let render = adapter(0x1000, "Microsoft Basic Render Driver", VENDOR_MICROSOFT);
+    assert_eq!(plan(&[gpu, render]), vec![hw(0x2000), sw(0x2000)]);
+}
+
+#[test]
 fn the_display_adapter_comes_before_other_gpus() {
     let desktop = [
         Adapter {
