@@ -9,7 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use greyscreen_core::export::{ExportJob, ExportPreset, ExportRange};
+use greyscreen_core::export::{ExportEvent, ExportJob, ExportPreset, ExportRange};
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team, TimedEvent};
 use greyscreen_core::library::VideoInfo;
 use greyscreen_core::library::{self, RecordingMeta};
@@ -470,7 +470,10 @@ fn shutdown_with_a_clip_job_and_an_export_running_neither_panics_nor_hangs() {
     });
     let dir = temp_dir("shutdown-jobs");
     let source_media = common::media(300);
-    let source = common::leftover_part(&dir, "source", &source_media, true).join("game.mp4.part");
+    let source_dir = temp_dir("shutdown-jobs-src");
+    let source_folder = common::leftover_part(&source_dir, "source", &source_media, true);
+    let source = source_folder.join("game.mp4");
+    std::fs::rename(source_folder.join("game.mp4.part"), &source).expect("rename source");
     let engine = Engine::start(
         Settings {
             output_dir: dir.clone(),
@@ -512,6 +515,12 @@ fn shutdown_with_a_clip_job_and_an_export_running_neither_panics_nor_hangs() {
         .ok();
     let began = Instant::now();
     drop(engine);
+    let export_started = |m: &UiMsg| {
+        matches!(
+            m,
+            UiMsg::Export(ExportEvent::Progress(_) | ExportEvent::Done(_))
+        )
+    };
     assert!(
         began.elapsed() < Duration::from_secs(15),
         "{:?}",
@@ -522,5 +531,13 @@ fn shutdown_with_a_clip_job_and_an_export_running_neither_panics_nor_hangs() {
         msgs.iter().any(|m| matches!(m, UiMsg::RecordingSaved(_))),
         "the recording was not saved"
     );
+    assert!(msgs.iter().any(export_started), "the export never ran");
+    assert!(
+        !msgs
+            .iter()
+            .any(|m| matches!(m, UiMsg::Status(EngineStatus::Error(_)))),
+        "the engine reported an error"
+    );
     std::fs::remove_dir_all(dir).ok();
+    std::fs::remove_dir_all(source_dir).ok();
 }

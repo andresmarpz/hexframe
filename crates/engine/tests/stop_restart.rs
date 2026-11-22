@@ -3,6 +3,7 @@
 mod common;
 
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -98,11 +99,54 @@ struct Counting {
     inner: FakeMediaSource,
     video: Arc<AtomicUsize>,
     audio: Arc<AtomicUsize>,
+    hold_after: Option<usize>,
+    held: Arc<AtomicUsize>,
+    configs: Arc<Mutex<Vec<CaptureConfig>>>,
+}
+
+impl Counting {
+    fn new(inner: FakeMediaSource) -> Self {
+        Self {
+            inner,
+            video: Arc::default(),
+            audio: Arc::default(),
+            hold_after: None,
+            held: Arc::default(),
+            configs: Arc::default(),
+        }
+    }
 }
 
 struct CountingSession {
     inner: Box<dyn MediaSession>,
-    forwarder: JoinHandle<()>,
+    forwarder: JoinHandle<Vec<MediaEvent>>,
+    out: Sender<MediaEvent>,
+    forward: Forward,
+    held: Arc<AtomicUsize>,
+}
+
+#[derive(Clone)]
+struct Forward {
+    video: Arc<AtomicUsize>,
+    audio: Arc<AtomicUsize>,
+}
+
+impl Forward {
+    fn send(&self, out: &Sender<MediaEvent>, event: MediaEvent) -> bool {
+        let track = match &event {
+            MediaEvent::Packet(packet) => Some(packet.track),
+            _ => None,
+        };
+        if out.send_timeout(event, Duration::from_secs(2)).is_err() {
+            return false;
+        }
+        match track {
+            Some(Track::Video) => self.video.fetch_add(1, Ordering::SeqCst),
+            Some(Track::Audio) => self.audio.fetch_add(1, Ordering::SeqCst),
+            None => 0,
+        };
+        true
+    }
 }
 
 impl MediaSession for CountingSession {
@@ -111,7 +155,13 @@ impl MediaSession for CountingSession {
     fn stop(self: Box<Self>) {
         let this = *self;
         this.inner.stop();
-        this.forwarder.join().ok();
+        let held = this.forwarder.join().unwrap_or_default();
+        this.held.store(held.len(), Ordering::SeqCst);
+        for event in held {
+            if !this.forward.send(&this.out, event) {
+                break;
+            }
+        }
     }
 }
 
@@ -122,26 +172,35 @@ impl MediaSource for Counting {
         cfg: CaptureConfig,
         out: Sender<MediaEvent>,
     ) -> Result<Box<dyn MediaSession>, String> {
+        self.configs.lock().expect("configs").push(cfg.clone());
         let (tx, rx) = bounded(64);
         let inner = self.inner.start(target, cfg, tx)?;
-        let (video, audio) = (self.video.clone(), self.audio.clone());
+        let forward = Forward {
+            video: self.video.clone(),
+            audio: self.audio.clone(),
+        };
+        let hold_after = self.hold_after;
+        let (forwarding, forwarding_out) = (forward.clone(), out.clone());
         let forwarder = thread::spawn(move || {
+            let mut held = Vec::new();
+            let mut forwarded = 0;
             for event in rx {
-                let track = match &event {
-                    MediaEvent::Packet(packet) => Some(packet.track),
-                    _ => None,
-                };
-                if out.send(event).is_err() {
+                if hold_after.is_some_and(|limit| forwarded >= limit) {
+                    held.push(event);
                     continue;
                 }
-                match track {
-                    Some(Track::Video) => video.fetch_add(1, Ordering::SeqCst),
-                    Some(Track::Audio) => audio.fetch_add(1, Ordering::SeqCst),
-                    None => 0,
-                };
+                forwarded += 1;
+                forwarding.send(&forwarding_out, event);
             }
+            held
         });
-        Ok(Box::new(CountingSession { inner, forwarder }))
+        Ok(Box::new(CountingSession {
+            inner,
+            forwarder,
+            out,
+            forward,
+            held: self.held.clone(),
+        }))
     }
 }
 
@@ -150,16 +209,13 @@ struct Counted {
     entry: RecordingEntry,
     video: usize,
     audio: usize,
+    held: usize,
 }
 
-fn counted_recording(tag: &str, run_for: Duration) -> Counted {
-    let video = Arc::new(AtomicUsize::new(0));
-    let audio = Arc::new(AtomicUsize::new(0));
-    let media = Counting {
-        inner: FakeMediaSource::new().with_speed(20),
-        video: video.clone(),
-        audio: audio.clone(),
-    };
+fn counted_recording(tag: &str, run_for: Duration, hold_after: Option<usize>) -> Counted {
+    let mut media = Counting::new(FakeMediaSource::new().with_speed(20));
+    media.hold_after = hold_after;
+    let (video, audio, held) = (media.video.clone(), media.audio.clone(), media.held.clone());
     let harness = start_idle(settings(tag), Arc::new(media));
     start_test(&harness, 600);
     recording_since(&harness.ui);
@@ -171,6 +227,7 @@ fn counted_recording(tag: &str, run_for: Duration) -> Counted {
         entry,
         video: video.load(Ordering::SeqCst),
         audio: audio.load(Ordering::SeqCst),
+        held: held.load(Ordering::SeqCst),
     }
 }
 
@@ -202,14 +259,15 @@ fn assert_whole_file(counted: &Counted) {
 
 #[test]
 fn stop_with_packets_queued_keeps_every_packet_and_writes_nothing_after_close() {
-    let counted = counted_recording("stop-queued", Duration::from_millis(700));
+    let counted = counted_recording("stop-queued", Duration::from_millis(700), Some(50));
+    assert!(counted.held > 0, "nothing was queued at stop");
     assert!(counted.video > 60, "{}", counted.video);
     assert_whole_file(&counted);
 }
 
 #[test]
 fn stop_right_after_start_keeps_the_last_packets() {
-    let counted = counted_recording("stop-early", Duration::ZERO);
+    let counted = counted_recording("stop-early", Duration::ZERO, None);
     assert!(counted.video >= 1 && counted.audio >= 1);
     assert_whole_file(&counted);
 }
@@ -265,7 +323,7 @@ fn a_late_audio_source_shows_up_in_the_health_numbers() {
 }
 
 #[test]
-#[ignore = "bug #79: the finished file loses the audio start offset"]
+#[ignore = "the finished file loses the audio start offset"]
 fn an_audio_source_that_starts_late_keeps_audio_and_video_in_step() {
     let (_harness, entry) = late_audio_recording("late-audio-sync");
     assert_tracks_match(&entry);
@@ -274,7 +332,9 @@ fn an_audio_source_that_starts_late_keeps_audio_and_video_in_step() {
 #[test]
 fn changing_fps_and_quality_during_a_recording_keeps_the_running_format() {
     let base = settings("format-change");
-    let harness = start_idle(base.clone(), Arc::new(FakeMediaSource::new()));
+    let media = Counting::new(FakeMediaSource::new());
+    let configs = media.configs.clone();
+    let harness = start_idle(base.clone(), Arc::new(media));
     start_test(&harness, 600);
     recording_since(&harness.ui);
     let changed = Settings {
@@ -283,9 +343,23 @@ fn changing_fps_and_quality_during_a_recording_keeps_the_running_format() {
         ..base
     };
     send(&harness, EngineCmd::ApplySettings(changed));
-    thread::sleep(Duration::from_millis(500));
+    let mut extra = Vec::new();
+    while let Ok(msg) = harness.ui.recv_timeout(Duration::from_millis(500)) {
+        extra.push(msg);
+    }
+    assert!(
+        !extra.iter().any(|m| matches!(
+            m,
+            UiMsg::RecordingSaved(_) | UiMsg::Status(EngineStatus::Recording { .. })
+        )),
+        "the recording restarted"
+    );
     send(&harness, EngineCmd::StopRecording);
     let entry = wait_saved(&harness);
+    let started = configs.lock().expect("configs");
+    assert_eq!(started.len(), 1);
+    assert_eq!(started[0].fps, 60);
+    assert_eq!(started[0].quality, Some(70));
     assert_eq!(inspect_video(&entry).video.fps, 60);
     assert_eq!(entry.meta.video_format.fps, 60);
 }
