@@ -19,6 +19,10 @@ const PCM_QUEUE: usize = 256;
 
 type Ready = Sender<Result<Vec<u8>, String>>;
 
+fn pcm_queue() -> (Sender<PcmBlock>, Receiver<PcmBlock>) {
+    crossbeam_channel::bounded(PCM_QUEUE)
+}
+
 enum AudioMsg {
     Packet(Packet),
     Warning(String),
@@ -30,14 +34,12 @@ pub(crate) struct AudioPipe {
     rx: Receiver<AudioMsg>,
     t0_tx: Sender<Hns>,
     counters: Arc<AudioCounters>,
-    pcm_probe: Receiver<PcmBlock>,
     pub(crate) format: AudioFormat,
 }
 
 impl AudioPipe {
     pub(crate) fn start(target: &CaptureTarget, qpc: QpcMap, bitrate: u32) -> Result<Self, String> {
-        let (pcm_tx, pcm_rx) = crossbeam_channel::bounded(PCM_QUEUE);
-        let pcm_probe = pcm_rx.clone();
+        let (pcm_tx, pcm_rx) = pcm_queue();
         let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
         let worker = std::thread::Builder::new()
@@ -75,7 +77,6 @@ impl AudioPipe {
             rx: msg_rx,
             t0_tx,
             counters,
-            pcm_probe,
             format: AudioFormat {
                 sample_rate: SAMPLE_RATE,
                 channels: CHANNELS,
@@ -87,7 +88,6 @@ impl AudioPipe {
 
     pub(crate) fn fill_stats(&self, stats: &mut CaptureStats) {
         self.counters.fill(stats);
-        stats.pcm_queue = u32::try_from(self.pcm_probe.len()).unwrap_or(u32::MAX);
     }
 
     pub(crate) fn begin(&self, t0: Hns) {
@@ -185,3 +185,6 @@ fn emit(out: &Sender<AudioMsg>, frames: &mut Vec<Vec<u8>>, next: &mut i64) {
         .ok();
     }
 }
+
+#[cfg(test)]
+mod tests;

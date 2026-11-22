@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+use crossbeam_channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender};
 use greyscreen_core::health::CaptureStats;
 use greyscreen_core::media::{AudioTimeline, Span};
 use greyscreen_core::time::{Hns, mono_now};
@@ -32,6 +32,7 @@ pub struct AudioCounters {
     gap_longest_ms: AtomicU32,
     gap_total_ms: AtomicU64,
     idle_ms: AtomicU64,
+    queue_depth: AtomicU32,
 }
 
 impl AudioCounters {
@@ -54,6 +55,34 @@ impl AudioCounters {
         stats.audio_gap_longest_ms = self.gap_longest_ms.load(Ordering::Relaxed);
         stats.audio_gap_total_ms = self.gap_total_ms.load(Ordering::Relaxed);
         stats.audio_idle_ms = self.idle_ms.load(Ordering::Relaxed);
+        stats.pcm_queue = self.queue_depth.load(Ordering::Relaxed);
+    }
+}
+
+const SEND_SLICE: Duration = Duration::from_millis(20);
+
+fn send_block(
+    out: &Sender<PcmBlock>,
+    block: PcmBlock,
+    stop: &AtomicBool,
+    counters: &AudioCounters,
+) -> bool {
+    let mut pending = block;
+    loop {
+        match out.send_timeout(pending, SEND_SLICE) {
+            Ok(()) => {
+                let depth = u32::try_from(out.len()).unwrap_or(u32::MAX);
+                counters.queue_depth.store(depth, Ordering::Relaxed);
+                return true;
+            }
+            Err(SendTimeoutError::Disconnected(_)) => return false,
+            Err(SendTimeoutError::Timeout(block)) => {
+                if stop.load(Ordering::Acquire) {
+                    return false;
+                }
+                pending = block;
+            }
+        }
     }
 }
 
@@ -292,7 +321,7 @@ fn capture_loop(
                         first_frame: timeline.frames_out() - frames as u64,
                         samples: vec![0; frames * CHANNELS],
                     };
-                    if out.send(block).is_err() {
+                    if !send_block(out, block, stop, counters) {
                         return;
                     }
                 }
@@ -303,7 +332,7 @@ fn capture_loop(
                 return;
             }
         }
-        match drain(stream, qpc, &mut timeline, &mut buffer, out, counters) {
+        match drain(stream, qpc, &mut timeline, &mut buffer, out, counters, stop) {
             Ok(true) => {}
             Ok(false) => return,
             Err(error) => {
@@ -321,6 +350,7 @@ fn drain(
     buffer: &mut Vec<u8>,
     out: &Sender<PcmBlock>,
     counters: &AudioCounters,
+    stop: &AtomicBool,
 ) -> Result<bool, WasapiError> {
     while let Some(frames) = stream.capture.get_next_packet_size()? {
         if frames == 0 {
@@ -356,7 +386,7 @@ fn drain(
             first_frame,
             samples,
         };
-        if out.send(block).is_err() {
+        if !send_block(out, block, stop, counters) {
             return Ok(false);
         }
     }
@@ -387,3 +417,6 @@ fn render(spans: &[Span], bytes: &[u8]) -> Vec<i16> {
 fn f32_to_i16(sample: f32) -> i16 {
     (sample.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16
 }
+
+#[cfg(test)]
+mod tests;
