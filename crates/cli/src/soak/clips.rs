@@ -9,7 +9,7 @@ use super::check::Verdict;
 
 pub(super) const CLIP_FAILED_NOTICE: &str = "A clip could not be saved";
 const CLIPS_DIR: &str = "clips";
-const RECORDING_WAIT: Duration = Duration::from_secs(30);
+pub(super) const RECORDING_WAIT: Duration = Duration::from_secs(30);
 const CLIP_WAIT: Duration = Duration::from_secs(20);
 const CLIP_AFTER: Duration = Duration::from_secs(2);
 const POLL: Duration = Duration::from_millis(200);
@@ -42,10 +42,13 @@ impl Soak<'_> {
                 self.clip_saves_failed, self.args.cycles
             ));
         }
+        verdict
+            .failures
+            .extend(self.window_failures.iter().cloned());
         verdict.passed = verdict.failures.is_empty();
     }
 
-    fn wait_for(&mut self, limit: Duration, done: impl Fn(&Self) -> bool) -> bool {
+    pub(super) fn wait_for(&mut self, limit: Duration, done: impl Fn(&Self) -> bool) -> bool {
         let deadline = Instant::now() + limit;
         while !done(self) {
             let now = Instant::now();

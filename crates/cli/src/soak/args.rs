@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 
 use super::check::{AvLimits, Limits};
-use super::profiles::WindowTarget;
+use super::profiles::{WindowPlan, WindowTarget};
 
 #[derive(clap::Args, Debug, Clone)]
 pub(crate) struct Args {
@@ -58,6 +58,8 @@ pub(crate) struct Args {
     pub(crate) random_secs: Option<(u32, u32)>,
     #[arg(skip)]
     pub(crate) failed_clip_saves: bool,
+    #[arg(skip)]
+    pub(crate) window_plan: Option<WindowPlan>,
 }
 
 impl Args {
@@ -87,6 +89,9 @@ impl Args {
         }
         if self.game_minutes == Some(0) {
             bail!("--game-minutes must be at least 1");
+        }
+        if self.game_minutes.is_some() && self.window == WindowTarget::Cloaked {
+            bail!("the game runs record League; use --window league");
         }
         Ok(())
     }

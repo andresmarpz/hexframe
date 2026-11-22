@@ -1,5 +1,5 @@
-use super::check::{Limits, Run, evaluate, growth, slope_per_min};
-use super::profiles::WindowTarget;
+use super::check::{self, Limits, Run, evaluate, growth, slope_per_min};
+use super::profiles::{WindowPlan, WindowTarget};
 use super::*;
 
 const MB: u64 = 1024 * 1024;
@@ -86,6 +86,7 @@ fn args(cycles: u32, out: PathBuf, dir: Option<PathBuf>) -> Args {
         av_limits: None,
         random_secs: None,
         failed_clip_saves: false,
+        window_plan: None,
     }
 }
 
@@ -281,6 +282,12 @@ fn every_profile_resolves_to_valid_args_with_unique_names() {
             profiles::Shape::FailedClips { cycles, seconds } => {
                 assert_eq!((resolved.cycles, resolved.seconds), (cycles, seconds));
                 assert!(resolved.failed_clip_saves);
+            }
+            profiles::Shape::Window {
+                cycles, seconds, ..
+            } => {
+                assert_eq!((resolved.cycles, resolved.seconds), (cycles, seconds));
+                assert_eq!(resolved.window, WindowTarget::Cloaked);
             }
             profiles::Shape::Cycles {
                 cycles, seconds, ..
@@ -536,4 +543,147 @@ fn a_recording_saved_while_waiting_for_the_clip_failure_keeps_every_cycle() {
         verdict.failures
     );
     std::fs::remove_dir_all(&dir).ok();
+}
+
+type WindowLog = Arc<std::sync::Mutex<Vec<String>>>;
+
+struct FakeWindow {
+    log: WindowLog,
+}
+
+impl FakeWindow {
+    fn note(&self, what: &str) {
+        self.log.lock().unwrap().push(what.to_owned());
+    }
+}
+
+impl window::TestWindow for FakeWindow {
+    fn target(&self) -> greyscreen_core::media::CaptureTarget {
+        greyscreen_core::media::CaptureTarget::GameWindow { hwnd: 7, pid: 1 }
+    }
+
+    fn resize(&self, width: i32, height: i32) {
+        self.note(&format!("resize {width}x{height}"));
+    }
+
+    fn minimise(&self) {
+        self.note("minimise");
+    }
+
+    fn restore(&self) {
+        self.note("restore");
+    }
+
+    fn close(self: Box<Self>) -> bool {
+        self.note("close");
+        true
+    }
+}
+
+fn fake_windows() -> (window::WindowFactory, WindowLog) {
+    let log = WindowLog::default();
+    let shared = Arc::clone(&log);
+    let factory: window::WindowFactory = Box::new(move || {
+        shared.lock().unwrap().push("open".to_owned());
+        Ok(Box::new(FakeWindow {
+            log: Arc::clone(&shared),
+        }))
+    });
+    (factory, log)
+}
+
+struct TargetRecorder(WindowLog);
+
+impl MediaSource for TargetRecorder {
+    fn start(
+        &self,
+        target: greyscreen_core::media::CaptureTarget,
+        _cfg: greyscreen_core::media::CaptureConfig,
+        _out: Sender<greyscreen_core::media::MediaEvent>,
+    ) -> Result<Box<dyn greyscreen_core::media::MediaSession>, String> {
+        self.0.lock().unwrap().push(format!("{target:?}"));
+        Err("recorder only".to_owned())
+    }
+}
+
+fn capture_config() -> greyscreen_core::media::CaptureConfig {
+    greyscreen_core::media::CaptureConfig {
+        fps: 60,
+        max_height: None,
+        video_bitrate: 8_000_000,
+        video_peak: 12_000_000,
+        quality: None,
+        quality_vs_speed: None,
+        gop_frames: 60,
+        audio: false,
+        audio_bitrate: 192_000,
+        cursor: false,
+        bitrate_pixels: 0,
+        diagnostics: false,
+    }
+}
+
+#[test]
+fn the_window_source_swaps_the_monitor_for_its_window_and_reopens_after_a_close() {
+    let (factory, log) = fake_windows();
+    let targets = WindowLog::default();
+    let (source, handle) =
+        WindowSource::wrap(Arc::new(TargetRecorder(Arc::clone(&targets))), factory);
+    let start = |target| {
+        let (out, _events) = unbounded();
+        source.start(target, capture_config(), out).err();
+    };
+    start(greyscreen_core::media::CaptureTarget::PrimaryMonitor);
+    start(greyscreen_core::media::CaptureTarget::PrimaryMonitor);
+    assert_eq!(*log.lock().unwrap(), ["open"]);
+    assert!(handle.close());
+    start(greyscreen_core::media::CaptureTarget::PrimaryMonitor);
+    assert_eq!(*log.lock().unwrap(), ["open", "close", "open"]);
+    assert!(
+        targets
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|t| t.contains("GameWindow"))
+    );
+}
+
+#[test]
+fn resizes_and_minimises_drive_the_window_while_each_recording_still_saves() {
+    for (plan, expect) in [
+        (WindowPlan::Resizes { secs: 2 }, "resize 1280x720"),
+        (WindowPlan::Minimises { count: 1 }, "restore"),
+    ] {
+        let dir = std::env::temp_dir().join(format!("greyscreen-soak-window-{}", std::process::id()));
+        let mut args = args(1, dir.join("report.json"), Some(dir.join("rec")));
+        args.seconds = 6;
+        args.window_plan = Some(plan);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (factory, log) = fake_windows();
+        let (media, handle) =
+            WindowSource::wrap(Arc::new(greyscreen_engine::FakeMediaSource::new()), factory);
+        let verdict = run_with_window(&args, media, default_league(&args), Some(handle)).unwrap();
+        assert!(verdict.passed, "{:?}", verdict.failures);
+        assert!(log.lock().unwrap().iter().any(|l| l == expect));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[test]
+fn an_audio_trim_after_minute_sixty_fails_and_one_before_does_not() {
+    let line = |t: f64, trims: u32| serde_json::json!({"t": t, "audio_trims": trims});
+    let mut cycle = good_cycle(1);
+    cycle.diag_seconds = vec![
+        line(10.0, 2),
+        line(3599.0, 2),
+        line(3601.0, 2),
+        line(3700.0, 2),
+    ];
+    assert_eq!(check::noise_failure(&cycle), None);
+    cycle.diag_seconds.push(line(3800.0, 3));
+    assert!(
+        check::noise_failure(&cycle)
+            .unwrap()
+            .contains("1 audio trims")
+    );
 }

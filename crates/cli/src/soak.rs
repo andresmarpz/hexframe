@@ -1,10 +1,13 @@
 mod args;
 mod check;
 mod clips;
+mod drive;
 mod gpu;
+mod judge;
 mod meter;
 mod profiles;
 mod rng;
+mod window;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -20,14 +23,16 @@ use greyscreen_engine::{
     UiMsg,
 };
 use greyscreen_league::LeagueMsg;
-use greyscreen_mp4::demux::Movie;
 use serde::Serialize;
 
 pub(crate) use args::Args;
 use check::{CycleResult, Limits, Run, Sample, Verdict, evaluate};
 use gpu::GpuReport;
+use judge::{judge_recording, missing_recording};
 use meter::Meter;
+use profiles::WindowPlan;
 use rng::Rng;
+use window::{WindowHandle, WindowSource};
 
 const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
 const SAVE_GRACE: Duration = Duration::from_secs(90);
@@ -67,7 +72,14 @@ fn start(args: &Args) -> Result<bool> {
     args.validate()?;
     #[cfg(windows)]
     crate::init_windows();
-    let verdict = run_with(args, default_media(), default_league(args))?;
+    let (media, window) = match args.window {
+        profiles::WindowTarget::Cloaked => {
+            let (media, handle) = WindowSource::wrap(default_media(), window::cloaked_factory()?);
+            (media, Some(handle))
+        }
+        profiles::WindowTarget::League => (default_media(), None),
+    };
+    let verdict = run_with_window(args, media, default_league(args), window)?;
     Ok(verdict.passed)
 }
 
@@ -89,7 +101,17 @@ fn default_league(args: &Args) -> LeagueFactory {
     }
 }
 
+#[cfg(test)]
 fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> Result<Verdict> {
+    run_with_window(args, media, league, None)
+}
+
+fn run_with_window(
+    args: &Args,
+    media: Arc<dyn MediaSource>,
+    league: LeagueFactory,
+    window: Option<WindowHandle>,
+) -> Result<Verdict> {
     let game_mode = args.game_minutes.is_some();
     let output_dir = args
         .dir
@@ -125,6 +147,7 @@ fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> 
     });
     let mut soak = Soak::new(args, rx);
     soak.output_dir = output_dir;
+    soak.window = window;
     match args.game_minutes {
         Some(minutes) => soak.run_games(&engine.cmd, minutes),
         None => soak.run_cycles(&engine.cmd),
@@ -151,6 +174,8 @@ struct Soak<'a> {
     seed: Option<u64>,
     output_dir: PathBuf,
     clip_saves_failed: u32,
+    window: Option<WindowHandle>,
+    window_failures: Vec<String>,
 }
 
 impl<'a> Soak<'a> {
@@ -172,6 +197,8 @@ impl<'a> Soak<'a> {
             seed: None,
             output_dir: PathBuf::new(),
             clip_saves_failed: 0,
+            window: None,
+            window_failures: Vec::new(),
         }
     }
 
@@ -219,6 +246,9 @@ impl<'a> Soak<'a> {
             let saved_before = self.cycles.len();
             if started && self.args.failed_clip_saves {
                 self.fail_a_clip(cmd);
+            }
+            if started && !self.args.failed_clip_saves {
+                self.drive_window(cmd, index, &mut rng);
             }
             let saved_early = self.cycles.len() > saved_before;
             if started && !saved_early && self.args.random_secs.is_some() {
@@ -327,7 +357,11 @@ impl<'a> Soak<'a> {
         let index = self.cycles.len() as u32 + 1;
         let min_secs = match self.args.game_minutes {
             Some(_) => self.args.min_video_secs.unwrap_or(MIN_GAME_VIDEO_SECS),
-            None if self.args.random_secs.is_some() => 0.0,
+            None if self.args.random_secs.is_some()
+                || matches!(self.args.window_plan, Some(WindowPlan::Closes { .. })) =>
+            {
+                0.0
+            }
             None => f64::from(self.args.seconds) * 0.5,
         };
         let result = judge_recording(index, entry, min_secs);
@@ -407,65 +441,6 @@ fn print_verdict(verdict: &Verdict, out: &std::path::Path) {
         }
         println!("FAIL: report {}", out.display());
     }
-}
-
-fn missing_recording(index: u32, waited: Duration) -> CycleResult {
-    CycleResult {
-        index,
-        folder: String::new(),
-        video_secs: 0.0,
-        dropped_pct: 0.0,
-        capture_errors: 0,
-        diag_seconds: Vec::new(),
-        health: None,
-        problem: Some(format!(
-            "no saved recording {} s after the start",
-            (waited + SAVE_GRACE).as_secs()
-        )),
-    }
-}
-
-fn judge_recording(index: u32, entry: &RecordingEntry, min_secs: f64) -> CycleResult {
-    let health = entry.meta.health.as_ref();
-    let (video_secs, problem) = match playable_secs(entry, min_secs) {
-        Ok(secs) => (secs, None),
-        Err(problem) => (0.0, Some(problem)),
-    };
-    CycleResult {
-        index,
-        folder: entry.folder.display().to_string(),
-        video_secs,
-        dropped_pct: health.map_or(0.0, |h| h.dropped_pct),
-        capture_errors: health.map_or(0, |h| h.capture_errors),
-        problem,
-        health: entry.meta.health.clone(),
-        diag_seconds: diag_seconds(&entry.folder),
-    }
-}
-
-fn diag_seconds(folder: &std::path::Path) -> Vec<serde_json::Value> {
-    let Ok(text) = std::fs::read_to_string(folder.join("diagnostics.jsonl")) else {
-        return Vec::new();
-    };
-    text.lines()
-        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .filter(|v| v["type"] == "second")
-        .collect()
-}
-
-fn playable_secs(entry: &RecordingEntry, min_secs: f64) -> Result<f64, String> {
-    if entry.meta.video.is_empty() {
-        return Err("the recording has no video file".to_owned());
-    }
-    let path = entry.folder.join(&entry.meta.video);
-    let movie = Movie::open(&path).map_err(|e| format!("{} does not open: {e}", path.display()))?;
-    let secs = movie.video_secs();
-    if movie.video_samples.is_empty() || secs < min_secs {
-        return Err(format!(
-            "video is {secs:.1} s, expected at least {min_secs:.1} s"
-        ));
-    }
-    Ok(secs)
 }
 
 #[cfg(test)]

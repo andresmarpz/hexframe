@@ -18,9 +18,21 @@ pub(crate) enum Shape {
         cycles: u32,
         seconds: u32,
     },
+    Window {
+        cycles: u32,
+        seconds: u32,
+        plan: Option<WindowPlan>,
+    },
     Games {
         minutes: u32,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum WindowPlan {
+    Closes { min_secs: u32, max_secs: u32 },
+    Resizes { secs: u32 },
+    Minimises { count: u32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -149,6 +161,65 @@ pub(crate) const PROFILES: &[Profile] = &[
         until_saved: false,
     },
     Profile {
+        name: "window-closes-200",
+        summary: "200 recordings of the cloaked window, each cut by closing the window after a random 2 to 6 s",
+        setup: "none; needs greyscreen-cli built with --features cloaked-window on Windows; the run fails when a recording keeps running 15 s after its window closed",
+        shape: Shape::Window {
+            cycles: 200,
+            seconds: 10,
+            plan: Some(WindowPlan::Closes {
+                min_secs: 2,
+                max_secs: 6,
+            }),
+        },
+        limits: DEFAULT_LIMITS,
+        uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
+    },
+    Profile {
+        name: "window-resize-60",
+        summary: "8 recordings of the cloaked window, each resized every 250 ms for 60 s",
+        setup: "none; needs the cloaked-window build; each saved video must have strictly rising dts",
+        shape: Shape::Window {
+            cycles: 8,
+            seconds: 70,
+            plan: Some(WindowPlan::Resizes { secs: 60 }),
+        },
+        limits: DEFAULT_LIMITS,
+        uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
+    },
+    Profile {
+        name: "window-minimise-20",
+        summary: "8 recordings of the cloaked window, each minimised and restored 20 times",
+        setup: "none; needs the cloaked-window build; each saved video must have strictly rising dts",
+        shape: Shape::Window {
+            cycles: 8,
+            seconds: 70,
+            plan: Some(WindowPlan::Minimises { count: 20 }),
+        },
+        limits: DEFAULT_LIMITS,
+        uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
+    },
+    Profile {
+        name: "window-restarts-50",
+        summary: "50 start and stop cycles on the cloaked window",
+        setup: "none; needs the cloaked-window build",
+        shape: Shape::Window {
+            cycles: 50,
+            seconds: 5,
+            plan: None,
+        },
+        limits: DEFAULT_LIMITS,
+        uses_window: false,
+        min_video_secs: None,
+        until_saved: false,
+    },
+    Profile {
         name: "game-30",
         summary: "30 minutes of League recording, back to back games",
         setup: "a League session Andres has freed",
@@ -249,7 +320,7 @@ impl super::Args {
         };
         let profile = find(name)?;
         if profile.uses_window && self.window == WindowTarget::Cloaked {
-            bail!("the cloaked test window is not built yet; use --window league");
+            bail!("the game profiles record League; use --window league");
         }
         let mut args = self.clone();
         match profile.shape {
@@ -279,6 +350,18 @@ impl super::Args {
                 args.seconds = seconds;
                 args.gap_secs = 1;
                 args.failed_clip_saves = true;
+                args.game_minutes = None;
+            }
+            Shape::Window {
+                cycles,
+                seconds,
+                plan,
+            } => {
+                args.cycles = cycles;
+                args.seconds = seconds;
+                args.gap_secs = 1;
+                args.window = WindowTarget::Cloaked;
+                args.window_plan = plan;
                 args.game_minutes = None;
             }
             Shape::Games { minutes } => args.game_minutes = Some(minutes),
@@ -332,6 +415,9 @@ pub(crate) fn describe() -> String {
                 Shape::FailedClips { cycles, seconds } => {
                     format!("{cycles} cycles of {seconds} s with a failed clip save")
                 }
+                Shape::Window {
+                    cycles, seconds, ..
+                } => format!("{cycles} cycles of {seconds} s on the cloaked window"),
                 Shape::Games { minutes } => format!("games for {minutes} min"),
             };
             format!(

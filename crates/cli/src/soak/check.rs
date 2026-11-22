@@ -4,6 +4,7 @@ const BYTES_PER_MB: f64 = 1024.0 * 1024.0;
 const MIN_POINTS: usize = 6;
 const MAX_WINDOW: usize = 10;
 const MIN_DRIFT_SECS: f64 = 600.0;
+const NOISE_AFTER_SECS: f64 = 3600.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub(crate) struct Sample {
@@ -201,7 +202,30 @@ fn av_failures(cycle: &CycleResult, av: &AvLimits) -> Vec<String> {
             ));
         }
     }
+    failures.extend(noise_failure(cycle));
     failures
+}
+
+pub(super) fn noise_failure(cycle: &CycleResult) -> Option<String> {
+    let trims = |v: &serde_json::Value| Some((v["t"].as_f64()?, v["audio_trims"].as_f64()?));
+    let points: Vec<(f64, f64)> = cycle.diag_seconds.iter().filter_map(trims).collect();
+    let before = points
+        .iter()
+        .filter(|p| p.0 < NOISE_AFTER_SECS)
+        .map(|p| p.1)
+        .fold(0.0, f64::max);
+    let after = points
+        .iter()
+        .filter(|p| p.0 >= NOISE_AFTER_SECS)
+        .map(|p| p.1)
+        .fold(before, f64::max);
+    (after > before).then(|| {
+        format!(
+            "recording {}: {:.0} audio trims after minute 60",
+            cycle.index,
+            after - before
+        )
+    })
 }
 
 pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
@@ -276,7 +300,8 @@ pub(crate) fn evaluate(run: &Run, limits: &Limits) -> Verdict {
     if limits.av.is_some() {
         judge
             .notes
-            .push("A/V limits: noise bursts after minute 60 are not measured".to_owned());
+            .push("A/V limits: a noise burst after minute 60 is read as an audio trim in the per-second lines"
+                .to_owned());
     }
     Verdict {
         passed: judge.failures.is_empty(),
