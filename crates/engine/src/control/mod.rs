@@ -18,7 +18,7 @@ use greyscreen_core::settings::Settings;
 use greyscreen_core::time::{Hns, mono_now, secs_to_hns};
 use greyscreen_league::LeagueMsg;
 
-use crate::api::{EngineCmd, LeagueGuard, NoticeLevel, UiMsg};
+use crate::api::{EngineCmd, EngineTiming, LeagueGuard, NoticeLevel, UiMsg};
 use crate::clipjob::ClipResult;
 use crate::delete;
 use crate::disk::FreeSpace;
@@ -34,7 +34,6 @@ use crate::writer::Report;
 use meta::Recording;
 
 const TICK: Duration = Duration::from_millis(250);
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(15);
 
 pub(crate) type Sink = Arc<dyn Fn(UiMsg) + Send + Sync>;
 
@@ -53,6 +52,7 @@ pub(crate) struct Spec {
     pub(crate) feedback: Option<FeedbackConfig>,
     pub(crate) hotkeys: Option<Box<dyn HotkeyBackend>>,
     pub(crate) free_space: Arc<dyn FreeSpace>,
+    pub(crate) timing: EngineTiming,
     pub(crate) active_folder: ActiveFolder,
     pub(crate) storyboards: Queue,
     pub(crate) cmd: Sender<EngineCmd>,
@@ -90,6 +90,7 @@ struct Control {
     active_folder: ActiveFolder,
     storyboards: Queue,
     free_space: Arc<dyn FreeSpace>,
+    shutdown_grace: Duration,
     disk_checked: Option<Instant>,
     disk_refused: bool,
     export: ExportHandle,
@@ -138,6 +139,7 @@ impl Control {
             feedback,
             hotkeys,
             free_space,
+            timing,
             active_folder,
             storyboards,
             cmd,
@@ -159,7 +161,8 @@ impl Control {
             disk_refused: false,
             export: ExportHandle::new(default_reencoder()),
             test_stop_at: None,
-            session: Session::new(settings.auto_record),
+            session: Session::with_timing(settings.auto_record, timing.session()),
+            shutdown_grace: timing.shutdown_grace,
             settings,
             media,
             sink,
@@ -214,7 +217,8 @@ impl Control {
             }
             self.sync_update_busy();
             if self.shutting_down {
-                let deadline = *deadline.get_or_insert_with(|| Instant::now() + SHUTDOWN_GRACE);
+                let grace = self.shutdown_grace;
+                let deadline = *deadline.get_or_insert_with(|| Instant::now() + grace);
                 self.stop_active();
                 if self.idle() || Instant::now() >= deadline {
                     break;

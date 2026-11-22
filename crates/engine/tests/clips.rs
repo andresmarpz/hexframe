@@ -9,7 +9,7 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use greyscreen_core::game::{GameEvent, GameResult, TimedEvent};
 use greyscreen_core::library::{self, RecordingMeta};
-use greyscreen_core::media::{CaptureConfig, CaptureTarget, MediaEvent, MediaSession, MediaSource};
+use greyscreen_core::media::MediaSource;
 use greyscreen_core::settings::{ClipSettings, Settings};
 use greyscreen_core::time::{Hns, secs_to_hns};
 use greyscreen_engine::{
@@ -302,29 +302,6 @@ fn sidecar_and_clip_times_subtract_the_media_offset() {
     assert_eq!(clip.file, "clips/00-01_MyKill.mp4");
 }
 
-struct FailsAfter {
-    inner: FakeMediaSource,
-    delay: Duration,
-    reason: &'static str,
-}
-
-impl MediaSource for FailsAfter {
-    fn start(
-        &self,
-        target: CaptureTarget,
-        cfg: CaptureConfig,
-        out: Sender<MediaEvent>,
-    ) -> Result<Box<dyn MediaSession>, String> {
-        let failed = out.clone();
-        let (delay, reason) = (self.delay, self.reason);
-        thread::spawn(move || {
-            thread::sleep(delay);
-            failed.send(MediaEvent::Failed(reason.to_owned())).ok();
-        });
-        self.inner.start(target, cfg, out)
-    }
-}
-
 fn error_notices(msgs: &[UiMsg]) -> Vec<&str> {
     msgs.iter()
         .filter_map(|m| match m {
@@ -341,11 +318,7 @@ fn error_notices(msgs: &[UiMsg]) -> Vec<&str> {
 fn capture_failure_in_the_tail_is_not_an_error_notice() {
     let harness = game_with(
         clip_settings("fail-tail", true),
-        Arc::new(FailsAfter {
-            inner: FakeMediaSource::new(),
-            delay: Duration::from_secs(1),
-            reason: "window closed",
-        }),
+        Arc::new(FakeMediaSource::new().failing_after(Duration::from_secs(1), "window closed")),
         Vec::new(),
         LeagueMsg::Ended(GameResult::Win),
         Duration::ZERO,
@@ -359,11 +332,7 @@ fn capture_failure_in_the_tail_is_not_an_error_notice() {
 fn capture_failure_while_recording_is_an_error_notice() {
     let harness = game_with(
         clip_settings("fail-live", true),
-        Arc::new(FailsAfter {
-            inner: FakeMediaSource::new(),
-            delay: Duration::from_secs(1),
-            reason: "window closed",
-        }),
+        Arc::new(FakeMediaSource::new().failing_after(Duration::from_secs(1), "window closed")),
         Vec::new(),
         LeagueMsg::Skipped("never".to_owned()),
         Duration::ZERO,
@@ -382,11 +351,10 @@ fn capture_failure_while_recording_is_an_error_notice() {
 fn an_encoder_failure_while_recording_saves_the_game_so_far() {
     let harness = game_with(
         clip_settings("fail-encoder", true),
-        Arc::new(FailsAfter {
-            inner: FakeMediaSource::new(),
-            delay: Duration::from_secs(1),
-            reason: "the video encoder stopped: 0x887a0005",
-        }),
+        Arc::new(FakeMediaSource::new().failing_after(
+            Duration::from_secs(1),
+            "the video encoder stopped: 0x887a0005",
+        )),
         Vec::new(),
         LeagueMsg::Skipped("never".to_owned()),
         Duration::ZERO,

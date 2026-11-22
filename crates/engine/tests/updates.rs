@@ -60,6 +60,7 @@ fn no_scheduled_check_runs_while_a_session_is_recording() {
         feedback: None,
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     engine
         .cmd
@@ -101,6 +102,7 @@ fn a_manual_check_without_an_updater_says_so() {
         feedback: None,
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     engine
         .cmd

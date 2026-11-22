@@ -629,3 +629,29 @@ fn a_fullscreen_failure_still_retries() {
         SessionState::Armed { retry: Some(_), .. }
     ));
 }
+
+#[test]
+fn short_timings_scale_the_start_timeout_and_retry_delay() {
+    let timing = SessionTiming {
+        start_timeout: 3 * SEC,
+        retry_delay: SEC,
+    };
+    let mut s = Session::with_timing(true, timing);
+    s.step(found());
+    s.step(Input::Tick(100 * SEC));
+    s.step(Input::Ready(info()));
+    assert!(s.step(Input::Tick(102 * SEC)).is_empty());
+    assert_eq!(s.step(Input::Tick(103 * SEC)), vec![Effect::StopMedia]);
+    assert!(s.step(Input::Tick(103 * SEC + SEC / 2)).is_empty());
+    assert_eq!(
+        s.step(Input::Tick(104 * SEC)),
+        vec![Effect::StartMedia(WINDOW)]
+    );
+}
+
+#[test]
+fn default_timing_is_fifteen_seconds_and_five_seconds() {
+    let timing = SessionTiming::default();
+    assert_eq!(timing.start_timeout, 15 * SEC);
+    assert_eq!(timing.retry_delay, 5 * SEC);
+}

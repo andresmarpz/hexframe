@@ -84,6 +84,7 @@ fn start(tag: &str, auto_record: bool) -> Match {
         feedback: None,
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     let mut ui = Ui::live(settings, engine.cmd.clone());
     ui.player_factory = fake_player::factory;

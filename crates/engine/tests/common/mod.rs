@@ -15,8 +15,8 @@ use greyscreen_core::media::{
 use greyscreen_core::settings::Settings;
 use greyscreen_core::time::Hns;
 use greyscreen_engine::{
-    Engine, EngineConfig, EngineHandle, EngineStatus, FakeMediaSource, FreeSpace, LeagueFactory,
-    RecordingEntry, UiMsg,
+    Engine, EngineConfig, EngineHandle, EngineStatus, EngineTiming, FakeMediaSource, FreeSpace,
+    LeagueFactory, RecordingEntry, UiMsg,
 };
 use greyscreen_league::LeagueMsg;
 use greyscreen_mp4::fragmented::FragmentedWriter;
@@ -97,6 +97,26 @@ pub(crate) fn start_engine_with_space(
     tap: Option<Tap>,
     free_space: Option<Arc<dyn FreeSpace>>,
 ) -> Harness {
+    start_engine_full(settings, media, league, tap, free_space, None)
+}
+
+pub(crate) fn start_engine_timed(
+    settings: Settings,
+    media: Arc<dyn MediaSource>,
+    league: LeagueFactory,
+    timing: EngineTiming,
+) -> Harness {
+    start_engine_full(settings, media, league, None, None, Some(timing))
+}
+
+fn start_engine_full(
+    settings: Settings,
+    media: Arc<dyn MediaSource>,
+    league: LeagueFactory,
+    tap: Option<Tap>,
+    free_space: Option<Arc<dyn FreeSpace>>,
+    timing: Option<EngineTiming>,
+) -> Harness {
     let dir = settings.output_dir.clone();
     let settings_path = dir.with_extension("settings.json");
     let (tx, rx) = unbounded();
@@ -116,6 +136,7 @@ pub(crate) fn start_engine_with_space(
         feedback: None,
         hotkeys: None,
         free_space,
+        timing,
     });
     Harness {
         engine: Some(engine),

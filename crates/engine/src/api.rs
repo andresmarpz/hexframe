@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use crossbeam_channel::{Sender, unbounded};
 use greyscreen_core::encoder::EncoderCheck;
@@ -11,7 +12,9 @@ use greyscreen_core::keybinds::Action;
 use greyscreen_core::library::{self, RecordingMeta};
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
+use greyscreen_core::session::SessionTiming;
 use greyscreen_core::settings::Settings;
+use greyscreen_core::time::{Hns, secs_to_hns};
 use greyscreen_core::update::UpdateState;
 use greyscreen_league::{GameLocator, LeagueMsg, LiveClient, Poller};
 
@@ -134,6 +137,37 @@ fn default_locator() -> Box<dyn GameLocator> {
     Box::new(greyscreen_league::AlwaysPresent)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EngineTiming {
+    pub shutdown_grace: Duration,
+    pub start_timeout: Duration,
+    pub retry_delay: Duration,
+}
+
+impl Default for EngineTiming {
+    fn default() -> Self {
+        let session = SessionTiming::default();
+        Self {
+            shutdown_grace: Duration::from_secs(15),
+            start_timeout: hns_to_duration(session.start_timeout),
+            retry_delay: hns_to_duration(session.retry_delay),
+        }
+    }
+}
+
+impl EngineTiming {
+    pub(crate) fn session(self) -> SessionTiming {
+        SessionTiming {
+            start_timeout: secs_to_hns(self.start_timeout.as_secs_f64()),
+            retry_delay: secs_to_hns(self.retry_delay.as_secs_f64()),
+        }
+    }
+}
+
+fn hns_to_duration(hns: Hns) -> Duration {
+    Duration::from_nanos(u64::try_from(hns).unwrap_or(0) * 100)
+}
+
 pub struct EngineConfig {
     pub settings: Settings,
     pub media: Arc<dyn MediaSource>,
@@ -144,6 +178,7 @@ pub struct EngineConfig {
     pub feedback: Option<FeedbackConfig>,
     pub hotkeys: Option<Box<dyn HotkeyBackend>>,
     pub free_space: Option<Arc<dyn FreeSpace>>,
+    pub timing: Option<EngineTiming>,
 }
 
 impl std::fmt::Debug for EngineConfig {
@@ -174,6 +209,7 @@ impl Engine {
             feedback: None,
             hotkeys: None,
             free_space: None,
+            timing: None,
         })
     }
 
@@ -188,6 +224,7 @@ impl Engine {
             feedback,
             hotkeys,
             free_space,
+            timing,
         } = config;
         settings.validate();
         let (cmd, cmd_rx) = unbounded();
@@ -205,6 +242,7 @@ impl Engine {
                 feedback,
                 hotkeys,
                 free_space: free_space.unwrap_or_else(|| Arc::new(SystemFreeSpace)),
+                timing: timing.unwrap_or_default(),
                 active_folder,
                 storyboards: storyboards.clone(),
                 cmd: cmd.clone(),

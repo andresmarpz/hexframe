@@ -337,6 +337,7 @@ fn the_dialog_walks_through_failure_and_success_with_a_fake_transport() {
         }),
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     let ui = Ui::live(Settings::default(), engine.cmd.clone());
     let mut rt = super::runtime_sized(ui, (960.0, 1400.0));

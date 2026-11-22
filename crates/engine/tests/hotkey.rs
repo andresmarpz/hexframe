@@ -103,6 +103,7 @@ fn start_with_fake(settings: Settings) -> (common::Harness, FakeHotkeys) {
         feedback: None,
         hotkeys: Some(Box::new(fake.clone())),
         free_space: None,
+        timing: None,
     });
     (
         common::Harness {

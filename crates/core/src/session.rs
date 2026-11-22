@@ -3,9 +3,10 @@ use crate::media::CaptureTarget;
 use crate::problem::Problem;
 use crate::time::{HNS_PER_SEC, Hns};
 
+mod timing;
+pub use timing::SessionTiming;
+
 const TAIL: Hns = 5 * HNS_PER_SEC;
-const START_TIMEOUT: Hns = 15 * HNS_PER_SEC;
-const START_RETRY_DELAY: Hns = 5 * HNS_PER_SEC;
 const MAX_START_RETRIES: u32 = 5;
 const MAX_RECORDING: Hns = 3 * 3600 * HNS_PER_SEC;
 
@@ -99,16 +100,22 @@ pub struct Session {
     last_pid: Option<u32>,
     auto_record: bool,
     live: Option<LiveGame>,
+    timing: SessionTiming,
 }
 
 impl Session {
     pub fn new(auto_record: bool) -> Self {
+        Self::with_timing(auto_record, SessionTiming::default())
+    }
+
+    pub fn with_timing(auto_record: bool, timing: SessionTiming) -> Self {
         Self {
             state: SessionState::Idle,
             now: 0,
             last_pid: None,
             auto_record,
             live: None,
+            timing,
         }
     }
 
@@ -313,7 +320,7 @@ impl Session {
                     started: Some(started),
                 },
                 Input::Tick(now),
-            ) if now - started >= START_TIMEOUT => self.start_failed(
+            ) if now - started >= self.timing.start_timeout => self.start_failed(
                 target,
                 game,
                 retries,
@@ -446,7 +453,7 @@ impl Session {
                     retry: Some(StartRetry {
                         game,
                         retries: retries + 1,
-                        at: self.now + START_RETRY_DELAY,
+                        at: self.now + self.timing.retry_delay,
                     }),
                 },
                 effects,

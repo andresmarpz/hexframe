@@ -88,6 +88,7 @@ fn rig(outcome: Outcome) -> Rig {
         }),
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     Rig {
         transport,
@@ -205,6 +206,7 @@ fn a_build_without_feedback_says_so() {
         feedback: None,
         hotkeys: None,
         free_space: None,
+        timing: None,
     });
     engine
         .cmd
