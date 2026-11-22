@@ -227,7 +227,7 @@ fn a_failed_start_gives_an_error_notice_and_the_next_good_start_shows_none() {
 }
 
 #[test]
-fn an_encoder_refusal_is_a_start_failure_with_the_raw_text_and_no_folder() {
+fn an_encoder_refusal_is_a_start_failure_with_the_friendly_notice_the_raw_status_and_no_folder() {
     let reason = "the video encoder failed to open: 0x8007000e";
     let media = FakeMediaSource::new().failing_to_start(reason);
     let probe = media.probe();
@@ -247,7 +247,13 @@ fn an_encoder_refusal_is_a_start_failure_with_the_raw_text_and_no_folder() {
     })
     .expect("error status");
     assert!(status.contains(reason), "{status}");
-    assert_eq!(notices.len(), 1, "{notices:?}");
+    assert_eq!(
+        notices,
+        vec![
+            "No video encoder found. Update your graphics driver, then restart Greyscreen."
+                .to_owned()
+        ]
+    );
     assert_eq!(folders_in(&harness.dir), 0);
     assert_eq!(probe.live_sessions(), 0);
 }
