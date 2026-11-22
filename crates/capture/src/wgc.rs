@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use greyscreen_core::health::CaptureStats;
+use greyscreen_core::log_once::LogOnce;
 use greyscreen_core::media::CaptureTarget;
 use greyscreen_core::tear::{Arrival, CopyWaits, HoldBack, Wait};
 use greyscreen_core::time::{HNS_PER_SEC, Hns, mono_now};
@@ -73,6 +74,7 @@ struct Shared {
     published: Mutex<Published>,
     worker: Mutex<Worker>,
     waits: Mutex<CopyWaits>,
+    frame_errors: Mutex<LogOnce>,
     torn: AtomicU64,
     promote_after: Hns,
     closed: AtomicBool,
@@ -142,6 +144,7 @@ impl WgcCapture {
                 pool_size: (item_size.Width, item_size.Height),
             }),
             waits: Mutex::new(CopyWaits::default()),
+            frame_errors: Mutex::new(LogOnce::new()),
             torn: AtomicU64::new(0),
             promote_after: HNS_PER_SEC * 5 / 2 / i64::from(options.fps.max(1)),
             closed: AtomicBool::new(false),
@@ -188,8 +191,13 @@ impl WgcCapture {
             let Some(pool) = sender.as_ref() else {
                 return Ok(());
             };
-            if let Err(error) = frame_shared.on_frame(pool) {
-                tracing::warn!(%error, "capture frame failed");
+            match frame_shared.on_frame(pool) {
+                Ok(()) => lock(&frame_shared.frame_errors).success(),
+                Err(error) => {
+                    if lock(&frame_shared.frame_errors).failure() {
+                        tracing::warn!(%error, "capture frame failed");
+                    }
+                }
             }
             Ok(())
         }))?);

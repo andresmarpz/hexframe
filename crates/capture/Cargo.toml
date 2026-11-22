@@ -28,6 +28,10 @@ required-features = ["fault-injection"]
 name = "cloaked_window"
 required-features = ["fault-injection"]
 
+[[test]]
+name = "wgc_teardown"
+required-features = ["fault-injection"]
+
 [target.'cfg(windows)'.dependencies]
 wasapi.workspace = true
 windows = { workspace = true, features = [

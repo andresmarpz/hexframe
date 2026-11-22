@@ -15,6 +15,7 @@ pub mod highlight;
 pub mod install;
 pub mod keybinds;
 pub mod library;
+pub mod log_once;
 pub mod media;
 pub mod nv12;
 pub mod paths;
