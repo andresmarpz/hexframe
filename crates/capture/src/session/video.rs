@@ -306,6 +306,7 @@ impl Video {
         drop(converter);
         drop(gpu);
         if let Some(debug) = live_debug {
+            crate::h264::reaper::wait_idle(std::time::Duration::from_secs(5));
             crate::debug_layer::report_live(&debug);
         }
         drop(mf);

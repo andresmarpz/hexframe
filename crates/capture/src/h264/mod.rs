@@ -8,7 +8,7 @@ pub use readback::PlaneMeans;
 pub(crate) use setup::take_property_log;
 mod rate;
 mod readback;
-mod reaper;
+pub(crate) mod reaper;
 mod setup;
 mod software;
 #[cfg(test)]

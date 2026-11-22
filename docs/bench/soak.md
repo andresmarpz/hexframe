@@ -31,7 +31,7 @@ Recordings stop at the engine's 3-hour limit, so there is no single 8-hour recor
 
 ## D3D debug layer and device removal
 
-`--d3d-debug` (also with `--profile`) creates the capture D3D11 devices with the debug layer. When a capture session ends, after everything but the device is released, the report lists the live D3D objects: `gpu.live_objects[]` in the JSON has one entry per session with a `count` and the `lines`, and the verdict notes the counts. The device itself is expected to be live. If the layer is not installed (Windows optional feature "Graphics Tools"), the run records no report and notes it. The flag has no effect off Windows.
+`--d3d-debug` (also with `--profile`) creates the capture D3D11 devices with the debug layer. When a capture session ends, after everything but the device is released (a debug-layer run waits up to 5 s for a parked hardware encoder to be released first, so a count above the device can still include its objects), the report lists the live D3D objects: `gpu.live_objects[]` in the JSON has one entry per session with a `count` and the `lines`, and the verdict notes the counts. The device itself is expected to be live. If the layer is not installed (Windows optional feature "Graphics Tools"), the run records no report and notes it. The flag has no effect off Windows.
 
 `gpu.device_removed` counts capture sessions that ended on a lost or removed graphics device. Any removal fails the run.
 

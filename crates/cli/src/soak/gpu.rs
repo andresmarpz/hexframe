@@ -31,7 +31,7 @@ impl GpuReport {
             .map(|r| r.count.to_string())
             .collect();
         vec![format!(
-            "d3d live objects at the end of each capture session: {} (lines in the report; the device itself is expected)",
+            "d3d live objects at the end of each capture session: {} (lines in the report; the device itself is expected, and a hardware encoder released late can show too)",
             counts.join(", ")
         )]
     }
