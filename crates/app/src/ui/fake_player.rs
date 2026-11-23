@@ -13,7 +13,6 @@ pub(crate) enum Call {
     Play,
     Pause,
     Seek(f64),
-    SeekFast(f64),
     Rate(f32),
     Muted(bool),
     Volume(f32),
@@ -54,7 +53,7 @@ pub(crate) fn clear_calls() {
 pub(crate) fn seeks() -> usize {
     calls()
         .iter()
-        .filter(|c| matches!(c, Call::Seek(_) | Call::SeekFast(_)))
+        .filter(|c| matches!(c, Call::Seek(_)))
         .count()
 }
 
@@ -88,14 +87,6 @@ impl ReviewPlayer for FakePlayer {
 
     fn seek(&self, secs: f64) {
         record(Call::Seek(secs));
-    }
-
-    fn seek_fast(&self, secs: f64) {
-        record(Call::SeekFast(secs));
-    }
-
-    fn seeking(&self) -> bool {
-        false
     }
 
     fn time(&self) -> f64 {

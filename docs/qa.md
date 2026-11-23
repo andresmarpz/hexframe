@@ -23,29 +23,9 @@ Run it:
 - Without `just` on Windows: `cargo build -p greyscreen -p greyscreen-cli -p greyscreen-qa` then `target\debug\greyscreen-qa.exe`.
 - A new flow: add a JSON file, run `just qa --update`, look at the snapshots in the report, commit them.
 
-What it can't cover: the real video player (headless shows a decoded still, plays nothing), sound, the native window (resize, DPI, title bar, tray), capture and the engine, and the Windows font rendering until Windows goldens are committed.
+What it can't cover: the real video player (headless shows a decoded still, plays nothing; Greyscreen has no real-player test of its own, Rune's own tests cover the player), sound, the native window (resize, DPI, title bar, tray), capture and the engine, and the Windows font rendering until Windows goldens are committed.
 
-## Layer 2: real player on Windows
-
-Headless runs never open the Windows player, and the recent bugs (layered presentation, WASAPI sound timing, seeks) lived there. These tests open the real one (Media Foundation, the shared GPU ring, the layer, the sound timing) with nothing seen or heard.
-
-- Where: `vendor/rune-media/src/video/windows/qa/tests.rs`, behind the crate's `qa` feature. A plain `cargo test` never runs them.
-- Run on Windows, from the repo root: `cargo test --manifest-path vendor/rune-media/Cargo.toml --target-dir target/vendor --features qa --lib video::windows -- --test-threads=1 --nocapture`. Keep the `video::windows` filter: the tests turn on playback for the whole test process.
-- Pictures: the clip decodes on a headless D3D12 device and Rune's surface pipeline draws each picture offscreen. The fixture (`vendor/rune-media/fixtures/qa-bars-60fps.m4v`, 6 s at 60 fps) writes each frame's number as bars, so every drawn picture is checked against `Player::time`.
-- Sound: a `qa` build has no WASAPI output at all. Sound goes to a test device that plays it in real time and records what was heard and when. The tests check its level, that each beep is heard within 40 ms of the clock, and silence while paused or not at 1x. The same timing code (device position, nudges, stops and re-reads) runs against the test device's clock. It doesn't cover a real device's latency, position reports or a device change.
-- Covered: play, sound in sync, pause and resume, paused and playing seeks, a seek past the end, 2x, the layer (it presents with the sound in sync, and a pause there shows the paused picture once the window takes the pictures back), a storm of 60 seeks in a second while playing (forward, and back and forth), a scrub of fast seeks that shows keyframes then plays on, and long seeks (8 to 10 minutes) on a 10-minute clip. After a storm or a long seek the clip must play on from the last seek within 250 ms, with sound in sync.
-- Seeks on a recording (`qa/seeks.rs`): a 4-minute clip shaped like a Greyscreen recording (2560x1440, 60 fps, H.264 High, a keyframe every second, AAC) plays 5 s, seeks 2.5 minutes forward, then twice 50 ms apart. Within 1 s the new position's pictures must show, and for 10 s each picture must follow the clock and none may stay over 0.3 s. One test has the window draw the pictures; the other runs the window's side of the layer as Rune does (its visual is keyed on the surface handle's value) and checks that the visual shows the surface the decoder presents to. A third makes 20 layers in turn and checks that none takes the surface handle value of one of the 8 that closed before it. Only those: `... --lib video::windows::qa::seeks -- --test-threads=1 --nocapture`, with `RUNE_MEDIA_QA_WINDOW=hidden` for a composed layer.
-- The long seeks and the recording need ffmpeg: `GREYSCREEN_QA_FFMPEG` (its full path), else the one on PATH; without it they skip. The first run makes the 10-minute clip (3.5 MB) and the 4-minute recording (about 5 MB) in the temp folder, both with the index at the end as in a finished recording. Only the long seeks: `... --lib video::windows::qa::tests::a_long -- --test-threads=1 --nocapture`; the storm and scrub: `... --lib video::windows::qa::tests::a_s -- --test-threads=1 --nocapture`.
-- The layer's window, by `RUNE_MEDIA_QA_WINDOW`:
-  - `none` (default): no window; the decoder presents onto its composition surface with no visual.
-  - `hidden`: a 1x1 tool window, cloaked and never shown, whose DirectComposition target shows the layer.
-  - `cloaked`: the same window, cloaked first, then shown with `SW_SHOWNOACTIVATE`. It stops and shows nothing if the cloak doesn't read back or the foreground window changes.
-- Why cloaking and not off-screen or transparent: Microsoft documents a cloaked window as "not visible to the user" and "still composed by DWM" ([DWMWINDOWATTRIBUTE](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute)), while fully occluded windows may skip composition ([DirectComposition architecture](https://learn.microsoft.com/en-us/windows/win32/directcomp/architecture-and-components)), and a visible no-activate or alpha-0 window is still a window on screen. Whether a swap chain keeps presenting with nothing composing it is not documented: start with `none`, then `hidden`, then `cloaked`.
-- A failure prints the frame, the times and the measured offsets. Fix the player in `vendor/rune-media` and record the change in `GREYSCREEN_PATCHES.md`.
-
-What it can't cover: the app around the player (its review screen in a real window), a real sound device, and anything a person sees on a real monitor (tearing, colour, DPI).
-
-## Layer 3: capture tests on a cloaked window
+## Layer 2: capture tests on a cloaked window
 
 Many capture tests need a window to capture (resize, minimise, close, start and stop soaks). Answer of the #31 spike: **yes, Windows Graphics Capture delivers frames from a cloaked top-level window**, so these tests no longer need a visible window or a League game.
 

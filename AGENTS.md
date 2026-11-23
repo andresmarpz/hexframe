@@ -64,5 +64,5 @@ The Mac cannot run Windows code: compile-check it with `just check-win`.
 
 ## Rune on Windows
 
-- Rune is pinned to `eb9f1104`. Rune `1dc3b333` (#1222) and everything after it make live window resize lag about a second on Windows. Before you bump the pin, resize a release build on Windows and compare it against this one.
-- The app uses `greyscreen_capture::instance` (a named event that brings the running window forward) instead of `rune::single_instance`. On Rune `e1d5cd48`, `single_instance` together with the app's other startup work made live resize lag. A minimal repro on `eb9f1104` did not lag, so the exact trigger is unknown. Keep the named event.
+- Rune is pinned to a `dev` commit in the root `Cargo.toml`. Before you bump the pin, resize a release build on Windows and compare it against the current one: an older Rune (`1dc3b333` to `2c2ff033`) made live resize lag about a second.
+- The app uses `greyscreen_capture::instance` (a named event that brings the running window forward and waits out an old copy on relaunch) instead of `rune::single_instance`, which only reports whether the app is the first. Keep it.

@@ -78,15 +78,6 @@ impl ReviewPlayer for Traced {
         self.0.seek(secs);
     }
 
-    fn seek_fast(&self, secs: f64) {
-        self.call(format_args!("seek fast {secs:.3}"));
-        self.0.seek_fast(secs);
-    }
-
-    fn seeking(&self) -> bool {
-        self.0.seeking()
-    }
-
     fn time(&self) -> f64 {
         self.0.time()
     }
@@ -124,15 +115,12 @@ impl ReviewPlayer for Traced {
     }
 }
 
-/// Watches one recording's player for stalls: playback that should move and doesn't, and seeks
-/// that don't land. Each stall writes one report to the log.
+/// Watches one recording's player for stalls: playback that should move and doesn't. Each stall writes one report to the log.
 #[derive(Debug, Default)]
 pub(crate) struct Watch {
-    seen: Option<(PlayerState, bool)>,
+    seen: Option<PlayerState>,
     /// The time while playing, and since when it has stood there.
     standing: Option<(f64, f64)>,
-    /// Since when the player waits for a seek's picture, and the time it was asked for.
-    seeking: Option<(f64, f64)>,
     /// A stall was reported and hasn't ended.
     stalled: Option<f64>,
     pub last_report: Option<String>,
@@ -154,33 +142,20 @@ impl Watch {
         scrubbing: bool,
         file: &Path,
     ) {
-        let (state, seeking, time) = (player.state(), player.seeking(), player.time());
-        if self.seen.as_ref() != Some(&(state.clone(), seeking)) {
-            let waits = if seeking {
-                ", waiting for a picture"
-            } else {
-                ""
-            };
-            note(format!("player {state:?}{waits} at {time:.3}"));
-            self.seen = Some((state, seeking));
+        let (state, time) = (player.state(), player.time());
+        if self.seen.as_ref() != Some(&state) {
+            note(format!("player {state:?} at {time:.3}"));
+            self.seen = Some(state);
         }
-        self.seeking = match self.seeking {
-            Some(since) if seeking => Some(since),
-            _ if seeking => Some((clock, time)),
-            _ => None,
-        };
-        let moving = player.is_playing() && !seeking && !scrubbing;
+        let moving = player.is_playing() && !scrubbing;
         self.standing = match self.standing {
             Some((at, since)) if moving && at == time => Some((at, since)),
             _ if moving => Some((time, clock)),
             _ => None,
         };
         self.measure_pace(clock, time, moving, file);
-        let stall = match (self.seeking, self.standing) {
-            (Some((since, to)), _) if clock - since > STALL => {
-                Some(("a seek waits for its picture", to, since))
-            }
-            (_, Some((at, since))) if clock - since > STALL => {
+        let stall = match self.standing {
+            Some((at, since)) if clock - since > STALL => {
                 Some(("playing, but the time stands still", at, since))
             }
             _ => None,

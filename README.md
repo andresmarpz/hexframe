@@ -176,7 +176,6 @@ Copyright (c) 2026 andresmarpz. GNU Affero General Public License, version 3 or 
 
 Parts that keep their own license:
 
-- `vendor/rune-media` is [Rune](https://github.com/anomalyco/rune)'s media crate with Greyscreen's fixes. It stays MIT (`vendor/rune-media/LICENSE`) so the fixes can go back upstream.
 - The sound effects in `crates/app/assets/sounds` come from [Hex](https://github.com/anomalyco/hex) (MIT, see `LICENSE-hex.txt` there).
 
 ## Legal

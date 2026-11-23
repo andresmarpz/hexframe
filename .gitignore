@@ -15,4 +15,3 @@ node_modules
 /apps/web/.astro
 .vercel
 /apps/api/.alchemy
-/vendor/rune-media/Cargo.lock

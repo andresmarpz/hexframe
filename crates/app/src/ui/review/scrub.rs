@@ -1,12 +1,10 @@
 use super::ReviewState;
 
-/// A drag asks for a preview picture at most this often.
-const PREVIEW_EVERY: f64 = 0.1;
-/// A pointer held still this long gets the exact picture before the release.
-const REST: f64 = 0.25;
+/// A drag asks the player for the pointer's picture at most this often.
+const SEEK_EVERY: f64 = 0.25;
 
 /// A drag on the seek bar or a marker. The thumb and the time follow the pointer at once; the
-/// player gets one keyframe preview at a time and one exact seek where the drag stops.
+/// player gets a seek every `SEEK_EVERY` and one more where the drag stops.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Scrub {
     pub target: f64,
@@ -14,12 +12,8 @@ pub(crate) struct Scrub {
     resume: bool,
     /// Playback stopped for the drag.
     paused: bool,
-    /// The last preview asked for: its time and when.
-    preview: Option<(f64, f64)>,
-    /// When the target last moved.
-    moved: f64,
-    /// The exact seek to the target was asked for.
-    exact: bool,
+    /// The last seek asked for: its time and when.
+    sought: Option<(f64, f64)>,
 }
 
 impl ReviewState {
@@ -29,22 +23,14 @@ impl ReviewState {
 
     pub(crate) fn scrub_to(&mut self, secs: f64) {
         let target = secs.clamp(0.0, self.duration().max(0.0));
-        let clock = self.clock;
         match &mut self.scrub {
-            Some(scrub) if scrub.target != target => {
-                scrub.target = target;
-                scrub.moved = clock;
-                scrub.exact = false;
-            }
-            Some(_) => {}
+            Some(scrub) => scrub.target = target,
             None if self.player.is_some() => {
                 self.scrub = Some(Scrub {
                     target,
                     resume: self.is_playing(),
                     paused: false,
-                    preview: None,
-                    moved: clock,
-                    exact: false,
+                    sought: None,
                 });
             }
             None => {}
@@ -61,21 +47,12 @@ impl ReviewState {
             }
             scrub.paused = true;
         }
-        if scrub.exact || player.seeking() {
-            return;
-        }
-        let target = scrub.target;
-        if clock - scrub.moved >= REST {
-            scrub.exact = true;
-            self.seek(target);
-            return;
-        }
         let due = scrub
-            .preview
-            .is_none_or(|(at, when)| at != target && clock - when >= PREVIEW_EVERY);
+            .sought
+            .is_none_or(|(at, when)| at != scrub.target && clock - when >= SEEK_EVERY);
         if due {
-            scrub.preview = Some((target, clock));
-            player.seek_fast(target);
+            scrub.sought = Some((scrub.target, clock));
+            player.seek(scrub.target);
         }
     }
 
@@ -83,7 +60,7 @@ impl ReviewState {
         let Some(scrub) = self.scrub.take() else {
             return;
         };
-        if !scrub.exact {
+        if scrub.sought.is_none_or(|(at, _)| at != scrub.target) {
             self.seek(scrub.target);
         }
         if scrub.resume

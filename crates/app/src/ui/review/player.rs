@@ -7,8 +7,6 @@ pub(crate) trait ReviewPlayer: Debug {
     fn play(&self);
     fn pause(&self);
     fn seek(&self, secs: f64);
-    fn seek_fast(&self, secs: f64);
-    fn seeking(&self) -> bool;
     fn time(&self) -> f64;
     fn duration(&self) -> Option<f64>;
     fn state(&self) -> PlayerState;
@@ -43,15 +41,6 @@ impl ReviewPlayer for Player {
     fn seek(&self, secs: f64) {
         log_call(self, format_args!("seek {secs:.3}"));
         Player::seek(self, secs);
-    }
-
-    fn seek_fast(&self, secs: f64) {
-        log_call(self, format_args!("seek fast {secs:.3}"));
-        Player::seek_fast(self, secs);
-    }
-
-    fn seeking(&self) -> bool {
-        Player::seeking(self)
     }
 
     fn time(&self) -> f64 {

@@ -307,7 +307,7 @@ impl ReviewState {
         if self.settling && !active && time == self.shown_time {
             self.settling = false;
         }
-        active || self.settling || self.scrubbing() || player.seeking()
+        active || self.settling || self.scrubbing()
     }
 
     pub(crate) fn tick(&mut self, clock: f64) {

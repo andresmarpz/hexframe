@@ -43,7 +43,6 @@ pub(crate) fn begin(headless: bool) -> Option<Launch> {
     let video_log = video_log_requested().then(send_rune_video_log);
     let install_error = install_step();
     install::set_process_app_id();
-    // Rune's single_instance makes live resize lag on Windows, so the app keeps its own.
     let claim = match instance::claim(SINGLE_INSTANCE_ID) {
         Claim::AlreadyRunning if std::env::var_os(RELAUNCH_ENV).is_some() => {
             wait_for_old_copy_to_exit();

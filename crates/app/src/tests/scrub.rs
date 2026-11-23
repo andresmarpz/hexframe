@@ -19,7 +19,6 @@ struct Session {
 fn windows_like() -> Media {
     Media {
         seek_latency: 0.2,
-        fast_latency: 0.03,
         layered: true,
         ..Media::new(LENGTH)
     }
@@ -129,11 +128,13 @@ fn a_two_second_drag_sends_a_few_seeks_and_plays_on_right_after_release() {
         waited * 1000.0
     );
     assert_eq!(fake_player::calls().first(), Some(&Call::Pause));
-    let exact: Vec<_> = fake_player::calls()
+    let last = fake_player::calls()
         .into_iter()
-        .filter(|c| matches!(c, Call::Seek(_)))
-        .collect();
-    assert_eq!(exact.len(), 1, "exact seeks {exact:?}");
+        .rfind(|c| matches!(c, Call::Seek(_)));
+    assert!(
+        matches!(last, Some(Call::Seek(at)) if (at - 0.6 * LENGTH).abs() < 0.01),
+        "last seek {last:?}"
+    );
 }
 
 #[test]
@@ -179,7 +180,7 @@ fn a_drag_on_a_paused_clip_leaves_it_paused_on_the_exact_picture() {
 }
 
 #[test]
-fn a_pointer_held_still_gets_the_exact_picture_before_release() {
+fn a_pointer_held_still_gets_its_picture_before_release() {
     let mut s = session(windows_like());
     s.drag(0.3, 0.5, |a| 0.3 + 0.1 * a);
     s.run(0.6);
@@ -194,30 +195,6 @@ fn a_pointer_held_still_gets_the_exact_picture_before_release() {
     s.tick();
     assert_eq!(fake_player::calls(), vec![Call::Play]);
     assert!(s.resumes(0.4 * LENGTH) <= RESUME);
-}
-
-#[test]
-fn a_seek_that_never_lands_writes_one_stall_report() {
-    let mut s = session(Media {
-        seek_latency: 4.0,
-        ..windows_like()
-    });
-    s.rt.update(|ui, _| ui.review_seek(600.0));
-    s.run(2.0);
-    let watch = &s.review().watch;
-    let report = watch.last_report.clone().expect("a stall report");
-    assert!(
-        report.contains("playback stall: a seek waits for its picture at 600.000"),
-        "{report}"
-    );
-    assert!(report.contains("seek 600.000"), "{report}");
-    assert!(
-        report.contains(&s.review().file.display().to_string()),
-        "{report}"
-    );
-    s.run(3.0);
-    assert_eq!(s.review().watch.reports, 1);
-    assert!(s.review().is_playing());
 }
 
 #[test]

@@ -12,7 +12,6 @@ pub(crate) struct Media {
     pub duration: f64,
     pub pictures_end: f64,
     pub seek_latency: f64,
-    pub fast_latency: f64,
     pub layered: bool,
 }
 
@@ -22,7 +21,6 @@ impl Media {
             duration,
             pictures_end: duration,
             seek_latency: 0.0,
-            fast_latency: 0.0,
             layered: false,
         }
     }
@@ -35,13 +33,11 @@ enum Run {
     Ended,
 }
 
-/// A seek the player still works on. Every seek runs to the end, in order: the worst a player
-/// can do with a storm of them.
+/// A seek the player still works on. A newer seek replaces it, as in Rune's decoder.
 #[derive(Debug, Clone, Copy)]
 struct Pending {
     to: f64,
     left: f64,
-    fast: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -144,8 +140,7 @@ impl Sim {
     }
 
     fn land(&mut self, seek: Pending) {
-        let at = if seek.fast { seek.to.floor() } else { seek.to };
-        let at = at.min(self.media.pictures_end);
+        let at = seek.to.min(self.media.pictures_end);
         self.position = at;
         self.picture = at;
         if self.seeks.is_empty() {
@@ -163,15 +158,12 @@ impl Sim {
         }
     }
 
-    fn seek(&mut self, secs: f64, fast: bool) {
+    fn seek(&mut self, secs: f64) {
         let to = secs.clamp(0.0, self.media.duration);
         self.reported = to;
-        let left = if fast {
-            self.media.fast_latency
-        } else {
-            self.media.seek_latency
-        };
-        self.seeks.push_back(Pending { to, left, fast });
+        let left = self.media.seek_latency;
+        self.seeks.clear();
+        self.seeks.push_back(Pending { to, left });
         if self.run == Run::Ended {
             self.run = Run::Paused;
         }
@@ -183,7 +175,7 @@ impl Sim {
     fn play(&mut self) {
         match self.run {
             Run::Playing => return,
-            Run::Ended => self.seek(0.0, false),
+            Run::Ended => self.seek(0.0),
             Run::Paused => {}
         }
         self.run = Run::Playing;
@@ -225,16 +217,7 @@ impl ReviewPlayer for SimPlayer {
 
     fn seek(&self, secs: f64) {
         record(Call::Seek(secs));
-        with(|sim| sim.seek(secs, false));
-    }
-
-    fn seek_fast(&self, secs: f64) {
-        record(Call::SeekFast(secs));
-        with(|sim| sim.seek(secs, true));
-    }
-
-    fn seeking(&self) -> bool {
-        with(|sim| !sim.seeks.is_empty())
+        with(|sim| sim.seek(secs));
     }
 
     fn time(&self) -> f64 {
