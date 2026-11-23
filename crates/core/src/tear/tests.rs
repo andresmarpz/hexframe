@@ -650,3 +650,34 @@ fn consecutive_rewinds_self_heal_if_the_scene_genuinely_returned() {
     }
     assert_ne!(feed_one(&mut guard, f0), Arrival::Rewound);
 }
+
+fn object_at(col: usize) -> Vec<u8> {
+    let mut frame = world(0);
+    for y in 20..32 {
+        for cell in &mut frame[y * GAME_WIDTH + col..y * GAME_WIDTH + col + 10] {
+            *cell ^= 0x18;
+        }
+    }
+    frame
+}
+
+#[test]
+fn a_stale_frame_that_differs_only_by_a_small_moving_object_is_dropped() {
+    let mut guard = HoldBack::default();
+    let feed_one = |guard: &mut HoldBack, mut thumb: Vec<u8>| {
+        let slot = guard.write_slot();
+        guard.store_thumb(slot, &mut thumb, GAME_WIDTH);
+        guard.arrive(slot)
+    };
+
+    assert_eq!(feed_one(&mut guard, object_at(10)), Arrival::Held);
+    assert!(matches!(
+        feed_one(&mut guard, object_at(14)),
+        Arrival::Published(_)
+    ));
+    assert_eq!(feed_one(&mut guard, object_at(10)), Arrival::Rewound);
+    assert!(matches!(
+        feed_one(&mut guard, object_at(18)),
+        Arrival::Published(_)
+    ));
+}
