@@ -17,6 +17,10 @@ This round follows Andres's review of round 4 (2026-11-27). It builds on `round4
   - the coloured minimap set (`tower.png`, `baron.png`, `riftherald.png`, `grub.png`, `dragon_<type>.png`, `inhibitor.png`);
   - `official/` for kill, death, assist and the monochrome objectives. `official/README.md` lists them.
 
+## Champion
+
+The real frames show **Vladimir**, so the last game's champion is Vladimir. Use a red letter avatar "V" (`var(--color-danger-bg)` with a `var(--color-danger-border)` border), or the purple avatar if red reads as Defeat. Every other sample datum stays as before.
+
 ## Timeline boxes, revised
 
 - **Kill box:** `var(--color-success-bg)` with a 2 px success-fg top border, plus the official kill icon at 12 px in the centre, tinted or left as is so it reads on green.
