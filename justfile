@@ -22,8 +22,7 @@ test *filter:
 
 # fmt, clippy and every test on the Windows PC for origin/main.
 win:
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh workflow run windows.yml -R andresmarpz/greyscreen --ref main
-    sleep 5; GH_TOKEN=$(gh auth token --user andresmarpz) gh run watch -R andresmarpz/greyscreen --exit-status $(GH_TOKEN=$(gh auth token --user andresmarpz) gh run list -R andresmarpz/greyscreen --workflow windows.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+    scripts/dispatch.sh windows.yml
 
 # Builds an ad-hoc signed Greyscreen.app for UI testing on this Mac and installs it in ~/Applications. Never published.
 mac-app:
@@ -92,14 +91,14 @@ web-deploy:
     for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen-lake.vercel.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
-# The tree must be clean and its commit already on origin/main. The Windows PC tests, builds and publishes it (release.yml).
+# The tree must be clean and its commit already on origin/main. The Windows PC tests, builds and publishes it (release.yml), then the site redeploys from here.
 release tag:
     git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
     git fetch -q origin && git merge-base --is-ancestor HEAD origin/main || { echo "push main first"; exit 1; }
     version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1); test "{{tag}}" = "v$version" || { echo "tag {{tag}} must equal v$version: set the workspace version to the full release version first"; exit 1; }
     scripts/release-meta.sh title {{tag}} >/dev/null
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh workflow run release.yml -R andresmarpz/greyscreen --ref main -f tag={{tag}} -f sha=$(git rev-parse HEAD)
-    sleep 5; GH_TOKEN=$(gh auth token --user andresmarpz) gh run watch -R andresmarpz/greyscreen --exit-status $(GH_TOKEN=$(gh auth token --user andresmarpz) gh run list -R andresmarpz/greyscreen --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+    scripts/dispatch.sh release.yml -f tag={{tag}} -f sha=$(git rev-parse HEAD)
+    just web-deploy
 
 # Rewrites the title and notes of every published release from its changelog entry.
 release-sync:

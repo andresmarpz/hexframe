@@ -1,7 +1,7 @@
 name: Windows
 
-# Runs on Andres's Windows PC (self-hosted runner, labels greyscreen and windows).
-# Manual or called by Release only: never on pull requests, so no outside code reaches the PC.
+# Runs on Andres's Windows PC (self-hosted runner, labels greyscreen and windows), manual or called by Release.
+# Fork pull requests need approval before any workflow runs, so outside code cannot reach the PC unasked.
 
 on:
   workflow_dispatch:

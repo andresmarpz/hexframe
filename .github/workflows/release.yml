@@ -1,6 +1,7 @@
 name: Release
 
 # `just release <tag>` starts this. The Windows PC tests the commit, builds the exes and publishes the release.
+# The Mac then redeploys the website with `just web-deploy`.
 
 on:
   workflow_dispatch:
@@ -38,7 +39,7 @@ jobs:
           ref: ${{ inputs.sha }}
           clean: false
       - run: cargo build --release --locked -p greyscreen -p greyscreen-cli
-      - run: pwsh -File scripts/check-windows-exe.ps1 target/release
+      - run: powershell -NoProfile -File scripts/check-windows-exe.ps1 target/release
       - name: Publish
         run: |
           rm -rf dist && mkdir dist
@@ -49,7 +50,3 @@ jobs:
           case "$TAG" in *-*) channel=--prerelease ;; *) channel=--latest ;; esac
           gh release create "$TAG" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt dist/LICENSE.txt \
             -R "$GITHUB_REPOSITORY" --target "$SHA" --title "$(scripts/release-meta.sh title "$TAG")" --notes-file dist/notes.md $channel
-      - name: Redeploy the website
-        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK"
-        env:
-          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}

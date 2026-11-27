@@ -3,6 +3,23 @@ param([Parameter(Mandatory)][string]$Token)
 $ErrorActionPreference = 'Stop'
 $version = '2.338.2'
 $dir = "$HOME\actions-runner-greyscreen"
+
+foreach ($id in 'Git.Git', 'GitHub.cli', 'Gyan.FFmpeg') {
+    winget list --id $id --exact --accept-source-agreements | Out-Null
+    if ($LASTEXITCODE -ne 0) { winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements }
+}
+
+$git = "$env:ProgramFiles\Git"
+$machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+$user = [Environment]::GetEnvironmentVariable('Path', 'User')
+$env:Path = "$git\bin;$git\cmd;$HOME\.cargo\bin;$machine;$user"
+if (-not (Get-Command cargo-nextest -ErrorAction SilentlyContinue)) { cargo install cargo-nextest --locked }
+foreach ($tool in 'bash', 'git', 'gh', 'cargo', 'ffmpeg', 'ffprobe') {
+    $found = (Get-Command $tool -ErrorAction Stop).Source
+    Write-Host "$tool -> $found"
+}
+if ((Get-Command bash).Source -notlike "$git*") { throw 'bash does not resolve to Git Bash' }
+
 New-Item -ItemType Directory -Force $dir | Out-Null
 Set-Location $dir
 if (-not (Test-Path .\config.cmd)) {
@@ -12,7 +29,7 @@ if (-not (Test-Path .\config.cmd)) {
     Remove-Item $zip
 }
 .\config.cmd --unattended --replace --url https://github.com/andresmarpz/greyscreen --token $Token --name greyscreen-pc --labels greyscreen,windows --work _work
-cargo install cargo-nextest --locked
+Set-Content -Path .\.path -Value $env:Path -NoNewline
 
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -Command `"Set-Location '$dir'; .\run.cmd`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME

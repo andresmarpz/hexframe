@@ -88,14 +88,6 @@ impl GpuDevice {
         Self::create(&adapter)
     }
 
-    #[cfg(any(test, feature = "fault-injection"))]
-    pub(crate) fn from_adapter_with_levels(
-        adapter: &IDXGIAdapter1,
-        levels: &[D3D_FEATURE_LEVEL],
-    ) -> windows::core::Result<Self> {
-        Self::create_with_levels(adapter, levels)
-    }
-
     fn create(adapter: &IDXGIAdapter1) -> windows::core::Result<Self> {
         Self::create_with_levels(adapter, &[D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0])
     }

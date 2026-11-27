@@ -34,11 +34,6 @@ impl<A: PowerApi> PowerGuard<A> {
         self.apply(false);
     }
 
-    #[cfg(test)]
-    pub(crate) fn is_held(&self) -> bool {
-        self.held
-    }
-
     fn apply(&mut self, on: bool) {
         if self.held == on {
             return;
