@@ -39,7 +39,7 @@ Copy the markup of these nodes with `get_jsx`, keep their structure and styles, 
 ### Titlebar
 
 - Height 44. Background `var(--color-surface)`. Bottom border 1 px `var(--color-border)`. Row, align centre, padding-left 16.
-- **Left:** the Greyscreen mark is a 16 px hexagon outline (SVG, stroke `var(--color-text)`, 1.5 px). Put "Greyscreen" next to it, 13 px, weight 500, `var(--color-text)`, gap 8. The group is 200 px wide (fixed, flex-shrink 0).
+- **Left:** the Greyscreen mark is a 16 px hexagon outline (SVG, stroke `var(--color-text)`, 1.5 px). Put "Greyscreen" next to it, 13 px, weight 500, `var(--color-text)`, gap 8. The group is 338 px wide (200 plus the 138 px caption buttons), so the navigation sits on the true window centre.
 - **Centre** (flex 1, justify centre): the kit segmented control with segments "Home" (selected), "Games" and "Clips". "Clips" carries the kit's trailing count badge "4". Use labels only, with no icons.
 - **Right:** a 200 px group, justify end, gap 4, padding-right 8:
   - Ghost icon button with the `comment` icon (Send feedback).
@@ -71,7 +71,7 @@ Row, gap 32, align start.
      - "0 of 3" labelled "Deaths reviewed".
   5. 24 px below: **Game ribbon** (`Last game / Ribbon`). It is the full width of the column, 40 px tall, and is the signature element (see "Game ribbon" below).
   6. 24 px below: **Actions row**, gap 8:
-     - Kit Submit button "Review deaths", followed inside or right after by a kit key cap "D".
+     - Kit Submit button "Review deaths". Its key (D) goes in the tooltip: a key cap beside the button read as a stray chip.
      - Kit Neutral button "Watch game".
      - Kit Ghost button with the `folder` icon, "Show in folder".
 
@@ -111,9 +111,9 @@ Row, gap 40, align start.
 
   | Avatar | Champion | Result | KDA | Length |
   |---|---|---|---|---|
-  | blue "A" | Ahri | Victory | 11 / 2 / 6 | 25:12 |
+  | purple "A" | Ahri | Victory | 11 / 2 / 6 | 25:12 |
   | green "J" | Jinx | Defeat | 4 / 7 / 5 | 28:40 |
-  | purple "L" | Lux | Victory | 9 / 5 / 21 | 19:03 |
+  | blue "L" | Lux | Victory | 9 / 5 / 21 | 19:03 |
 
 ### Status bar
 
