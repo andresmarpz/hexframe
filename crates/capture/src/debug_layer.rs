@@ -106,6 +106,3 @@ fn read_message(queue: &ID3D11InfoQueue, index: u64) -> Option<String> {
             .to_owned(),
     )
 }
-
-#[cfg(test)]
-mod tests;

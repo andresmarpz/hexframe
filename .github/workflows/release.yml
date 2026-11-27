@@ -1,0 +1,55 @@
+name: Release
+
+# `just release <tag>` starts this. The Windows PC tests the commit, builds the exes and publishes the release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v0.1.20 or v0.1.20-preview.29
+        required: true
+        type: string
+      sha:
+        description: Commit to release
+        required: true
+        type: string
+
+jobs:
+  check:
+    uses: ./.github/workflows/windows.yml
+    with:
+      ref: ${{ inputs.sha }}
+
+  publish:
+    needs: check
+    runs-on: [self-hosted, windows, greyscreen]
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag }}
+      SHA: ${{ inputs.sha }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+          clean: false
+      - run: cargo build --release --locked -p greyscreen -p greyscreen-cli
+      - run: pwsh -File scripts/check-windows-exe.ps1 target/release
+      - name: Publish
+        run: |
+          rm -rf dist && mkdir dist
+          cp target/release/greyscreen.exe target/release/greyscreen-cli.exe packaging/README.txt dist/
+          cp LICENSE dist/LICENSE.txt
+          cp dist/greyscreen.exe dist/GreyscreenSetup.exe
+          scripts/release-meta.sh notes "$TAG" > dist/notes.md
+          case "$TAG" in *-*) channel=--prerelease ;; *) channel=--latest ;; esac
+          gh release create "$TAG" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt dist/LICENSE.txt \
+            -R "$GITHUB_REPOSITORY" --target "$SHA" --title "$(scripts/release-meta.sh title "$TAG")" --notes-file dist/notes.md $channel
+      - name: Redeploy the website
+        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK"
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}

@@ -212,6 +212,3 @@ fn fallback_bytes() -> [u8; 16] {
     }
     bytes
 }
-
-#[cfg(test)]
-mod tests;

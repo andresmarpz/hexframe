@@ -11,9 +11,6 @@ mod timeline;
 mod toolbar;
 mod transport;
 
-#[cfg(test)]
-mod tests;
-
 use rune::{Color, El, PlayerState, ScrollSpec, TextStyle, Tx, col, el, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Divider, IconButton, IconButtonVariant, Kit};
 

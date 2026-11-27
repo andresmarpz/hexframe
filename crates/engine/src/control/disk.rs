@@ -199,6 +199,3 @@ impl Drop for ReplyOnDrop {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

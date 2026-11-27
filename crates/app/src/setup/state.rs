@@ -17,7 +17,7 @@ pub(crate) enum Cmd {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+#[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) enum Msg {
     Closing,
     Copying,
@@ -69,7 +69,7 @@ impl SetupState {
         }
     }
 
-    #[cfg_attr(not(any(windows, test)), allow(dead_code))]
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub(crate) fn apply(&mut self, msg: Msg) {
         self.phase = match (&self.phase, msg) {
             (Phase::Copying | Phase::Closing, Msg::Closing) => Phase::Closing,

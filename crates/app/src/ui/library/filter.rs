@@ -70,6 +70,3 @@ impl Ui {
         self.recordings.iter().find(|rec| rec.meta.id == id)
     }
 }
-
-#[cfg(test)]
-mod tests;

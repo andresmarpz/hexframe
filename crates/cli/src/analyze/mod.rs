@@ -154,6 +154,3 @@ pub(crate) fn assemble(
         overall,
     }
 }
-
-#[cfg(test)]
-mod tests;

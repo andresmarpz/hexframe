@@ -276,7 +276,7 @@ impl Ui {
     }
 
     pub(crate) fn reveal_output_dir(&self) {
-        crate::qa::reveal(&self.settings.output_dir);
+        crate::headless::reveal(&self.settings.output_dir);
     }
 
     pub(crate) fn change(&mut self, edit: impl FnOnce(&mut Settings)) {

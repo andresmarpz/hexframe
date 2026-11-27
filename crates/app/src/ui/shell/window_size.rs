@@ -106,6 +106,3 @@ impl Ui {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

@@ -2,7 +2,7 @@ use greyscreen_engine::{NoticeAction, NoticeLevel};
 use rune::{El, Tx};
 use rune_kit::{Kit, Toast, ToastRegion};
 
-use crate::qa::reveal;
+use crate::headless::reveal;
 use crate::ui::{Notice, Ui};
 
 pub(crate) fn toast(notice: &Notice, k: &Kit) -> El {

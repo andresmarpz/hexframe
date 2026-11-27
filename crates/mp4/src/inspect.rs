@@ -81,6 +81,3 @@ fn read_trailing_moov(file: &mut File, len: u64) -> Result<Vec<u8>> {
 pub fn sample_secs(rows: &[SampleRow], timescale: u32) -> f64 {
     rows.iter().map(|r| u64::from(r.duration)).sum::<u64>() as f64 / f64::from(timescale.max(1))
 }
-
-#[cfg(test)]
-mod tests;

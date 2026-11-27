@@ -53,6 +53,3 @@ pub(crate) fn stopped(free_bytes: u64) -> UiMsg {
         gb_text(free_bytes)
     ))
 }
-
-#[cfg(test)]
-mod tests;

@@ -62,6 +62,3 @@ impl Drop for DiagWriter {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

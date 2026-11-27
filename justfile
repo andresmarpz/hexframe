@@ -1,7 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-win := "x86_64-pc-windows-msvc"
-
 export RUSTC_WRAPPER := env("RUSTC_WRAPPER", `command -v sccache || true`)
 
 default:
@@ -10,47 +8,28 @@ default:
 fmt:
     cargo fmt --all
 
-lint:
+# Everyday gate, run before every push: fmt and clippy. No tests.
+check:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets --locked -- -D warnings
 
 spell:
     typos
 
-check-win:
-    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"; cargo xwin clippy --workspace --all-targets --target {{win}} --locked -- -D warnings
+# Runs the tests matching a filter here, for example `just test mp4`. The full suite runs on the Windows PC.
+test *filter:
+    cargo nextest run --workspace --locked {{filter}}
 
-# Uses cargo-nextest when installed (cargo install cargo-nextest --locked): each test runs in its own process, in parallel across all binaries.
-test:
-    if cargo nextest --version >/dev/null 2>&1; then cargo nextest run --workspace --locked; else cargo test --workspace --locked; fi
-
-build-win:
-    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"; cargo xwin build --release --locked --target {{win}} -p greyscreen -p greyscreen-cli
-    @ls -lh target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe
-
-dist: build-win
-    rm -rf dist
-    mkdir -p dist
-    cp target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt dist/
-    cp LICENSE dist/LICENSE.txt
-    cp dist/greyscreen.exe dist/GreyscreenSetup.exe
-
-# Headless UI QA (docs/qa.md): no window, no OS input, no sound. Args go to greyscreen-qa: --update, --only NAME, --library DIR.
-qa *args:
-    cargo build -q --locked -p greyscreen -p greyscreen-cli -p greyscreen-qa
-    target/debug/greyscreen-qa {{args}}
-
-# Everyday gate: fmt check, host clippy and the tests. Run before every push.
-check: lint test
-
-# Full gate for releases and Windows-only code: check, typos and Windows clippy.
-ci: check spell check-win
+# fmt, clippy and every test on the Windows PC for origin/main.
+win:
+    GH_TOKEN=$(gh auth token --user andresmarpz) gh workflow run windows.yml -R andresmarpz/greyscreen --ref main
+    sleep 5; GH_TOKEN=$(gh auth token --user andresmarpz) gh run watch -R andresmarpz/greyscreen --exit-status $(GH_TOKEN=$(gh auth token --user andresmarpz) gh run list -R andresmarpz/greyscreen --workflow windows.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 
 # Builds an ad-hoc signed Greyscreen.app for UI testing on this Mac and installs it in ~/Applications. Never published.
 mac-app:
     packaging/macos/build-app.sh
 
-# Same bundle without installing it, the way CI builds it.
+# Same bundle without installing it.
 mac-bundle:
     packaging/macos/build-app.sh --no-install
 
@@ -113,21 +92,14 @@ web-deploy:
     for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen-lake.vercel.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
-# The tree must be clean and its commit already on origin/main. The release tags that commit, so later pushes to main do not stop it.
-# Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
+# The tree must be clean and its commit already on origin/main. The Windows PC tests, builds and publishes it (release.yml).
 release tag:
     git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
     git fetch -q origin && git merge-base --is-ancestor HEAD origin/main || { echo "push main first"; exit 1; }
     version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1); test "{{tag}}" = "v$version" || { echo "tag {{tag}} must equal v$version: set the workspace version to the full release version first"; exit 1; }
-    just release-publish {{tag}} "$(git rev-parse HEAD)"
-
-# The full gate and the Windows build run side by side.
-[parallel, private]
-release-publish tag sha: ci dist
-    test "$(git rev-parse HEAD)" = "{{sha}}" || { echo "HEAD moved during the build, release not published"; exit 1; }
-    scripts/release-meta.sh notes {{tag}} > dist/notes.md
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt dist/LICENSE.txt -R andresmarpz/greyscreen --target {{sha}} --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
-    just web-deploy
+    scripts/release-meta.sh title {{tag}} >/dev/null
+    GH_TOKEN=$(gh auth token --user andresmarpz) gh workflow run release.yml -R andresmarpz/greyscreen --ref main -f tag={{tag}} -f sha=$(git rev-parse HEAD)
+    sleep 5; GH_TOKEN=$(gh auth token --user andresmarpz) gh run watch -R andresmarpz/greyscreen --exit-status $(GH_TOKEN=$(gh auth token --user andresmarpz) gh run list -R andresmarpz/greyscreen --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 
 # Rewrites the title and notes of every published release from its changelog entry.
 release-sync:

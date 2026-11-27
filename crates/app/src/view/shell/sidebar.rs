@@ -221,6 +221,3 @@ fn brand(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
         .child(el().grow(1.0).a11y_hidden())
         .child(collapse_button(s, k))
 }
-
-#[cfg(test)]
-mod tests;

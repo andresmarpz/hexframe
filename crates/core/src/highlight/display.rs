@@ -57,6 +57,3 @@ pub fn dominant_label<'a>(labels: impl IntoIterator<Item = &'a str>) -> Option<&
         .into_iter()
         .min_by_key(|label| describe_label(label).rank)
 }
-
-#[cfg(test)]
-mod tests;

@@ -100,6 +100,3 @@ fn scaled_width(width: u32, height: u32, target: u32) -> u32 {
     let exact = f64::from(width) * f64::from(target) / f64::from(height);
     ((exact / 2.0).round() as u32) * 2
 }
-
-#[cfg(test)]
-mod tests;

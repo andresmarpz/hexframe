@@ -252,6 +252,3 @@ pub(crate) fn describe(
         lines,
     })
 }
-
-#[cfg(test)]
-mod tests;

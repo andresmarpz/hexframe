@@ -92,7 +92,7 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
     let info = &rec.meta.game.info;
     let champion = info.me.champion.as_str();
     let kda = kda(&rec.meta.events, info);
-    let shown = when(&rec.meta.started_at, &crate::qa::now());
+    let shown = when(&rec.meta.started_at, &jiff::Zoned::now());
     let mode = mode_label(&info.mode);
     let result = rec.meta.game.result;
     let result_word = match result {

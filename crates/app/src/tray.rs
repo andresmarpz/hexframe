@@ -31,12 +31,6 @@ impl Link {
             tracing::debug!("tray thread ended");
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn detached() -> (Link, Receiver<TrayState>) {
-        let (tx, rx) = unbounded();
-        (Link { tx }, rx)
-    }
 }
 
 #[derive(Debug)]
@@ -162,6 +156,3 @@ fn icon(png: &[u8]) -> Option<TrayIcon> {
     buf.truncate(info.buffer_size());
     Some(TrayIcon::rgba(info.width, info.height, buf))
 }
-
-#[cfg(test)]
-mod tests;

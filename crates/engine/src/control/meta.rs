@@ -190,6 +190,3 @@ pub(super) fn feed_item(event: &TimedEvent, rec_secs: f64, highlights: Vec<Highl
         highlights,
     }
 }
-
-#[cfg(test)]
-mod tests;

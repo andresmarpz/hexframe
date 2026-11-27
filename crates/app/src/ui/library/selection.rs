@@ -78,7 +78,7 @@ impl Ui {
     }
 
     pub(crate) fn list_items(&self) -> Vec<ListItem> {
-        let now = crate::qa::now();
+        let now = jiff::Zoned::now();
         let mut items = Vec::new();
         if self.live_row_visible() {
             items.push(ListItem::Live);

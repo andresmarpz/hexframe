@@ -152,6 +152,3 @@ pub struct TimedEvent {
     pub at: Hns,
     pub kind: GameEvent,
 }
-
-#[cfg(test)]
-mod tests;

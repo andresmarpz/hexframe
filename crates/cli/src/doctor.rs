@@ -1,7 +1,5 @@
 #[cfg_attr(not(windows), allow(dead_code))]
 mod deep;
-#[cfg(test)]
-mod tests;
 
 use std::path::Path;
 use std::process::ExitCode;

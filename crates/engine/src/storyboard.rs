@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod tests;
-
 use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::thread;

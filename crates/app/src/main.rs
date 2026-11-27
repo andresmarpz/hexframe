@@ -1,10 +1,10 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod champion_icons;
+mod headless;
 mod logging;
 mod logo;
 mod platform;
-mod qa;
 mod quit;
 mod setup;
 mod sfx;

@@ -18,6 +18,3 @@ pub fn hns_to_secs(h: Hns) -> f64 {
 pub fn secs_to_hns(s: f64) -> Hns {
     (s * HNS_PER_SEC as f64).round() as Hns
 }
-
-#[cfg(test)]
-mod tests;

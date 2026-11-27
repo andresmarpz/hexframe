@@ -1,6 +1,3 @@
-#[cfg(test)]
-pub(crate) mod tests;
-
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

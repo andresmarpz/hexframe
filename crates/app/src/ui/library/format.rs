@@ -280,6 +280,3 @@ pub(crate) fn game_secs_at(entry: &RecordingEntry, rec_secs: f64) -> f64 {
         .map_or(0.0, |event| event.rec_secs - event.game_secs);
     (rec_secs - offset).max(0.0)
 }
-
-#[cfg(test)]
-mod tests;

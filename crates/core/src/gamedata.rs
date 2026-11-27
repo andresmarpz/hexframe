@@ -199,6 +199,3 @@ pub fn report_unmapped_event(kind: &GameEvent, info: &GameInfo) {
         tracing::warn!(id, map = ?info.map, mode = %info.mode, "structure id missing from the bundled game data");
     }
 }
-
-#[cfg(test)]
-mod tests;

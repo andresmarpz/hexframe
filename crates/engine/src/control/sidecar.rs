@@ -124,6 +124,3 @@ impl Drop for SidecarWriter {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

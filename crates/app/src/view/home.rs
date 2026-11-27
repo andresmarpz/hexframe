@@ -28,7 +28,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     if s.detail() == Detail::Live {
         return page.h_full().min_h(0.0).child(feed::panel(s, k));
     }
-    let now = crate::qa::now();
+    let now = jiff::Zoned::now();
     let mut page = page;
     if !s.settings.first_run_done {
         page = page.child(first_run::card_for(s, k));

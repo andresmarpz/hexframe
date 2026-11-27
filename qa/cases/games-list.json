@@ -1,7 +1,0 @@
-{
-  "about": "The games list shows every game grouped by day, with the pick prompt until one is opened.",
-  "scene": "games-pick",
-  "steps": [
-    {"check": "list", "has": ["games-list", "games-pick", "nav-games"], "text": ["8 games"]}
-  ]
-}

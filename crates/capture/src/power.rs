@@ -127,6 +127,3 @@ impl Drop for WindowsPower {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

@@ -16,7 +16,6 @@ greyscreen-league = { path = "crates/league" }
 greyscreen-capture = { path = "crates/capture" }
 greyscreen-engine = { path = "crates/engine" }
 greyscreen-thumbs = { path = "crates/thumbs" }
-greyscreen-qa = { path = "crates/qa" }
 windows = "0.62"
 wasapi = "0.27"
 proptest = "1.12"

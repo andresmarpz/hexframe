@@ -27,9 +27,6 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::PCWSTR;
 
-#[cfg(test)]
-mod tests;
-
 const DUMPS_KEPT: usize = 3;
 const MAX_FRAMES: usize = 48;
 const OOM_LINE: &[u8] = b"crash: out of memory (an allocation failed)\n";

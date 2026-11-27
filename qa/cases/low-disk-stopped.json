@@ -1,7 +1,0 @@
-{
-  "about": "A recording stopped because the disk filled up says so, with Learn more.",
-  "scene": "notice-disk-stopped",
-  "steps": [
-    {"check": "stopped", "has": ["notice", "text:Recording stopped: the disk is almost full", "label:Learn more"]}
-  ]
-}

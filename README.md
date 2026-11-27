@@ -9,9 +9,6 @@
 <p align="center">Automatic League of Legends recorder and death review for Windows.</p>
 
 <p align="center">
-  <a href="https://github.com/andresmarpz/greyscreen/actions/workflows/tests.yml"><img src="https://github.com/andresmarpz/greyscreen/actions/workflows/tests.yml/badge.svg?event=release" alt="Tests"></a>
-  <a href="https://github.com/andresmarpz/greyscreen/actions/workflows/windows.yml"><img src="https://github.com/andresmarpz/greyscreen/actions/workflows/windows.yml/badge.svg?event=release" alt="Windows build"></a>
-  <a href="https://github.com/andresmarpz/greyscreen/actions/workflows/macos.yml"><img src="https://github.com/andresmarpz/greyscreen/actions/workflows/macos.yml/badge.svg?event=release" alt="macOS build"></a>
   <a href="https://github.com/andresmarpz/greyscreen/releases/latest"><img src="https://img.shields.io/github/v/release/andresmarpz/greyscreen?include_prereleases&label=release" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/andresmarpz/greyscreen" alt="License"></a>
 </p>
@@ -132,17 +129,14 @@ cargo install --locked cargo-xwin
 **Commands:**
 
 ```bash
-# Everyday gate: format check, clippy and tests
+# Everyday gate: format check and clippy
 just check
 
-# Full gate: check, typos and Windows clippy
-just ci
+# Tests matching a filter
+just test mp4
 
-# Build Windows release executables
-just build-win
-
-# Build both exes plus README.txt and LICENSE.txt into dist/
-just dist
+# fmt, clippy and every test on the Windows PC
+just win
 
 # Simulate a League match, then run the UI against it with fake capture
 cargo run -p greyscreen-cli -- fake-league --port 2999 --speed 4

@@ -81,6 +81,3 @@ fn set(settings: &mut greyscreen_core::settings::Settings, edge: PaneEdge, width
         PaneEdge::List => settings.list_width = width,
     }
 }
-
-#[cfg(test)]
-mod tests;

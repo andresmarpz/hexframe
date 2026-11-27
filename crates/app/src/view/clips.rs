@@ -35,7 +35,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     let body = if clips.is_empty() {
         no_matches(k)
     } else {
-        let now = crate::qa::now();
+        let now = jiff::Zoned::now();
         let mut grid = col().key("clips-grid").w_full().gap(GAP);
         for chunk in clips.chunks(COLUMNS) {
             let mut line = row().w_full().gap(GAP);

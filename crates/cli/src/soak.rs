@@ -102,11 +102,6 @@ fn default_league(args: &Args) -> LeagueFactory {
     }
 }
 
-#[cfg(test)]
-fn run_with(args: &Args, media: Arc<dyn MediaSource>, league: LeagueFactory) -> Result<Verdict> {
-    run_with_window(args, media, league, None)
-}
-
 fn run_with_window(
     args: &Args,
     media: Arc<dyn MediaSource>,
@@ -467,6 +462,3 @@ fn print_verdict(verdict: &Verdict, out: &std::path::Path) {
         println!("FAIL: report {}", out.display());
     }
 }
-
-#[cfg(test)]
-mod tests;

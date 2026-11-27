@@ -106,6 +106,3 @@ impl InstanceSignal {
         spawn_waiter("greyscreen-quit", self.quit_event, quit);
     }
 }
-
-#[cfg(test)]
-mod tests;

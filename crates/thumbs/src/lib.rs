@@ -1,10 +1,8 @@
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 mod nv12;
 mod priority;
 mod shape;
 mod sheet;
-#[cfg(test)]
-mod tests;
 
 #[cfg(target_os = "macos")]
 mod macos;

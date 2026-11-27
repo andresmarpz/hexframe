@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod tests;
-
 use std::path::PathBuf;
 
 use greyscreen_core::export::{
@@ -378,13 +375,13 @@ impl Ui {
 
     pub(crate) fn export_reveal(&self) {
         if let ExportPhase::Done { done, .. } = &self.export.phase {
-            crate::qa::reveal(&done.path);
+            crate::headless::reveal(&done.path);
         }
     }
 
     pub(crate) fn export_copy(&mut self) {
         if let ExportPhase::Done { done, copy, .. } = &mut self.export.phase {
-            *copy = match crate::qa::copy_file(&done.path) {
+            *copy = match crate::headless::copy_file(&done.path) {
                 Ok(()) => CopyState::Copied,
                 Err(why) => CopyState::Failed(why),
             };

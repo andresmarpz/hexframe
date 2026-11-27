@@ -44,11 +44,7 @@ pub(crate) fn reload() {
 }
 
 fn icons_dir() -> std::path::PathBuf {
-    if crate::qa::active() {
-        std::env::temp_dir().join("greyscreen-no-icons")
-    } else {
-        paths::champion_icons_dir()
-    }
+    paths::champion_icons_dir()
 }
 
 fn image_for(name: &str) -> Option<Image> {

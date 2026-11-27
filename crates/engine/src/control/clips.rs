@@ -161,6 +161,3 @@ fn unique_name(base: &str, taken: impl Fn(&str) -> bool) -> String {
         .find(|candidate| !taken(candidate))
         .unwrap_or_else(|| base.to_owned())
 }
-
-#[cfg(test)]
-mod tests;

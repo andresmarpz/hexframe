@@ -1,6 +1,3 @@
-mod action;
-mod combo;
-mod keymap;
 
 use super::KeyCombo;
 

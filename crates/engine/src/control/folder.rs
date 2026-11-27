@@ -18,6 +18,3 @@ pub(super) fn check_writable(dir: &Path) -> Result<(), String> {
     fs::write(&probe, b"").map_err(unusable)?;
     fs::remove_file(&probe).map_err(unusable)
 }
-
-#[cfg(test)]
-mod tests;

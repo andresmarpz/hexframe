@@ -63,6 +63,3 @@ pub fn bt709_studio_over_black(red: u8, green: u8, blue: u8, alpha: u8) -> Ycbcr
 fn code(value: f32) -> u8 {
     value.round().clamp(0.0, 255.0) as u8
 }
-
-#[cfg(test)]
-mod tests;

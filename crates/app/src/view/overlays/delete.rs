@@ -10,7 +10,7 @@ const WIDTH: f32 = 400.0;
 const PADDING: f32 = 16.0;
 
 pub(crate) fn confirm_delete(rec: &RecordingEntry, k: &Kit, layer: &mut Vec<El>) {
-    let shown = when(&rec.meta.started_at, &crate::qa::now());
+    let shown = when(&rec.meta.started_at, &jiff::Zoned::now());
     let summary = format!(
         "{} · {} · {}",
         rec.meta.game.info.me.champion,

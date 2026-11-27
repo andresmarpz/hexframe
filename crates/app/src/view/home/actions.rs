@@ -1,4 +1,4 @@
-use crate::qa::reveal;
+use crate::headless::reveal;
 use greyscreen_core::paths;
 use greyscreen_core::problem::Problem;
 use greyscreen_engine::{EngineCmd, EngineStatus};

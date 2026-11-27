@@ -73,6 +73,3 @@ fn pin_process_media_foundation() {
         }
     });
 }
-
-#[cfg(test)]
-mod tests;

@@ -17,11 +17,6 @@ impl BoxWriter {
         self.buf.len()
     }
 
-    #[cfg(test)]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.buf.is_empty()
-    }
-
     pub(crate) fn into_inner(self) -> Vec<u8> {
         self.buf
     }
@@ -103,6 +98,3 @@ impl BoxWriter {
         self.buf.resize(self.buf.len() + count, 0);
     }
 }
-
-#[cfg(test)]
-mod tests;

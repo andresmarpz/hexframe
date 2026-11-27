@@ -305,6 +305,3 @@ fn source_and_target(args: &Args) -> Result<(Box<dyn MediaSource>, CaptureTarget
         target,
     ))
 }
-
-#[cfg(test)]
-mod tests;

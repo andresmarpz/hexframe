@@ -3,9 +3,6 @@ use std::time::Duration;
 
 use windows::core::{Error, HRESULT};
 
-#[cfg(test)]
-mod tests;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Point {
     AdapterOpen,

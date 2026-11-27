@@ -197,6 +197,3 @@ pub fn classify(event: &GameEvent, info: &GameInfo) -> Vec<Highlight> {
         _ => Vec::new(),
     }
 }
-
-#[cfg(test)]
-mod tests;

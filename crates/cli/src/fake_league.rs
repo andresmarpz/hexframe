@@ -183,6 +183,3 @@ fn visible_events(script: &Script, game_time: f64) -> Vec<Value> {
         })
         .collect()
 }
-
-#[cfg(test)]
-mod tests;

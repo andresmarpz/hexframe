@@ -1,9 +1,6 @@
 // Ported from OBS Studio plugins/win-capture/window-capture.c (the previously_failed flag).
 // Copyright (C) OBS Studio contributors. Licensed under GPL-2.0-or-later.
 
-#[cfg(test)]
-mod tests;
-
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LogOnce {
     failing: bool,

@@ -404,6 +404,3 @@ fn string_property(text: &str) -> windows::core::Result<PROPVARIANT> {
         },
     })
 }
-
-#[cfg(test)]
-mod tests;

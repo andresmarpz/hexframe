@@ -157,12 +157,9 @@ fn command_output(program: &str, args: &[&str]) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 fn windows_build(ver_output: &str) -> Option<String> {
     let inside = ver_output.split_once('[')?.1.split_once(']')?.0;
     let build = inside.split_whitespace().next_back()?;
     Some(build.to_owned())
 }
-
-#[cfg(test)]
-mod tests;

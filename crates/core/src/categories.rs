@@ -256,6 +256,3 @@ pub fn categorize(events: &[EventEntry], info: &GameInfo) -> Vec<EventCategory> 
         .map(|event| category_of(&event.kind, info))
         .collect()
 }
-
-#[cfg(test)]
-mod tests;

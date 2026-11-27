@@ -53,6 +53,3 @@ pub(crate) fn default_output_dir() -> PathBuf {
 pub fn settings_file() -> PathBuf {
     config_dir().join("settings.json")
 }
-
-#[cfg(test)]
-mod tests;

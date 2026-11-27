@@ -42,10 +42,9 @@ crates/
   thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder, and a keyframe pass that packs many small frames into JPEG sprite sheets (`write_sheets`, used for storyboards). macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
   app/      greyscreen          The Rune UI binary. It also holds the setup window.
   cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `storyboard` (builds the seek bar storyboard of a recording folder and prints the time it took), `analyze` (recording health report), `demo` (seeds or clears a fake library), `soak` (repeated recordings through the real engine, or a named `--profile` from `docs/bench/soak.md`, with a memory, handle, thread and GPU memory sample each second; writes a JSON report and exits non-zero on a leak, a missing or unplayable recording or an engine error).
-  qa/       greyscreen-qa       Headless UI QA (`docs/qa.md`). A library (case format, locators, tree checks, script compiler, image diff) and a runner binary that drives the app binary through Rune's `--script`, `--tree` and `--snap`. No Greyscreen dependencies; never shipped.
 ```
 
-Dependency direction: `core` ← (`mp4`, `league`, `capture`, `engine`); `mp4` ← (`capture`, `engine`); `league` ← (`engine`, `app`, `cli`); `thumbs` ← (`engine`, `app`, `cli`); `capture` (Windows only) ← (`engine`, `app`, `cli`); `engine` ← (`app`, `cli`). `app` also uses `core` and `league` directly. `qa` depends on no Greyscreen crate; `app` uses it only in tests, and its runner starts the `greyscreen` and `greyscreen-cli` binaries.
+Dependency direction: `core` ← (`mp4`, `league`, `capture`, `engine`); `mp4` ← (`capture`, `engine`); `league` ← (`engine`, `app`, `cli`); `thumbs` ← (`engine`, `app`, `cli`); `capture` (Windows only) ← (`engine`, `app`, `cli`); `engine` ← (`app`, `cli`). `app` also uses `core` and `league` directly.
 
 ## Clocks and time units
 
@@ -419,7 +418,7 @@ Two presets (`ExportPreset`), one destination choice (this game's `exports/` fol
 
 The Windows encoder is `greyscreen_capture::transcode` (compile-checked on the Mac, not run there). It opens the source with an `IMFSourceReader` (NV12 out, advanced video processing as in the thumbnail code), seeks to the start, and reads video and audio interleaved. Video frames before the start are dropped, and so are frames closer than one output frame interval (60 to 30 fps). Each kept frame is cropped to the display aperture and scaled to the plan size on the CPU (`core::nv12::scale`, bilinear, tested on the Mac) and written to an `IMFSinkWriter` MP4 sink with an H.264 High output type at the plan bitrate and AAC-LC 128 kbps. Audio is decoded to PCM by the reader and re-encoded by the writer; a source with another sample rate or more than two channels exports without sound. The writer asks for hardware transforms first. Any failure with hardware on removes the partial file and runs the whole export again with the software encoder. On other platforms the Discord preset is disabled with a note, and the engine answers "Only Original quality works on this computer".
 
-The finished dialog shows size and length, "Show in folder" (`reveal`) and "Copy file". Copy puts the file on the clipboard as a file drop: on Windows `greyscreen_capture::clipboard::copy_file` writes a `CF_HDROP` `DROPFILES` block, on macOS `osascript` sets the clipboard to the file, so it pastes into Discord. Headless QA and unit tests never touch the real clipboard or open Explorer.
+The finished dialog shows size and length, "Show in folder" (`reveal`) and "Copy file". Copy puts the file on the clipboard as a file drop: on Windows `greyscreen_capture::clipboard::copy_file` writes a `CF_HDROP` `DROPFILES` block, on macOS `osascript` sets the clipboard to the file, so it pastes into Discord. Headless runs and unit tests never touch the real clipboard or open Explorer.
 
 ## Updates
 

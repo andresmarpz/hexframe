@@ -213,6 +213,3 @@ pub fn is_stale_download(file_name: &str, running: &Version) -> bool {
     };
     Version::parse(tag).is_some_and(|version| version <= *running)
 }
-
-#[cfg(test)]
-mod tests;

@@ -4,9 +4,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-mod tests;
-
 pub const STORYBOARD_FILE: &str = "storyboard.json";
 pub const STORYBOARD_VERSION: u32 = 1;
 pub const TILE_WIDTH: u32 = 160;

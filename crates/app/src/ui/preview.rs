@@ -12,7 +12,7 @@ use greyscreen_core::library::{
 };
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineStatus, FeedItem, RecordingEntry};
-use jiff::{SignedDuration, Unit};
+use jiff::{SignedDuration, Unit, Zoned};
 
 use super::{Screen, Ui};
 
@@ -35,10 +35,7 @@ pub(super) fn ui() -> Ui {
     ui.recordings = recordings();
     ui.live_selected = true;
     ui.screen = Screen::Games;
-    if let Some(dir) = crate::qa::library() {
-        ui.recordings = greyscreen_engine::library_entries(dir);
-        ui.settings.output_dir = dir.to_owned();
-    } else if rune::is_headless() {
+    if rune::is_headless() {
         seed_thumbs(&mut ui.recordings);
     }
     ui
@@ -154,9 +151,9 @@ struct Row {
 }
 
 fn entry(row: Row) -> RecordingEntry {
-    let now = crate::qa::now()
+    let now = Zoned::now()
         .round(Unit::Hour)
-        .unwrap_or_else(|_| crate::qa::now());
+        .unwrap_or_else(|_| Zoned::now());
     let started_at = now
         .checked_sub(SignedDuration::from_hours(row.hours_ago))
         .unwrap_or(now);

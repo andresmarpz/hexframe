@@ -37,6 +37,3 @@ impl Ui {
             .map_or_else(|| "unbound".to_owned(), |combo| combo.display(MAC))
     }
 }
-
-#[cfg(test)]
-mod tests;

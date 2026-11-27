@@ -49,7 +49,7 @@ impl Game {
 }
 
 fn games(s: &Ui) -> Vec<Game> {
-    let now = crate::qa::now();
+    let now = jiff::Zoned::now();
     let open = s.selected_id().filter(|_| s.screen == Screen::Games);
     recent_games(&s.recordings, RECENT_LIMIT)
         .into_iter()

@@ -26,20 +26,12 @@ thread_local! {
     static OPEN: Cell<usize> = const { Cell::new(0) };
 }
 
-pub(crate) fn open_players() -> usize {
-    OPEN.get()
-}
-
 pub(crate) fn set_playing(playing: bool) {
     PLAYING.set(playing);
 }
 
 pub(crate) fn set_duration(secs: f64) {
     DURATION.set(secs);
-}
-
-pub(crate) fn set_time(secs: f64) {
-    TIME.set(secs);
 }
 
 pub(crate) fn calls() -> Vec<Call> {

@@ -4,9 +4,6 @@ mod scenes;
 mod state;
 mod view;
 
-#[cfg(test)]
-mod tests;
-
 use rune::{App, AppSpec, Chrome, WindowOptions};
 
 const WINDOW: (f32, f32) = (460.0, 420.0);

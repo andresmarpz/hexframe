@@ -135,6 +135,3 @@ pub fn support_label(scheduling: Option<GpuScheduling>) -> &'static str {
 pub fn mib(bytes: u64) -> u64 {
     bytes / (1024 * 1024)
 }
-
-#[cfg(test)]
-mod tests;

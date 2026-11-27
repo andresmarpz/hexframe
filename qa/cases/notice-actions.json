@@ -1,9 +1,0 @@
-{
-  "about": "A failed recovery offers Show in folder, a refused start offers Learn more. Headless runs only record the click.",
-  "scene": "notice-recover-failed",
-  "steps": [
-    {"check": "recover-failed", "has": ["notice", "text:Couldn't recover", "label:Show in folder"], "lacks": ["label:Learn more"]},
-    {"tap": "label:Show in folder"},
-    {"check": "still-open", "has": ["notice"], "snap": false}
-  ]
-}

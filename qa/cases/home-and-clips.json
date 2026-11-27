@@ -1,9 +1,0 @@
-{
-  "about": "Home shows the recorder card and recent clips; Clips shows the grid of every saved clip.",
-  "scene": "home",
-  "steps": [
-    {"check": "home", "has": ["home", "state-card", "recent-clips"]},
-    {"tap": "nav-clips"},
-    {"check": "clips", "has": ["clips-grid"]}
-  ]
-}

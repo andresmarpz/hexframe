@@ -1,4 +1,4 @@
-use crate::qa::reveal;
+use crate::headless::reveal;
 use rune::El;
 use rune_kit::{Kit, Menu, MenuItem};
 

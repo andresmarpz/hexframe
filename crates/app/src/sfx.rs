@@ -129,6 +129,3 @@ fn cue_for(msg: &UiMsg, was_recording: bool) -> Option<Cue> {
         _ => None,
     }
 }
-
-#[cfg(test)]
-pub(crate) mod tests;

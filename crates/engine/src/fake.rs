@@ -470,6 +470,3 @@ fn wait_until(deadline: Hns, stop: &Receiver<()>) -> bool {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

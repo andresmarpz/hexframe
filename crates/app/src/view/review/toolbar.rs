@@ -1,4 +1,4 @@
-use crate::qa::reveal;
+use crate::headless::reveal;
 use greyscreen_core::game::GameResult;
 use greyscreen_core::health::Level;
 use rune::{El, el, row, text};

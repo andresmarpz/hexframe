@@ -95,11 +95,6 @@ impl RuneOutput {
         });
         failures
     }
-
-    #[cfg(test)]
-    pub(super) fn playing(&self) -> usize {
-        self.live.len()
-    }
 }
 
 impl Output for RuneOutput {

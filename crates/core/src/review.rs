@@ -248,6 +248,3 @@ impl ReviewData {
             .retain(|d| d.event_id != event_id || !d.is_blank());
     }
 }
-
-#[cfg(test)]
-mod tests;

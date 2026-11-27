@@ -8,8 +8,6 @@ use rune_kit::Kit;
 use crate::ui::{PanelTab, ReviewState, Ui};
 use crate::view::{card, hairline};
 
-#[cfg(test)]
-pub(super) use events::event_title;
 use events::events_body;
 
 pub(super) const PANEL_WIDTH: f32 = 280.0;

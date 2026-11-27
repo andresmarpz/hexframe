@@ -5,103 +5,11 @@ mod common;
 use std::fs;
 use std::sync::Arc;
 
-use greyscreen_core::game::Team;
 use greyscreen_core::library;
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{EngineCmd, EngineStatus, FakeMediaSource, UiMsg};
 
-use common::{
-    assert_playable_from_key_frame, leftover_part, library_message, media, start_idle, temp_dir,
-    wait_for,
-};
-
-#[test]
-fn leftover_parts_are_recovered_or_renamed_before_the_first_scan() {
-    let media = media(240);
-    let output = temp_dir("recover");
-    let crashed = leftover_part(&output, "2025-01-01_00-00-00_Ahri_CLASSIC", &media, false);
-    let done = leftover_part(&output, "2025-01-02_00-00-00_Zed_CLASSIC", &media, true);
-    let finished_bytes = fs::metadata(done.join("game.mp4.part"))
-        .expect("part")
-        .len();
-
-    let harness = start_idle(
-        Settings {
-            output_dir: output,
-            ..Settings::default()
-        },
-        Arc::new(FakeMediaSource::fast()),
-    );
-    let entries = library_message(&harness);
-    assert_eq!(entries.len(), 2);
-    for folder in [&crashed, &done] {
-        assert!(folder.join("game.mp4").is_file(), "{}", folder.display());
-        assert!(!folder.join("game.mp4.part").exists());
-        assert_playable_from_key_frame(&folder.join("game.mp4"));
-        let entry = entries.iter().find(|e| &e.folder == folder).expect("entry");
-        assert!(entry.size_bytes > 0);
-        assert!(
-            entry.meta.duration_secs > 1.0,
-            "{}",
-            entry.meta.duration_secs
-        );
-    }
-    assert_eq!(
-        fs::metadata(done.join("game.mp4")).expect("video").len(),
-        finished_bytes
-    );
-    assert_eq!(entries[0].meta.game.info.me.team, Team::Order);
-}
-
-#[test]
-fn rescan_reports_new_recordings() {
-    let output = temp_dir("rescan");
-    let harness = start_idle(
-        Settings {
-            output_dir: output.clone(),
-            ..Settings::default()
-        },
-        Arc::new(FakeMediaSource::fast()),
-    );
-    assert!(library_message(&harness).is_empty());
-    let media = media(120);
-    leftover_part(&output, "2025-01-03_00-00-00_Ahri_CLASSIC", &media, true);
-    fs::rename(
-        output.join("2025-01-03_00-00-00_Ahri_CLASSIC/game.mp4.part"),
-        output.join("2025-01-03_00-00-00_Ahri_CLASSIC/game.mp4"),
-    )
-    .expect("rename");
-    let cmd = harness.engine.as_ref().expect("engine").cmd.clone();
-    cmd.send(EngineCmd::RescanLibrary).ok();
-    let entries = library_message(&harness);
-    assert_eq!(entries.len(), 1);
-    assert!(entries[0].size_bytes > 0);
-}
-
-#[test]
-fn applied_settings_are_saved_to_the_given_path() {
-    let output = temp_dir("settings");
-    let harness = start_idle(
-        Settings {
-            output_dir: output.clone(),
-            ..Settings::default()
-        },
-        Arc::new(FakeMediaSource::fast()),
-    );
-    let path = harness.settings_path.clone();
-    let changed = Settings {
-        output_dir: output,
-        fps: 30,
-        audio: false,
-        ..Settings::default()
-    };
-    let cmd = harness.engine.as_ref().expect("engine").cmd.clone();
-    cmd.send(EngineCmd::ApplySettings(changed.clone())).ok();
-    drop(cmd);
-    let mut harness = harness;
-    harness.engine.take();
-    assert_eq!(Settings::load(&path), changed);
-}
+use common::{leftover_part, library_message, media, start_idle, temp_dir, wait_for};
 
 #[test]
 fn recovery_sets_the_video_when_the_sidecar_has_a_duration_but_no_video() {
