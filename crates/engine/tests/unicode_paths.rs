@@ -109,6 +109,10 @@ fn recording_clipping_recovering_exporting_and_deleting_work_in_a_unicode_folder
         })
         .expect("library after delete");
         assert!(after.iter().all(|entry| entry.folder != saved.folder));
+        let gone_by = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while saved.folder.exists() && std::time::Instant::now() < gone_by {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
         assert!(!saved.folder.exists());
     }
 
