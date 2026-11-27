@@ -128,6 +128,7 @@ fn spawn_helper(directory: &Path, exe_name: &str, title_units: usize) -> Helper 
 }
 
 #[test]
+#[ignore = "spawns from a path over 260 characters, needs LongPathsEnabled"]
 fn the_walk_skips_a_decoy_in_front_and_survives_the_game_closing() {
     let root = tempfile::tempdir().expect("temp dir");
     let game_dir = long_directory(root.path());

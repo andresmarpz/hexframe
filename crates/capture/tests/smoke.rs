@@ -74,6 +74,7 @@ fn has_render_endpoint() -> bool {
 }
 
 #[test]
+#[ignore = "a 60 s timing soak, run it by hand"]
 fn loopback_audio_matches_wall_time_across_a_minute_of_silence() {
     if !has_render_endpoint() {
         eprintln!("no render endpoint, skipping");
