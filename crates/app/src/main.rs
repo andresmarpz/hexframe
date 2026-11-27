@@ -84,6 +84,9 @@ fn main() {
         .on_window(ui::remember_window)
         .keep_running()
         .release_gpu_when_closed();
+    if let Some(mode) = font_smoothing() {
+        app = app.font_smoothing(mode);
+    }
     if std::env::args().any(|arg| arg == HIDDEN_FLAG) {
         app = app.windowless();
     }
@@ -156,5 +159,16 @@ fn main() {
     if let Err(err) = result {
         eprintln!("{err}");
         std::process::exit(1);
+    }
+}
+
+fn font_smoothing() -> Option<rune::FontSmoothing> {
+    use rune::FontSmoothing;
+    match std::env::var("GREYSCREEN_FONT_SMOOTHING").ok().as_deref() {
+        Some("on") => Some(FontSmoothing::On),
+        Some("off") => Some(FontSmoothing::Off),
+        Some("windfoil") => Some(FontSmoothing::Windfoil),
+        Some("chromium") => Some(FontSmoothing::WindfoilChromium),
+        _ => cfg!(target_os = "macos").then_some(FontSmoothing::Off),
     }
 }
