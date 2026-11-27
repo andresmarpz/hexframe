@@ -60,3 +60,12 @@ Dock geometry: the dock is 48 tall with a 24 radius.
     - a kit **Contrast** 28 px icon button with the play triangle (plays the game);
     - a Neutral 28 px icon button with the **Duotone `folder-reveal`** icon (`3RB-0` on page `p-5-0`), which replaces the flat folder.
   - Remove "Open" and the word "Watch".
+
+## Icon rules (Andres, 2026-11-27)
+
+- **Folder:** always the custom `folder-reveal` icon (Duotone `3RB-0`, Line `3R1-0`, page `p-5-0`). The flat kit folder is retired.
+- **Settings, storage settings and any settings entry:** always the custom **gear** (Duotone `7MG-0`, Line `7M8-0`). It replaces the kit's hexagon `settings-gear`.
+- **Objectives:** flat traced Riot silhouettes (`lol-icons/match-history/svg/`).
+- **Kill:** Riot's crossed swords.
+- **Death:** the skull.
+- **Dock:** every item is 28 px tall inside the 48 px dock, with 10 px insets. The record button is 28 px with a 3 px glow. The storage button is a Ghost button with padding 0 8.
