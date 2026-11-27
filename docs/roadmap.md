@@ -12,5 +12,5 @@ Status on 2026-11-21. `docs/architecture.md` describes how the app works today. 
 - CLI: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `storyboard`, `analyze`, `demo`.
 - Recording health: a `health` summary in every `game.json`, the Recording health popover in the review toolbar, the optional `diagnostics.jsonl` and `greyscreen-cli analyze`.
 - Backend `apps/api`: feedback and experimental crash upload on Cloudflare.
-- Website, brand assets and releases built and published on the Windows PC (`just release`). Each release has its changelog in `apps/web/src/content/changelog/`.
+- Website, brand assets and releases from the Mac (`just release`). Each release has its changelog in `apps/web/src/content/changelog/`.
 - Adversarial review of capture, engine, mp4 and league (`docs/reviews/2026-11-21-adversarial.md`). Every item it found is fixed.

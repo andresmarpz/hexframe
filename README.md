@@ -135,8 +135,8 @@ just check
 # Tests matching a filter
 just test mp4
 
-# fmt, clippy and every test on the Windows PC
-just win
+# Windows release executables
+just build-win
 
 # Simulate a League match, then run the UI against it with fake capture
 cargo run -p greyscreen-cli -- fake-league --port 2999 --speed 4

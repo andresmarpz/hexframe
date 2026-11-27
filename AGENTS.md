@@ -10,8 +10,8 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 2. Read `AGENTS.md`, `docs/architecture.md`, the ticket and the research sections it names. A change that makes a doc untrue fixes the doc in the same commit.
 3. Change only the files the ticket lists. If something outside them must change, make the smallest change and say so in your final report.
 4. Do not take design decisions. If the ticket is ambiguous or wrong, pick the option closest to `docs/architecture.md`, and list it under "Deviations" in your report.
-5. `just check` must pass: fmt and host clippy, no tests. When you change recording, playback or a bug that has a test, run that crate's tests with `just test <filter>`. Windows-only code (`capture`, `thumbs`, `cfg(windows)`) is checked on the Windows PC with `just win`.
-6. Commit with the message `<crate>: <what changed>` (for example `mp4: add fragmented writer`). Then `git fetch origin && git rebase origin/main && just check && git push origin HEAD:main`. On a push race, repeat the rebase.
+5. Run Rust on the Windows PC, not the Mac (see "Rust on the Windows PC"). `just check` must pass there: fmt and clippy, no tests. When you change recording, playback or a bug that has a test, also run that crate's tests with `just test <filter>`.
+6. Commit with the message `<crate>: <what changed>` (for example `mp4: add fragmented writer`). Push it to a branch, pass `just check` on the PC, then `git fetch origin && git rebase origin/main && git push origin HEAD:main`. On a push race, repeat the rebase.
 7. Final report, under 15 lines: commit sha, what was built, the tests added, deviations, and anything left unverified.
 
 ## Issues
@@ -39,12 +39,12 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 
 ## Commands
 
-- `just check`: the everyday gate on the Mac: fmt check and host clippy. Under a minute warm.
-- `just test <filter>`: the tests matching a filter, on the Mac. `cargo install cargo-nextest --locked`.
-- `just win`: fmt, clippy and every test on the Windows PC (`windows.yml` on the self-hosted runner, labels `greyscreen` and `windows`). Setup: `scripts/setup-windows-runner.ps1 <token>` on the PC.
+- `just check`: the everyday gate: fmt check and clippy, no tests.
+- `just test <filter>`: the tests matching a filter, through cargo-nextest (`cargo install cargo-nextest --locked`).
+- `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows through cargo-xwin. `just dist` copies them with `README.txt` and `LICENSE.txt` into `dist/`, plus a `GreyscreenSetup.exe` copy.
 - QA never uses OS-level input, never activates or shows a window, never plays sound out loud and never changes system settings. Never QA by driving the real app with UI Automation, SendInput or a visible window.
-- CI: pushes run only the spell check (`ci.yml`). The Windows PC runs `windows.yml` (manual, and before each release) and `release.yml`. Neither runs on pull requests, and fork pull requests need approval before any workflow runs, so no outside code reaches the PC.
-- `just release <tag>`: checks the tree, the version and the changelog, then starts `release.yml` on the Windows PC and waits. The PC runs fmt, clippy and the tests, builds both exes, checks them, publishes the GitHub release and redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe`, `README.txt` and `LICENSE.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. The tree must be clean and `HEAD` already on `origin/main`; the release tags that commit. A tag with a dash is a prerelease.
+- CI: pushes run only the spell check (`ci.yml`). No tests or builds run in GitHub Actions.
+- `just release <tag>`: runs `just check` and the Windows build side by side, publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe`, `README.txt` and `LICENSE.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. The tree must be clean and `HEAD` already on `origin/main`; the release tags that commit. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.
 - `just mac-app`: build an ad-hoc signed `dist/mac/Greyscreen.app` (fake capture media, for UI testing only) and install it to `~/Applications/Greyscreen.app`.
 - `just brand`: regenerate the icons and web images from the SVGs in `brand/`.
@@ -59,7 +59,9 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just web-tokens`: regenerate the website's theme tokens from Rune's neutral kit.
 - `just web-screens`: render the app scenes into `apps/web/public/screens`.
 
-The Mac cannot run Windows code: check it on the PC with `just win`.
+## Rust on the Windows PC
+
+Andres's Windows PC is a linked T3 environment and is idle. Run Rust there, not on the Mac: `just check`, `just test`, builds and Windows-only code (`capture`, `thumbs`, `cfg(windows)`). Push your branch, then run the commands in a checkout on the PC (`git fetch origin <branch>` and `git checkout --detach <sha>`). Without `just` there, run the same cargo commands: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo nextest run --workspace --locked <filter>`. Never drive its GUI. The Mac only edits, and builds the macOS app (`just mac-app`) and releases (`just release`).
 
 ## Rune on Windows
 

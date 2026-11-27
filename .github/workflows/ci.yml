@@ -1,6 +1,6 @@
 name: CI
 
-# Pushes run only the spell check. Tests and builds run on the Windows PC (windows.yml, release.yml).
+# Pushes run only the spell check. Rust runs on Andres's Windows PC through T3, not in CI.
 
 on:
   push:
