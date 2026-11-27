@@ -16,6 +16,16 @@ This round follows Andres's review of round 3 (2026-11-27). Read `round3.md` and
 
 ## 1. Icon set (page `Icons`)
 
+**Update (Andres, 2026-11-27):** the custom objective glyphs looked bad. Use **Riot's official minimap icons** for objectives:
+
+- Source: CommunityDragon, `raw.communitydragon.org/latest/game/assets/ux/minimap/icons/`. Local copies are in `~/.local/share/greyscreen-design/lol-icons/`.
+- Riot's fan-project terms allow this, and the app already uses Data Dragon champion icons.
+- Files:
+  - `tower.png`, `inhibitor.png`, `baron.png`, `riftherald.png`, `grub.png`;
+  - `dragon_<type>.png` for each elemental dragon (from the event's `dragon_type`), and `dragon_elder.png`.
+
+The custom `folder-reveal` and `space` glyphs below stay. The custom objective glyphs are kept only for reference.
+
 The icons are original drawings, not Riot art. All are drawn on a 16 px grid; the 12 px sizes are scaled for timeline boxes.
 
 | Icon | Shape |
