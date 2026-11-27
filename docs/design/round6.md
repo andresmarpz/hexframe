@@ -44,3 +44,19 @@ Dock geometry: the dock is 48 tall with a 24 radius.
 
 - Both artboards are edited in place, nothing is clipped, and every colour is a token.
 - finish_working_on_nodes is called.
+
+## Round 6b: Andres's follow-up (2026-11-27)
+
+- **Objective icons:**
+  - Use the **flat one-colour style** of the kill and death icons, not the coloured minimap set.
+  - Source: Riot's scoreboard and match-history objective silhouettes (baron, dragon, elder, herald, grubs, inhibitor, turret), traced to SVG in `~/.local/share/greyscreen-design/lol-icons/match-history/svg/*.svg`.
+  - Inline them, 12 px, with the `fill` attribute set to:
+    - `var(--color-text)` for my team's objectives;
+    - `var(--color-text-muted)` for the enemy's.
+  - Every dragon uses `dragon.svg` and an elder uses `elder.svg`. Grey objective boxes are unchanged.
+- **Home card actions:** "Watch" and "Open" did the same thing. The new actions:
+  - Click the card's thumbnail or title to open the Last game screen.
+  - On the right, two icon-only buttons:
+    - a kit **Contrast** 28 px icon button with the play triangle (plays the game);
+    - a Neutral 28 px icon button with the **Duotone `folder-reveal`** icon (`3RB-0` on page `p-5-0`), which replaces the flat folder.
+  - Remove "Open" and the word "Watch".
