@@ -146,6 +146,7 @@ pub(super) fn timeline(review: &ReviewState, k: &Kit) -> El {
         .w_full()
         .h(HEIGHT)
         .hover_group()
+        .instant_changes()
         .on_layout(|ui: &mut Ui, rect: [f32; 4]| {
             if let Some(review) = &mut ui.review {
                 review.timeline_rect = rect;

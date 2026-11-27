@@ -235,3 +235,28 @@ fn the_card_also_shows_in_theater_mode() {
     assert!(card(&rt).is_some());
     assert!(rt.find("seek-preview-tile").is_some());
 }
+
+#[test]
+fn the_card_lands_under_the_pointer_on_the_next_frame_in_every_view() {
+    for theater in [false, true] {
+        let mut rt = review(review_entry());
+        rt.update(move |ui, _| {
+            if let Some(review) = &mut ui.review {
+                review.theater = theater;
+            }
+        });
+        for _ in 0..3 {
+            rt.frame(TICK);
+        }
+        hover(&mut rt, 0.2);
+        let (x, y) = at(&rt, 0.8);
+        rt.pointer_move(x, y);
+        rt.frame(TICK);
+        let [card_x, _, card_w, _] = card(&rt).expect("card");
+        let center = card_x + card_w / 2.0;
+        assert!(
+            (center - x).abs() < 2.0,
+            "theater {theater}: card at {center}, pointer at {x}"
+        );
+    }
+}
