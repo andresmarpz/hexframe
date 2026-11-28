@@ -1372,7 +1372,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-capture",
@@ -1393,7 +1393,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-capture"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-core",
@@ -1407,7 +1407,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-cli"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "anyhow",
  "clap",
@@ -1429,7 +1429,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-core"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "crossbeam-channel",
  "dirs",
@@ -1445,7 +1445,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-engine"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "crossbeam-channel",
  "fs4",
@@ -1465,7 +1465,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-league"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "crossbeam-channel",
  "greyscreen-core",
@@ -1482,7 +1482,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-mp4"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "greyscreen-core",
  "proptest",
@@ -1491,7 +1491,7 @@ dependencies = [
 
 [[package]]
 name = "greyscreen-thumbs"
-version = "0.1.20-preview.28"
+version = "0.1.21-preview.29"
 dependencies = [
  "image",
  "objc2 0.6.5",
