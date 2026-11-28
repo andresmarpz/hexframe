@@ -1,0 +1,247 @@
+:root {
+  --kit-shadow: #0000006b;
+  --white-20: #ffffff33;
+  --white-10: #ffffff1a;
+  --white-12: #ffffff1f;
+  --white-0: #ffffff00;
+  --icon-faint: #a2a5aab3;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --kit-shadow: #14161b1f;
+    --icon-faint: #606369b3;
+  }
+}
+
+.kit-button {
+  --kit-height: 24px;
+  --kit-pad: 12px;
+  --kit-radius: var(--radius-md);
+  --kit-font-size: 13px;
+  --kit-line: 20px;
+  --kit-gap: 6px;
+  --kit-fg: var(--text);
+  --kit-weight: 500;
+  --kit-rest: var(--kit-shadow) 0 1px 1.5px, var(--border) 0 0 0 0.5px;
+  --kit-base: transparent;
+  --kit-sheen: linear-gradient(180deg, transparent, transparent);
+  --kit-hover: linear-gradient(180deg, var(--hover), var(--hover));
+  --kit-pressed: linear-gradient(180deg, var(--pressed), var(--pressed));
+  --kit-disabled: 0.5;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kit-gap);
+  height: var(--kit-height);
+  padding: 0 var(--kit-pad);
+  border: 0;
+  border-radius: var(--kit-radius);
+  background-color: var(--kit-base);
+  background-image: var(--kit-sheen);
+  box-shadow: var(--kit-rest);
+  color: var(--kit-fg);
+  font-family: var(--font-sans, "Inter Variable", "Inter", system-ui, sans-serif);
+  font-size: var(--kit-font-size);
+  font-weight: var(--kit-weight);
+  line-height: var(--kit-line);
+  white-space: pre;
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kit-button svg {
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.kit-button[data-size="mini"] {
+  --kit-height: 16px;
+  --kit-pad: 8px;
+  --kit-radius: var(--radius-sm);
+  --kit-font-size: 9px;
+  --kit-line: 12px;
+  --kit-gap: 4px;
+}
+
+.kit-button[data-size="small"] {
+  --kit-height: 20px;
+  --kit-pad: 10px;
+  --kit-radius: var(--radius-sm);
+  --kit-font-size: 11px;
+  --kit-line: 12px;
+}
+
+.kit-button[data-size="large"] {
+  --kit-height: 28px;
+  --kit-pad: 14px;
+  --kit-radius: var(--radius-lg);
+}
+
+.kit-button[data-size="xl"] {
+  --kit-height: 36px;
+  --kit-pad: 18px;
+  --kit-radius: var(--radius-xl);
+}
+
+.kit-button[data-variant="neutral"],
+.kit-button[data-variant="danger"],
+.kit-button[data-variant="warning"] {
+  --kit-base: var(--surface);
+}
+
+.kit-button[data-variant="danger"] {
+  --kit-fg: var(--danger-fg);
+}
+
+.kit-button[data-variant="warning"] {
+  --kit-fg: var(--warning-fg);
+}
+
+.kit-button[data-variant="outline"] {
+  --kit-rest: var(--border-muted) 0 0 0 1px inset;
+}
+
+.kit-button[data-variant="contrast"],
+.kit-button[data-variant="submit"] {
+  --kit-base: var(--text);
+  --kit-fg: var(--text-inverse);
+  --kit-rest: var(--kit-shadow) 0 1px 1.5px;
+  --kit-sheen: linear-gradient(180deg, var(--white-20), var(--white-0));
+  --kit-hover: linear-gradient(180deg, var(--white-10), var(--white-10));
+  --kit-pressed: linear-gradient(180deg, var(--white-20), var(--white-20));
+  --kit-disabled: 0.4;
+}
+
+.kit-button[data-variant="submit"] {
+  --kit-hover: linear-gradient(180deg, var(--white-12), var(--white-12));
+}
+
+.kit-button[data-variant="ghost"],
+.kit-button[data-variant="ghostMuted"],
+.kit-button[data-variant="ghostFaint"] {
+  --kit-rest: 0 0 0 0 transparent;
+}
+
+.kit-button[data-variant="ghostMuted"] {
+  --kit-fg: var(--text-muted);
+  --kit-weight: 400;
+}
+
+.kit-button[data-variant="ghostFaint"] {
+  --kit-fg: var(--text-faint);
+}
+
+.kit-button[data-variant="ghostFaint"] svg path {
+  stroke: var(--icon-faint);
+}
+
+.kit-button[data-variant="loading"] {
+  --kit-base: var(--layer-2);
+  --kit-rest: var(--border-muted) 0 0 0 0.5px inset;
+  --kit-disabled: 1;
+}
+
+.kit-button:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-image: var(--kit-hover), var(--kit-sheen);
+}
+
+.kit-button:active:not(:disabled):not([aria-disabled="true"]) {
+  background-image: var(--kit-pressed), var(--kit-sheen);
+}
+
+.kit-button[data-variant="loading"]:hover,
+.kit-button[data-variant="loading"]:active {
+  background-image: none;
+}
+
+.kit-button:focus-visible {
+  box-shadow: var(--kit-rest), var(--page) 0 0 0 2px, var(--accent) 0 0 0 4px;
+}
+
+.kit-button:disabled,
+.kit-button[aria-disabled="true"] {
+  opacity: var(--kit-disabled);
+  cursor: default;
+}
+
+.kit-badge {
+  --kit-badge-bg: var(--layer-2);
+  --kit-badge-border: var(--border);
+  --kit-badge-fg: var(--text-muted);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 16px;
+  padding: 0 4px;
+  border: 0.5px solid var(--kit-badge-border);
+  border-radius: var(--radius-xs);
+  background-color: var(--kit-badge-bg);
+  color: var(--kit-badge-fg);
+  font-family: var(--font-sans, "Inter Variable", "Inter", system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 11px;
+  white-space: pre;
+}
+
+.kit-badge[data-appearance="standard"] {
+  --kit-badge-bg: var(--surface);
+  --kit-badge-border: var(--border-muted);
+  --kit-badge-fg: var(--text);
+  height: 18px;
+  padding: 0 6px;
+  font-size: 13px;
+  line-height: 19.5px;
+}
+
+.kit-badge[data-variant="highContrast"] {
+  --kit-badge-border: var(--border-muted);
+}
+
+.kit-badge[data-variant="subtle"] {
+  --kit-badge-bg: var(--layer-3);
+  --kit-badge-border: transparent;
+}
+
+.kit-badge[data-variant="accent"] {
+  --kit-badge-bg: var(--accent);
+  --kit-badge-border: transparent;
+  --kit-badge-fg: var(--text-inverse);
+}
+
+.kit-keybind {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kit-keycap {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+  background-color: var(--layer-3);
+  color: var(--text-muted);
+  font-family: var(--font-sans, "Inter Variable", "Inter", system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 11px;
+  white-space: pre;
+}
+
+.kit-keybind[data-variant="ghost"] .kit-keycap {
+  background-color: transparent;
+  color: var(--text-faint);
+}
