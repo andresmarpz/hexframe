@@ -9,7 +9,7 @@ mod settings;
 mod shell;
 mod widgets;
 
-pub(crate) use widgets::{champion, thumb};
+pub(crate) use widgets::{champion, icon_sheet, thumb};
 
 use greyscreen_core::settings::NavStyle;
 use rune::{Cx, El, col, row};
@@ -21,6 +21,9 @@ use screens::screen;
 
 pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let k = Kit::neutral(cx.system_dark());
+    if icon_sheet::shown() {
+        return rune_kit::root(icon_sheet::sheet(&k, s.recordings.first()), Vec::new());
+    }
     let mut layer: Vec<El> = Vec::new();
     let theater = s.review.as_ref().filter(|r| r.theater);
     let body = match theater {

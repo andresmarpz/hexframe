@@ -5,6 +5,7 @@ mod export;
 mod feedback;
 mod games;
 mod home;
+mod icons;
 mod notices;
 mod review;
 mod settings;
@@ -25,6 +26,7 @@ pub(crate) fn all() -> &'static [Scene] {
     ALL.get_or_init(|| {
         [
             home::SCENES,
+            icons::SCENES,
             notices::SCENES,
             games::SCENES,
             dock::SCENES,

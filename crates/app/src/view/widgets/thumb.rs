@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use greyscreen_core::library::ClipEntry;
-use greyscreen_core::library::thumb::{GAME_THUMB_FILE, clip_thumb_file};
+use greyscreen_core::library::thumb::{GAME_HERO_FILE, GAME_THUMB_FILE, clip_thumb_file};
 use greyscreen_engine::RecordingEntry;
-use rune::{Color, El, Icon, Image, ImageCache, Waker, el, row};
+use rune::{Color, El, Icon, Image, ImageCache, SurfaceFit, Waker, el, row};
 use rune_kit::{Badge, BadgeVariant, Kit};
 
 use super::champion::champion_icon;
@@ -134,6 +134,10 @@ pub(crate) fn game_path(rec: &RecordingEntry) -> PathBuf {
     rec.folder.join(GAME_THUMB_FILE)
 }
 
+pub(crate) fn hero_path(rec: &RecordingEntry) -> PathBuf {
+    rec.folder.join(GAME_HERO_FILE)
+}
+
 pub(crate) fn clip_path(rec: &RecordingEntry, clip: &ClipEntry) -> PathBuf {
     rec.folder.join(clip_thumb_file(clip))
 }
@@ -153,6 +157,15 @@ pub(crate) fn game_thumb(k: &Kit, rec: &RecordingEntry, width: f32) -> El {
         k.c.bg_base,
         badge_icon(width),
     ))
+}
+
+pub(crate) fn game_hero(k: &Kit, rec: &RecordingEntry, w: f32, h: f32) -> El {
+    let shown = ready_image(&hero_path(rec)).or_else(|| ready_image(&game_path(rec)));
+    let frame = el().size(w, h).a11y_hidden();
+    match shown {
+        Some(image) => frame.pixels_fit(image.pixels(), SurfaceFit::Fill),
+        None => frame.fill(k.c.layer_02),
+    }
 }
 
 pub(crate) fn clip_thumb(k: &Kit, rec: &RecordingEntry, clip: &ClipEntry, shape: El) -> El {
