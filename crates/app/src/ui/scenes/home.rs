@@ -20,14 +20,10 @@ fn demo(ui: &mut Ui) {
 }
 
 pub(super) const SCENES: &[Scene] = &[
-    ("home", |ui| {
-        home(ui);
-        ui.last_game = ui.recordings.first().cloned();
-    }),
+    ("home", home),
     ("home-empty", |ui| {
         home(ui);
         ui.recordings.clear();
-        ui.last_game = None;
     }),
     ("demo", demo),
     ("home-first-run", |ui| {
@@ -63,10 +59,6 @@ pub(super) const SCENES: &[Scene] = &[
         ui.status = EngineStatus::GameRunning;
         ui.settings.auto_record = false;
     }),
-    ("last-game", |ui| {
-        home(ui);
-        ui.last_game = ui.recordings.first().cloned();
-    }),
     ("waiting", |ui| {
         home(ui);
         ui.status = EngineStatus::Waiting;
@@ -87,7 +79,6 @@ pub(super) const SCENES: &[Scene] = &[
     }),
     ("home-no-encoder", |ui| {
         home(ui);
-        ui.last_game = ui.recordings.first().cloned();
         ui.encoder = encoder(CheckOutcome::Failed, "");
         if let Some(check) = ui.encoder.as_mut() {
             check.first_failure = SAMPLE_FAILURE.into();
@@ -95,7 +86,6 @@ pub(super) const SCENES: &[Scene] = &[
     }),
     ("software-encoder-notice", |ui| {
         home(ui);
-        ui.last_game = ui.recordings.first().cloned();
         ui.encoder = encoder(CheckOutcome::Software, SOFTWARE_LABEL);
         let notice = Notice {
             level: NoticeLevel::Warn,

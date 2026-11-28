@@ -30,7 +30,7 @@ pub(super) fn ambient(s: &Ui, k: &Kit) -> Option<El> {
     if s.screen != Screen::Home || s.detail() == Detail::Live {
         return None;
     }
-    let entry = s.last_game.as_ref()?;
+    let entry = s.latest_game()?;
     let fade = el()
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .linear_gradient(PI, [(0.0, k.c.page.alpha(0.0)), (1.0, k.c.page)]);
@@ -77,7 +77,7 @@ pub(super) fn page(s: &Ui, k: &Kit) -> El {
     if !s.settings.first_run_done {
         page = page.child(first_run::card_for(s, k));
     }
-    if let Some(entry) = &s.last_game {
+    if let Some(entry) = s.latest_game() {
         page = page.child(last_game::card(entry, k, &now));
     }
     let week = week::section(s, k, &now);

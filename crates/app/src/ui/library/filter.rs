@@ -56,9 +56,6 @@ impl Ui {
         let Some(id) = self.filter.pending_delete.take() else {
             return;
         };
-        if self.last_game.as_ref().is_some_and(|rec| rec.meta.id == id) {
-            self.last_game = None;
-        }
         if self.selected_id() == Some(id.as_str()) {
             self.review = None;
         }

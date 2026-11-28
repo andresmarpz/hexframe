@@ -120,7 +120,7 @@ impl Ui {
         let data = review.entry.meta.review.clone();
         let id = review.entry.meta.id.clone();
         let folder = review.entry.folder.clone();
-        for rec in self.recordings.iter_mut().chain(self.last_game.iter_mut()) {
+        for rec in self.recordings.iter_mut() {
             if rec.meta.id == id {
                 rec.meta.review = data.clone();
             }

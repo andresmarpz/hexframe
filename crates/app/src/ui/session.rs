@@ -62,7 +62,6 @@ impl Ui {
             UiMsg::RecordingSaved(entry) => {
                 self.first_test_saved(&entry);
                 let text = format!("Recording saved: {}", entry.meta.game.info.me.champion);
-                self.last_game = Some(entry.clone());
                 match self
                     .recordings
                     .iter_mut()
@@ -96,7 +95,6 @@ impl Ui {
         match &status {
             EngineStatus::Recording { .. } if !was_recording => {
                 self.feed.clear();
-                self.last_game = None;
                 self.recording_since_clock = Some(tx.clock());
                 self.elapsed_secs = 0;
                 self.live_selected = self.review.is_none();
