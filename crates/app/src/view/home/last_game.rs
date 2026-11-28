@@ -181,7 +181,7 @@ fn timeline(entry: &RecordingEntry, k: &Kit) -> El {
         .w_full()
         .px(16.0)
         .py(14.0)
-        .child(minute_timeline(k, &boxes, TIMELINE_WIDTH).w_full())
+        .child(minute_timeline(k, &boxes, TIMELINE_WIDTH))
 }
 
 fn ago(entry: &RecordingEntry, now: &Zoned) -> String {

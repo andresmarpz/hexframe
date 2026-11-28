@@ -48,7 +48,7 @@ pub(super) fn hero(s: &Ui, rec: &RecordingEntry, k: &Kit, when: &str, latest: bo
         .child(actions(s, rec, k))
         .child(
             el().pin(Some(INSET), None, Some(INSET), Some(TIMELINE_BOTTOM))
-                .child(minute_timeline(&night, &boxes, 0.0)),
+                .child(minute_timeline(&night, &boxes, 1232.0 - 2.0 * INSET)),
         )
 }
 

@@ -275,6 +275,20 @@ fn recordings() -> Vec<RecordingEntry> {
     list
 }
 
+pub(super) fn set_minutes(rec: &mut RecordingEntry, minutes: f64) {
+    let rebuilt = entry(Row {
+        hours_ago: 2,
+        champion: "Ahri",
+        mode: "CLASSIC",
+        result: GameResult::Win,
+        minutes,
+        size_mb: 1_820,
+        clips: rec.meta.clips.len(),
+    });
+    rec.meta.events = rebuilt.meta.events;
+    rec.meta.duration_secs = rebuilt.meta.duration_secs;
+}
+
 pub(super) fn demo_recordings() -> Vec<RecordingEntry> {
     let fixture = review_entry();
     recordings()

@@ -68,5 +68,5 @@ pub(crate) fn sheet(k: &Kit) -> El {
         .h_full()
         .fill(k.c.page)
         .padding(32.0)
-        .child(minute_timeline(k, &boxes, width))
+        .child(col().w(width).child(minute_timeline(k, &boxes, width)))
 }

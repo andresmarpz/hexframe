@@ -7,6 +7,8 @@ use crate::view::TABULAR;
 
 const GAP: f32 = 2.0;
 const BOX_HEIGHT: f32 = 20.0;
+const MAX_BOX: f32 = 36.0;
+const MIN_BOX: f32 = KILL_ICON + 2.0 * 2.0;
 const BORDER: f32 = 2.0;
 const RADIUS: f32 = 2.0;
 const KILL_ICON: f32 = 14.0;
@@ -27,17 +29,25 @@ struct Look {
     glow: Option<Color>,
 }
 
-pub(crate) fn minute_timeline(k: &Kit, boxes: &[MinuteBox], width: f32) -> El {
+pub(crate) fn minute_timeline(k: &Kit, boxes: &[MinuteBox], widest: f32) -> El {
+    let count = boxes.len() as f32;
+    let gaps = GAP * (count - 1.0).max(0.0);
+    let packed = count * MIN_BOX + gaps;
     let strip = row().h(BOX_HEIGHT + LABEL_GAP + LABEL_HEIGHT).gap(GAP);
-    let mut strip = if width > 0.0 {
-        strip.w(width)
+    let scrolls = packed > widest;
+    let mut strip = if scrolls {
+        strip.w(packed)
     } else {
-        strip.w_full()
+        strip.w_full().max_w(count * MAX_BOX + gaps)
     };
     for minute in boxes {
         strip = strip.child(cell(k, minute));
     }
-    strip
+    if scrolls {
+        row().w_full().scroll_x().child(strip)
+    } else {
+        strip
+    }
 }
 
 fn cell(k: &Kit, minute: &MinuteBox) -> El {
