@@ -57,7 +57,7 @@ fn label(k: &Kit, minute: u32) -> El {
         .mt(LABEL_GAP)
         .center()
         .a11y_hidden();
-    if minute % LABEL_EVERY != 0 {
+    if !minute.is_multiple_of(LABEL_EVERY) {
         return slot;
     }
     let font = TextStyle {

@@ -1,4 +1,4 @@
-use std::path::{Component, MAIN_SEPARATOR, Path};
+use std::path::{Component, MAIN_SEPARATOR_STR, Path};
 
 use greyscreen_core::disk::StorageUsage;
 use rune::{El, col, el, row, text};
@@ -43,7 +43,7 @@ fn short_path(dir: &Path) -> String {
         })
         .collect();
     let start = names.len().saturating_sub(2);
-    names[start..].join(&MAIN_SEPARATOR.to_string())
+    names[start..].join(MAIN_SEPARATOR_STR)
 }
 
 fn free_label(dir: &Path, free: u64) -> String {

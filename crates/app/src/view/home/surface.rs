@@ -30,16 +30,11 @@ pub(super) fn surface(k: &Kit) -> El {
 }
 
 pub(super) fn header(k: &Kit, title: &str, aside: Option<String>) -> El {
-    let mut header = row()
-        .w_full()
-        .px(16.0)
-        .center_y()
-        .justify_between()
-        .child(
-            text(title.to_owned())
-                .font(sized(k.ty.ui_medium, 13.0, 16.0))
-                .color(k.c.text_base),
-        );
+    let mut header = row().w_full().px(16.0).center_y().justify_between().child(
+        text(title.to_owned())
+            .font(sized(k.ty.ui_medium, 13.0, 16.0))
+            .color(k.c.text_base),
+    );
     if let Some(aside) = aside {
         header = header.child(
             text(aside)

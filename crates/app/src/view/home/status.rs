@@ -4,11 +4,11 @@ use rune::{El, col, el, row, text};
 use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, glyphs};
 
 use super::actions;
+use crate::ui::library::format::mode_label;
+use crate::ui::{Ui, format_clock};
 use crate::view::widgets::champion::champion_icon;
 use crate::view::widgets::{state_pill, status_pill};
 use crate::view::{card, title_style};
-use crate::ui::library::format::mode_label;
-use crate::ui::{Ui, format_clock};
 
 pub(super) fn card_for(s: &Ui, k: &Kit) -> Option<El> {
     headline(s, k).map(|h| state_card(s, k, h))
@@ -62,7 +62,13 @@ fn headline(s: &Ui, k: &Kit) -> Option<Headline> {
             }
         }
         EngineStatus::Finalizing => Headline {
-            pill: status_pill(k, "Saving", k.c.layer_02, k.c.text_muted, Some(k.c.text_faint)),
+            pill: status_pill(
+                k,
+                "Saving",
+                k.c.layer_02,
+                k.c.text_muted,
+                Some(k.c.text_faint),
+            ),
             title: "Saving...".to_owned(),
             detail: muted(k, "Finishing the video file."),
             clock: None,

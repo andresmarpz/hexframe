@@ -47,7 +47,11 @@ fn fresh_count(s: &Ui, now: &Zoned) -> usize {
         .iter()
         .flat_map(|entry| {
             let start = entry.meta.started_at.timestamp().as_second() as f64;
-            entry.meta.clips.iter().map(move |clip| start + clip.start_secs)
+            entry
+                .meta
+                .clips
+                .iter()
+                .map(move |clip| start + clip.start_secs)
         })
         .filter(|at| *at >= cutoff as f64)
         .count()

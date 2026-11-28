@@ -62,7 +62,11 @@ fn summary(entry: &RecordingEntry, k: &Kit, now: &Zoned) -> El {
                 .child(champion_line(entry, k))
                 .child(stats(entry, k)),
         )
-        .child(rune::icon(&CHEVRON, 16.0).color(k.c.text_faint).a11y_hidden())
+        .child(
+            rune::icon(&CHEVRON, 16.0)
+                .color(k.c.text_faint)
+                .a11y_hidden(),
+        )
 }
 
 fn picture(entry: &RecordingEntry, k: &Kit) -> El {
@@ -80,10 +84,7 @@ fn picture(entry: &RecordingEntry, k: &Kit) -> El {
         .clip_rounded(8.0)
         .fill(k.c.layer_02)
         .center()
-        .child(
-            thumb::game_hero(k, entry, w, h)
-                .pin(Some(0.0), Some(0.0), None, None),
-        )
+        .child(thumb::game_hero(k, entry, w, h).pin(Some(0.0), Some(0.0), None, None))
         .child(disc)
         .a11y_hidden()
 }
@@ -103,7 +104,12 @@ fn title_line(entry: &RecordingEntry, k: &Kit, now: &Zoned) -> El {
         .w_full()
         .justify_between()
         .center_y()
-        .child(text(word).key("last-game-result").font(word_style).color(color))
+        .child(
+            text(word)
+                .key("last-game-result")
+                .font(word_style)
+                .color(color),
+        )
         .child(
             text(format!("Last game · {}", ago(entry, now)))
                 .font(sized(k.ty.ui, 12.0, 16.0))
@@ -135,7 +141,10 @@ fn stats(entry: &RecordingEntry, k: &Kit) -> El {
     let meta = &entry.meta;
     let figures = kda(&meta.events, &meta.game.info);
     let mut items = vec![(
-        format!("{} / {} / {}", figures.kills, figures.deaths, figures.assists),
+        format!(
+            "{} / {} / {}",
+            figures.kills, figures.deaths, figures.assists
+        ),
         "KDA".to_owned(),
     )];
     if let Some(percent) = kill_participation(&meta.events, &meta.game.info) {
@@ -178,9 +187,8 @@ fn timeline(entry: &RecordingEntry, k: &Kit) -> El {
 fn ago(entry: &RecordingEntry, now: &Zoned) -> String {
     let ended = entry.meta.started_at.timestamp().as_second() + entry.meta.duration_secs as i64;
     let secs = (now.timestamp().as_second() - ended).max(0);
-    let unit = |count: i64, name: &str| {
-        format!("{count} {name}{} ago", if count == 1 { "" } else { "s" })
-    };
+    let unit =
+        |count: i64, name: &str| format!("{count} {name}{} ago", if count == 1 { "" } else { "s" });
     match secs {
         0..=59 => "just now".to_owned(),
         60..=3599 => unit(secs / 60, "minute"),

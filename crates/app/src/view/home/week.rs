@@ -37,7 +37,12 @@ pub(super) fn section(s: &Ui, k: &Kit, now: &Zoned) -> Option<El> {
     let figure = row()
         .gap(8.0)
         .center_y()
-        .child(text(rate).key("week-win-rate").font(big).color(k.c.text_base))
+        .child(
+            text(rate)
+                .key("week-win-rate")
+                .font(big)
+                .color(k.c.text_base),
+        )
         .child(
             text("win rate")
                 .font(sized(k.ty.ui, 13.0, 18.0))
@@ -68,7 +73,11 @@ pub(super) fn section(s: &Ui, k: &Kit, now: &Zoned) -> Option<El> {
             .grow(1.0)
             .min_w(0.0)
             .gap(8.0)
-            .child(header(k, "This week", Some(plural(stats.games, "game", "games"))))
+            .child(header(
+                k,
+                "This week",
+                Some(plural(stats.games, "game", "games")),
+            ))
             .child(card),
     )
 }

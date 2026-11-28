@@ -28,8 +28,7 @@ pub(in crate::view) fn top_bar(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     } else {
         EDGE_PAD
     };
-    el()
-        .key("top-bar")
+    el().key("top-bar")
         .pin(Some(0.0), Some(0.0), Some(0.0), None)
         .h(HEIGHT)
         .child(
