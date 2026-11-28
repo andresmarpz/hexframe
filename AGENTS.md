@@ -1,6 +1,6 @@
 # Greyscreen
 
-Greyscreen was called Greyscreen until 2026-11-28; the GitHub repo, website URL and API URL still use the old name.
+Greyscreen was called Greyscreen until 2026-11-28; the GitHub repo and the API URL still use the old name. The old site address greyscreen-lake.vercel.app redirects to greyscreen.app.
 
 League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done, GitHub issues have what is next, `docs/research/` has the API details.
 
@@ -54,7 +54,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
 - `just web-build`: build the website into `apps/web/dist`.
 - `just web-check`: `astro check` and a website build.
-- Pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock` deploy the website (https://greyscreen-lake.vercel.app): the GitHub workflow `web.yml` triggers a Vercel deploy hook. Vercel's Git deployments are off, so other pushes create no Vercel deployment.
+- Pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock` deploy the website (https://greyscreen.app): the GitHub workflow `web.yml` triggers a Vercel deploy hook. Vercel's Git deployments are off, so other pushes create no Vercel deployment.
 - `just web-deploy`: manual fallback, a local authenticated build published to Vercel production, then a URL check.
 - `just api-dev`: run the backend (`apps/api`, Cloudflare Worker on Effect and Alchemy) locally in workerd with emulated R2 and D1. No Cloudflare account needed.
 - `just api-test`, `just api-check`: backend tests, and typecheck plus tests. See `apps/api/README.md` for deploys.

@@ -1,6 +1,6 @@
 use crate::encoder::{BUSY_HELP, OpenFailure};
 
-pub const FAQ_URL: &str = "https://greyscreen-lake.vercel.app/faq";
+pub const FAQ_URL: &str = "https://greyscreen.app/faq";
 pub const NO_FRAMES: &str = "no frames from the game window";
 pub const DISK_FULL_NOTICE: &str =
     "The disk is full, so the full game video stopped. Free some space to record the next game.";

@@ -94,12 +94,12 @@ api-test:
 api-check:
     cd apps/api && bun run typecheck && bun run test
 
-# Manual deploy to https://greyscreen-lake.vercel.app with a local build that carries a GitHub token. Pushes to main that touch the site deploy through the web.yml workflow and a Vercel deploy hook; this recipe is the manual fallback.
+# Manual deploy to https://greyscreen.app with a local build that carries a GitHub token. Pushes to main that touch the site deploy through the web.yml workflow and a Vercel deploy hook; this recipe is the manual fallback.
 web-deploy:
     export VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; vercel pull --yes --environment=production && vercel build --prod --yes
     test -s .vercel/output/static/index.html || { echo "web-deploy: .vercel/output/static/index.html is missing, not deploying" >&2; exit 1; }
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy --prebuilt --prod --yes
-    for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen-lake.vercel.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
+    for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
 # The tree must be clean and its commit already on origin/main. The release tags that commit, so later pushes to main do not stop it.

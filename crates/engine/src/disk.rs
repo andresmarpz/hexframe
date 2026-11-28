@@ -5,7 +5,7 @@ use greyscreen_core::disk::{CHECK_EVERY_SECS, gb_text};
 
 use crate::api::{NoticeAction, NoticeLevel, UiMsg};
 
-pub const LOW_DISK_URL: &str = "https://greyscreen-lake.vercel.app/faq#low-disk";
+pub const LOW_DISK_URL: &str = "https://greyscreen.app/faq#low-disk";
 pub(crate) const REFUSED_REASON: &str = "Not enough disk space to record";
 
 pub trait FreeSpace: Send + Sync {

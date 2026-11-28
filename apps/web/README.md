@@ -32,7 +32,7 @@ The build reads the repo's releases and star count from the GitHub API (`src/lib
 
 ## Help anchors
 
-The app's "Learn more" links open `https://greyscreen-lake.vercel.app/faq#<anchor>`. Each anchor is the `id` of an item in `src/content/faq.ts`. Do not rename them:
+The app's "Learn more" links open `https://greyscreen.app/faq#<anchor>`. Each anchor is the `id` of an item in `src/content/faq.ts`. Do not rename them:
 
 `vanguard`, `fps`, `storage`, `low-disk`, `death-review`, `fullscreen`, `window-not-found`, `run-as-admin`, `folder-not-writable`, `no-encoder`, `no-gpu`, `video-conversion`, `updates`, `uninstall`, `privacy`, `free`, `help`.
 
@@ -58,7 +58,7 @@ Builds the app and renders the scenes with `greyscreen --snap`. The recipe sets 
 
 ## Deploy
 
-Vercel project `greyscreen` (team `andresmarpzs-projects`) is connected to `andresmarpz/greyscreen` and publishes https://greyscreen-lake.vercel.app.
+Vercel project `greyscreen` (team `andresmarpzs-projects`) is connected to `andresmarpz/greyscreen` and publishes https://greyscreen.app (DNS at Namecheap: two A records for `@` and a CNAME for `www`, which redirects to the bare domain). The old https://greyscreen-lake.vercel.app redirects there with the path kept, so links in older app versions still work.
 
 - Vercel's Git deployments are off (`git.deploymentEnabled` is false in `apps/web/vercel.json`), so no push creates a deployment by itself. The GitHub workflow `.github/workflows/web.yml` runs on pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock`, and triggers a production deploy through the Vercel deploy hook stored in the `VERCEL_DEPLOY_HOOK` repo secret. Rust-only pushes create nothing on Vercel. The workflow can also be run by hand.
 - Project settings (in Vercel, not in git): root directory `apps/web`, "include source files outside the root directory" on (the site imports `brand/`), Node 24.x. Install, build and output commands live in `apps/web/vercel.json`.
