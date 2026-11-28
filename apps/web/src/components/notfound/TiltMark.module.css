@@ -1,0 +1,30 @@
+.root {
+  display: inline-flex;
+}
+
+.face {
+  transform-box: view-box;
+  transform-origin: 32px 32px;
+}
+
+.root[data-phase="tilt"] .face {
+  animation: tilt 450ms cubic-bezier(0.3, 0.7, 0.4, 1) 600ms both;
+}
+
+@keyframes tilt {
+  from {
+    transform: rotate(14deg);
+  }
+
+  60% {
+    transform: rotate(-4deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.root[data-phase="upright"] .face {
+  transform: rotate(14deg);
+}
