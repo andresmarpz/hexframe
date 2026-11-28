@@ -1,6 +1,6 @@
 # Greyscreen
 
-Greyscreen was called Greyscreen until 2026-11-28; the GitHub repo and the API URL still use the old name. The old site address greyscreen-lake.vercel.app redirects to greyscreen.app.
+Greyscreen was called Greyscreen until 2026-11-28; the GitHub repo still uses the old name. The old site address greyscreen-lake.vercel.app redirects to greyscreen.app.
 
 League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done, GitHub issues have what is next, `docs/research/` has the API details.
 
