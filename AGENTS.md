@@ -43,8 +43,8 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just test <filter>`: the tests matching a filter, through cargo-nextest (`cargo install cargo-nextest --locked`).
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows through cargo-xwin. `just dist` copies them with `README.txt` and `LICENSE.txt` into `dist/`, plus a `GreyscreenSetup.exe` copy.
 - QA never uses OS-level input, never activates or shows a window, never plays sound out loud and never changes system settings. Never QA by driving the real app with UI Automation, SendInput or a visible window.
-- CI: pushes run only the spell check (`ci.yml`). No tests or builds run in GitHub Actions.
-- `just release <tag>`: runs `just check` and the Windows build side by side, publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe`, `README.txt` and `LICENSE.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. The tree must be clean and `HEAD` already on `origin/main`; the release tags that commit. A tag with a dash is a prerelease.
+- CI: pushes run only the spell check (`ci.yml`). No tests run in GitHub Actions. The only build is the release build on a version tag (`release.yml`), which SignPath requires.
+- `just release <tag>`: runs `just check` on the Mac and pushes the tag. The `Release` workflow builds on a GitHub-hosted Windows runner, signs through SignPath (Andres approves each request), publishes the GitHub release and redeploys the website. See `docs/release-signing.md`. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe`, `README.txt` and `LICENSE.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. The tree must be clean and `HEAD` already on `origin/main`; the release tags that commit. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.
 - `just mac-app`: build an ad-hoc signed `dist/mac/Greyscreen.app` (fake capture media, for UI testing only) and install it to `~/Applications/Greyscreen.app`.
 - `just brand`: regenerate the icons and web images from the SVGs in `brand/`.
@@ -59,7 +59,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 
 ## Rust on the Windows PC
 
-Andres's Windows PC is a linked T3 environment and is idle. Run Rust there, not on the Mac: `just check`, `just test`, builds and Windows-only code (`capture`, `thumbs`, `cfg(windows)`). Push your branch, then run the commands in a checkout on the PC (`git fetch origin <branch>` and `git checkout --detach <sha>`). Without `just` there, run the same cargo commands: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo nextest run --workspace --locked <filter>`. Never drive its GUI. The Mac only edits, and builds the macOS app (`just mac-app`) and releases (`just release`).
+Andres's Windows PC is a linked T3 environment and is idle. Run Rust there, not on the Mac: `just check`, `just test`, builds and Windows-only code (`capture`, `thumbs`, `cfg(windows)`). Push your branch, then run the commands in a checkout on the PC (`git fetch origin <branch>` and `git checkout --detach <sha>`). Without `just` there, run the same cargo commands: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo nextest run --workspace --locked <filter>`. Never drive its GUI. The Mac only edits, and builds the macOS app (`just mac-app`) and starts releases (`just release`).
 
 ## Rune on Windows
 

@@ -85,24 +85,19 @@ web-deploy:
     export VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; vercel pull --yes --environment=production && vercel build --prod --yes
     test -s .vercel/output/static/index.html || { echo "web-deploy: .vercel/output/static/index.html is missing, not deploying" >&2; exit 1; }
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy --prebuilt --prod --yes
-    for path in / /download/ /faq/ /changelog/ /privacy/ /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
+    for path in / /download/ /faq/ /changelog/ /privacy/ /code-signing/ /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
 # The tree must be clean and its commit already on origin/main. The release tags that commit, so later pushes to main do not stop it.
-# Builds, checks and publishes a GitHub release from this Mac. It uses no Actions minutes.
+# Runs the gate here, then pushes the tag. The Release workflow builds on GitHub, signs through SignPath, publishes and redeploys the website.
 release tag:
     git diff --quiet && git diff --cached --quiet || { echo "commit your changes first"; exit 1; }
     git fetch -q origin && git merge-base --is-ancestor HEAD origin/main || { echo "push main first"; exit 1; }
     version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1); test "{{tag}}" = "v$version" || { echo "tag {{tag}} must equal v$version: set the workspace version to the full release version first"; exit 1; }
-    just release-publish {{tag}} "$(git rev-parse HEAD)"
-
-# The gate and the Windows build run side by side.
-[parallel, private]
-release-publish tag sha: check dist
-    test "$(git rev-parse HEAD)" = "{{sha}}" || { echo "HEAD moved during the build, release not published"; exit 1; }
-    scripts/release-meta.sh notes {{tag}} > dist/notes.md
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt dist/LICENSE.txt -R andresmarpz/greyscreen --target {{sha}} --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
-    just web-deploy
+    scripts/release-meta.sh title {{tag}}
+    just check
+    git tag {{tag}} && git push origin {{tag}}
+    @echo "Approve the signing request in SignPath, then watch: https://github.com/andresmarpz/greyscreen/actions/workflows/release.yml"
 
 # Rewrites the title and notes of every published release from its changelog entry.
 release-sync:

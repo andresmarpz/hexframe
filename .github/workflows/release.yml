@@ -1,0 +1,105 @@
+name: Release
+
+# A version tag builds, signs and publishes a release. A manual run only builds and test-signs.
+# Public repository: GitHub-hosted runners cost nothing. SignPath signs only builds made on them.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the workspace version
+        id: version
+        shell: bash
+        run: echo "version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Check the tag against the workspace version
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          test "$GITHUB_REF_NAME" = "v$VERSION" || { echo "tag $GITHUB_REF_NAME must equal v$VERSION"; exit 1; }
+          scripts/release-meta.sh title "$GITHUB_REF_NAME"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked -p greyscreen -p greyscreen-cli
+      - name: Stage unsigned files
+        shell: bash
+        run: |
+          mkdir unsigned
+          cp target/release/greyscreen.exe target/release/greyscreen-cli.exe unsigned/
+      - uses: actions/upload-artifact@v7
+        id: unsigned
+        with:
+          name: unsigned
+          path: unsigned/
+          if-no-files-found: error
+      - name: Sign with SignPath
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'greyscreen' }}
+          signing-policy-slug: ${{ github.ref_type == 'tag' && 'release-signing' || 'test-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+      - name: Stage release files
+        shell: bash
+        run: |
+          from=unsigned
+          [ -f signed/greyscreen.exe ] && from=signed
+          echo "release files come from $from"
+          mkdir release
+          cp "$from/greyscreen.exe" "$from/greyscreen-cli.exe" packaging/README.txt release/
+          cp LICENSE release/LICENSE.txt
+          cp release/greyscreen.exe release/GreyscreenSetup.exe
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: release
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in *-*) channel=--prerelease ;; *) channel=--latest ;; esac
+          scripts/release-meta.sh notes "$TAG" > notes.md
+          gh release create "$TAG" release/GreyscreenSetup.exe release/greyscreen.exe release/greyscreen-cli.exe release/README.txt release/LICENSE.txt \
+            --verify-tag --title "$(scripts/release-meta.sh title "$TAG")" --notes-file notes.md "$channel"
+      - name: Deploy the website
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK"

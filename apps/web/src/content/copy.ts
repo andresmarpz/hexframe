@@ -25,6 +25,7 @@ export const nav = [
 
 export const footerLinks = [
   { label: "Privacy", href: "/privacy/" },
+  { label: "Code signing policy", href: "/code-signing/" },
   { label: "Get help", href: "/faq/#help" },
   { label: "GitHub Issues", href: issuesUrl },
   ...(discordUrl ? [{ label: "Discord", href: discordUrl }] : []),

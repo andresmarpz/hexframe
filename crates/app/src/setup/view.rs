@@ -7,6 +7,7 @@ use crate::logo::LOGO;
 const LOGO_SIZE: f32 = 56.0;
 const CONTENT_WIDTH: f32 = 340.0;
 const ACTION_HEIGHT: f32 = 112.0;
+const PRIVACY_URL: &str = "https://greyscreen.app/privacy/";
 
 pub(super) fn root(s: &SetupState, cx: &mut Cx<SetupState>) -> El {
     let k = Kit::neutral(cx.system_dark());
@@ -19,6 +20,14 @@ pub(super) fn root(s: &SetupState, cx: &mut Cx<SetupState>) -> El {
         .gap(24.0)
         .child(heading(&k))
         .child(action(s, &k))
+        .child(footer(s, &k));
+    rune_kit::root(body, Vec::new())
+}
+
+fn footer(s: &SetupState, k: &Kit) -> El {
+    col()
+        .center()
+        .gap(4.0)
         .child(
             text(format!("Installs to {}", s.install_path))
                 .key("setup-path")
@@ -27,8 +36,8 @@ pub(super) fn root(s: &SetupState, cx: &mut Cx<SetupState>) -> El {
                 .wrap()
                 .align(Align::Center)
                 .w(CONTENT_WIDTH),
-        );
-    rune_kit::root(body, Vec::new())
+        )
+        .child(privacy_link(k))
 }
 
 fn heading(k: &Kit) -> El {
@@ -124,6 +133,19 @@ fn install_button(k: &Kit, label: &str) -> El {
         .on_press(|s: &mut SetupState| s.install())
         .build(k)
         .key("setup-install")
+}
+
+fn privacy_link(k: &Kit) -> El {
+    Button::new("Privacy policy")
+        .variant(ButtonVariant::GhostMuted)
+        .control_size(ControlSize::Small)
+        .on_press_tx(|_: &mut SetupState, tx: &mut rune::Tx| {
+            if let Err(err) = tx.open_url(PRIVACY_URL) {
+                tracing::warn!(%err, "cannot open the privacy policy");
+            }
+        })
+        .build(k)
+        .key("setup-privacy")
 }
 
 fn busy(k: &Kit, label: &str) -> El {
