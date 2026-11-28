@@ -224,13 +224,19 @@ impl WeekStats {
     }
 }
 
-pub(crate) fn week_stats(recordings: &[RecordingEntry], now: &Zoned) -> WeekStats {
+fn this_week<'a>(
+    recordings: &'a [RecordingEntry],
+    now: &Zoned,
+) -> impl Iterator<Item = &'a RecordingEntry> {
     let cutoff = now.timestamp().as_second() - WEEK_SECS;
+    recordings
+        .iter()
+        .filter(move |rec| rec.meta.started_at.timestamp().as_second() >= cutoff)
+}
+
+pub(crate) fn week_stats(recordings: &[RecordingEntry], now: &Zoned) -> WeekStats {
     let mut stats = WeekStats::default();
-    for rec in recordings {
-        if rec.meta.started_at.timestamp().as_second() < cutoff {
-            continue;
-        }
+    for rec in this_week(recordings, now) {
         stats.games += 1;
         stats.secs += rec.meta.duration_secs;
         match rec.meta.game.result {
@@ -240,6 +246,41 @@ pub(crate) fn week_stats(recordings: &[RecordingEntry], now: &Zoned) -> WeekStat
         }
     }
     stats
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(crate) struct WeekStrip {
+    pub results: Vec<GameResult>,
+    pub most_played: Option<String>,
+}
+
+#[allow(dead_code)]
+pub(crate) fn week_strip(recordings: &[RecordingEntry], now: &Zoned, limit: usize) -> WeekStrip {
+    let mut games: Vec<&RecordingEntry> = this_week(recordings, now).collect();
+    games.sort_by_key(|rec| rec.meta.started_at.timestamp());
+    let mut counts: Vec<(&str, usize)> = Vec::new();
+    for rec in &games {
+        let champion = rec.meta.game.info.me.champion.as_str();
+        match counts.iter_mut().find(|(name, _)| *name == champion) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((champion, 1)),
+        }
+    }
+    let most_played = counts
+        .iter()
+        .enumerate()
+        .max_by_key(|(order, (_, count))| (*count, *order))
+        .map(|(_, (name, _))| (*name).to_owned());
+    let skip = games.len().saturating_sub(limit);
+    WeekStrip {
+        results: games
+            .iter()
+            .skip(skip)
+            .map(|rec| rec.meta.game.result)
+            .collect(),
+        most_played,
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -320,6 +320,7 @@ impl Control {
             meta: recording.meta,
             folder: recording.folder,
         }));
+        library::spawn_usage(self.settings.output_dir.clone(), self.sink.clone());
         storage::spawn(
             self.settings.output_dir.clone(),
             self.settings.storage_limit_bytes(),

@@ -18,6 +18,7 @@ mod storage;
 mod storyboard;
 mod thumbs;
 pub mod updater;
+mod usage;
 mod writer;
 
 pub use api::{

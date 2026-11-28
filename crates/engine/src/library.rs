@@ -8,6 +8,7 @@ use crate::api::{RecordingEntry, UiMsg};
 use crate::control::Sink;
 use crate::recovery;
 use crate::storage::{self, ActiveFolder};
+use crate::usage;
 use crate::writer::VIDEO_FILE;
 
 pub(crate) const CLIPS_DIR: &str = "clips";
@@ -39,10 +40,21 @@ pub fn entries(output_dir: &Path) -> Vec<RecordingEntry> {
         .collect()
 }
 
+pub(crate) fn publish(output_dir: &Path, sink: &Sink) {
+    sink(UiMsg::Library(entries(output_dir)));
+    publish_usage(output_dir, sink);
+}
+
+pub(crate) fn publish_usage(output_dir: &Path, sink: &Sink) {
+    sink(UiMsg::Storage(usage::scan(output_dir)));
+}
+
+pub(crate) fn spawn_usage(output_dir: PathBuf, sink: Sink) {
+    spawn_worker("storage-usage", move || publish_usage(&output_dir, &sink));
+}
+
 pub(crate) fn spawn_scan(output_dir: PathBuf, sink: Sink) {
-    spawn_worker("library-scan", move || {
-        sink(UiMsg::Library(entries(&output_dir)));
-    });
+    spawn_worker("library-scan", move || publish(&output_dir, &sink));
 }
 
 pub(crate) fn spawn_startup(
@@ -55,7 +67,7 @@ pub(crate) fn spawn_startup(
     spawn_worker("library-startup", move || {
         let recovery = recovery::recover_parts(&parts, &active);
         storage::run(&output_dir, limit_bytes, &active, &sink);
-        sink(UiMsg::Library(entries(&output_dir)));
+        publish(&output_dir, &sink);
         if let Some(notice) = recovery.notice(&output_dir) {
             sink(notice);
         }

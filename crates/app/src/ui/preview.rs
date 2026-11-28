@@ -1,9 +1,11 @@
 mod death;
+mod events;
 mod health;
 mod thumbs;
 
 use std::path::PathBuf;
 
+use greyscreen_core::disk::StorageUsage;
 use greyscreen_core::game::{GameEvent, GameInfo, GameResult, Player, Team};
 use greyscreen_core::highlight::{Highlight, Objective, Structure};
 use greyscreen_core::library::thumb::clip_thumb_file;
@@ -33,6 +35,12 @@ pub(super) fn ui() -> Ui {
     ui.elapsed_secs = 12 * 60 + 34;
     ui.feed = feed().into();
     ui.recordings = recordings();
+    ui.storage = Some(StorageUsage {
+        videos: 104_000_000_000,
+        clips: 6_200_000_000,
+        previews: 1_800_000_000,
+        free: Some(418_000_000_000),
+    });
     ui.live_selected = true;
     ui.screen = Screen::Games;
     if rune::is_headless() {
@@ -66,12 +74,28 @@ fn player(champion: &str) -> Player {
     }
 }
 
+fn mate(name: &str, team: Team) -> Player {
+    Player {
+        name: name.into(),
+        champion: name.into(),
+        team,
+        is_bot: false,
+    }
+}
+
 fn game_info(champion: &str, mode: &str) -> GameInfo {
     GameInfo {
         mode: mode.into(),
         map: Some(11),
         me: player(champion),
-        players: vec![player(champion)],
+        players: [
+            player(champion),
+            mate("Jinx", Team::Order),
+            mate("Lux", Team::Chaos),
+            mate("Lee Sin", Team::Chaos),
+            mate("Zed", Team::Chaos),
+        ]
+        .into(),
     }
 }
 
@@ -163,30 +187,18 @@ fn entry(row: Row) -> RecordingEntry {
         row.champion,
         row.mode
     );
-    let (kills, deaths, assists) = (
-        row.clips + 1,
-        (row.size_mb / 500) as usize,
-        row.minutes as usize / 3,
+    let info = game_info(row.champion, row.mode);
+    let events = events::build(
+        &events::Shape {
+            minutes: row.minutes,
+            kills: row.clips + 1,
+            deaths: (row.size_mb / 500) as usize,
+            assists: row.minutes as usize / 3,
+            rift: row.mode == "CLASSIC",
+            result: row.result,
+        },
+        &info,
     );
-    let me = || String::from("Summoner");
-    let fights = (0..kills)
-        .map(|_| (me(), "Zed".to_owned(), Vec::new()))
-        .chain((0..deaths).map(|_| ("Lee Sin".to_owned(), me(), Vec::new())))
-        .chain((0..assists).map(|_| ("Jinx".to_owned(), "Lux".to_owned(), vec![me()])));
-    let events = fights
-        .zip(1u32..)
-        .map(|((killer, victim, assisters), id)| EventEntry {
-            id,
-            game_secs: f64::from(id) * 60.0,
-            rec_secs: f64::from(id) * 60.0 + 8.0,
-            kind: GameEvent::ChampionKill {
-                killer,
-                victim,
-                assisters,
-            },
-            highlights: Vec::new(),
-        })
-        .collect();
     let clips = (0..row.clips)
         .map(|i| ClipEntry {
             file: format!("clips/{i:02}-00_MyKill.mp4"),
@@ -205,7 +217,7 @@ fn entry(row: Row) -> RecordingEntry {
             duration_secs: row.minutes * 60.0,
             video: "game.mp4".into(),
             game: GameRecord {
-                info: game_info(row.champion, row.mode),
+                info,
                 result: row.result,
             },
             events,
@@ -272,15 +284,6 @@ pub(super) fn demo_recordings() -> Vec<RecordingEntry> {
             let scale = fixture.meta.duration_secs / last;
             for event in &mut rec.meta.events {
                 event.rec_secs *= scale;
-                event.highlights = match &event.kind {
-                    GameEvent::ChampionKill { killer, .. } if killer == "Summoner" => {
-                        vec!["MyKill".to_owned()]
-                    }
-                    GameEvent::ChampionKill { victim, .. } if victim == "Summoner" => {
-                        vec!["MyDeath".to_owned()]
-                    }
-                    _ => vec!["MyAssist".to_owned()],
-                };
             }
             if !rec.meta.clips.is_empty() {
                 rec.meta.clips = fixture.meta.clips.clone();
@@ -299,18 +302,6 @@ pub(super) fn review_entry() -> RecordingEntry {
     entry.meta.video = "review.mp4".into();
     entry.meta.duration_secs = 10.0;
     let who = || String::from("Summoner");
-    let mate = |name: &str, champion: &str, team: Team| Player {
-        name: name.into(),
-        champion: champion.into(),
-        team,
-        is_bot: false,
-    };
-    entry.meta.game.info.players.extend([
-        mate("Jinx", "Jinx", Team::Order),
-        mate("Lux", "Lux", Team::Chaos),
-        mate("Lee Sin", "Lee Sin", Team::Chaos),
-        mate("Zed", "Zed", Team::Chaos),
-    ]);
     let kill = |killer: &str, victim: &str| GameEvent::ChampionKill {
         killer: killer.into(),
         victim: victim.into(),

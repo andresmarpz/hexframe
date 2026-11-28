@@ -93,7 +93,7 @@ fn run(output_dir: &Path, id: &str, active: Option<&str>, mover: Mover, sink: &S
             });
         }
     }
-    sink(UiMsg::Library(library::entries(output_dir)));
+    library::publish(output_dir, sink);
 }
 
 pub(crate) fn spawn(output_dir: PathBuf, id: String, active: Option<String>, sink: Sink) {

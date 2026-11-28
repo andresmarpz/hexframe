@@ -4,6 +4,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crossbeam_channel::{Sender, unbounded};
+use greyscreen_core::disk::StorageUsage;
 use greyscreen_core::encoder::EncoderCheck;
 use greyscreen_core::export::{ExportEvent, ExportJob};
 use greyscreen_core::feedback::{FeedbackDraft, FeedbackResult};
@@ -95,6 +96,7 @@ pub enum UiMsg {
     ClipSaved(ClipEntry),
     RecordingSaved(RecordingEntry),
     Library(Vec<RecordingEntry>),
+    Storage(StorageUsage),
     Notice {
         level: NoticeLevel,
         text: String,

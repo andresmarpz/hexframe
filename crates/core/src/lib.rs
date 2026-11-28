@@ -26,4 +26,5 @@ pub mod session;
 pub mod settings;
 pub mod tear;
 pub mod time;
+pub mod timeline;
 pub mod update;

@@ -74,6 +74,7 @@ impl Ui {
                 self.show_notice(NoticeLevel::Info, text, tx);
             }
             UiMsg::Library(recordings) => self.apply_library(recordings),
+            UiMsg::Storage(usage) => self.storage = Some(usage),
             UiMsg::Thumbnail(path) => crate::view::thumb::invalidate(&path),
             UiMsg::Storyboard(folder) => self.storyboard_ready(&folder),
             UiMsg::Notice { level, text } => self.show_notice(level, text, tx),

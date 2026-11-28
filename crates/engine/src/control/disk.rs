@@ -88,6 +88,7 @@ impl Control {
         tracing::info!(cleanup = ?cleaned.cleanup, "deleted old game videos to make room");
         self.notice(NoticeLevel::Info, cleaned.cleanup.low_disk_notice());
         self.send(UiMsg::Library(cleaned.entries));
+        library::spawn_usage(self.settings.output_dir.clone(), self.sink.clone());
     }
 
     fn free_bytes(&self) -> Option<u64> {

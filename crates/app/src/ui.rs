@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crossbeam_channel::Sender;
+use greyscreen_core::disk::StorageUsage;
 use greyscreen_core::encoder::EncoderCheck;
 use greyscreen_core::keybinds::Action;
 use greyscreen_core::settings::Settings;
@@ -83,6 +84,7 @@ pub(crate) struct Ui {
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
     pub recordings: Vec<RecordingEntry>,
+    pub storage: Option<StorageUsage>,
     pub filter: RecordingsFilter,
     pub last_game: Option<RecordingEntry>,
     pub settings: Settings,
@@ -142,6 +144,7 @@ impl Ui {
             status: EngineStatus::Idle,
             feed: VecDeque::new(),
             recordings: Vec::new(),
+            storage: None,
             filter: RecordingsFilter::default(),
             last_game: None,
             notice: None,

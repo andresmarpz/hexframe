@@ -60,7 +60,7 @@ fn active_id(active: &ActiveFolder) -> Option<String> {
     active.lock().map(|id| id.clone()).unwrap_or_default()
 }
 
-fn folder_bytes(folder: &Path) -> u64 {
+pub(crate) fn folder_bytes(folder: &Path) -> u64 {
     let Ok(entries) = fs::read_dir(folder) else {
         return 0;
     };
@@ -169,7 +169,7 @@ pub(crate) fn run(output_dir: &Path, limit_bytes: Option<u64>, active: &ActiveFo
         level: NoticeLevel::Info,
         text: cleanup.notice(),
     });
-    sink(UiMsg::Library(library::entries(output_dir)));
+    library::publish(output_dir, sink);
 }
 
 pub(crate) fn spawn(

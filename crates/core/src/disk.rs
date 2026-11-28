@@ -9,6 +9,20 @@ pub const CHECK_EVERY_SECS: u64 = 10;
 
 const _: () = assert!(STOP_BYTES < START_FLOOR_BYTES);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct StorageUsage {
+    pub videos: u64,
+    pub clips: u64,
+    pub previews: u64,
+    pub free: Option<u64>,
+}
+
+impl StorageUsage {
+    pub fn used(&self) -> u64 {
+        self.videos + self.clips + self.previews
+    }
+}
+
 pub fn bytes_per_sec(config: &CaptureConfig) -> u64 {
     let audio = if config.audio {
         u64::from(config.audio_bitrate)
