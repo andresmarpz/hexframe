@@ -115,6 +115,6 @@ Dock geometry: the dock is 48 tall with a 24 radius.
   - Captions read "Double Kill" … "Penta Kill", with no numbers.
 - **Top bar:**
   - The titlebar has no fill and no line, so the background (and Home's ambient frame) runs to the top of the window.
-  - Home, Games and Clips sit in a floating **top dock**: a 40 px pill with radius 20, `var(--color-surface)`, and the bottom dock's shadow, holding the stock kit segmented control.
+  - Home, Games and Clips sit in a floating **top dock**: a 36 px tray with radius 10 and 4 px padding on every side, so its corners are concentric with the stock kit segmented control (radius 6) inside it. It uses `var(--color-surface)` and the bottom dock's shadow, and is centred in the 44 px bar (4 px from the top).
   - Brand, settings gear and the Windows window buttons stay on the clear bar.
   - Sheet: Components › "Top bar".
