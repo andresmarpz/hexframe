@@ -1,0 +1,152 @@
+.head {
+  padding: 96px var(--gutter) 0;
+}
+
+.head h1 {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding-bottom: 32px;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 96px;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 96px var(--gutter) 0;
+  box-sizing: content-box;
+}
+
+.group {
+  display: flex;
+  border-top: 1px solid var(--color-site-concrete);
+  padding-top: 32px;
+  scroll-margin-top: 96px;
+}
+
+.groupTitle {
+  flex: none;
+  width: 320px;
+  padding-top: 4px;
+  color: var(--color-site-ink);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 48px;
+  width: 760px;
+}
+
+.intro {
+  margin: 0;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 112px;
+}
+
+.question {
+  color: var(--color-site-ink);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.answer code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+  color: var(--color-site-ink);
+}
+
+.help {
+  padding: 96px var(--gutter) 320px;
+  scroll-margin-top: 32px;
+}
+
+.card {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 48px;
+  border-radius: var(--radius-site-stage);
+  background: var(--color-site-fog);
+}
+
+.helpMain {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 24px;
+  width: 560px;
+}
+
+.helpHead,
+.helpItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.helpHead {
+  gap: 12px;
+}
+
+.helpItem {
+  gap: 8px;
+}
+
+.helpSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: none;
+  gap: 24px;
+  width: 360px;
+}
+
+.note {
+  color: var(--color-site-graphite);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+@media (max-width: 899px) {
+  .group {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .groupTitle {
+    width: auto;
+    padding-top: 0;
+  }
+
+  .column {
+    width: auto;
+  }
+
+  .card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 32px;
+    padding: 28px 24px;
+  }
+
+  .helpMain,
+  .helpSide {
+    width: auto;
+  }
+}
