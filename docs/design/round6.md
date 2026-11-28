@@ -64,7 +64,7 @@ Dock geometry: the dock is 48 tall with a 24 radius.
 ## Icon rules (Andres, 2026-11-27)
 
 - **Folder:** always the custom `folder-reveal` icon (Duotone `3RB-0`, Line `3R1-0`, page `p-5-0`). The flat kit folder is retired.
-- **Settings, storage settings and any settings entry:** always the custom **gear** (Duotone `7MG-0`, Line `7M8-0`). It replaces the kit's hexagon `settings-gear`.
+- **Settings, storage settings and any settings entry:** always the **Rune kit `settings-gear`** icon. The custom gear was deleted (Andres, 2026-11-27).
 - **Objectives:** flat traced Riot silhouettes (`lol-icons/match-history/svg/`).
 - **Kill:** Riot's crossed swords.
 - **Death:** the skull.
@@ -77,3 +77,19 @@ Dock geometry: the dock is 48 tall with a 24 radius.
   - The kill icon sits 1 px from the top of the content.
   - A badge circle 8 px wide, filled with the box colour, starts at y 10 and holds the number (7 px, weight 700). It knocks out only the handle tips.
 - **Penta:** an inverted box, solid success-fg with dark swords, plus a soft green glow.
+
+## File layout (Andres, 2026-11-27)
+
+- **Official screens:** page `Home` (`p-9-0`) and page `Last game` (`p-A-0`), one artboard each. Edit them in place. Do not make round copies any more.
+- **App-only components:** page `Components` (`p-B-0`), one sheet per component in the Rune Kit convention (layers named `Component / Variant / State`):
+  - the recording dock;
+  - the record button;
+  - the storage popover;
+  - the last game card;
+  - the clip card;
+  - game actions;
+  - the timeline box.
+
+  Rune Kit stays the shared kit. Generic parts can be promoted into it later.
+- **Icons:** page `Icons`.
+- **Older rounds:** archived under the bottom divider.
