@@ -3,7 +3,7 @@ import styles from "./Numbers.module.css";
 
 const numbers = [
   { value: "1080p60", label: "DEFAULT QUALITY" },
-  { value: "~55 MB", label: "PER MINUTE" },
+  { value: "AGPL-3.0", label: "OPEN SOURCE" },
   { value: "1 .exe", label: "NO ADMIN RIGHTS" },
 ];
 

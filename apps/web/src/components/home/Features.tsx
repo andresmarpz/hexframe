@@ -7,7 +7,7 @@ const steps = [
   {
     time: "00:01",
     title: "Play normally.",
-    body: "Your GPU records the game window and League's audio. Discord and your mic stay out.",
+    body: "It records the game and League's sound. Discord and your mic stay out.",
   },
   { time: "32:14", title: "Review and clip.", body: "Jump to any kill, death or objective." },
 ];

@@ -7,10 +7,10 @@ export const site = {
   name: "Greyscreen",
   title: "Greyscreen — Automatic League of Legends recorder for Windows",
   description:
-    "Free, open-source League of Legends recorder for Windows. Auto-records games and key clips on your GPU. Local MP4 files, no account.",
+    "A fast, free and open-source League of Legends recorder for Windows. Records every game and cuts the clips for you. No ads, no account.",
   ogTitle: "Greyscreen — Automatic League of Legends recorder for Windows",
   ogDescription:
-    "Free, open-source Windows recorder for League of Legends. Auto-captures full games and clips on your GPU, with an event timeline for review.",
+    "A fast League of Legends recorder for Windows with no ads and no account. Records every game, marks every death and cuts the clips for you.",
   tagline: "Free, open-source League of Legends recorder for Windows.",
   riotNotice:
     "Greyscreen isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",

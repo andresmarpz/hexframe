@@ -5,9 +5,9 @@ import { DeathReview } from "./sections/DeathReview";
 import styles from "./sections/Timeline.module.css";
 
 const points = [
-  { title: "Filters and pre-roll", body: "Jump to 5 seconds before any event." },
+  { title: "Filters and pre-roll", body: "Show only what you want. Jumps start 5 seconds early." },
   { title: "Death review", body: "Step through each death, tag it, write a note." },
-  { title: "Theater mode and speed", body: "Go big, or slow it down to see what went wrong." },
+  { title: "Theater mode and speed", body: "Fill the window, or slow it down to see what went wrong." },
 ];
 
 export function Timeline() {
@@ -17,8 +17,7 @@ export function Timeline() {
         <RespawnLabel seconds={20} />
         <h2 className={`h2 ${styles.title}`}>every death, on the timeline.</h2>
         <p className={`body ${styles.intro}`}>
-          Scrubbing a 32 minute game for one fight is a waste of a grey screen. Greyscreen puts every event on the seek bar,
-          so you jump straight to the play.
+          Every kill, death and objective gets a marker on the seek bar. Click one and you&apos;re at the fight.
         </p>
         <ul className={styles.points}>
           {points.map((point) => (

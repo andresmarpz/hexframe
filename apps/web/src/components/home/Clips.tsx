@@ -30,8 +30,8 @@ export function Clips() {
         <RespawnLabel seconds={10} />
         <h2 className={`h2 ${styles.title}`}>clips cut themselves.</h2>
         <p className={`body ${styles.intro}`}>
-          Kills, multikills, aces, dragons, barons: clipped while you play. Saw something the game didn&apos;t count? Press F9
-          to save the last 30 seconds.
+          Kills, multikills, aces, dragons and barons are clipped while you play. Press F9 to save the last 30 seconds of
+          anything else.
         </p>
         <kbd className={styles.keycap}>F9</kbd>
         <div className={styles.export}>

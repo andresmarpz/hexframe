@@ -26,8 +26,7 @@ export function Hero({ downloads }: Props) {
         <div className={styles.row}>
           <div className={styles.copy}>
             <p className={`lead ${styles.lead}`}>
-              Greyscreen records every League game on your GPU, pins every kill, death and dragon to a timeline, and
-              cuts the clips for you.
+              A fast League recorder with no ads and no account. It records every game and cuts the clips for you.
             </p>
             <div className={styles.buttons}>
               <DownloadButton initial={downloads} />
