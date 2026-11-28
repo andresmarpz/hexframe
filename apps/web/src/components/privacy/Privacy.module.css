@@ -44,6 +44,7 @@
   flex: none;
   gap: 16px;
   width: 760px;
+  max-width: calc(100% - 320px);
 }
 
 .sent {
@@ -111,6 +112,7 @@
 
   .content {
     width: auto;
+    max-width: none;
   }
 }
 

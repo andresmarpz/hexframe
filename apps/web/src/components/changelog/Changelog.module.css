@@ -47,6 +47,7 @@
   flex: none;
   gap: 20px;
   width: 760px;
+  max-width: calc(100% - 320px);
 }
 
 .bullets {
@@ -94,6 +95,7 @@
   .meta,
   .body {
     width: auto;
+    max-width: none;
     padding-top: 0;
   }
 }

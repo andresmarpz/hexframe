@@ -38,6 +38,7 @@
   flex: none;
   gap: 48px;
   width: 760px;
+  max-width: calc(100% - 320px);
 }
 
 .intro {
@@ -89,7 +90,8 @@
 .helpMain {
   display: flex;
   flex-direction: column;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 24px;
   width: 560px;
 }
@@ -112,7 +114,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 24px;
   width: 360px;
 }
@@ -136,6 +139,7 @@
 
   .column {
     width: auto;
+    max-width: none;
   }
 
   .card {
