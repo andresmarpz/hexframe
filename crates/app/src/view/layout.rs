@@ -1,9 +1,7 @@
-use greyscreen_core::settings::NavStyle;
 use rune::{El, ScrollSpec, TextStyle, col, el, row, text};
 use rune_kit::Kit;
 
 use super::shell;
-use crate::ui::Ui;
 
 pub(crate) const TABULAR: &str = "'tnum' 1";
 const PAGE_MAX_WIDTH: f32 = 880.0;
@@ -21,35 +19,28 @@ pub(super) fn content_column() -> El {
         .items_center()
 }
 
-pub(super) fn page_column(s: &Ui) -> El {
+pub(super) fn page_column() -> El {
     col()
         .key("page")
         .w_full()
         .max_w(PAGE_MAX_WIDTH)
         .px(PAGE_GUTTER)
         .pt(20.0)
-        .pb(PAGE_GUTTER.max(dock_clearance(s)))
+        .pb(shell::CLEARANCE)
         .gap(16.0)
 }
 
-pub(super) fn dock_clearance(s: &Ui) -> f32 {
-    match s.settings.nav_style {
-        NavStyle::Sidebar => 0.0,
-        NavStyle::Dock => shell::dock::CLEARANCE,
-    }
+pub(super) fn fixed_content(page: El) -> El {
+    content_column().child(page_column().h_full().min_h(0.0).child(page))
 }
 
-pub(super) fn fixed_content(s: &Ui, page: El) -> El {
-    content_column().child(page_column(s).h_full().min_h(0.0).child(page))
-}
-
-pub(super) fn scrolling_content(s: &Ui, page: El) -> El {
+pub(super) fn scrolling_content(page: El) -> El {
     content_column()
         .scroll(ScrollSpec {
             stick_bottom: false,
         })
         .scroll_edge_fade(SCROLL_FADE)
-        .child(page_column(s).child(page))
+        .child(page_column().child(page))
 }
 
 pub(super) fn card(k: &Kit) -> El {

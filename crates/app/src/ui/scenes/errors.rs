@@ -1,8 +1,8 @@
 use greyscreen_core::problem::{FOLDER_UNUSABLE, NO_FRAMES};
 use greyscreen_engine::EngineStatus;
 
-use super::{Scene, docked, home};
-use crate::ui::{Screen, Ui};
+use super::{Scene, home};
+use crate::ui::Ui;
 
 fn failed(ui: &mut Ui, raw: &str) {
     home(ui);
@@ -45,10 +45,5 @@ pub(super) const SCENES: &[Scene] = &[
             ui,
             "screen capture failed to start: windows api error: Access is denied. (0x80070005)",
         );
-    }),
-    ("dock-error", |ui| {
-        docked(ui);
-        ui.status = EngineStatus::Error(NO_FRAMES.to_owned());
-        ui.go(Screen::Home);
     }),
 ];

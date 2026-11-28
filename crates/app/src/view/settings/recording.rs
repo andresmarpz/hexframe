@@ -1,5 +1,5 @@
 use greyscreen_core::encoder::CheckOutcome;
-use greyscreen_core::settings::{NavStyle, Quality, Resolution, resolution_options};
+use greyscreen_core::settings::{Quality, Resolution, resolution_options};
 use greyscreen_engine::EngineStatus;
 use rune::{Drag, El, Phase, row, text};
 use rune_kit::{Kit, SegmentedControl, Select, SelectAppearance};
@@ -14,9 +14,6 @@ const QUALITIES: [(Quality, &str); 3] = [
     (Quality::High, "High"),
     (Quality::Max, "Max"),
 ];
-const NAV_STYLES: [(NavStyle, &str); 2] =
-    [(NavStyle::Sidebar, "Sidebar"), (NavStyle::Dock, "Dock")];
-const NAV_STYLE_WIDTH: f32 = 160.0;
 const QUALITY_NOTE: &str = "Higher quality uses more disk space.";
 const FALLBACK_NATIVE_HEIGHT: u32 = 1440;
 const FPS_OPTIONS: [u32; 2] = [30, 60];
@@ -112,13 +109,6 @@ pub(super) fn render(s: &Ui, k: &Kit, layer: &mut Vec<El>, which: Row) -> El {
             settings.capture_cursor,
             |ui| ui.change(|s| s.capture_cursor = !s.capture_cursor),
         ),
-        Row::NavStyle => setting_row(
-            k,
-            "nav-style-row",
-            "Navigation style",
-            Some("A side panel, or a floating dock at the bottom."),
-            nav_style(s, k),
-        ),
         Row::SoundEffects => toggle_row(
             k,
             "sound-effects",
@@ -193,20 +183,6 @@ fn sound_volume(s: &Ui, k: &Kit) -> El {
                 .color(k.c.text_muted)
                 .w(PERCENT_WIDTH),
         )
-}
-
-fn nav_style(s: &Ui, k: &Kit) -> El {
-    SegmentedControl::new(
-        &NAV_STYLES.map(|(_, label)| label),
-        NAV_STYLES
-            .iter()
-            .position(|(style, _)| *style == s.settings.nav_style),
-    )
-    .label("Navigation style")
-    .width(Some(NAV_STYLE_WIDTH))
-    .on_pick(|ui: &mut Ui, i: usize, _: &mut rune::Tx| ui.change(|s| s.nav_style = NAV_STYLES[i].0))
-    .build(k)
-    .key("nav-style")
 }
 
 pub(in crate::view) fn quality_control(s: &Ui, k: &Kit, key: &'static str) -> El {

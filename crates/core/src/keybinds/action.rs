@@ -107,7 +107,6 @@ actions! {
     PreviousGame => Spec::new("previous_game", "Previous game", Group::General, Scope::App, &["Up"]),
     NextGame => Spec::new("next_game", "Next game", Group::General, Scope::App, &["Down"]),
     FocusPlayer => Spec::new("focus_player", "Focus the player", Group::General, Scope::App, &["Enter"]),
-    ToggleNav => Spec::new("toggle_nav", "Collapse or expand the navigation", Group::General, Scope::App, &["Mod+\\"]),
     FocusSearch => Spec::new("focus_search", "Search games", Group::General, Scope::App, &["Mod+F"]),
     SendFeedback => Spec::new("send_feedback", "Send feedback", Group::General, Scope::App, &[]),
 }

@@ -14,7 +14,6 @@ pub(super) enum Row {
     Encoder,
     Audio,
     Cursor,
-    NavStyle,
     SoundEffects,
     SoundVolume,
     Diagnostics,
@@ -47,7 +46,6 @@ impl Row {
             }
             Self::Audio => "audio sound game audio microphone discord",
             Self::Cursor => "cursor mouse pointer",
-            Self::NavStyle => "navigation style layout sidebar dock menu tabs",
             Self::SoundEffects => {
                 "sound effects sounds noise chime click beep notification mute quiet"
             }
@@ -103,17 +101,15 @@ pub(super) struct SectionGroup {
 pub(super) fn groups_in(section: SettingsSection) -> Vec<SectionGroup> {
     match section {
         SettingsSection::General => {
-            let mut app_rows = Vec::new();
+            let mut groups = Vec::new();
             if platform::CAN_START_WITH_WINDOWS {
-                app_rows.push(Row::StartWithWindows);
-            }
-            app_rows.push(Row::NavStyle);
-            vec![
-                SectionGroup {
+                groups.push(SectionGroup {
                     id: "app",
                     title: Some("App"),
-                    rows: app_rows,
-                },
+                    rows: vec![Row::StartWithWindows],
+                });
+            }
+            groups.extend([
                 SectionGroup {
                     id: "sound",
                     title: Some("Sound"),
@@ -134,7 +130,8 @@ pub(super) fn groups_in(section: SettingsSection) -> Vec<SectionGroup> {
                     title: Some("About"),
                     rows: vec![Row::Version, Row::RiotNotice],
                 },
-            ]
+            ]);
+            groups
         }
         SettingsSection::Recording => vec![
             SectionGroup {

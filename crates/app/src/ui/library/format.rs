@@ -91,27 +91,6 @@ pub(crate) fn day_heading(at: &Zoned, now: &Zoned) -> String {
     }
 }
 
-pub(crate) fn ago(at: &Zoned, now: &Zoned) -> String {
-    const MINUTE: i64 = 60;
-    const HOUR: i64 = 60 * MINUTE;
-    const DAY: i64 = 24 * HOUR;
-    let secs = now.timestamp().as_second() - at.timestamp().as_second();
-    match secs {
-        ..MINUTE => "now".to_owned(),
-        MINUTE..HOUR => format!("{}m", secs / MINUTE),
-        HOUR..DAY => format!("{}h", secs / HOUR),
-        DAY..WEEK_SECS => format!("{}d", secs / DAY),
-        _ => format!("{}w", secs / WEEK_SECS),
-    }
-}
-
-pub(crate) fn recent_games(recordings: &[RecordingEntry], limit: usize) -> Vec<&RecordingEntry> {
-    let mut games: Vec<&RecordingEntry> = recordings.iter().collect();
-    games.sort_by_key(|rec| std::cmp::Reverse(rec.meta.started_at.timestamp()));
-    games.truncate(limit);
-    games
-}
-
 pub(crate) fn kda(events: &[EventEntry], info: &GameInfo) -> Kda {
     let mut kda = Kda::default();
     for event in events {

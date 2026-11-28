@@ -1,4 +1,3 @@
-use greyscreen_core::settings::NavStyle;
 use greyscreen_core::update::UpdateInfo;
 use rune::{El, row};
 use rune_kit::{Kit, Toast};
@@ -13,10 +12,8 @@ pub(crate) fn layer(s: &Ui, k: &Kit) -> Option<El> {
     let info = s.update_banner()?;
     let bottom_gap = if s.notice.is_some() {
         NOTICE_GAP
-    } else if s.settings.nav_style == NavStyle::Dock {
-        DOCK_GAP
     } else {
-        EDGE_GAP
+        DOCK_GAP
     };
     Some(
         row()

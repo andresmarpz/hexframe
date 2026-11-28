@@ -1,5 +1,4 @@
 mod death;
-mod dock;
 mod errors;
 mod export;
 mod feedback;
@@ -9,12 +8,12 @@ mod icons;
 mod notices;
 mod review;
 mod settings;
+mod shell;
 mod update;
 
 use std::sync::OnceLock;
 
 use greyscreen_core::encoder::{CheckOutcome, EncoderCheck};
-use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::EngineStatus;
 
 use super::{Screen, SettingsSection, Ui, preview};
@@ -29,11 +28,11 @@ pub(crate) fn all() -> &'static [Scene] {
             icons::SCENES,
             notices::SCENES,
             games::SCENES,
-            dock::SCENES,
             errors::SCENES,
             export::SCENES,
             review::SCENES,
             settings::SCENES,
+            shell::SCENES,
             update::SCENES,
             feedback::SCENES,
         ]
@@ -76,9 +75,4 @@ fn encoder(outcome: CheckOutcome, name: &str) -> Option<EncoderCheck> {
         noticed: true,
         verdicts: Vec::new(),
     })
-}
-
-fn docked(ui: &mut Ui) {
-    idle(ui);
-    ui.settings.nav_style = NavStyle::Dock;
 }

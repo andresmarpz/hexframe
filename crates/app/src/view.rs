@@ -6,13 +6,12 @@ mod overlays;
 mod review;
 mod screens;
 mod settings;
-mod shell;
+pub(crate) mod shell;
 mod widgets;
 
 pub(crate) use widgets::{champion, icon_sheet, thumb};
 
-use greyscreen_core::settings::NavStyle;
-use rune::{Cx, El, col, row};
+use rune::{Cx, El, col};
 use rune_kit::Kit;
 
 use crate::ui::Ui;
@@ -64,35 +63,20 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
 
 fn window(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     let review_width = cx.layout_with("review", |r| r[2]);
-    match s.settings.nav_style {
-        NavStyle::Sidebar => {
-            let folded = shell::sidebar::is_folded(s, cx.layout_with("window", |r| r[2]));
-            row()
-                .key("window")
+    col()
+        .key("window")
+        .w_full()
+        .h_full()
+        .fill(k.c.bg_deep)
+        .child(
+            col()
                 .w_full()
-                .h_full()
-                .fill(k.c.bg_deep)
-                .child(shell::sidebar::panel(s, k, folded, cx.titlebar_inset()))
-                .child(col().grow(1.0).min_w(0.0).h_full().child(screen(
-                    s,
-                    k,
-                    shell::sidebar::lights_overhang(folded, cx.titlebar_inset()),
-                    review_width,
-                )))
-        }
-        NavStyle::Dock => col()
-            .key("window")
-            .w_full()
-            .h_full()
-            .fill(k.c.bg_deep)
-            .child(col().w_full().grow(1.0).min_h(0.0).child(screen(
-                s,
-                k,
-                cx.titlebar_inset(),
-                review_width,
-            )))
-            .children(shell::dock::hover_zone(s))
-            .child(shell::dock::layer(s, k)),
-    }
-    .instant_changes()
+                .grow(1.0)
+                .min_h(0.0)
+                .child(screen(s, k, review_width)),
+        )
+        .children(shell::hover_zone(s))
+        .children(shell::layer(s, k))
+        .child(shell::top_bar(s, k, cx))
+        .instant_changes()
 }

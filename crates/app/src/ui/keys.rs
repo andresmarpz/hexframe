@@ -4,7 +4,6 @@ mod rebind;
 use greyscreen_core::keybinds::{Action, Scope};
 use greyscreen_core::library::EventEntry;
 use greyscreen_core::review::DeathTag;
-use greyscreen_core::settings::NavStyle;
 use rune::{Key, KeyEvent, Tx};
 
 use super::review::jump::{next_target, previous_target};
@@ -58,8 +57,6 @@ impl Ui {
                 self.go(Screen::Games);
                 tx.focus("filter-champion", true);
             }
-            Action::ToggleNav if self.settings.nav_style == NavStyle::Sidebar => self.toggle_nav(),
-            Action::ToggleNav => return false,
             Action::PreviousGame | Action::NextGame if self.screen != Screen::Games => {
                 return false;
             }
@@ -127,7 +124,6 @@ impl Ui {
             | Action::PreviousGame
             | Action::NextGame
             | Action::FocusPlayer
-            | Action::ToggleNav
             | Action::FocusSearch
             | Action::SendFeedback => return false,
         }

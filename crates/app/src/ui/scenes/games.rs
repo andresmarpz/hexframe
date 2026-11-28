@@ -6,12 +6,10 @@ use crate::ui::Screen;
 pub(super) const SCENES: &[Scene] = &[
     ("games-wide", |ui| {
         game(ui);
-        ui.settings.nav_width = 320;
         ui.settings.list_width = 440;
     }),
     ("games-narrow", |ui| {
         game(ui);
-        ui.settings.nav_width = 180;
         ui.settings.list_width = 240;
     }),
     ("games-pick", idle),

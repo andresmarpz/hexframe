@@ -7,10 +7,9 @@ mod last_game;
 mod week;
 
 use greyscreen_core::problem::Problem;
-use greyscreen_core::settings::NavStyle;
 use greyscreen_engine::EngineStatus;
 use rune::{El, col, el, row, text};
-use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, Switch, glyphs};
+use rune_kit::{ControlSize, IconButton, IconButtonVariant, Kit, glyphs};
 
 use super::widgets::champion::champion_icon;
 use super::widgets::{state_pill, status_pill};
@@ -169,18 +168,9 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         )
         .child(el().h(2.0))
         .child(actions::bar(s, k));
-    let show_switch = s.settings.nav_style != NavStyle::Dock;
-    let has_controls = show_switch || h.danger;
     let mut right = col().items_end().gap(14.0);
-    if has_controls {
-        let mut controls = row().gap(10.0).center_y();
-        if show_switch {
-            controls = controls.child(record_switch(s, k));
-        }
-        if h.danger {
-            controls = controls.child(dismiss_button(k));
-        }
-        right = right.child(controls);
+    if h.danger {
+        right = right.child(row().gap(10.0).center_y().child(dismiss_button(k)));
     }
     let has_clock = h.clock.is_some();
     if let Some(clock) = h.clock {
@@ -207,7 +197,7 @@ fn state_card(s: &Ui, k: &Kit) -> El {
         .justify_between()
         .items_start()
         .child(left);
-    if has_controls || has_clock {
+    if h.danger || has_clock {
         body = body.child(right);
     }
     let mut card = card(k).key("state-card").padding(20.0);
@@ -226,23 +216,4 @@ fn dismiss_button(k: &Kit) -> El {
         .on_press(|ui: &mut Ui| ui.dismiss_error())
         .build(k)
         .key("dismiss-error")
-}
-
-fn record_switch(s: &Ui, k: &Kit) -> El {
-    row()
-        .gap(10.0)
-        .center_y()
-        .child(
-            text("Record games")
-                .font(k.ty.body_medium)
-                .color(k.c.text_base),
-        )
-        .child(
-            Switch::new(s.settings.auto_record)
-                .label("Record games".to_owned())
-                .hide_label()
-                .on_toggle(|ui: &mut Ui| ui.change(|s| s.auto_record = !s.auto_record))
-                .build(k)
-                .key("record-games"),
-        )
 }

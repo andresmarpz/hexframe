@@ -25,7 +25,7 @@ use greyscreen_engine::{
     EncoderCheckSpec, Engine, EngineConfig, EngineStatus, FeedbackConfig, league_factory_default,
     run_probe_child, spawn_isolated_encoder_check,
 };
-use rune::{App, AppSpec, Chrome};
+use rune::{App, AppSpec, Titlebar};
 
 use sfx::Sfx;
 use ui::Ui;
@@ -76,10 +76,7 @@ fn main() {
         ..AppSpec::new("Greyscreen", opening_size, Ui::preview, view::root)
     };
     let mut app = App::new(spec)
-        .chrome(Chrome {
-            traffic_lights: Some((16.0, 17.0)),
-            ..Chrome::DEFAULT
-        })
+        .titlebar(Titlebar::new(view::shell::HEIGHT))
         .maximized(settings.window_maximized)
         .on_window(ui::remember_window)
         .keep_running()

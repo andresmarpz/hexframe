@@ -161,6 +161,6 @@ fn footer(s: &Ui, k: &Kit) -> El {
         .color(k.c.text_faint)
         .truncate()
         .px(8.0)
-        .pb(super::layout::dock_clearance(s))
+        .pb(super::shell::CLEARANCE)
         .a11y_hidden()
 }

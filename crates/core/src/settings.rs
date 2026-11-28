@@ -44,11 +44,6 @@ impl PaneWidth {
     }
 }
 
-pub const NAV_WIDTH: PaneWidth = PaneWidth {
-    min: 180,
-    max: 320,
-    default: 220,
-};
 pub const LIST_WIDTH: PaneWidth = PaneWidth {
     min: 240,
     max: 440,
@@ -79,13 +74,6 @@ impl Quality {
             Quality::Max => 80,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum NavStyle {
-    #[default]
-    Sidebar,
-    Dock,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,11 +134,8 @@ pub struct Settings {
     pub legacy_save_clip_hotkey: Option<Option<String>>,
     pub storage_limit_gb: Option<u32>,
     pub check_updates: bool,
-    pub nav_style: NavStyle,
-    pub sidebar_collapsed: bool,
     pub review_inspector_hidden: bool,
     pub games_list_hidden: bool,
-    pub nav_width: u32,
     pub list_width: u32,
     pub window_size: Option<(u32, u32)>,
     pub window_maximized: bool,
@@ -183,11 +168,8 @@ impl Default for Settings {
             legacy_save_clip_hotkey: None,
             storage_limit_gb: None,
             check_updates: true,
-            nav_style: NavStyle::default(),
-            sidebar_collapsed: false,
             review_inspector_hidden: false,
             games_list_hidden: false,
-            nav_width: NAV_WIDTH.default,
             list_width: LIST_WIDTH.default,
             window_size: None,
             window_maximized: false,
@@ -250,7 +232,6 @@ impl Settings {
         self.clips.post_secs = self.clips.post_secs.clamp(1, MAX_CLIP_SECS);
         self.storage_limit_gb = self.storage_limit_gb.map(nearest_storage_limit);
         self.sound_volume = self.sound_volume.min(MAX_SOUND_VOLUME);
-        self.nav_width = NAV_WIDTH.clamp(self.nav_width);
         self.list_width = LIST_WIDTH.clamp(self.list_width);
         self.window_size = self.window_size.map(|(w, h)| {
             (

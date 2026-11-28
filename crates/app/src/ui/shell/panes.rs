@@ -1,4 +1,4 @@
-use greyscreen_core::settings::{LIST_WIDTH, NAV_WIDTH, PaneWidth};
+use greyscreen_core::settings::{LIST_WIDTH, PaneWidth};
 use greyscreen_engine::EngineCmd;
 
 use crate::ui::Ui;
@@ -7,14 +7,12 @@ pub(crate) const STEP: i32 = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PaneEdge {
-    Nav,
     List,
 }
 
 impl PaneEdge {
     pub(crate) fn range(self) -> PaneWidth {
         match self {
-            PaneEdge::Nav => NAV_WIDTH,
             PaneEdge::List => LIST_WIDTH,
         }
     }
@@ -29,7 +27,6 @@ pub(crate) struct PaneDrag {
 impl Ui {
     pub(crate) fn pane_width(&self, edge: PaneEdge) -> u32 {
         match edge {
-            PaneEdge::Nav => self.settings.nav_width,
             PaneEdge::List => self.settings.list_width,
         }
     }
@@ -77,7 +74,6 @@ impl Ui {
 
 fn set(settings: &mut greyscreen_core::settings::Settings, edge: PaneEdge, width: u32) {
     match edge {
-        PaneEdge::Nav => settings.nav_width = width,
         PaneEdge::List => settings.list_width = width,
     }
 }

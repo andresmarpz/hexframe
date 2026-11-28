@@ -28,7 +28,7 @@ fn runtime() -> Runtime<Ui> {
 }
 
 fn tap(rt: &mut Runtime<Ui>, key: &str) {
-    if rt.state.settings_open && key != "nav-settings" && key != "dock-settings" {
+    if rt.state.settings_open && key != "top-settings" {
         let target = key.to_owned();
         rt.update(move |_, tx| tx.scroll_into_view(target));
         for _ in 0..40 {
@@ -60,7 +60,7 @@ fn review_runtime_showing(shown: CategorySet) -> Runtime<Ui> {
 #[test]
 fn the_resolution_menu_opens_under_its_trigger_and_picks_a_value() {
     let mut rt = runtime();
-    tap(&mut rt, "nav-settings");
+    tap(&mut rt, "top-settings");
     tap(&mut rt, "settings-nav-recording");
     tap(&mut rt, "resolution-trigger");
     for _ in 0..30 {
