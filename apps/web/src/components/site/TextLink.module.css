@@ -1,0 +1,23 @@
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-site-ink);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.arrow {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .arrow {
+    transition: transform 150ms ease-out;
+  }
+
+  .link:hover .arrow {
+    transform: translateX(4px);
+  }
+}

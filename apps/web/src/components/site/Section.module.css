@@ -1,0 +1,30 @@
+.section {
+  --pad: var(--section-pad-desktop, 160px);
+  padding: var(--pad) var(--gutter);
+}
+
+@media (max-width: 899px) {
+  .section {
+    --pad: var(--section-pad-mobile, 96px);
+  }
+}
+
+.paper {
+  background: var(--color-site-paper);
+  color: var(--color-site-ink);
+}
+
+.fog {
+  background: var(--color-site-fog);
+  color: var(--color-site-ink);
+}
+
+.ink {
+  background: var(--color-site-ink);
+  color: var(--color-site-paper);
+}
+
+.inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+}

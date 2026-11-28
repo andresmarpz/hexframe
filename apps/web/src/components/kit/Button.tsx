@@ -1,3 +1,5 @@
+"use client";
+
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import "./kit.css";
 
@@ -13,7 +15,7 @@ export type ButtonVariant =
   | "ghostFaint"
   | "loading";
 
-export type ButtonSize = "mini" | "small" | "regular" | "large" | "xl";
+export type ButtonSize = "mini" | "small" | "regular" | "large" | "xl" | "xxl";
 
 type Shared = {
   variant?: ButtonVariant;

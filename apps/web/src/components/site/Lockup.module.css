@@ -1,0 +1,17 @@
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-site-ink);
+}
+
+.light {
+  color: var(--color-site-paper);
+}
+
+.word {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 30px;
+  letter-spacing: -0.06em;
+}

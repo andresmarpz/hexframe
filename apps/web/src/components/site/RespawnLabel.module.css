@@ -1,0 +1,20 @@
+.label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.label svg {
+  flex-shrink: 0;
+}
+
+.text {
+  color: var(--color-site-graphite);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--text-site-label);
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: pre;
+}
