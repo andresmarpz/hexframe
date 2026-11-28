@@ -7,6 +7,7 @@ const AWAKE_SECS: f64 = 2.5;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct DockState {
     pub visible: bool,
+    pub storage_open: bool,
     hovered: bool,
     awake_since: Option<f64>,
 }
@@ -15,6 +16,7 @@ impl Default for DockState {
     fn default() -> Self {
         DockState {
             visible: true,
+            storage_open: false,
             hovered: false,
             awake_since: None,
         }
@@ -25,6 +27,10 @@ impl Ui {
     pub(crate) fn dock_hover(&mut self, inside: bool, tx: &mut Tx) {
         self.dock.hovered = inside;
         self.wake_dock(tx.clock());
+    }
+
+    pub(crate) fn storage_popover(&mut self, open: bool) {
+        self.dock.storage_open = open;
     }
 
     pub(crate) fn wake_dock(&mut self, clock: f64) {
@@ -47,6 +53,9 @@ impl Ui {
         let visible = !playing || self.dock.hovered || recent;
         let changed = visible != self.dock.visible;
         self.dock.visible = visible;
+        if !visible {
+            self.dock.storage_open = false;
+        }
         changed
     }
 }

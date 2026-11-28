@@ -40,6 +40,9 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     }
     review::controls_layer(s, &k, &mut layer);
     if theater.is_none() {
+        shell::overlay(s, &k, &mut layer);
+    }
+    if theater.is_none() {
         settings::sheet(
             s,
             &k,
