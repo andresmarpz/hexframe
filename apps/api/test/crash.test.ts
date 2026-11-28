@@ -38,6 +38,21 @@ test(
   }),
 );
 
+for (const header of ["x-greyscreen-version", "x-greyscreen-version"]) {
+  test(
+    `takes the version from ${header} when the JSON has none`,
+    Effect.gen(function* () {
+      const { url } = yield* stack;
+      const response = yield* upload(
+        url,
+        { minidump: new Blob([new Uint8Array([1])]), json: JSON.stringify({ os: "Windows 11" }) },
+        { [header]: "0.1.8" },
+      );
+      expect(response.status).toBe(202);
+    }),
+  );
+}
+
 test(
   "rejects a missing minidump with 400",
   Effect.gen(function* () {

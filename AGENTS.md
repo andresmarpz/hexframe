@@ -1,5 +1,7 @@
 # Greyscreen
 
+Greyscreen was called Greyscreen until 2026-11-28; the GitHub repo, website URL and API URL still use the old name.
+
 League of Legends gameplay recorder for Windows. Rust workspace with a Rune GPU UI, a website in `apps/web` and a Cloudflare backend in `apps/api`. Read `docs/architecture.md` first: it fixes the shared types, units and rules. `docs/roadmap.md` has what is done, GitHub issues have what is next, `docs/research/` has the API details.
 
 Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback clients), `capture` (Windows only), `engine` (threads and I/O), `thumbs` (OS thumbnails), `app` (the Rune UI and the setup window) and `cli`. `docs/architecture.md` has the dependency direction.
@@ -44,7 +46,7 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just build-win`: release build of `greyscreen.exe` and `greyscreen-cli.exe` for Windows through cargo-xwin. `just dist` copies them with `README.txt` and `LICENSE.txt` into `dist/`, plus a `GreyscreenSetup.exe` copy.
 - QA never uses OS-level input, never activates or shows a window, never plays sound out loud and never changes system settings. Never QA by driving the real app with UI Automation, SendInput or a visible window.
 - CI: pushes run only the spell check (`ci.yml`). No tests or builds run in GitHub Actions.
-- `just release <tag>`: runs `just check` and the Windows build side by side, publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), `greyscreen-cli.exe`, `README.txt` and `LICENSE.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. The tree must be clean and `HEAD` already on `origin/main`; the release tags that commit. A tag with a dash is a prerelease.
+- `just release <tag>`: runs `just check` and the Windows build side by side, publishes a GitHub release from the Mac, then redeploys the website. The release assets are `GreyscreenSetup.exe` (the website's download), `greyscreen.exe` (the same binary, which the in-app updater downloads), a `greyscreen.exe` copy of it (old builds' updaters only look for that name), `greyscreen-cli.exe`, `README.txt` and `LICENSE.txt`. Write `apps/web/src/content/changelog/<version>.md` first: its title and bullets become the release title and notes. The tree must be clean and `HEAD` already on `origin/main`; the release tags that commit. A tag with a dash is a prerelease.
 - `just release-sync`: rewrite every GitHub release title and notes from the changelog.
 - `just mac-app`: build an ad-hoc signed `dist/mac/Greyscreen.app` (fake capture media, for UI testing only) and install it to `~/Applications/Greyscreen.app`.
 - `just brand`: regenerate the icons and web images from the SVGs in `brand/`.

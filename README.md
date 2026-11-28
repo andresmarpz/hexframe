@@ -8,6 +8,8 @@
 
 <p align="center">Automatic League of Legends recorder and death review for Windows.</p>
 
+<p align="center">Greyscreen was called Greyscreen until 2026-11-28; the GitHub repo, website URL and API URL still use the old name.</p>
+
 <p align="center">
   <a href="https://github.com/andresmarpz/greyscreen/releases/latest"><img src="https://img.shields.io/github/v/release/andresmarpz/greyscreen?include_prereleases&label=release" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/andresmarpz/greyscreen" alt="License"></a>
