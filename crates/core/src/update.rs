@@ -201,7 +201,6 @@ impl UpdateState {
 }
 
 const DOWNLOAD_PREFIX: &str = "greyscreen-";
-const LEGACY_DOWNLOAD_PREFIX: &str = "greyscreen-";
 
 pub fn download_file_name(tag: &str) -> String {
     format!("{DOWNLOAD_PREFIX}{tag}.exe")
@@ -210,7 +209,6 @@ pub fn download_file_name(tag: &str) -> String {
 pub fn is_stale_download(file_name: &str, running: &Version) -> bool {
     let Some(tag) = file_name
         .strip_prefix(DOWNLOAD_PREFIX)
-        .or_else(|| file_name.strip_prefix(LEGACY_DOWNLOAD_PREFIX))
         .and_then(|rest| rest.strip_suffix(".exe"))
     else {
         return false;

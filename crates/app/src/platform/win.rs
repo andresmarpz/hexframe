@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use greyscreen_capture::install::{self, InstallError};
 use greyscreen_capture::instance::{self, Claim, InstanceSignal};
-use greyscreen_core::install::{LEGACY_RELAUNCH_ENV, StartPlan, UNINSTALL_FLAG};
+use greyscreen_core::install::{StartPlan, UNINSTALL_FLAG};
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use rune::AppHandle;
@@ -62,9 +62,7 @@ pub(crate) fn begin(headless: bool) -> Option<Launch> {
 }
 
 fn relaunch_requested() -> bool {
-    [RELAUNCH_ENV, LEGACY_RELAUNCH_ENV]
-        .iter()
-        .any(|name| std::env::var_os(name).is_some())
+    std::env::var_os(RELAUNCH_ENV).is_some()
 }
 
 fn wait_for_old_copy_to_exit() {

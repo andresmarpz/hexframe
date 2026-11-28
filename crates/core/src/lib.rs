@@ -14,7 +14,6 @@ pub mod health;
 pub mod highlight;
 pub mod install;
 pub mod keybinds;
-pub mod legacy;
 pub mod library;
 pub mod log_once;
 pub mod media;

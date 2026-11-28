@@ -26,14 +26,12 @@ build-win:
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"; cargo xwin build --release --locked --target {{win}} -p greyscreen -p greyscreen-cli
     @ls -lh target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe
 
-# greyscreen.exe is a copy of greyscreen.exe: installed Greyscreen builds update by downloading that asset name.
 dist: build-win
     rm -rf dist
     mkdir -p dist
     cp target/{{win}}/release/greyscreen.exe target/{{win}}/release/greyscreen-cli.exe packaging/README.txt dist/
     cp LICENSE dist/LICENSE.txt
     cp dist/greyscreen.exe dist/GreyscreenSetup.exe
-    cp dist/greyscreen.exe dist/greyscreen.exe
 
 # Builds an ad-hoc signed Greyscreen.app for UI testing on this Mac and installs it in ~/Applications. Never published.
 mac-app:
@@ -103,7 +101,7 @@ release tag:
 release-publish tag sha: check dist
     test "$(git rev-parse HEAD)" = "{{sha}}" || { echo "HEAD moved during the build, release not published"; exit 1; }
     scripts/release-meta.sh notes {{tag}} > dist/notes.md
-    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt dist/LICENSE.txt -R andresmarpz/greyscreen --target {{sha}} --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
+    GH_TOKEN=$(gh auth token --user andresmarpz) gh release create "{{tag}}" dist/GreyscreenSetup.exe dist/greyscreen.exe dist/greyscreen-cli.exe dist/README.txt dist/LICENSE.txt -R andresmarpz/greyscreen --target {{sha}} --title "$(scripts/release-meta.sh title {{tag}})" --notes-file dist/notes.md {{ if tag =~ '-' { "--prerelease" } else { "--latest" } }}
     just web-deploy
 
 # Rewrites the title and notes of every published release from its changelog entry.

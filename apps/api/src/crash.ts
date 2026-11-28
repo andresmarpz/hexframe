@@ -60,7 +60,7 @@ export const crashRoute = (store: Store) =>
         return reject(minidump.size === 0 ? 400 : 413, "minidump size out of range");
       }
 
-      const appVersion = typeof meta["app_version"] === "string" ? meta["app_version"] : request.headers["x-greyscreen-version"] ?? request.headers["x-greyscreen-version"];
+      const appVersion = typeof meta["app_version"] === "string" ? meta["app_version"] : request.headers["x-greyscreen-version"];
       if (appVersion === undefined || !isSafeVersion(appVersion)) {
         return reject(400, "app_version missing or invalid");
       }

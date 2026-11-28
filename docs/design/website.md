@@ -98,7 +98,6 @@ Clone the real app screens. Never redraw them.
 - Last game screen: artboard `72F-0` (1280x760, page "Last game"). Highlights row, timeline row and hero are inside it.
 - Home screen: artboard `79Y-0` (1280x760, page "Home").
 - Use `<x-paper-clone node-id="72F-0" style="...">` inside write_html, or `duplicate_nodes` with a `parentId`. Then get_tree_summary on the clone to find its children.
-- The app screens still say "Greyscreen" with a hexagon icon in the top left. In every clone, set that text to `Greyscreen` and replace the hexagon icon with the LIGHT mark at the same size (white tile, ink face). Leave the source artboards untouched.
 - To show a part of a screen (for example the timeline row), clone just that child node into your layout.
 - A clone keeps its 1280 width. Where you need it smaller, set `transform: scale(x)` with `transform-origin: top left` and wrap it in a fixed-size box with overflow hidden. Check it in a screenshot.
 

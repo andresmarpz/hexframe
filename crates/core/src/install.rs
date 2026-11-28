@@ -13,14 +13,6 @@ pub const UPDATE_FLAG: &str = "--update";
 pub const NO_INSTALL_ENV: &str = "GREYSCREEN_NO_INSTALL";
 pub const INSTALL_DIR_NAME: &str = "Greyscreen";
 
-pub const LEGACY_APP_ID: &str = "dev.greyscreen.app";
-pub const LEGACY_INSTALL_DIR_NAME: &str = "Greyscreen";
-pub const LEGACY_UNINSTALL_KEY: &str =
-    r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Greyscreen";
-pub const LEGACY_RUN_VALUE: &str = "Greyscreen";
-pub const LEGACY_SHORTCUT_NAME: &str = "Greyscreen.lnk";
-pub const LEGACY_RELAUNCH_ENV: &str = "GREYSCREEN_RELAUNCH";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegValue {
     Text(String),
@@ -119,10 +111,6 @@ pub fn start_plan(
 
 pub fn without_update_flag(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {
     args.into_iter().filter(|arg| arg != UPDATE_FLAG).collect()
-}
-
-pub fn should_remove_legacy_dir(dir_exists: bool, running_from_it: bool) -> bool {
-    dir_exists && !running_from_it
 }
 
 pub fn wait_until(timeout: Duration, poll: Duration, mut ready: impl FnMut() -> bool) -> bool {

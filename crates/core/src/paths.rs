@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 const APP_DIR: &str = "Greyscreen";
-pub(crate) const LEGACY_APP_DIR: &str = "Greyscreen";
 
 pub(crate) fn config_root() -> PathBuf {
     dirs::config_dir().unwrap_or_default()

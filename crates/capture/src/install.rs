@@ -5,11 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use greyscreen_core::install::{
-    APP_ID, EXE_NAME, INSTALL_DIR_NAME, InstallPlan, LEGACY_APP_ID, LEGACY_INSTALL_DIR_NAME,
-    LEGACY_RUN_VALUE, LEGACY_SHORTCUT_NAME, LEGACY_UNINSTALL_KEY, NO_INSTALL_ENV, QUIT_POLL,
-    QUIT_WAIT, RUN_KEY, RUN_VALUE, RegValue, StartPlan, UNINSTALL_KEY, UPDATE_FLAG,
-    cleanup_command, install_date_today, install_plan, is_inside, run_command,
-    should_remove_legacy_dir, start_plan, uninstall_values, wait_until, without_update_flag,
+    APP_ID, EXE_NAME, INSTALL_DIR_NAME, InstallPlan, NO_INSTALL_ENV, QUIT_POLL, QUIT_WAIT, RUN_KEY,
+    RUN_VALUE, RegValue, StartPlan, UNINSTALL_KEY, UPDATE_FLAG, cleanup_command,
+    install_date_today, install_plan, is_inside, run_command, start_plan, uninstall_values,
+    wait_until, without_update_flag,
 };
 use windows::Win32::Foundation::{E_OUTOFMEMORY, ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
 use windows::Win32::Storage::EnhancedStorage::PKEY_AppUserModel_ID;
@@ -42,8 +41,6 @@ pub enum InstallError {
     Copy { path: PathBuf, source: io::Error },
     #[error("Greyscreen is still running. Quit it from the tray, then run this file again.")]
     StillRunning,
-    #[error("The old Greyscreen is still running. Quit it from the tray, then run this file again.")]
-    LegacyStillRunning,
     #[error("the shortcut thread stopped")]
     ShortcutThread,
     #[error(transparent)]
@@ -61,22 +58,14 @@ pub fn install_dir() -> Result<PathBuf, InstallError> {
     Ok(programs_dir()?.join(INSTALL_DIR_NAME))
 }
 
-fn legacy_install_dir() -> Result<PathBuf, InstallError> {
-    Ok(programs_dir()?.join(LEGACY_INSTALL_DIR_NAME))
-}
-
-fn shortcut_path_named(name: &str) -> Result<PathBuf, InstallError> {
+fn shortcut_path() -> Result<PathBuf, InstallError> {
     let roaming = std::env::var_os("APPDATA").ok_or(InstallError::NoAppData)?;
     Ok(PathBuf::from(roaming)
         .join("Microsoft")
         .join("Windows")
         .join("Start Menu")
         .join("Programs")
-        .join(name))
-}
-
-fn shortcut_path() -> Result<PathBuf, InstallError> {
-    shortcut_path_named(SHORTCUT_NAME)
+        .join(SHORTCUT_NAME))
 }
 
 pub fn is_installed_copy() -> bool {
@@ -133,7 +122,6 @@ pub fn install(mut progress: impl FnMut(Progress)) -> Result<(), InstallError> {
             !crate::instance::is_running(APP_ID)
         });
     }
-    close_legacy_app(&mut progress)?;
     progress(Progress::Copying);
     let size = if plan == InstallPlan::RelaunchInstalled {
         fs::metadata(&target)?.len()
@@ -152,48 +140,8 @@ pub fn install(mut progress: impl FnMut(Progress)) -> Result<(), InstallError> {
         Ok(()) => tracing::info!("wrote the Start menu shortcut"),
         Err(error) => tracing::warn!(%error, "cannot write the Start menu shortcut"),
     }
-    remove_legacy_install();
     tracing::info!("installed");
     Ok(())
-}
-
-fn close_legacy_app(progress: &mut impl FnMut(Progress)) -> Result<(), InstallError> {
-    if !crate::instance::is_running(LEGACY_APP_ID) {
-        return Ok(());
-    }
-    tracing::info!("an old Greyscreen is running, asking it to quit");
-    progress(Progress::ClosingRunning);
-    crate::instance::request_quit(LEGACY_APP_ID);
-    if wait_until(QUIT_WAIT, QUIT_POLL, || {
-        !crate::instance::is_running(LEGACY_APP_ID)
-    }) {
-        return Ok(());
-    }
-    tracing::warn!("the old Greyscreen is still running, giving up");
-    Err(InstallError::LegacyStillRunning)
-}
-
-fn remove_legacy_install() {
-    if start_with_windows_value(LEGACY_RUN_VALUE) {
-        match set_start_with_windows(true) {
-            Ok(()) => {
-                tracing::info!("moved the old start-with-Windows entry");
-                delete_run_value(LEGACY_RUN_VALUE).ok();
-            }
-            Err(error) => tracing::warn!(%error, "cannot move the old start-with-Windows entry"),
-        }
-    }
-    if let Ok(shortcut) = shortcut_path_named(LEGACY_SHORTCUT_NAME) {
-        fs::remove_file(shortcut).ok();
-    }
-    delete_key(LEGACY_UNINSTALL_KEY);
-    let (Ok(dir), Ok(exe)) = (legacy_install_dir(), std::env::current_exe()) else {
-        return;
-    };
-    if should_remove_legacy_dir(dir.exists(), is_inside(&exe, &dir)) {
-        tracing::info!(dir = %dir.display(), "removing the old Greyscreen install folder");
-        spawn_cleanup(&dir);
-    }
 }
 
 pub fn install_and_relaunch() -> Result<bool, InstallError> {
@@ -204,17 +152,12 @@ pub fn install_and_relaunch() -> Result<bool, InstallError> {
     }
     if files_match(&source, &dir.join(EXE_NAME)) {
         tracing::info!("the installed copy is identical, relaunching it");
-        if let Err(error) = close_legacy_app(&mut drop) {
-            show_still_running(&error);
-            return Ok(true);
-        }
-        remove_legacy_install();
         launch_installed(without_update_flag(std::env::args_os().skip(1)))?;
         return Ok(true);
     }
     match install(drop) {
         Ok(()) => {}
-        Err(error @ (InstallError::StillRunning | InstallError::LegacyStillRunning)) => {
+        Err(error @ InstallError::StillRunning) => {
             show_still_running(&error);
             return Ok(true);
         }

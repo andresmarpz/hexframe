@@ -12,7 +12,7 @@ Returns `{"ok":true,"version":"<api package version>"}`.
 
 ### `POST /v1/feedback`
 
-JSON body, with the header `x-greyscreen-version` (the server also accepts the old `x-greyscreen-version`, which installed apps still send):
+JSON body, with the header `x-greyscreen-version`:
 
 ```json
 {
@@ -35,7 +35,7 @@ JSON body, with the header `x-greyscreen-version` (the server also accepts the o
 
 Not part of the desktop contract yet: the app does not call it. It can change without notice.
 
-`multipart/form-data` with two parts: `minidump` (a file, at most 20 MB) and `json` (a JSON object, at most 64 KB). `app_version` comes from the JSON, or from the `x-greyscreen-version` header (or the old `x-greyscreen-version`) when the JSON has none. The whole body is capped at 25 MB.
+`multipart/form-data` with two parts: `minidump` (a file, at most 20 MB) and `json` (a JSON object, at most 64 KB). `app_version` comes from the JSON, or from the `x-greyscreen-version` header when the JSON has none. The whole body is capped at 25 MB.
 
 - `202 {"id"}`: stored in R2 as `crashes/<version>/<yyyy>/<mm>/<dd>/<id>/minidump.dmp` and `meta.json`, and indexed in the D1 table `crash_reports`.
 - `400`, `413`, `429`: same error shape. The limit is 10 uploads per hour per IP address.
