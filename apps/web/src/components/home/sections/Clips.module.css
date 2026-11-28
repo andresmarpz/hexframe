@@ -1,0 +1,114 @@
+.columns {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 96px;
+}
+
+.grid {
+  --stage-pad: 48px;
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 710px;
+}
+
+.card {
+  width: 299px;
+  height: 168px;
+  border-radius: 12px;
+}
+
+.right {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 440px;
+}
+
+.title {
+  margin-top: 24px;
+}
+
+.intro {
+  margin-top: 32px;
+}
+
+.keycap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  margin-top: 48px;
+  border: solid var(--color-site-ink);
+  border-width: 2px 2px 4px;
+  border-radius: 20px;
+  color: var(--color-site-ink);
+  font-family: inherit;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 48px;
+}
+
+.export {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.exportLabel {
+  margin-right: 4px;
+  color: var(--color-site-graphite);
+}
+
+@media (max-width: 899px) {
+  .columns {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .right {
+    display: contents;
+  }
+
+  .intro {
+    margin-top: 24px;
+  }
+
+  .grid {
+    --stage-pad: 24px;
+    order: 1;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    width: auto;
+    margin-top: 48px;
+  }
+
+  .card {
+    border-radius: 10px;
+  }
+
+  .card1 {
+    order: 2;
+  }
+
+  .card3,
+  .card4 {
+    display: none;
+  }
+
+  .keycap {
+    order: 2;
+    align-self: flex-start;
+  }
+
+  .export {
+    order: 2;
+    flex-wrap: wrap;
+  }
+}

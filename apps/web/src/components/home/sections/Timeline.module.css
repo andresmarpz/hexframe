@@ -1,0 +1,91 @@
+.columns {
+  display: flex;
+  align-items: center;
+  gap: 96px;
+}
+
+.left {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 480px;
+}
+
+.title {
+  margin-top: 24px;
+}
+
+.intro {
+  margin-top: 32px;
+}
+
+.points {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 48px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.point {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.pointText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pointTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.panel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  padding: 40px;
+  border-radius: var(--radius-site-stage);
+  background: var(--color-site-ink);
+}
+
+.seekbar {
+  width: 100%;
+  height: 56px;
+}
+
+@media (max-width: 899px) {
+  .columns {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .left {
+    display: contents;
+  }
+
+  .intro {
+    margin-top: 24px;
+  }
+
+  .panel {
+    order: 1;
+    gap: 16px;
+    margin-top: 48px;
+    padding: 24px;
+  }
+
+  .points {
+    order: 2;
+  }
+}
