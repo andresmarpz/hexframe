@@ -19,7 +19,7 @@ export function DownloadCard({ initial }: Props) {
     <>
       <div className={styles.cardText}>
         <p className={`label ${styles.meta}`}>{`${version}Public beta`}</p>
-        <h2 className="h3">{APP_ASSET}</h2>
+        <h2 className="h3">{downloads?.app?.name ?? APP_ASSET}</h2>
         <p className="body">Windows 10 2004+ and 11, 64-bit.</p>
       </div>
       <div className={styles.cardActions}>

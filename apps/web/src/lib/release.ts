@@ -4,6 +4,7 @@ export const CLI_ASSET = "greyscreen-cli.exe";
 const LEGACY_CLI_ASSET = "greyscreen-cli.exe";
 
 export interface Asset {
+  name: string;
   url: string;
   size: number;
 }
@@ -35,7 +36,7 @@ interface ApiRelease {
 function findAsset(assets: ApiAsset[], name: string): Asset | null {
   const asset = assets.find((a) => a.name === name);
   if (typeof asset?.browser_download_url !== "string" || typeof asset.size !== "number") return null;
-  return { url: asset.browser_download_url, size: asset.size };
+  return { name: name, url: asset.browser_download_url, size: asset.size };
 }
 
 function toDownloads(raw: ApiRelease): Downloads | null {
