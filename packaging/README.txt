@@ -11,6 +11,11 @@ Install
    Your recordings and settings are kept.
 
 greyscreen.exe in the same release is the same program. The updater inside Greyscreen downloads it, so you do not need it.
+greyscreen.exe is the same program again. Old Greyscreen versions download it to update themselves, so you do not need it either.
+
+Upgrading from Greyscreen
+
+Greyscreen is the new name of Greyscreen. Installing it, or updating from inside Greyscreen, closes Greyscreen, moves your settings and logs, keeps your recordings, and removes the old install. Start with Windows stays on.
 
 First run
 

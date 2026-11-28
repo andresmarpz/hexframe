@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 use greyscreen_capture::clock::QpcMap;
 use greyscreen_capture::com::ComGuard;
 use greyscreen_capture::d3d::GpuDevice;
-use greyscreen_capture::testing::cloaked_window::{CloakedWindow, FrameReader, Reveal, read_counter};
+use greyscreen_capture::testing::cloaked_window::{
+    CloakedWindow, FrameReader, Reveal, read_counter,
+};
 use greyscreen_capture::wgc::{WgcCapture, WgcOptions};
 use greyscreen_core::health::StallWatch;
 use greyscreen_core::time::HNS_PER_SEC;

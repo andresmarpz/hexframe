@@ -143,7 +143,9 @@ struct TempPath(PathBuf);
 
 impl TempPath {
     fn new(name: &str) -> Self {
-        Self(std::env::temp_dir().join(format!("greyscreen-fmp4-{}-{name}.mp4", std::process::id())))
+        Self(
+            std::env::temp_dir().join(format!("greyscreen-fmp4-{}-{name}.mp4", std::process::id())),
+        )
     }
 
     fn path(&self) -> &Path {

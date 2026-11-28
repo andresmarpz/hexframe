@@ -8,7 +8,8 @@ fn commands_quote_paths_with_spaces_and_parentheses() {
         r#""C:\Program Files (x86)\Greyscreen\greyscreen.exe" --hidden"#
     );
     assert!(
-        uninstall_command(exe).starts_with(r#""C:\Program Files (x86)\Greyscreen\greyscreen.exe" "#)
+        uninstall_command(exe)
+            .starts_with(r#""C:\Program Files (x86)\Greyscreen\greyscreen.exe" "#)
     );
     assert_eq!(
         cleanup_command(Path::new(r"C:\Users\Jo (work)\Greyscreen")),

@@ -40,7 +40,10 @@ fn temp_dir(tag: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
-    std::env::temp_dir().join(format!("greyscreen-e1-{tag}-{}-{nanos}", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "greyscreen-e1-{tag}-{}-{nanos}",
+        std::process::id()
+    ))
 }
 
 fn player(name: &str, champion: &str, team: Team) -> Player {

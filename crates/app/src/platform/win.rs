@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use greyscreen_capture::install::{self, InstallError};
 use greyscreen_capture::instance::{self, Claim, InstanceSignal};
-use greyscreen_core::install::{StartPlan, UNINSTALL_FLAG};
+use greyscreen_core::install::{LEGACY_RELAUNCH_ENV, StartPlan, UNINSTALL_FLAG};
 use greyscreen_core::media::MediaSource;
 use greyscreen_core::paths;
 use rune::AppHandle;
@@ -44,7 +44,7 @@ pub(crate) fn begin(headless: bool) -> Option<Launch> {
     let install_error = install_step();
     install::set_process_app_id();
     let claim = match instance::claim(SINGLE_INSTANCE_ID) {
-        Claim::AlreadyRunning if std::env::var_os(RELAUNCH_ENV).is_some() => {
+        Claim::AlreadyRunning if relaunch_requested() => {
             wait_for_old_copy_to_exit();
             instance::claim(SINGLE_INSTANCE_ID)
         }
@@ -59,6 +59,12 @@ pub(crate) fn begin(headless: bool) -> Option<Launch> {
         }),
         Claim::AlreadyRunning => None,
     }
+}
+
+fn relaunch_requested() -> bool {
+    [RELAUNCH_ENV, LEGACY_RELAUNCH_ENV]
+        .iter()
+        .any(|name| std::env::var_os(name).is_some())
 }
 
 fn wait_for_old_copy_to_exit() {

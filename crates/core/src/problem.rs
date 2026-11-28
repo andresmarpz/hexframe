@@ -95,7 +95,9 @@ impl Problem {
             Problem::NoGpu => {
                 "Check that your graphics card is enabled and its driver is installed, then restart Greyscreen."
             }
-            Problem::ConversionUnsupported => "Update your graphics driver, then restart Greyscreen.",
+            Problem::ConversionUnsupported => {
+                "Update your graphics driver, then restart Greyscreen."
+            }
             Problem::WindowsTooOld => "Update to Windows 10 version 1903 or newer.",
             Problem::CaptureBlocked => {
                 "If League runs as administrator, run Greyscreen as administrator too."

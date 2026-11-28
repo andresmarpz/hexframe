@@ -9,7 +9,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use greyscreen_core::game::{GameInfo, GameResult, Player, Team};
-use greyscreen_core::library::{self, GameRecord, META_FILE, META_VERSION, RecordingMeta, VideoInfo};
+use greyscreen_core::library::{
+    self, GameRecord, META_FILE, META_VERSION, RecordingMeta, VideoInfo,
+};
 use greyscreen_core::settings::Settings;
 use greyscreen_engine::{
     EngineCmd, EngineStatus, FakeMediaSource, FreeSpace, LOW_DISK_URL, NoticeAction, NoticeLevel,

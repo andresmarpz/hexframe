@@ -42,11 +42,17 @@ fn work(commands: &Receiver<Cmd>, handle: &AppHandle<SetupState>) {
             }
             Cmd::OpenInstalled => match install::launch_installed([]) {
                 Ok(()) => handle.quit(),
-                Err(err) => send(handle, Msg::Failed(format!("cannot start Greyscreen: {err}"))),
+                Err(err) => send(
+                    handle,
+                    Msg::Failed(format!("cannot start Greyscreen: {err}")),
+                ),
             },
             Cmd::RunHere => match install::launch_here_without_installing() {
                 Ok(()) => handle.quit(),
-                Err(err) => send(handle, Msg::Failed(format!("cannot start Greyscreen: {err}"))),
+                Err(err) => send(
+                    handle,
+                    Msg::Failed(format!("cannot start Greyscreen: {err}")),
+                ),
             },
         }
     }

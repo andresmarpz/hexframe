@@ -74,7 +74,9 @@ impl WindowsPower {
         if let Some(handle) = self.handle {
             return Ok(handle);
         }
-        let mut reason: Vec<u16> = "Greyscreen is recording gameplay\0".encode_utf16().collect();
+        let mut reason: Vec<u16> = "Greyscreen is recording gameplay\0"
+            .encode_utf16()
+            .collect();
         let context = REASON_CONTEXT {
             Version: POWER_REQUEST_CONTEXT_VERSION,
             Flags: POWER_REQUEST_CONTEXT_SIMPLE_STRING,

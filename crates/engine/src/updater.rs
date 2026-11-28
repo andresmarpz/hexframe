@@ -19,6 +19,7 @@ const CHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 const BUSY_RETRY: Duration = Duration::from_secs(60);
 const INSTALL_GRACE: Duration = Duration::from_secs(30);
 const DOWNLOAD_DIR: &str = "Greyscreen";
+const LEGACY_DOWNLOAD_DIR: &str = "Greyscreen";
 
 pub trait UpdateSource: Send + Sync {
     fn releases(&self) -> Result<Vec<Release>, UpdateError>;
@@ -42,6 +43,7 @@ pub struct UpdateConfig {
     pub running: String,
     pub can_install: bool,
     pub dir: PathBuf,
+    pub legacy_dir: Option<PathBuf>,
     pub launch: Launcher,
     pub first_check: Duration,
     pub interval: Duration,
@@ -65,6 +67,7 @@ impl UpdateConfig {
             running: running.to_owned(),
             can_install,
             dir: std::env::temp_dir().join(DOWNLOAD_DIR),
+            legacy_dir: Some(std::env::temp_dir().join(LEGACY_DOWNLOAD_DIR)),
             launch: Box::new(|path| {
                 std::process::Command::new(path)
                     .arg(greyscreen_core::install::UPDATE_FLAG)
@@ -351,13 +354,18 @@ impl Worker {
     }
 
     fn remove_stale_downloads(&self) {
-        let (Some(running), Ok(entries)) = (&self.running, fs::read_dir(&self.config.dir)) else {
+        let Some(running) = &self.running else {
             return;
         };
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            if is_stale_download(&name.to_string_lossy(), running) {
-                fs::remove_file(entry.path()).ok();
+        for dir in std::iter::once(&self.config.dir).chain(&self.config.legacy_dir) {
+            let Ok(entries) = fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                if is_stale_download(&name.to_string_lossy(), running) {
+                    fs::remove_file(entry.path()).ok();
+                }
             }
         }
     }

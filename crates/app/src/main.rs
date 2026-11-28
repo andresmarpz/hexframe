@@ -17,6 +17,7 @@ mod tests;
 
 use greyscreen_core::encoder::PROBE_FLAG;
 use greyscreen_core::install::HIDDEN_FLAG;
+use greyscreen_core::legacy;
 use greyscreen_core::paths;
 use greyscreen_core::settings::NATIVE_HEIGHT_CEILING;
 use greyscreen_core::settings::Settings;
@@ -53,8 +54,14 @@ fn main() {
     let Some(mut launch) = platform::begin(headless) else {
         return;
     };
+    let adopted = if headless {
+        Vec::new()
+    } else {
+        legacy::adopt_legacy_data()
+    };
     let _log_guard = (!headless).then(logging::init).flatten();
     tracing::info!("greyscreen {} starting", env!("GREYSCREEN_BUILD"));
+    adopted.iter().for_each(legacy::Adoption::log);
     launch.configure_process();
     if let Err(err) = rune::set_app_icon(include_bytes!("../assets/icon.png").as_slice()) {
         tracing::warn!(%err, "cannot set app icon");
