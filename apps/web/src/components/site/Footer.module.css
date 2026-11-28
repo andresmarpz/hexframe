@@ -1,4 +1,5 @@
 .footer {
+  margin-top: 160px;
   border-top: 1px solid var(--color-site-concrete);
   padding: 64px var(--gutter) 0;
   background: var(--color-site-paper);
@@ -58,6 +59,7 @@
 
 @media (max-width: 899px) {
   .footer {
+    margin-top: 96px;
     padding-top: 48px;
   }
 

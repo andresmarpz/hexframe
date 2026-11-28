@@ -18,7 +18,7 @@ export function Respawn({ downloads: initial }: Props) {
   const version = downloads ? `${displayVersion(downloads.tag)} · ` : "";
 
   return (
-    <Section id="respawn" innerClassName={styles.inner}>
+    <Section id="respawn" className={styles.root} innerClassName={styles.inner}>
       <RespawnLabel seconds={0} />
       <TiltMark size={160} className={styles.mark} />
       <h2 className={`display ${styles.title}`}>respawn.</h2>

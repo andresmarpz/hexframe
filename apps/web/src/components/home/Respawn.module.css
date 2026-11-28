@@ -1,3 +1,7 @@
+.root.root {
+  padding-bottom: 0;
+}
+
 .inner {
   display: flex;
   flex-direction: column;
