@@ -17,6 +17,7 @@
 
 .lead {
   padding-block: 32px;
+  text-wrap: balance;
 }
 
 @media (max-width: 899px) {

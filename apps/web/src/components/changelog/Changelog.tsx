@@ -39,7 +39,9 @@ export function Changelog({ entries }: Props) {
                 {entry.bullets.map((bullet) => (
                   <li key={bullet} className={styles.bullet}>
                     <XBullet size={14} />
-                    <p className="body">{bullet}</p>
+                    <p className="body">
+                      {bullet.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : part))}
+                    </p>
                   </li>
                 ))}
               </ul>

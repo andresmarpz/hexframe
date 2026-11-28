@@ -18,7 +18,7 @@
 .sections {
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: 96px var(--gutter) 160px;
+  padding: 96px var(--gutter) 0;
   box-sizing: content-box;
 }
 
@@ -113,11 +113,5 @@
   .content {
     width: auto;
     max-width: none;
-  }
-}
-
-@media (max-width: 899px) {
-  .sections {
-    padding-bottom: 96px;
   }
 }
