@@ -5,8 +5,10 @@ mod export_icon;
 pub(crate) mod game_icons;
 mod grip;
 pub(crate) mod icon_sheet;
+pub(crate) mod minute_timeline;
 mod stable_button;
 pub(crate) mod thumb;
+pub(crate) mod timeline_sheet;
 mod tone;
 mod volume_slider;
 

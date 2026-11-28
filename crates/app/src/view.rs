@@ -9,7 +9,7 @@ mod settings;
 pub(crate) mod shell;
 mod widgets;
 
-pub(crate) use widgets::{champion, icon_sheet, thumb};
+pub(crate) use widgets::{champion, icon_sheet, thumb, timeline_sheet};
 
 use rune::{Cx, El, col};
 use rune_kit::Kit;
@@ -22,6 +22,9 @@ pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {
     let k = Kit::neutral(cx.system_dark());
     if icon_sheet::shown() {
         return rune_kit::root(icon_sheet::sheet(&k, s.recordings.first()), Vec::new());
+    }
+    if timeline_sheet::shown() {
+        return rune_kit::root(timeline_sheet::sheet(&k), Vec::new());
     }
     let mut layer: Vec<El> = Vec::new();
     let theater = s.review.as_ref().filter(|r| r.theater);
