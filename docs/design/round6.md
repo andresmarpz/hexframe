@@ -64,7 +64,7 @@ Dock geometry: the dock is 48 tall with a 24 radius.
 ## Icon rules (Andres, 2026-11-27)
 
 - **Folder:** always the custom `folder-reveal` icon (Duotone `3RB-0`, Line `3R1-0`, page `p-5-0`). The flat kit folder is retired.
-- **Settings, storage settings and any settings entry:** always the **Rune kit `settings-gear`** icon. The custom gear was deleted (Andres, 2026-11-27).
+- **Settings, storage settings and any settings entry:** always the **Rune kit `settings-gear`** icon, with the exact current path from `rune/themes/opencode/src/icons.rs` (`SETTINGS_GEAR`, the taller hexagon). The custom gear was deleted (Andres, 2026-11-27).
 - **Objectives:** flat traced Riot silhouettes (`lol-icons/match-history/svg/`).
 - **Kill:** Riot's crossed swords.
 - **Death:** the skull.
@@ -93,3 +93,23 @@ Dock geometry: the dock is 48 tall with a 24 radius.
   Rune Kit stays the shared kit. Generic parts can be promoted into it later.
 - **Icons:** page `Icons`.
 - **Older rounds:** archived under the bottom divider.
+
+## Home and Last game updates (2026-11-27)
+
+- **Home:**
+  - 48 px of space under the titlebar.
+  - An **ambient background**: the last game's frame, blurred 72 px, at 42% opacity, fading into the page. It is the game's own light, not decoration.
+- **Last game card, variant A** (chosen):
+  - Thumbnail with play.
+  - "Victory" with "Last game · 2 hours ago".
+  - The champion line.
+  - The stats row: KDA, kill participation, clips and deaths reviewed.
+  - A chevron. The whole card opens the Last game screen, and the card has no action buttons.
+  - Variants B (hero) and C (compact row) stay on the Components sheet.
+- **Last game:**
+  - Breadcrumb padding 16 24 12.
+  - Hero 396 tall.
+  - Highlights header centred with All clips, with an 8 px gap to the cards.
+- **Timeline box:**
+  - The penta strip is `var(--color-success-bg)`.
+  - Captions read "Double Kill" … "Penta Kill", with no numbers.
