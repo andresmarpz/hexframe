@@ -15,7 +15,7 @@ use rune::{Cx, El, col};
 use rune_kit::Kit;
 
 use crate::ui::Ui;
-use layout::{TABULAR, card, hairline, title_style, titled_card};
+use layout::{TABULAR, card, hairline, title_style};
 use screens::screen;
 
 pub(crate) fn root(s: &Ui, cx: &mut Cx<Ui>) -> El {

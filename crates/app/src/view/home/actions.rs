@@ -2,18 +2,17 @@ use crate::headless::reveal;
 use greyscreen_core::paths;
 use greyscreen_core::problem::Problem;
 use greyscreen_engine::{EngineCmd, EngineStatus};
-use rune::{El, Tx, row, text};
+use rune::{El, Tx, row};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
 
-use crate::ui::{TEST_RECORDING_SECS, Ui};
+use crate::ui::Ui;
 use crate::view::widgets::stable_label_content;
 
-pub(super) fn bar(s: &Ui, k: &Kit) -> El {
+pub(super) fn bar(s: &Ui, k: &Kit) -> Option<El> {
     match &s.status {
-        EngineStatus::Recording { .. } => recording(s, k),
-        EngineStatus::Error(message) => failed(Problem::from_error(message), k),
-        _ if !s.settings.first_run_done => row().key("first-run-quiet"),
-        status => idle(status, !s.recordings.is_empty(), k),
+        EngineStatus::Recording { .. } => Some(recording(s, k)),
+        EngineStatus::Error(message) => Some(failed(Problem::from_error(message), k)),
+        _ => None,
     }
 }
 
@@ -67,40 +66,6 @@ fn failed(problem: Problem, k: &Kit) -> El {
             false,
             |_, _| reveal(&paths::logs_dir()),
         ));
-    }
-    bar
-}
-
-fn idle(status: &EngineStatus, has_games: bool, k: &Kit) -> El {
-    let reason = match status {
-        EngineStatus::Idle | EngineStatus::GameRunning => None,
-        EngineStatus::Finalizing => Some("Not available while the last game is saving."),
-        _ => Some("Not available while League is starting."),
-    };
-    let variant = if has_games {
-        ButtonVariant::Ghost
-    } else {
-        ButtonVariant::Outline
-    };
-    let test = Button::new("Test recording (10 s)")
-        .variant(variant)
-        .control_size(ControlSize::Large)
-        .disabled(reason.is_some())
-        .on_press_tx(|ui: &mut Ui, _| {
-            ui.send(EngineCmd::StartTestRecording {
-                secs: TEST_RECORDING_SECS,
-            })
-        })
-        .build(k)
-        .key("test-recording");
-    let mut bar = row().gap(12.0).center_y().child(test);
-    if let Some(reason) = reason {
-        bar = bar.child(
-            text(reason)
-                .key("test-recording-reason")
-                .font(k.ty.small)
-                .color(k.c.text_muted),
-        );
     }
     bar
 }

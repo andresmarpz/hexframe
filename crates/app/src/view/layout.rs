@@ -8,7 +8,6 @@ const PAGE_MAX_WIDTH: f32 = 880.0;
 const PAGE_GUTTER: f32 = 24.0;
 const CARD_RADIUS: f32 = 10.0;
 const SCROLL_FADE: f32 = 28.0;
-const SECTION_HEADER_HEIGHT: f32 = 44.0;
 
 pub(super) fn content_column() -> El {
     col()
@@ -43,28 +42,30 @@ pub(super) fn scrolling_content(page: El) -> El {
         .child(page_column().child(page))
 }
 
+pub(super) fn wide_scrolling_content(page: El, top: f32) -> El {
+    content_column()
+        .scroll(ScrollSpec {
+            stick_bottom: false,
+        })
+        .scroll_edge_fade(SCROLL_FADE)
+        .child(
+            col()
+                .key("page")
+                .w_full()
+                .max_w(PAGE_MAX_WIDTH + 2.0 * PAGE_GUTTER)
+                .px(PAGE_GUTTER)
+                .pt(top)
+                .pb(shell::CLEARANCE)
+                .child(page),
+        )
+}
+
 pub(super) fn card(k: &Kit) -> El {
     col()
         .w_full()
         .fill(k.c.bg_base)
         .radius(CARD_RADIUS)
         .border(1.0, k.c.border_base)
-}
-
-pub(super) fn section_header(k: &Kit, title: &str) -> El {
-    row()
-        .w_full()
-        .h(SECTION_HEADER_HEIGHT)
-        .px(16.0)
-        .center_y()
-        .child(text(title).font(k.ty.body_medium).color(k.c.text_base))
-}
-
-pub(super) fn titled_card(k: &Kit, key: &'static str, title: &str) -> El {
-    card(k)
-        .key(key)
-        .child(section_header(k, title))
-        .child(hairline(k))
 }
 
 pub(super) fn hairline(k: &Kit) -> El {

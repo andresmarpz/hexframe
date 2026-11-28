@@ -24,6 +24,11 @@ pub(super) const SCENES: &[Scene] = &[
         home(ui);
         ui.last_game = ui.recordings.first().cloned();
     }),
+    ("home-empty", |ui| {
+        home(ui);
+        ui.recordings.clear();
+        ui.last_game = None;
+    }),
     ("demo", demo),
     ("home-first-run", |ui| {
         first_run(ui);

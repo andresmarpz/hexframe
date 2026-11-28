@@ -1,52 +1,56 @@
-use rune::{Cursor, El, el, row, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
+use jiff::Zoned;
+use rune::{Align, Cursor, El, col, el, row, text};
+use rune_kit::Kit;
 
+use super::surface::{header, sized, surface};
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips};
-use crate::ui::{Screen, Ui, format_clock};
-use crate::view::thumb::{self, ASPECT};
-use crate::view::{TABULAR, card, hairline};
+use crate::ui::{Ui, format_clock};
+use crate::view::{TABULAR, hairline, thumb};
 
-const LIMIT: usize = 4;
-const GAP: f32 = 12.0;
+const LIMIT: usize = 2;
+const ROW_HEIGHT: f32 = 70.0;
+const THUMB: (f32, f32) = (96.0, 54.0);
+const WEEK_SECS: i64 = 7 * 24 * 60 * 60;
 
-pub(super) fn section(s: &Ui, k: &Kit) -> Option<El> {
+pub(super) fn section(s: &Ui, k: &Kit, now: &Zoned) -> Option<El> {
     let clips = recent_clips(&s.recordings, LIMIT);
     if clips.is_empty() {
         return None;
     }
-    let mut strip = row().w_full().padding(12.0).gap(GAP);
-    for clip in &clips {
-        strip = strip.child(item(clip, k));
+    let fresh = fresh_count(s, now);
+    let mut list = surface(k).key("recent-clips-card");
+    for (n, clip) in clips.iter().enumerate() {
+        if n > 0 {
+            list = list.child(el().w_full().px(16.0).child(hairline(k)));
+        }
+        list = list.child(item(clip, k));
     }
-    for _ in clips.len()..LIMIT {
-        strip = strip.child(el().w(0.0).grow(1.0).a11y_hidden());
-    }
-    let header = row()
-        .w_full()
-        .h(44.0)
-        .px(16.0)
-        .center_y()
-        .justify_between()
-        .child(
-            text("Recent clips")
-                .font(k.ty.body_medium)
-                .color(k.c.text_base),
-        )
-        .child(
-            Button::new("View all")
-                .variant(ButtonVariant::Ghost)
-                .control_size(ControlSize::Small)
-                .on_press(|ui: &mut Ui| ui.go(Screen::Clips))
-                .build(k)
-                .key("home-view-all-clips"),
-        );
     Some(
-        card(k)
+        col()
             .key("recent-clips")
-            .child(header)
-            .child(hairline(k))
-            .child(strip),
+            .w(0.0)
+            .grow(1.0)
+            .min_w(0.0)
+            .gap(8.0)
+            .child(header(
+                k,
+                "Recent clips",
+                (fresh > 0).then(|| format!("{fresh} new")),
+            ))
+            .child(list),
     )
+}
+
+fn fresh_count(s: &Ui, now: &Zoned) -> usize {
+    let cutoff = now.timestamp().as_second() - WEEK_SECS;
+    s.recordings
+        .iter()
+        .flat_map(|entry| {
+            let start = entry.meta.started_at.timestamp().as_second() as f64;
+            entry.meta.clips.iter().map(move |clip| start + clip.start_secs)
+        })
+        .filter(|at| *at >= cutoff as f64)
+        .count()
 }
 
 fn item(clip: &RecentClip, k: &Kit) -> El {
@@ -55,32 +59,45 @@ fn item(clip: &RecentClip, k: &Kit) -> El {
     let id = clip.entry.meta.id.clone();
     let index = clip.index;
     let game_time = format_clock(game_secs_at(clip.entry, clip.clip.start_secs) as u32);
-    let picture = thumb::clip_thumb(k, clip.entry, clip.clip, el().w_full().aspect_ratio(ASPECT));
-    rune::col()
+    let length = format_clock((clip.clip.end_secs - clip.clip.start_secs).max(0.0) as u32);
+    row()
         .key(format!("home-clip-{id}-{index}"))
         .role("button")
         .label(format!("Play {title} clip from {champion} game"))
-        .w(0.0)
-        .grow(1.0)
-        .min_w(0.0)
-        .gap(6.0)
-        .padding(4.0)
-        .radius(k.radius.md)
+        .w_full()
+        .h(ROW_HEIGHT)
+        .px(16.0)
+        .py(8.0)
+        .gap(12.0)
+        .center_y()
+        .cursor(Cursor::Pointer)
         .hover(k.c.hover)
         .hover_group()
-        .cursor(Cursor::Pointer)
         .on_press(move |ui: &mut Ui| ui.open_clip(id.clone(), index))
-        .child(picture)
+        .child(thumb::clip_thumb_small(k, clip.entry, clip.clip, THUMB))
         .child(
-            text(title)
-                .font(k.ty.body_medium)
-                .color(k.c.text_base)
-                .truncate(),
+            col()
+                .w(0.0)
+                .grow(1.0)
+                .min_w(0.0)
+                .gap(2.0)
+                .child(
+                    text(title)
+                        .font(sized(k.ty.ui_medium, 13.0, 18.0))
+                        .color(k.c.text_base)
+                        .truncate(),
+                )
+                .child(
+                    text(format!("at {game_time}"))
+                        .font(sized(k.ty.ui, 12.0, 16.0).features(TABULAR))
+                        .color(k.c.text_muted),
+                ),
         )
         .child(
-            text(format!("{champion} · {game_time}"))
-                .font(k.ty.small.features(TABULAR))
+            text(length)
+                .font(sized(k.ty.ui, 12.0, 16.0).features(TABULAR))
                 .color(k.c.text_muted)
-                .truncate(),
+                .w(40.0)
+                .align(Align::End),
         )
 }
