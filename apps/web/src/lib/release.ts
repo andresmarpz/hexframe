@@ -36,7 +36,7 @@ interface ApiRelease {
 function findAsset(assets: ApiAsset[], name: string): Asset | null {
   const asset = assets.find((a) => a.name === name);
   if (typeof asset?.browser_download_url !== "string" || typeof asset.size !== "number") return null;
-  return { name: name, url: asset.browser_download_url, size: asset.size };
+  return { name, url: asset.browser_download_url, size: asset.size };
 }
 
 function toDownloads(raw: ApiRelease): Downloads | null {
