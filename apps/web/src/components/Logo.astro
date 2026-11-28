@@ -6,7 +6,7 @@ interface Props {
 }
 
 const { height = 24 } = Astro.props;
-const [, , viewWidth, viewHeight] = lockup.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
+const [, , viewWidth = 1, viewHeight = 1] = (lockup.match(/viewBox="([^"]+)"/)?.[1] ?? "").split(" ").map(Number);
 const width = Math.round((height * viewWidth) / viewHeight);
 const themed = lockup
   .replace(/<title>.*?<\/title>\s*/, "")
