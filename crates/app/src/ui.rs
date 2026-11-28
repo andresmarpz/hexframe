@@ -36,7 +36,7 @@ mod tests;
 pub(crate) use export::{CopyState, Destination, ExportPhase, ExportUi, Handle as RangeHandle};
 pub(crate) use feedback::{FeedbackPhase, FeedbackUi, MESSAGE_KEY as FEEDBACK_MESSAGE_KEY};
 pub(crate) use first_run::TestRun;
-pub(crate) use format::{format_clock, format_size, format_size_rate};
+pub(crate) use format::{format_clock, format_length, format_size, format_size_rate};
 pub(crate) use keys::MAC;
 pub(crate) use library::{Detail, ListItem, RecordingsFilter};
 pub(crate) use review::jump::seek_target;

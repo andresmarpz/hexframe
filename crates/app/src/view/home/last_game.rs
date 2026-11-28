@@ -31,13 +31,14 @@ static CHEVRON: Icon = Icon {
 
 pub(super) fn card(entry: &RecordingEntry, k: &Kit, now: &Zoned) -> El {
     let champion = entry.meta.game.info.me.champion.as_str();
+    let id = entry.meta.id.clone();
     surface(k)
         .key("last-game-card")
         .role("button")
         .label(format!("Open {champion} game"))
         .cursor(Cursor::Pointer)
         .hover(k.c.hover)
-        .on_press(|ui: &mut Ui| ui.open_last_game())
+        .on_press(move |ui: &mut Ui| ui.open_game(id.clone()))
         .child(summary(entry, k, now))
         .child(el().w_full().px(16.0).child(hairline(k)))
         .child(timeline(entry, k))

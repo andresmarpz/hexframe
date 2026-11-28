@@ -4,7 +4,7 @@ use rune_kit::Kit;
 
 use super::surface::{header, sized, surface};
 use crate::ui::library::format::{RecentClip, clip_title, game_secs_at, recent_clips};
-use crate::ui::{Ui, format_clock};
+use crate::ui::{Ui, format_length};
 use crate::view::{TABULAR, hairline, thumb};
 
 const LIMIT: usize = 2;
@@ -58,8 +58,8 @@ fn item(clip: &RecentClip, k: &Kit) -> El {
     let title = clip_title(&clip.clip.label);
     let id = clip.entry.meta.id.clone();
     let index = clip.index;
-    let game_time = format_clock(game_secs_at(clip.entry, clip.clip.start_secs) as u32);
-    let length = format_clock((clip.clip.end_secs - clip.clip.start_secs).max(0.0) as u32);
+    let game_time = format_length(game_secs_at(clip.entry, clip.clip.start_secs) as u32);
+    let length = format_length((clip.clip.end_secs - clip.clip.start_secs).max(0.0) as u32);
     row()
         .key(format!("home-clip-{id}-{index}"))
         .role("button")

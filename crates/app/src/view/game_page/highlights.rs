@@ -6,7 +6,7 @@ use rune::{Cursor, El, Icon, SurfaceFit, TextStyle, col, el, row, text};
 use rune_kit::{Badge, BadgeVariant, Button, ButtonVariant, ControlSize, Kit};
 
 use crate::ui::library::format::{clip_title, game_secs_at};
-use crate::ui::{Screen, Ui, format_clock};
+use crate::ui::{Screen, Ui, format_length};
 use crate::view::TABULAR;
 use crate::view::thumb::{ASPECT, clip_path, ready_image};
 
@@ -87,8 +87,8 @@ fn header(s: &Ui, shown: usize, k: &Kit) -> El {
 fn card(rec: &RecordingEntry, index: usize, clip: &ClipEntry, k: &Kit) -> El {
     let title = clip_title(&clip.label);
     let id = rec.meta.id.clone();
-    let at = format_clock(game_secs_at(rec, clip.start_secs) as u32);
-    let length = format_clock((clip.end_secs - clip.start_secs).max(0.0) as u32);
+    let at = format_length(game_secs_at(rec, clip.start_secs) as u32);
+    let length = format_length((clip.end_secs - clip.start_secs).max(0.0) as u32);
     let picture = match ready_image(&clip_path(rec, clip)) {
         Some(image) => el()
             .w_full()

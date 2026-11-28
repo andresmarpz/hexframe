@@ -14,7 +14,7 @@ const OBJECTIVE_ICON: f32 = 12.0;
 const STACK_WIDTH: f32 = 14.0;
 const STACK_HEIGHT: f32 = 18.0;
 const ICON_TOP: f32 = 1.0;
-const BADGE: f32 = 8.0;
+const BADGE: f32 = 7.0;
 const BADGE_TOP: f32 = 10.0;
 const LABEL_HEIGHT: f32 = 12.0;
 const LABEL_GAP: f32 = 4.0;
@@ -179,7 +179,7 @@ fn glyph(icon: &'static Icon, size: f32, color: Color) -> El {
 
 fn stacked(k: &Kit, multikill: Multikill, look: &Look) -> El {
     let font = TextStyle {
-        size: 7.0,
+        size: 6.0,
         weight: 700.0,
         line_height: BADGE,
         ..k.ty.small.features(TABULAR)
