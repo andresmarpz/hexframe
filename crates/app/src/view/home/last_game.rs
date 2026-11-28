@@ -1,6 +1,6 @@
 use greyscreen_core::game::GameResult;
 use greyscreen_core::gamedata::map_name;
-use greyscreen_core::timeline::kill_participation;
+use greyscreen_core::timeline::{kill_participation, minute_boxes};
 use greyscreen_engine::RecordingEntry;
 use jiff::Zoned;
 use rune::{Cursor, El, Icon, TextStyle, col, el, row, text};
@@ -10,10 +10,12 @@ use super::surface::{sized, surface};
 use crate::ui::library::format::{kda, mode_label, review_progress};
 use crate::ui::{Ui, format_clock};
 use crate::view::widgets::champion::champion_icon;
+use crate::view::widgets::minute_timeline::minute_timeline;
 use crate::view::{TABULAR, hairline, thumb};
 
 const THUMB_SIZE: (f32, f32) = (192.0, 108.0);
 const PLAY: f32 = 32.0;
+const TIMELINE_WIDTH: f32 = 848.0;
 
 static PLAY_GLYPH: Icon = Icon {
     name: "home-play",
@@ -163,7 +165,13 @@ fn stat(k: &Kit, value: String, label: String) -> El {
 }
 
 fn timeline(entry: &RecordingEntry, k: &Kit) -> El {
-    col().w_full().px(16.0).py(14.0).child(el().h(34.0))
+    let meta = &entry.meta;
+    let boxes = minute_boxes(&meta.events, &meta.game.info, meta.duration_secs);
+    col()
+        .w_full()
+        .px(16.0)
+        .py(14.0)
+        .child(minute_timeline(k, &boxes, TIMELINE_WIDTH).w_full())
 }
 
 fn ago(entry: &RecordingEntry, now: &Zoned) -> String {

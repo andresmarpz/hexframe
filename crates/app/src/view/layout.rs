@@ -1,4 +1,4 @@
-use rune::{El, ScrollSpec, TextStyle, col, el, row, text};
+use rune::{El, ScrollSpec, TextStyle, col, el};
 use rune_kit::Kit;
 
 use super::shell;
