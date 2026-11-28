@@ -1,0 +1,149 @@
+.hero {
+  padding: 96px var(--gutter) 0;
+}
+
+.inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+.headline {
+  --size: min(var(--text-site-display), 9.444vw);
+  display: flex;
+  flex-direction: column;
+  margin-top: 32px;
+  color: var(--color-site-ink);
+  font-size: var(--size);
+  font-weight: 900;
+  line-height: 0.8824em;
+  letter-spacing: -0.06em;
+  text-transform: lowercase;
+}
+
+.tail {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.147em;
+}
+
+.mark {
+  width: 0.7647em;
+  height: 0.7647em;
+  margin-bottom: 0.0588em;
+  flex-shrink: 0;
+}
+
+.wrap {
+  display: none;
+}
+
+.face {
+  transform-box: view-box;
+  transform-origin: 32px 32px;
+  animation: tip 450ms 600ms both linear(0, 0.102, 0.325, 0.572, 0.787, 0.944, 1.04, 1.086, 1.094, 1.082, 1.06, 1.036, 1.017, 1.003, 0.995, 0.992, 0.991, 0.993, 0.995, 0.997, 1);
+}
+
+@keyframes tip {
+  from {
+    transform: rotate(14deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 48px;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 32px;
+  width: 560px;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-site-graphite);
+}
+
+@media (max-width: 899px) {
+  .hero {
+    padding-top: 48px;
+  }
+
+  .headline {
+    --size: 56px;
+    margin-top: 24px;
+    line-height: 52px;
+  }
+
+  .tail {
+    gap: 8px;
+  }
+
+  .mark {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 4px;
+  }
+
+  .wrap {
+    display: block;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 32px;
+    margin-top: 32px;
+  }
+
+  .copy {
+    width: auto;
+  }
+
+  .copy .lead {
+    font-size: 18px;
+    line-height: 28px;
+  }
+
+  .buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .buttons > a {
+    width: 100%;
+  }
+
+  .facts {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .face {
+    animation: none;
+  }
+}
