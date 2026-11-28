@@ -4,7 +4,7 @@ import { download, site } from "../../content/copy";
 import { getDownloads } from "../../lib/github-build";
 
 export const metadata: Metadata = {
-  title: `${download.title} — ${site.name}`,
+  title: `Download — ${site.name}`,
   description: download.intro,
 };
 
