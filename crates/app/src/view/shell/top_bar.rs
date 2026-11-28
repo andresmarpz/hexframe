@@ -1,9 +1,10 @@
-use rune::{Cx, El, Icon, col, row, text};
+use rune::{Cx, El, col, el, row, text};
 use rune_kit::{Badge, ControlSize, IconButton, IconButtonVariant, Kit, SegmentedControl};
 
 use super::float::floating;
 use crate::logo::LOGO;
 use crate::ui::{Screen, Ui};
+use crate::view::widgets::game_icons::SETTINGS_GEAR;
 
 pub(crate) const HEIGHT: f32 = 44.0;
 const EDGE_PAD: f32 = 16.0;
@@ -20,12 +21,6 @@ const TABS: [(Screen, &str); 3] = [
     (Screen::Clips, "Clips"),
 ];
 
-static SETTINGS_GEAR: Icon = Icon {
-    name: "settings-gear",
-    view: 16.0,
-    body: r#"<path d="M1.5 11V5L8 1L14.5 5V11L8 15L1.5 11Z" stroke-linecap="round" stroke-linejoin="round" stroke="currentColor"/><path d="M10.5 8C10.5 9.38071 9.38071 10.5 8 10.5C6.61929 10.5 5.5 9.38071 5.5 8C5.5 6.61929 6.61929 5.5 8 5.5C9.38071 5.5 10.5 6.61929 10.5 8Z" stroke="currentColor"/>"#,
-};
-
 pub(in crate::view) fn top_bar(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     let insets = cx.chrome_insets();
     let start = if insets.leading > 0.0 {
@@ -33,26 +28,28 @@ pub(in crate::view) fn top_bar(s: &Ui, k: &Kit, cx: &Cx<Ui>) -> El {
     } else {
         EDGE_PAD
     };
-    row()
+    el()
         .key("top-bar")
         .pin(Some(0.0), Some(0.0), Some(0.0), None)
         .h(HEIGHT)
-        .pl(start)
-        .pr(insets.trailing + CAPTION_GAP)
-        .center_y()
-        .window_drag()
-        .child(brand(k))
         .child(
             row()
-                .grow(1.0)
-                .min_w(0.0)
-                .h_full()
+                .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
+                .pl(start)
+                .pr(insets.trailing + CAPTION_GAP)
+                .center_y()
+                .window_drag()
+                .child(brand(k))
+                .child(row().grow(1.0).min_w(0.0).h_full().window_drag())
+                .child(settings_button(k)),
+        )
+        .child(
+            row()
+                .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
                 .center_y()
                 .justify_center()
-                .window_drag()
                 .child(top_dock(s, k)),
         )
-        .child(settings_button(k))
 }
 
 fn brand(k: &Kit) -> El {
