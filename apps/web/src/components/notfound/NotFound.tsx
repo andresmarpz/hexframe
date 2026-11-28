@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "../kit/Button";
-import { TiltMark } from "./TiltMark";
+import { TiltMark } from "../site/TiltMark";
 import styles from "./NotFound.module.css";
 
 const START_SECONDS = 5;
@@ -23,7 +23,7 @@ export function NotFound() {
 
   return (
     <section className={styles.page}>
-      <TiltMark size={200} className={styles.mark} trigger="load" />
+      <TiltMark size={200} className={styles.mark} />
       <h1 className={`display ${styles.headline}`}>this page died.</h1>
       <p className={`lead ${styles.lead}`}>Respawning you on the home page in 0:{String(seconds).padStart(2, "0")}.</p>
       <Button href="/" variant="contrast" size="xxl">

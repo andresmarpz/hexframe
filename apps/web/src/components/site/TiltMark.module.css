@@ -1,0 +1,33 @@
+.root {
+  display: inline-flex;
+}
+
+.face {
+  transform-box: view-box;
+  transform-origin: 32px 32px;
+}
+
+.root[data-phase="upright"] .face {
+  transform: rotate(14deg);
+}
+
+.root[data-phase="tilt"] .face {
+  animation: tip 450ms 600ms both linear(0, 0.102, 0.325, 0.572, 0.787, 0.944, 1.04, 1.086, 1.094, 1.082, 1.06, 1.036, 1.017, 1.003, 0.995, 0.992, 0.991, 0.993, 0.995, 0.997, 1);
+}
+
+@keyframes tip {
+  from {
+    transform: rotate(14deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-phase] .face {
+    animation: none;
+    transform: none;
+  }
+}

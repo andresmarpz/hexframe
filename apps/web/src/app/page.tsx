@@ -6,13 +6,13 @@ import { Numbers } from "../components/home/Numbers";
 import { Respawn } from "../components/home/Respawn";
 import { Safe } from "../components/home/Safe";
 import { Timeline } from "../components/home/Timeline";
-import { getDownloads, getStars } from "../lib/github-build";
+import { getDownloads } from "../lib/github-build";
 
 export default async function HomePage() {
-  const [downloads, stars] = await Promise.all([getDownloads(), getStars()]);
+  const downloads = await getDownloads();
   return (
     <>
-      <Hero downloads={downloads} stars={stars} />
+      <Hero downloads={downloads} />
       <HeroStage />
       <Features />
       <Timeline />

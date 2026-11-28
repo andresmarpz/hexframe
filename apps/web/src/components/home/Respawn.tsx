@@ -2,11 +2,11 @@
 
 import { displayVersion, type Downloads } from "../../lib/release";
 import { useDownloads } from "../../lib/use-downloads";
-import { TiltMark } from "../notfound/TiltMark";
 import { DownloadButton } from "../site/DownloadButton";
 import { RespawnLabel } from "../site/RespawnLabel";
 import { Section } from "../site/Section";
 import { TextLink } from "../site/TextLink";
+import { TiltMark } from "../site/TiltMark";
 import styles from "./Respawn.module.css";
 
 interface Props {
@@ -20,7 +20,7 @@ export function Respawn({ downloads: initial }: Props) {
   return (
     <Section id="respawn" className={styles.root} innerClassName={styles.inner}>
       <RespawnLabel seconds={0} />
-      <TiltMark size={160} className={styles.mark} />
+      <TiltMark size={160} when="view" className={styles.mark} />
       <h2 className={`display ${styles.title}`}>respawn.</h2>
       <p className={`lead ${styles.lead}`}>Your next game records itself.</p>
       <div className={styles.actions}>

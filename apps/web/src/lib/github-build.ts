@@ -1,5 +1,5 @@
 import { repo } from "../content/copy";
-import { pickDownloads, pickStars, type Downloads } from "./release";
+import { pickDownloads, type Downloads } from "./release";
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -28,8 +28,4 @@ function fetchJson(path: string): Promise<unknown> {
 
 export async function getDownloads(): Promise<Downloads | null> {
   return pickDownloads(await fetchJson("/releases?per_page=30"));
-}
-
-export async function getStars(): Promise<number | null> {
-  return pickStars(await fetchJson(""));
 }

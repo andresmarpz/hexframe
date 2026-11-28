@@ -106,7 +106,6 @@
 
 .markerRing,
 .drop,
-.dropPath,
 .timer {
   position: absolute;
   opacity: 0;
@@ -159,14 +158,6 @@
 
 .clipCard {
   box-shadow: #11111166 0 12px 32px -8px;
-}
-
-.dropPath {
-  top: 64px;
-  left: 719px;
-  width: 1.5px;
-  height: 96px;
-  background: repeating-linear-gradient(to bottom, var(--color-site-paper) 0 3px, transparent 3px 7px);
 }
 
 .drop {
@@ -260,7 +251,6 @@
   .death,
   .deathLine,
   .markerRing,
-  .dropPath,
   .drop,
   .dropFace,
   .timer,
@@ -272,15 +262,6 @@
     animation-duration: 9s;
     animation-iteration-count: infinite;
     animation-timing-function: linear;
-  }
-
-  .clip {
-    top: 500px;
-  }
-
-  .clipLine {
-    top: 566px;
-    height: 43px;
   }
 
   .image {
@@ -308,10 +289,6 @@
 
   .markerRing {
     animation-name: pop;
-  }
-
-  .dropPath {
-    animation-name: showMiddle;
   }
 
   .drop {

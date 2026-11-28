@@ -145,11 +145,11 @@
   --kit-disabled: 1;
 }
 
-.kit-button:hover:not(:disabled):not([aria-disabled="true"]) {
+.kit-button:hover:not(:disabled):not([aria-disabled="true"]):not([data-inert]) {
   background-image: var(--kit-hover), var(--kit-sheen);
 }
 
-.kit-button:active:not(:disabled):not([aria-disabled="true"]) {
+.kit-button:active:not(:disabled):not([aria-disabled="true"]):not([data-inert]) {
   background-image: var(--kit-pressed), var(--kit-sheen);
 }
 
@@ -165,6 +165,10 @@
 .kit-button:disabled,
 .kit-button[aria-disabled="true"] {
   opacity: var(--kit-disabled);
+  cursor: default;
+}
+
+.kit-button[data-inert] {
   cursor: default;
 }
 

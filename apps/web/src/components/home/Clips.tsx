@@ -36,10 +36,10 @@ export function Clips() {
         <kbd className={styles.keycap}>F9</kbd>
         <div className={styles.export}>
           <span className={`label ${styles.exportLabel}`}>Export</span>
-          <Button variant="outline" size="regular">
+          <Button inert variant="outline" size="regular">
             Original quality
           </Button>
-          <Button variant="outline" size="regular">
+          <Button inert variant="outline" size="regular">
             For Discord (under 10 MB)
           </Button>
         </div>

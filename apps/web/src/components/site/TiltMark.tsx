@@ -1,26 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mark } from "../site/Mark";
+import { Mark } from "./Mark";
 import styles from "./TiltMark.module.css";
 
 interface Props {
   size: number;
+  tone?: "dark" | "light";
   className?: string;
-  trigger?: "load" | "view";
+  markClassName?: string;
+  when?: "load" | "view";
 }
 
-export function TiltMark({ size, className, trigger = "view" }: Props) {
+export function TiltMark({ size, tone, className, markClassName, when = "load" }: Props) {
   const root = useRef<HTMLSpanElement>(null);
-  const [phase, setPhase] = useState<"rest" | "upright" | "tilt">("rest");
+  const [phase, setPhase] = useState<"rest" | "upright" | "tilt">(when === "load" ? "tilt" : "rest");
 
   useEffect(() => {
+    if (when === "load") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const element = root.current;
-    if (trigger === "load" || !element) {
-      setPhase("tilt");
-      return;
-    }
+    if (!element) return;
     setPhase("upright");
     const observer = new IntersectionObserver(
       (entries) => {
@@ -32,11 +32,11 @@ export function TiltMark({ size, className, trigger = "view" }: Props) {
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [trigger]);
+  }, [when]);
 
   return (
     <span ref={root} className={[styles.root, className].filter(Boolean).join(" ")} data-phase={phase}>
-      <Mark size={size} faceClassName={styles.face} />
+      <Mark size={size} tone={tone} className={markClassName} faceClassName={styles.face} />
     </span>
   );
 }

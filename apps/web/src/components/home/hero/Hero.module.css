@@ -37,22 +37,6 @@
   display: none;
 }
 
-.face {
-  transform-box: view-box;
-  transform-origin: 32px 32px;
-  animation: tip 450ms 600ms both linear(0, 0.102, 0.325, 0.572, 0.787, 0.944, 1.04, 1.086, 1.094, 1.082, 1.06, 1.036, 1.017, 1.003, 0.995, 0.992, 0.991, 0.993, 0.995, 0.997, 1);
-}
-
-@keyframes tip {
-  from {
-    transform: rotate(14deg);
-  }
-
-  to {
-    transform: rotate(0deg);
-  }
-}
-
 .row {
   display: flex;
   align-items: flex-end;
@@ -139,11 +123,5 @@
     flex-direction: row;
     align-items: flex-start;
     gap: 16px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .face {
-    animation: none;
   }
 }

@@ -81,12 +81,3 @@ export function formatReleaseDate(date: string): string {
 export function formatMegabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
-
-export function pickStars(json: unknown): number | null {
-  const count = (json as { stargazers_count?: unknown } | null)?.stargazers_count;
-  return typeof count === "number" ? count : null;
-}
-
-export function mergeStars(current: number | null, fetched: number | null): number | null {
-  return fetched ?? current;
-}

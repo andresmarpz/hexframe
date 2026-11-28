@@ -5,7 +5,6 @@ import styles from "./Download.module.css";
 
 interface Props {
   downloads: Downloads | null;
-  stars: number | null;
 }
 
 const steps = [

@@ -26,7 +26,6 @@ export function HeroStage() {
                 <img className={styles.clipCard} src="/screens/hero-clip.webp" width={299} height={168} alt="" loading="lazy" />
               </div>
 
-              <div className={styles.dropPath} aria-hidden="true" />
               <div className={styles.drop} aria-hidden="true">
                 <Mark size={96} faceClassName={styles.dropFace} />
               </div>

@@ -22,6 +22,7 @@ type Shared = {
   size?: ButtonSize;
   icon?: ReactNode;
   disabled?: boolean;
+  inert?: boolean;
   className?: string;
   children?: ReactNode;
 };
@@ -38,6 +39,7 @@ export function Button(props: ButtonProps) {
     size = "regular",
     icon,
     disabled,
+    inert,
     className,
     children,
     ...rest
@@ -49,6 +51,14 @@ export function Button(props: ButtonProps) {
       {children}
     </>
   );
+
+  if (inert) {
+    return (
+      <span className={classes} data-variant={variant} data-size={size} data-inert="">
+        {content}
+      </span>
+    );
+  }
 
   if (rest.href !== undefined) {
     const { href, onClick, ...anchor } = rest as AnchorHTMLAttributes<HTMLAnchorElement>;

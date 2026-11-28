@@ -1,15 +1,14 @@
 import type { Downloads } from "../../lib/release";
 import { DownloadButton } from "../site/DownloadButton";
 import { GitHubButton } from "../site/GitHubButton";
-import { Mark } from "../site/Mark";
+import { TiltMark } from "../site/TiltMark";
 import styles from "./hero/Hero.module.css";
 
 interface Props {
   downloads: Downloads | null;
-  stars: number | null;
 }
 
-export function Hero({ downloads, stars }: Props) {
+export function Hero({ downloads }: Props) {
   return (
     <section className={styles.hero}>
       <div className={styles.inner}>
@@ -20,7 +19,7 @@ export function Hero({ downloads, stars }: Props) {
             <br className={styles.wrap} />{" "}
             <span className={styles.tail}>
               count
-              <Mark size={104} className={styles.mark} faceClassName={styles.face} />
+              <TiltMark size={104} markClassName={styles.mark} />
             </span>
           </span>
         </h1>
@@ -32,7 +31,7 @@ export function Hero({ downloads, stars }: Props) {
             </p>
             <div className={styles.buttons}>
               <DownloadButton initial={downloads} />
-              <GitHubButton initialStars={stars} />
+              <GitHubButton />
             </div>
           </div>
           <ul className={`label ${styles.facts}`}>
