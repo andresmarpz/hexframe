@@ -75,7 +75,7 @@ Dock geometry: the dock is 48 tall with a 24 radius.
 - Every box is 20 px tall: a 2 px top border plus 18 px of content. An icon never touches the border.
 - **Multikill** (2 to 4):
   - The kill icon sits 1 px from the top of the content.
-  - A badge circle 8 px wide, filled with the box colour, starts at y 10 and holds the number (7 px, weight 700). It knocks out only the handle tips.
+  - A badge circle 7 px wide, filled with the box colour, starts at y 10 and holds the number (6 px, weight 700). It knocks out only the handle tips.
 - **Penta:** an inverted box, solid success-fg with dark swords, plus a soft green glow.
 
 ## File layout (Andres, 2026-11-27)
