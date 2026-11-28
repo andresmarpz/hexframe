@@ -36,7 +36,7 @@ fn heading(k: &Kit) -> El {
         .key("setup-heading")
         .center()
         .gap(10.0)
-        .child(rune::icon(&LOGO, LOGO_SIZE).color(k.c.bg_accent).a11y_hidden())
+        .child(rune::icon(&LOGO, LOGO_SIZE).color(k.c.text_base).a11y_hidden())
         .child(
             text("Greyscreen")
                 .font(k.ty.body_medium)

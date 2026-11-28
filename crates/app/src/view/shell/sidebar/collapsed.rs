@@ -106,7 +106,7 @@ fn brand(s: &Ui, k: &Kit, titlebar_inset: f32) -> El {
         .child(
             row().key("nav-brand").h(36.0).center().child(
                 rune::icon(&LOGO, LOGO_SIZE)
-                    .color(k.c.bg_accent)
+                    .color(k.c.text_base)
                     .a11y_hidden(),
             ),
         )

@@ -177,7 +177,7 @@ fn wordmark(k: &Kit) -> El {
         .key("nav-brand")
         .gap(10.0)
         .center_y()
-        .child(rune::icon(&LOGO, 20.0).color(k.c.bg_accent).a11y_hidden())
+        .child(rune::icon(&LOGO, 20.0).color(k.c.text_base).a11y_hidden())
         .child(text("Greyscreen").font(type_::SECTION).color(k.c.text_base))
 }
 

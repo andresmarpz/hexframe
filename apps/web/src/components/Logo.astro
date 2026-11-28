@@ -6,11 +6,12 @@ interface Props {
 }
 
 const { height = 24 } = Astro.props;
-const width = Math.round((height * 548) / 112);
+const [, , viewWidth, viewHeight] = lockup.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
+const width = Math.round((height * viewWidth) / viewHeight);
 const themed = lockup
   .replace(/<title>.*?<\/title>\s*/, "")
-  .replaceAll('fill="#4392F7"', 'fill="var(--accent)"')
-  .replaceAll('fill="#EFF0F2"', 'fill="currentColor"')
+  .replaceAll('fill="#111111"', 'fill="var(--text)"')
+  .replaceAll('stroke="#FFFFFF"', 'stroke="var(--page)"')
   .replace("<svg ", `<svg width="${width}" height="${height}" aria-hidden="true" focusable="false" `);
 ---
 

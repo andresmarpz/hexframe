@@ -55,7 +55,7 @@ brand:
     cp brand/favicon.svg apps/web/public/favicon.svg
     d=$(mktemp -d); \
     rsvg-convert -w 32 -h 32 brand/favicon.svg -o $d/32.png; \
-    rsvg-convert -w 16 -h 16 brand/favicon.svg -o $d/16.png; \
+    rsvg-convert -w 16 -h 16 brand/app-icon-16.svg -o $d/16.png; \
     magick $d/32.png $d/16.png apps/web/public/favicon.ico; \
     rm -rf $d
     rsvg-convert -w 180 -h 180 brand/app-icon.svg -o apps/web/public/apple-touch-icon.png
