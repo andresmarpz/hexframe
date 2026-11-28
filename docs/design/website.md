@@ -115,7 +115,7 @@ Clone the real app screens. Never redraw them.
 1. **Nav**, height 88, padding 0 64, space-between, align center. Left: Lockup. Middle: links Features, Download, FAQ, Changelog (gap 32). Right: text link `GitHub` and a small primary button `Download`.
 2. **Hero**, padding 96 64 0.
    - No label above the headline. Display headline on two lines: `make the grey` / `screen count` followed by the dark Mark, 104px, sitting on the baseline in place of the full stop (a row with align-items flex-end; put the second line and the mark in one row with gap 20).
-   - 48px below, a row with two columns, space-between, align flex-end. Left (width 560): Lead "A fast League recorder with no ads and no account. It records every game and cuts the clips for you." Then 32px below, the Primary CTA, gap 12, then the Secondary CTA. Right: a mono stack (gap 10, align right), graphite: `FREE`, `OPEN SOURCE`, `WINDOWS 10 & 11`.
+   - 48px below, a row with two columns, space-between, align flex-end. Left (width 560): Lead "The fastest League recorder, with no ads and no account. It records every game and cuts the clips for you." Then 32px below, the Primary CTA, gap 12, then the Secondary CTA. Right: a mono stack (gap 10, align right), graphite: `FREE`, `OPEN SOURCE`, `WINDOWS 10 & 11`.
 3. **Hero stage**, padding 72 64 0. A Stage, full width 1312. Inside, a clone of the Last game screen (rebranded), centred, at scale 1 (stage 1312 minus 48 padding each side is 1216, so scale the clone to 0.95 inside a 1216x722 box). Callouts:
    - top-left over the edge: `● REC 24:31` / "Started by itself."
    - over the timeline, pointing at a red death marker: `DEATH 3 OF 7` / "Tagged: Ganked."
@@ -167,4 +167,4 @@ Show each micro-interaction as 2-3 small frames (rest, hover, press) built from 
 
 Every string must earn its place (clean-copy ladder). Cut captions that restate a title or a visual, and never say the same fact twice on one page. Keep compatibility facts next to every download button.
 
-Lead with what players get: fast, no ads, no account, open source. How it works (the GPU encoder, Windows Graphics Capture, the Live Client Data API) goes only where it answers a question: the "stays out of the game." section, the requirements and the FAQ.
+Lead with what players get: the fastest recorder (sell it, don't hedge), no ads, no account, open source. How it works (the GPU encoder, Windows Graphics Capture, the Live Client Data API) goes only where it answers a question: the "stays out of the game." section, the requirements and the FAQ.

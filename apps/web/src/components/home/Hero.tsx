@@ -26,7 +26,7 @@ export function Hero({ downloads }: Props) {
         <div className={styles.row}>
           <div className={styles.copy}>
             <p className={`lead ${styles.lead}`}>
-              A fast League recorder with no ads and no account. It records every game and cuts the clips for you.
+              The fastest League recorder, with no ads and no account. It records every game and cuts the clips for you.
             </p>
             <div className={styles.buttons}>
               <DownloadButton initial={downloads} />
