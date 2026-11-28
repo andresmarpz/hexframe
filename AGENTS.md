@@ -52,13 +52,12 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just brand`: regenerate the icons and web images from the SVGs in `brand/`.
 - `just fmt`: format the workspace.
 - `just web-dev`: run the website (`apps/web`) dev server. Run `bun install` first.
-- `just web-build`: build the website into `apps/web/dist`.
-- `just web-check`: `astro check` and a website build.
+- `just web-build`: static export of the website into `apps/web/out`.
+- `just web-check`: typecheck (`next typegen` and `tsc` 7) and a website build.
 - Pushes to `main` that change `apps/web/`, `brand/`, `package.json` or `bun.lock` deploy the website (https://greyscreen.app): the GitHub workflow `web.yml` triggers a Vercel deploy hook. Vercel's Git deployments are off, so other pushes create no Vercel deployment.
 - `just web-deploy`: manual fallback, a local authenticated build published to Vercel production, then a URL check.
 - `just api-dev`: run the backend (`apps/api`, Cloudflare Worker on Effect and Alchemy) locally in workerd with emulated R2 and D1. No Cloudflare account needed.
 - `just api-test`, `just api-check`: backend tests, and typecheck plus tests. See `apps/api/README.md` for deploys.
-- `just web-tokens`: regenerate the website's theme tokens from Rune's neutral kit.
 - `just web-screens`: render the app scenes into `apps/web/public/screens`.
 
 ## Rust on the Windows PC

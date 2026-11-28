@@ -69,6 +69,18 @@ export function mergeDownloads(current: Downloads | null, fetched: Downloads | n
   return fetched;
 }
 
+export function displayVersion(tag: string): string {
+  return tag.replace(/-preview\./, " preview ");
+}
+
+export function formatReleaseDate(date: string): string {
+  return new Date(date).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+export function formatMegabytes(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function pickStars(json: unknown): number | null {
   const count = (json as { stargazers_count?: unknown } | null)?.stargazers_count;
   return typeof count === "number" ? count : null;

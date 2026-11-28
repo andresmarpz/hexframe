@@ -64,9 +64,6 @@ brand:
     rsvg-convert -w 1200 -h 630 brand/og-image.svg -o apps/web/public/og.png
     sed 's|viewBox="0 0 1200 630"|viewBox="0 15 1200 600"|' brand/og-image.svg | rsvg-convert -w 1280 -h 640 -o brand/social-preview.png
 
-web-tokens:
-    cargo run -q --locked -p greyscreen --example export_tokens > apps/web/src/styles/rune-tokens.css
-
 # HOME points at /Users/Shared so the Recordings subtitle shows a neutral path, not the real user.
 web-screens:
     cargo build -q --locked -p greyscreen
@@ -83,7 +80,7 @@ web-build:
     export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && bun run build
 
 web-check:
-    export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && bun run check && bun run build
+    export GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; cd apps/web && bun run typecheck && bun run build
 
 api-dev:
     cd apps/api && bun run dev
@@ -99,7 +96,7 @@ web-deploy:
     export VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 GH_TOKEN="${GH_TOKEN:-$(gh auth token --user andresmarpz 2>/dev/null)}"; vercel pull --yes --environment=production && vercel build --prod --yes
     test -s .vercel/output/static/index.html || { echo "web-deploy: .vercel/output/static/index.html is missing, not deploying" >&2; exit 1; }
     VERCEL_ORG_ID=team_jHrXpSIdA6RnJeTxQQd0q1pP VERCEL_PROJECT_ID=prj_4SHas5qPeNUS4xqwKSnucDo2Zr95 vercel deploy --prebuilt --prod --yes
-    for path in / /download /changelog /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
+    for path in / /download/ /faq/ /changelog/ /privacy/ /og.png /favicon.svg; do code=$(curl -s -o /dev/null -w '%{http_code}' "https://greyscreen.app$path"); echo "$code $path"; [ "$code" = 200 ] || { echo "web-deploy: $path returned $code after deploy" >&2; exit 1; }; done
 
 # Title and notes come from apps/web/src/content/changelog/<version>.md. A tag with a dash is a prerelease.
 # The tree must be clean and its commit already on origin/main. The release tags that commit, so later pushes to main do not stop it.

@@ -11,7 +11,9 @@ Thumbs.db
 !crates/*/fixtures/*.mp4
 /target-*
 node_modules
-/apps/web/dist
-/apps/web/.astro
+/apps/web/.next
+/apps/web/out
+/apps/web/next-env.d.ts
+*.tsbuildinfo
 .vercel
 /apps/api/.alchemy
