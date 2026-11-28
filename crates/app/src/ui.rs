@@ -78,6 +78,7 @@ pub(crate) struct Ui {
     pub pane_drag: Option<PaneDrag>,
     pub window_watch: WindowSizeWatch,
     pub live_selected: bool,
+    pub game_page: Option<String>,
     pub status: EngineStatus,
     pub feed: VecDeque<FeedItem>,
     pub recordings: Vec<RecordingEntry>,
@@ -138,6 +139,7 @@ impl Ui {
             pane_drag: None,
             window_watch: WindowSizeWatch::new(),
             live_selected: false,
+            game_page: None,
             status: EngineStatus::Idle,
             feed: VecDeque::new(),
             recordings: Vec::new(),
@@ -216,6 +218,7 @@ impl Ui {
 
     pub(crate) fn open_review_entry(&mut self, entry: RecordingEntry) {
         self.close_settings();
+        self.game_page = None;
         let review = ReviewState::open(
             entry,
             self.player_factory,

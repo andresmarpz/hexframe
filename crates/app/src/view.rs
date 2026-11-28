@@ -1,4 +1,5 @@
 mod clips;
+mod game_page;
 mod games;
 mod home;
 mod layout;

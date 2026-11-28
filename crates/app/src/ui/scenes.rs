@@ -3,6 +3,7 @@ mod dock;
 mod errors;
 mod export;
 mod feedback;
+mod game_page;
 mod games;
 mod home;
 mod icons;
@@ -30,6 +31,7 @@ pub(crate) fn all() -> &'static [Scene] {
             icons::SCENES,
             notices::SCENES,
             games::SCENES,
+            game_page::SCENES,
             errors::SCENES,
             export::SCENES,
             review::SCENES,

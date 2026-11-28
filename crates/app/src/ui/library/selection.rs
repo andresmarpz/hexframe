@@ -1,6 +1,6 @@
 use greyscreen_engine::{EngineStatus, RecordingEntry};
 
-use super::format::day_heading;
+use super::format::{day_heading, death_total};
 use crate::ui::{Screen, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,6 +10,7 @@ pub(crate) enum Detail {
     Clips,
     Live,
     Game,
+    GamePage,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +34,7 @@ impl Ui {
             Screen::Home => Detail::Welcome,
             Screen::Games if self.live_selected && self.live_row_visible() => Detail::Live,
             Screen::Games if self.review.is_some() => Detail::Game,
+            Screen::Games if self.game_page.is_some() => Detail::GamePage,
             Screen::Games => Detail::Pick,
             Screen::Clips => Detail::Clips,
         }
@@ -52,7 +54,59 @@ impl Ui {
 
     pub(crate) fn close_game(&mut self) {
         self.live_selected = false;
+        if self.review.is_none() || self.game_page.is_none() {
+            self.game_page = None;
+        }
         self.review = None;
+    }
+
+    pub(crate) fn open_game(&mut self, id: String) {
+        let Some(entry) = self.recordings.iter().find(|r| r.meta.id == id) else {
+            return;
+        };
+        let id = entry.meta.id.clone();
+        self.close_settings();
+        if let Some(review) = &mut self.review {
+            review.pause();
+        }
+        self.review = None;
+        self.live_selected = false;
+        self.game_page = Some(id);
+        self.screen = Screen::Games;
+    }
+
+    pub(crate) fn game_page_entry(&self) -> Option<&RecordingEntry> {
+        let id = self.game_page.as_deref()?;
+        self.recordings.iter().find(|r| r.meta.id == id)
+    }
+
+    fn open_page_review(&mut self) -> bool {
+        let Some(entry) = self.game_page_entry().cloned() else {
+            return false;
+        };
+        let id = entry.meta.id.clone();
+        self.open_review_entry(entry);
+        self.game_page = Some(id);
+        true
+    }
+
+    pub(crate) fn reveal_game_page_folder(&self) {
+        if let Some(entry) = self.game_page_entry() {
+            crate::headless::reveal(&entry.folder);
+        }
+    }
+
+    pub(crate) fn play_game_page(&mut self) {
+        if self.open_page_review() {
+            self.play_game();
+        }
+    }
+
+    pub(crate) fn review_game_page_deaths(&mut self) {
+        let has_deaths = self.game_page_entry().is_some_and(|e| death_total(e) > 0);
+        if has_deaths && self.open_page_review() {
+            self.review_deaths();
+        }
     }
 
     pub(crate) fn apply_library(&mut self, recordings: Vec<RecordingEntry>) {
@@ -62,6 +116,9 @@ impl Ui {
             .is_some_and(|id| !self.recordings.iter().any(|rec| rec.meta.id == id));
         if gone {
             self.review = None;
+        }
+        if self.game_page_entry().is_none() {
+            self.game_page = None;
         }
     }
 
@@ -105,6 +162,11 @@ impl Ui {
             return;
         };
         let current = match self.detail() {
+            Detail::GamePage => slots.iter().position(|slot| {
+                slot.is_some_and(|i| {
+                    Some(self.recordings[i].meta.id.as_str()) == self.game_page.as_deref()
+                })
+            }),
             Detail::Live => slots.iter().position(Option::is_none),
             Detail::Game => slots.iter().position(|slot| {
                 slot.is_some_and(|i| {
@@ -124,8 +186,13 @@ impl Ui {
         match slots[next] {
             None => self.select_live(),
             Some(index) => {
-                let entry = self.recordings[index].clone();
-                self.open_review_entry(entry);
+                let id = self.recordings[index].meta.id.clone();
+                if self.detail() == Detail::GamePage {
+                    self.open_game(id);
+                } else {
+                    let entry = self.recordings[index].clone();
+                    self.open_review_entry(entry);
+                }
             }
         }
     }

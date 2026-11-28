@@ -2,7 +2,7 @@ use rune::{El, Transition, col, row};
 use rune_kit::{Divider, Kit, Toolbar};
 
 use super::layout::{fixed_content, scrolling_content};
-use super::{clips, games, home, review, shell};
+use super::{clips, game_page, games, home, review, shell};
 use crate::ui::{Detail, Screen, Ui};
 
 fn settled(el: El) -> El {
@@ -37,6 +37,9 @@ fn clips_screen(s: &Ui, k: &Kit) -> El {
 }
 
 fn games_screen(s: &Ui, k: &Kit, review_width: Option<f32>) -> El {
+    if s.detail() == Detail::GamePage {
+        return game_page::view(s, k);
+    }
     let (main, toolbar): (El, Option<Toolbar>) = match (s.detail(), &s.review) {
         (Detail::Game, Some(review)) => (
             review_page(s, k, review_width),

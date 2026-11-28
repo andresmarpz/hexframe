@@ -127,7 +127,7 @@ pub(super) fn game(rec: &RecordingEntry, selected: bool, k: &Kit) -> El {
         .color(k.c.text_muted)
         .truncate();
     base(k, rec.meta.id.clone(), label, selected)
-        .on_press(move |ui: &mut Ui| ui.open_review(id.clone()))
+        .on_press(move |ui: &mut Ui| ui.open_game(id.clone()))
         .on_secondary_press(move |ui: &mut Ui, at, _: &mut Tx| {
             ui.open_row_menu(menu_id.clone(), at)
         })

@@ -64,6 +64,10 @@ impl Ui {
             Action::NextGame => self.step_selection(1),
             Action::FocusPlayer if self.detail() == Detail::Game => tx.focus("review-video", true),
             Action::FocusPlayer => return false,
+            Action::ReviewDeaths if self.detail() == Detail::GamePage => {
+                self.review_game_page_deaths()
+            }
+            Action::ExitFullscreen if self.detail() == Detail::GamePage => self.close_game(),
             Action::ToggleGamesList
                 if self.screen == Screen::Games
                     && self.detail() == Detail::Game

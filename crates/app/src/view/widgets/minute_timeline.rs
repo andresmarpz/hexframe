@@ -28,10 +28,12 @@ struct Look {
 }
 
 pub(crate) fn minute_timeline(k: &Kit, boxes: &[MinuteBox], width: f32) -> El {
-    let mut strip = row()
-        .w(width)
-        .h(BOX_HEIGHT + LABEL_GAP + LABEL_HEIGHT)
-        .gap(GAP);
+    let strip = row().h(BOX_HEIGHT + LABEL_GAP + LABEL_HEIGHT).gap(GAP);
+    let mut strip = if width > 0.0 {
+        strip.w(width)
+    } else {
+        strip.w_full()
+    };
     for minute in boxes {
         strip = strip.child(cell(k, minute));
     }
