@@ -99,13 +99,7 @@ fn card(rec: &RecordingEntry, index: usize, clip: &ClipEntry, k: &Kit) -> El {
     let fade = el()
         .pin(Some(0.0), None, Some(0.0), Some(0.0))
         .h(FADE_HEIGHT)
-        .linear_gradient(
-            PI,
-            [
-                (0.0, k.alpha(k.c.page, 0.0)),
-                (1.0, k.alpha(k.c.page, 0.85)),
-            ],
-        )
+        .linear_gradient(PI, [(0.0, k.dark_a(0.0)), (1.0, k.dark_a(0.85))])
         .a11y_hidden();
     let badge = Badge::new(length)
         .variant(BadgeVariant::Neutral)
@@ -130,7 +124,7 @@ fn card(rec: &RecordingEntry, index: usize, clip: &ClipEntry, k: &Kit) -> El {
                     line_height: 16.0,
                     ..k.ty.ui.features(TABULAR)
                 })
-                .color(k.c.text_muted),
+                .color(Kit::neutral(true).c.text_muted),
         );
     col().w(0.0).grow(1.0).min_w(0.0).child(
         el().key(format!("game-clip-{index}"))

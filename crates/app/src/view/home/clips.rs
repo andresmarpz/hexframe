@@ -8,7 +8,10 @@ use crate::ui::{Ui, format_length};
 use crate::view::{TABULAR, hairline, thumb};
 
 const LIMIT: usize = 2;
-const ROW_HEIGHT: f32 = 70.0;
+const ROW_HEIGHT: f32 = 66.0;
+const INSET: f32 = 6.0;
+const INSET_Y: f32 = 4.0;
+const ROW_PAD: f32 = 16.0;
 const THUMB: (f32, f32) = (96.0, 54.0);
 const WEEK_SECS: i64 = 7 * 24 * 60 * 60;
 
@@ -18,10 +21,10 @@ pub(super) fn section(s: &Ui, k: &Kit, now: &Zoned) -> Option<El> {
         return None;
     }
     let fresh = fresh_count(s, now);
-    let mut list = surface(k).key("recent-clips-card");
+    let mut list = surface(k).key("recent-clips-card").px(INSET).py(INSET_Y);
     for (n, clip) in clips.iter().enumerate() {
         if n > 0 {
-            list = list.child(el().w_full().px(16.0).child(hairline(k)));
+            list = list.child(el().w_full().px(ROW_PAD - INSET).child(hairline(k)));
         }
         list = list.child(item(clip, k));
     }
@@ -70,10 +73,11 @@ fn item(clip: &RecentClip, k: &Kit) -> El {
         .label(format!("Play {title} clip from {champion} game"))
         .w_full()
         .h(ROW_HEIGHT)
-        .px(16.0)
-        .py(8.0)
+        .px(ROW_PAD - INSET)
+        .py(6.0)
         .gap(12.0)
         .center_y()
+        .radius(8.0)
         .cursor(Cursor::Pointer)
         .hover(k.c.hover)
         .hover_group()

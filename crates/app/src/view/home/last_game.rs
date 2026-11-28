@@ -77,7 +77,7 @@ fn picture(entry: &RecordingEntry, k: &Kit) -> El {
         .radius(PLAY / 2.0)
         .fill(k.c.scrim)
         .border(0.5, k.light(0.2))
-        .child(rune::icon(&PLAY_GLYPH, PLAY).color(k.c.text_base));
+        .child(rune::icon(&PLAY_GLYPH, PLAY).color(k.c.white));
     el().key("last-game-thumb")
         .size(w, h)
         .radius(8.0)

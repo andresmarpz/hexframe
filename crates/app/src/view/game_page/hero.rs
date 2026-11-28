@@ -34,6 +34,7 @@ static PLAY: Icon = Icon {
 pub(super) fn hero(s: &Ui, rec: &RecordingEntry, k: &Kit, when: &str, latest: bool) -> El {
     let meta = &rec.meta;
     let boxes = minute_boxes(&meta.events, &meta.game.info, meta.duration_secs);
+    let night = Kit::neutral(true);
     el().key("game-hero")
         .w_full()
         .h(HEIGHT)
@@ -43,24 +44,23 @@ pub(super) fn hero(s: &Ui, rec: &RecordingEntry, k: &Kit, when: &str, latest: bo
         .child(game_hero(k, rec, 1232.0, HEIGHT).w_full().h_full())
         .child(scrim(k))
         .child(play(k))
-        .child(info(rec, k, when, latest))
+        .child(info(rec, &night, when, latest))
         .child(actions(s, rec, k))
         .child(
             el().pin(Some(INSET), None, Some(INSET), Some(TIMELINE_BOTTOM))
-                .child(minute_timeline(k, &boxes, 0.0)),
+                .child(minute_timeline(&night, &boxes, 0.0)),
         )
 }
 
 fn scrim(k: &Kit) -> El {
-    let page = k.c.page;
     el().key("game-hero-scrim")
         .pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0))
         .linear_gradient(
             PI,
             [
-                (0.0, k.alpha(page, 0.15)),
-                (0.5, k.alpha(page, 0.55)),
-                (1.0, k.alpha(page, 0.92)),
+                (0.0, k.dark_a(0.15)),
+                (0.5, k.dark_a(0.55)),
+                (1.0, k.dark_a(0.92)),
             ],
         )
         .a11y_hidden()

@@ -2,6 +2,7 @@ use rune::{El, Shadow, TextStyle, col, row, text};
 use rune_kit::Kit;
 
 use crate::view::TABULAR;
+use crate::view::layout::edge;
 
 const RADIUS: f32 = 12.0;
 
@@ -26,7 +27,7 @@ pub(super) fn surface(k: &Kit) -> El {
         .box_shadow(shadow(0.5, 0.0, 0.0, k.light(0.06), true))
         .box_shadow(shadow(2.0, 4.0, 0.0, soft, false))
         .box_shadow(shadow(1.0, 2.0, 0.0, soft, false))
-        .box_shadow(shadow(0.0, 0.0, 0.5, k.light(0.16), false))
+        .box_shadow(shadow(0.0, 0.0, 0.5, edge(k), false))
 }
 
 pub(super) fn header(k: &Kit, title: &str, aside: Option<String>) -> El {

@@ -20,6 +20,7 @@ use surface::{sized, surface};
 
 const AMBIENT_HEIGHT: f32 = 504.0;
 const AMBIENT_OPACITY: f32 = 0.42;
+const AMBIENT_OPACITY_LIGHT: f32 = 0.28;
 const AMBIENT_BLUR: f32 = 64.0;
 const AMBIENT_WIDTH: f32 = 1600.0;
 const CONTENT_TOP: f32 = 48.0;
@@ -42,7 +43,11 @@ pub(super) fn ambient(s: &Ui, k: &Kit) -> Option<El> {
             .child(
                 game_hero(k, entry, AMBIENT_WIDTH, AMBIENT_HEIGHT)
                     .w_full()
-                    .opacity(AMBIENT_OPACITY)
+                    .opacity(if k.dark {
+                        AMBIENT_OPACITY
+                    } else {
+                        AMBIENT_OPACITY_LIGHT
+                    })
                     .blur(AMBIENT_BLUR),
             )
             .child(fade),

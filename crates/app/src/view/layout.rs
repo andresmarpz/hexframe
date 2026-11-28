@@ -68,6 +68,14 @@ pub(super) fn card(k: &Kit) -> El {
         .border(1.0, k.c.border_base)
 }
 
+pub(super) fn edge(k: &Kit) -> rune::Color {
+    if k.dark {
+        k.light(0.16)
+    } else {
+        k.c.border_base
+    }
+}
+
 pub(super) fn hairline(k: &Kit) -> El {
     el().w_full().h(1.0).fill(k.c.border_muted).a11y_hidden()
 }

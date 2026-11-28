@@ -5,7 +5,7 @@ use greyscreen_core::keybinds::Action;
 use greyscreen_engine::{EngineCmd, EngineStatus};
 use rune::{Cursor, El, Shadow, col, el, row, text};
 use rune_kit::{
-    Button, ButtonVariant, ControlSize, Keybind, Kit, Placement, Popover, ProgressCircle,
+    Button, ButtonVariant, ControlSize, Keybind, Kit, Placement, ProgressCircle, popover, scrim,
 };
 
 use super::bottom::DOCK_HEIGHT;
@@ -22,10 +22,10 @@ const DIVIDER_HEIGHT: f32 = 20.0;
 const DOT: f32 = 10.0;
 const GLOW: f32 = 3.0;
 const POPOVER_GAP: f32 = 8.0;
+const POPOVER_RADIUS: f32 = 12.0;
 const KEY: &str = "recorder-dock";
 
 pub(super) fn dock(s: &Ui, k: &Kit) -> El {
-    let open = s.dock.storage_open;
     let surface = row()
         .key(KEY)
         .h(DOCK_HEIGHT)
@@ -37,26 +37,28 @@ pub(super) fn dock(s: &Ui, k: &Kit) -> El {
         .child(divider(k))
         .child(save_clip(s, k))
         .child(divider(k))
-        .child(storage_button(s, k, open));
-    popover(open)
-        .trigger(floating(surface, k))
-        .build(k, &mut Vec::new())
+        .child(storage_button(s, k, s.dock.storage_open));
+    floating(surface, k)
 }
 
 pub(super) fn overlay(s: &Ui, k: &Kit, layer: &mut Vec<El>) {
-    if s.dock.storage_open {
-        popover(true).child(storage::body(s, k)).build(k, layer);
+    if !s.dock.storage_open {
+        return;
     }
-}
-
-fn popover(open: bool) -> Popover {
-    Popover::new("storage")
+    layer.push(scrim("storage-scrim", |ui: &mut Ui| {
+        ui.storage_popover(false)
+    }));
+    let surface = floating(storage::body(s, k).radius(POPOVER_RADIUS), k)
+        .role("dialog")
         .label("Storage")
-        .padding(0.0)
-        .placement(Placement::TopEnd)
-        .gutter(POPOVER_GAP)
-        .open(open)
-        .on_close(|ui: &mut Ui| ui.storage_popover(false))
+        .focus_return("dock-storage");
+    layer.push(popover::anchored(
+        k,
+        surface,
+        KEY,
+        Placement::TopEnd,
+        POPOVER_GAP,
+    ));
 }
 
 fn status(s: &Ui, k: &Kit) -> El {
@@ -174,11 +176,14 @@ fn save_clip(s: &Ui, k: &Kit) -> El {
 }
 
 fn storage_button(s: &Ui, k: &Kit, open: bool) -> El {
-    let usage = s.storage;
-    let label = usage.map_or_else(|| "Storage".to_owned(), |u| storage::whole(u.used()));
-    let ring = ProgressCircle::new(storage::fraction(s))
-        .size(16.0)
-        .build(k);
+    let label = s
+        .storage
+        .map_or_else(|| "Storage".to_owned(), |u| storage::whole(u.used()));
+    let ring = storage::limited(s).then(|| {
+        ProgressCircle::new(storage::fraction(s))
+            .size(16.0)
+            .build(k)
+    });
     Button::new("Storage")
         .variant(ButtonVariant::Ghost)
         .control_size(ControlSize::Large)
@@ -187,7 +192,7 @@ fn storage_button(s: &Ui, k: &Kit, open: bool) -> El {
             row()
                 .gap(6.0)
                 .center_y()
-                .child(ring)
+                .children(ring)
                 .child(text(label).font(font.features(TABULAR)).color(ink))
         })
         .on_press(move |ui: &mut Ui| ui.storage_popover(!open))
