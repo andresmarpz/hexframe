@@ -1,0 +1,7 @@
+.arrow {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.875em;
+  height: 0.875em;
+  vertical-align: -0.1em;
+}

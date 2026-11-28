@@ -1,0 +1,324 @@
+.band {
+  composes: band from "./HeroStage.module.css";
+}
+
+.image {
+  composes: image from "./HeroStage.module.css";
+}
+
+.rec {
+  composes: rec from "./HeroStage.module.css";
+}
+
+.recTime {
+  composes: recTime from "./HeroStage.module.css";
+}
+
+.death {
+  composes: death from "./HeroStage.module.css";
+}
+
+.deathLine {
+  composes: deathLine from "./HeroStage.module.css";
+}
+
+.markerRing {
+  composes: markerRing from "./HeroStage.module.css";
+}
+
+.drop {
+  composes: drop from "./HeroStage.module.css";
+}
+
+.dropFace {
+  composes: dropFace from "./HeroStage.module.css";
+}
+
+.timer {
+  composes: timer from "./HeroStage.module.css";
+}
+
+.timerText {
+  composes: timerText from "./HeroStage.module.css";
+}
+
+.clip {
+  composes: clip from "./HeroStage.module.css";
+}
+
+.clipLine {
+  composes: clipLine from "./HeroStage.module.css";
+}
+
+.ghost {
+  composes: ghost from "./HeroStage.module.css";
+}
+
+.clipCard {
+  composes: clipCard from "./HeroStage.module.css";
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .band[data-paused="true"] *,
+  .band[data-paused="true"] *::before,
+  .band[data-paused="true"] *::after {
+    animation-play-state: paused;
+  }
+
+  .image,
+  .rec,
+  .recTime,
+  .death,
+  .deathLine,
+  .markerRing,
+  .drop,
+  .dropFace,
+  .timer,
+  .timerText,
+  .clip,
+  .clipLine,
+  .ghost,
+  .clipCard {
+    animation-duration: 9s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+  }
+
+  .image {
+    animation-name: grey;
+  }
+
+  .rec {
+    animation-name: showEarly;
+  }
+
+  .recTime {
+    counter-reset: seconds var(--rec-seconds);
+    animation-name: recTick;
+    animation-timing-function: steps(9, jump-end);
+  }
+
+  .recTime::after {
+    content: "24:" counter(seconds, decimal-leading-zero);
+  }
+
+  .death,
+  .deathLine {
+    animation-name: showMiddle;
+  }
+
+  .markerRing {
+    animation-name: pop;
+  }
+
+  .drop {
+    animation-name: drop;
+  }
+
+  .dropFace {
+    animation-name: tilt;
+  }
+
+  .timer {
+    animation-name: showMiddle;
+  }
+
+  .timerText {
+    counter-reset: seconds var(--respawn-seconds);
+    animation-name: countdown;
+  }
+
+  .timerText::after {
+    content: "RESPAWN 0:" counter(seconds, decimal-leading-zero);
+  }
+
+  .clip,
+  .clipLine,
+  .ghost {
+    animation-name: showLate;
+  }
+
+  .clipCard {
+    animation-name: slide;
+  }
+}
+
+@keyframes grey {
+  0%,
+  26.667% {
+    filter: grayscale(0);
+    animation-timing-function: ease;
+  }
+
+  31.111%,
+  66.667% {
+    filter: grayscale(1);
+    animation-timing-function: ease-out;
+  }
+
+  71.111%,
+  100% {
+    filter: grayscale(0);
+  }
+}
+
+@keyframes showEarly {
+  0%,
+  26.667% {
+    opacity: 1;
+  }
+
+  29.2%,
+  97.8% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes recTick {
+  from {
+    --rec-seconds: 31;
+  }
+
+  to {
+    --rec-seconds: 40;
+  }
+}
+
+@keyframes showMiddle {
+  0%,
+  26.667% {
+    opacity: 0;
+  }
+
+  29.2%,
+  66.667% {
+    opacity: 1;
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  0%,
+  46.666% {
+    opacity: 1;
+    transform: scale(0);
+  }
+
+  49% {
+    transform: scale(1.15);
+  }
+
+  50%,
+  97.8% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes drop {
+  0%,
+  26.667% {
+    opacity: 0;
+    transform: translateY(-240px);
+    animation-timing-function: linear(0, 0.092, 0.302, 0.545, 0.768, 0.94, 1.052, 1.11, 1.126, 1.114, 1.088, 1.057, 1.029, 1.007, 0.993, 0.986, 0.984, 0.986, 0.989, 0.993, 1);
+  }
+
+  32.222%,
+  66.667% {
+    opacity: 1;
+    transform: translateY(0);
+    animation-timing-function: ease-in;
+  }
+
+  71.111%,
+  100% {
+    opacity: 0;
+    transform: translateY(-240px);
+  }
+}
+
+@keyframes tilt {
+  0%,
+  28.9% {
+    transform: rotate(14deg);
+    animation-timing-function: linear(0, 0.102, 0.325, 0.572, 0.787, 0.944, 1.04, 1.086, 1.094, 1.082, 1.06, 1.036, 1.017, 1.003, 0.995, 0.992, 0.991, 0.993, 0.995, 0.997, 1);
+  }
+
+  35.6%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes countdown {
+  0%,
+  26.667% {
+    --respawn-seconds: 12;
+  }
+
+  46.667% {
+    --respawn-seconds: 10;
+  }
+
+  66.667%,
+  100% {
+    --respawn-seconds: 0;
+  }
+}
+
+@keyframes showLate {
+  0%,
+  79.99% {
+    opacity: 0;
+  }
+
+  82.2%,
+  93.3% {
+    opacity: 1;
+  }
+
+  98.9%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slide {
+  0%,
+  79.99% {
+    opacity: 0;
+    transform: translateY(0);
+    animation-timing-function: ease-out;
+  }
+
+  80% {
+    opacity: 1;
+    transform: translateY(0);
+    animation-timing-function: ease-out;
+  }
+
+  84.4%,
+  93.3% {
+    opacity: 1;
+    transform: translateY(-24px);
+  }
+
+  98.9%,
+  100% {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}

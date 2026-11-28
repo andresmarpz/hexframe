@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   title: `${notFound.headline} — ${site.name}`,
   description: notFound.body,
   robots: { index: false },
+  alternates: { canonical: null },
+  openGraph: { url: null },
 };
 
 export default function NotFoundPage() {

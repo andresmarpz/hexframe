@@ -8,7 +8,7 @@ import { site } from "../content/copy";
 import { siteUrl } from "../lib/site-url";
 import "../styles/global.css";
 
-const sans = Inter({ subsets: ["latin", "latin-ext"], axes: ["opsz"], variable: "--font-sans", display: "swap", adjustFontFallback: false, fallback: ["Inter Arrow", "system-ui", "sans-serif"] });
+const sans = Inter({ subsets: ["latin"], axes: ["opsz"], variable: "--font-sans", display: "swap" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
 
 const imageAlt = "Greyscreen: automatic League of Legends game recorder and review timeline.";

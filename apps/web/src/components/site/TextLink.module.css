@@ -1,7 +1,7 @@
 .link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: var(--color-site-ink);
   font-size: 16px;
   font-weight: 500;
@@ -9,7 +9,7 @@
 }
 
 .arrow {
-  display: inline-block;
+  display: inline-flex;
 }
 
 @media (prefers-reduced-motion: no-preference) {

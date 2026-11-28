@@ -1,10 +1,8 @@
-// TODO(copy): strings outside the written copy: download section titles and buttons, notFound buttons, review image alts
 export const repo = "andresmarpz/greyscreen";
 export const githubUrl = `https://github.com/${repo}`;
 export const releasesUrl = `${githubUrl}/releases`;
 export const issuesUrl = `${githubUrl}/issues`;
 export const discordUrl = "";
-
 export const site = {
   name: "Greyscreen",
   title: "Greyscreen — Automatic League of Legends recorder for Windows",
@@ -31,137 +29,6 @@ export const footerLinks = [
   { label: "GitHub Issues", href: issuesUrl },
   ...(discordUrl ? [{ label: "Discord", href: discordUrl }] : []),
 ];
-
-export const hero = {
-  headline: "Record every League game automatically",
-  subheadline:
-    "Sits in your Windows tray, records full matches and key clips on your GPU, and maps every play on a timeline for review.",
-  primaryCta: "Download for Windows",
-  secondaryCta: "View on GitHub",
-  screenAlt: "The Greyscreen window while a League game is being recorded, with the games list and the live event feed.",
-};
-
-export const trust = [
-  "Free",
-  "Open source",
-  "Public beta",
-  "Windows 10 and 11 (64-bit)",
-  "Local MP4s, no account",
-];
-
-export type IconName = "detect" | "gpu" | "clips" | "audio" | "library" | "local";
-
-export const features: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: "detect",
-    title: "Automatic game detection",
-    body: 'Starts with Windows if you want, sits in the tray, and records each match automatically. Flip the "Record games" switch whenever you want to pause.',
-  },
-  {
-    icon: "gpu",
-    title: "Hardware GPU encoding",
-    body: "Encodes H.264 video on your graphics card instead of your CPU. Choose Balanced, High, or Max quality at 30 or 60 fps, with size estimates in Settings.",
-  },
-  {
-    icon: "clips",
-    title: "Auto clips and manual saves",
-    body: "Saves short clips around kills, deaths, multikills, first blood, aces, towers, inhibitors, dragons, heralds, barons, and void grubs. Also supports manually saving the last 30 seconds.",
-  },
-  {
-    icon: "audio",
-    title: "Game audio only",
-    body: "Records only League's own audio. Discord and your microphone stay out of your videos. Show or hide the mouse cursor to analyze your movement.",
-  },
-  {
-    icon: "library",
-    title: "Match library",
-    body: "Browse games by champion icon, Victory or Defeat, KDA, duration, clips, and size. Filter your recordings, or delete old ones to the Recycle Bin.",
-  },
-  {
-    icon: "local",
-    title: "Local files, no account",
-    body: "Recordings stay on your PC as normal MP4s with a small JSON file beside them. No account and no uploads. Nothing is sent unless you press Send feedback. Installs from one .exe without admin rights.",
-  },
-];
-
-export const howItWorks = {
-  title: "How it works",
-  steps: [
-    {
-      title: "Install and queue up.",
-      body: "Run the single .exe to install Greyscreen in your user folder without admin rights. It sits in the tray and waits for League.",
-    },
-    {
-      title: "Play normally.",
-      body: "When a game starts, Greyscreen records the game window on your GPU, captures League's audio, and logs match events automatically.",
-    },
-    {
-      title: "Review and clip.",
-      body: "Open the library after your match to jump to any kill, death, or objective on the timeline, or grab the clips already saved for you.",
-    },
-  ],
-  screenAlt: "The Greyscreen Home screen showing the last recorded game.",
-};
-
-export const review = {
-  title: "Built for reviewing",
-  intro:
-    "Scrubbing through a full match to find one fight wastes time. Greyscreen pairs your video with an event timeline so you can go straight to the plays you want to check.",
-  points: [
-    {
-      title: "Color-coded markers",
-      body: "Hover a marker to see who killed whom, which tower fell, or every kill of a pentakill.",
-    },
-    {
-      title: "Event filters and pre-roll",
-      body: "Filter to deaths, kills, or objectives, and jump to 5 seconds before any event.",
-    },
-    {
-      title: "Fullscreen theater mode",
-      body: "Watch fullscreen while keeping the event timeline on screen.",
-    },
-    {
-      title: "Playback speed",
-      body: "Adjust playback speed to inspect close fights.",
-    },
-  ],
-  recordingsAlt: "The Greyscreen Games screen with the games list, the video player and the event timeline.",
-};
-
-export const safe = {
-  title: "Stays out of the game",
-  points: [
-    {
-      title: "Official Riot local API",
-      body: "Events come from Riot's Live Client Data API, which League serves on your own PC. Video uses Windows' standard capture of the game window.",
-    },
-    {
-      title: "No memory reading or injection",
-      body: "Greyscreen does not read game memory, inject into the game, or change game files.",
-    },
-    {
-      title: "Local files only",
-      body: "Recordings stay on your PC as an MP4 with a small JSON file next to it. No account, no uploads. Nothing is sent unless you press Send feedback.",
-    },
-  ],
-  more: "More in the FAQ",
-};
-
-export const homeQuestions = {
-  title: "Questions",
-  items: [
-    { label: "Is it safe with Vanguard? Will I get banned?", href: "/faq/#vanguard" },
-    { label: "Does it cost FPS?", href: "/faq/#fps" },
-    { label: "Where are my recordings, and how much space do they use?", href: "/faq/#storage" },
-    { label: "Why isn't it recording?", href: "/faq/#fullscreen" },
-    { label: "What does it send?", href: "/privacy/" },
-  ],
-};
-
-export const closing = {
-  headline: "Ready for your next game",
-  button: "Download for Windows",
-};
 
 export const download = {
   title: "Download Greyscreen",

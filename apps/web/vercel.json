@@ -3,6 +3,10 @@
   "framework": "nextjs",
   "installCommand": "cd ../.. && bun install --frozen-lockfile",
   "buildCommand": "bun run build",
+  "redirects": [
+    { "source": "/sitemap-index.xml", "destination": "/sitemap.xml", "permanent": true },
+    { "source": "/sitemap-0.xml", "destination": "/sitemap.xml", "permanent": true }
+  ],
   "git": {
     "deploymentEnabled": false
   }

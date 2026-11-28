@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Arrow } from "./Arrow";
 import styles from "./TextLink.module.css";
 
 interface Props {
@@ -15,8 +16,8 @@ export function TextLink({ href, arrow = true, className, children }: Props) {
     <>
       {children}
       {arrow && (
-        <span className={styles.arrow} aria-hidden="true">
-          →
+        <span className={styles.arrow}>
+          <Arrow />
         </span>
       )}
     </>

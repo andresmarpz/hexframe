@@ -1,21 +1,5 @@
 @import "./tokens.css";
 
-@font-face {
-  font-family: "Inter Arrow";
-  font-weight: 400;
-  src: url("/fonts/inter-arrow-400.woff2") format("woff2");
-  unicode-range: U+2192;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Inter Arrow";
-  font-weight: 500;
-  src: url("/fonts/inter-arrow-500.woff2") format("woff2");
-  unicode-range: U+2192;
-  font-display: swap;
-}
-
 *,
 *::before,
 *::after {

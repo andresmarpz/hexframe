@@ -1,14 +1,13 @@
 import { releasesUrl } from "../../content/copy";
 import type { ChangelogEntry } from "../../lib/changelog";
-import type { Downloads } from "../../lib/release";
 import { Badge } from "../kit/Badge";
+import { Arrow } from "../site/Arrow";
 import { TextLink } from "../site/TextLink";
 import { XBullet } from "../site/XBullet";
 import styles from "./Changelog.module.css";
 
 interface Props {
   entries: ChangelogEntry[];
-  downloads: Downloads | null;
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -40,7 +39,13 @@ export function Changelog({ entries }: Props) {
                   <li key={bullet} className={styles.bullet}>
                     <XBullet size={14} />
                     <p className="body">
-                      {bullet.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : part))}
+                      {bullet.split("`").map((part, i) =>
+                        i % 2 ? (
+                          <code key={i}>{part}</code>
+                        ) : (
+                          part.split("→").flatMap((piece, j) => (j ? [<Arrow key={`${i}-${j}`} />, piece] : [piece]))
+                        ),
+                      )}
                     </p>
                   </li>
                 ))}

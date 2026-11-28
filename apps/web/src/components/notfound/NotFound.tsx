@@ -11,15 +11,26 @@ const START_SECONDS = 5;
 export function NotFound() {
   const router = useRouter();
   const [seconds, setSeconds] = useState(START_SECONDS);
+  const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
+    const cancel = () => setCancelled(true);
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    for (const name of events) window.addEventListener(name, cancel, { passive: true, once: true });
+    return () => {
+      for (const name of events) window.removeEventListener(name, cancel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (cancelled) return;
     if (seconds <= 0) {
       router.push("/");
       return;
     }
     const timer = window.setTimeout(() => setSeconds((value) => value - 1), 1000);
     return () => window.clearTimeout(timer);
-  }, [seconds, router]);
+  }, [seconds, cancelled, router]);
 
   return (
     <section className={styles.page}>

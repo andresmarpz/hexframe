@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { githubUrl, nav } from "../../content/copy";
 import { Button } from "../kit/Button";
+import { Arrow } from "./Arrow";
 import { Lockup } from "./Lockup";
 import styles from "./Nav.module.css";
 
@@ -38,7 +39,7 @@ export function Nav() {
         </nav>
         <div className={styles.actions}>
           <a className={styles.link} href={githubUrl} rel="noopener">
-            GitHub →
+            GitHub <Arrow />
           </a>
           <Button href="/download/" variant="contrast" size="large">
             Download
@@ -70,7 +71,7 @@ export function Nav() {
             </Link>
           ))}
           <a className={styles.sheetLink} href={githubUrl} rel="noopener">
-            GitHub →
+            GitHub <Arrow />
           </a>
           <Button href="/download/" variant="contrast" size="xxl" onClick={() => setOpen(false)}>
             Download

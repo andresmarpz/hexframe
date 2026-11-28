@@ -64,15 +64,6 @@ brand:
     rsvg-convert -w 1200 -h 630 brand/og-image.svg -o apps/web/public/og.png
     sed 's|viewBox="0 0 1200 630"|viewBox="0 15 1200 600"|' brand/og-image.svg | rsvg-convert -w 1280 -h 640 -o brand/social-preview.png
 
-# HOME points at /Users/Shared so the Recordings subtitle shows a neutral path, not the real user.
-web-screens:
-    cargo build -q --locked -p greyscreen
-    mkdir -p apps/web/public/screens "/Users/Shared/Library/Application Support/Greyscreen"
-    ln -sfn "$HOME/Library/Application Support/Greyscreen/cache" "/Users/Shared/Library/Application Support/Greyscreen/cache"
-    for scene in recording last-game recordings settings; do HOME=/Users/Shared target/debug/greyscreen --snap apps/web/public/screens/$scene.png --scene $scene --scale 2 --theme dark || echo "skipped $scene"; done
-    rm "/Users/Shared/Library/Application Support/Greyscreen/cache"
-    rmdir "/Users/Shared/Library/Application Support/Greyscreen" "/Users/Shared/Library/Application Support" /Users/Shared/Library
-
 web-dev:
     cd apps/web && bun run dev
 

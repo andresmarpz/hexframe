@@ -110,7 +110,7 @@
     gap: 24px;
   }
 
-  .cardActions > :last-child {
+  .cardActions > :not(:first-child) {
     align-self: flex-start;
   }
 

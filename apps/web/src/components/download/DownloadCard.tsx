@@ -13,6 +13,7 @@ interface Props {
 
 export function DownloadCard({ initial }: Props) {
   const downloads = useDownloads(initial);
+  const cliHref = downloads?.cli?.url ?? downloads?.pageUrl ?? releasesUrl;
   const version = downloads ? `${displayVersion(downloads.tag)} · ` : "";
 
   return (
@@ -25,6 +26,7 @@ export function DownloadCard({ initial }: Props) {
       <div className={styles.cardActions}>
         <DownloadButton initial={initial} className={styles.button} />
         <TextLink href={releasesUrl}>All releases on GitHub</TextLink>
+        <TextLink href={cliHref}>greyscreen-cli.exe</TextLink>
       </div>
     </>
   );

@@ -58,7 +58,6 @@ Crates: `core` (pure logic), `mp4`, `league` (Live Client, updates and feedback 
 - `just web-deploy`: manual fallback, a local authenticated build published to Vercel production, then a URL check.
 - `just api-dev`: run the backend (`apps/api`, Cloudflare Worker on Effect and Alchemy) locally in workerd with emulated R2 and D1. No Cloudflare account needed.
 - `just api-test`, `just api-check`: backend tests, and typecheck plus tests. See `apps/api/README.md` for deploys.
-- `just web-screens`: render the app scenes into `apps/web/public/screens`.
 
 ## Rust on the Windows PC
 

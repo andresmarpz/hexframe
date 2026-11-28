@@ -17,16 +17,16 @@ In `apps/web`, `bun run typecheck` runs `next typegen` and `tsc --noEmit` (TypeS
 
 ## GitHub data
 
-The build reads the repo's releases and star count from the GitHub API (`src/lib/github-build.ts`), so the static HTML already has the newest release that carries `GreyscreenSetup.exe` (or the older `GreyscreenSetup.exe` or `greyscreen.exe`), with its version, date and size. If no release has it, the buttons link to the newest release page, then to `/releases`. The client components `DownloadButton`, `ReleaseInfo` and `GitHubButton` (`src/components/site/`) refresh the same data in the browser (sessionStorage, 10 minutes) and never replace good data with worse. The `just web-*` recipes pass a token from `gh` for the `andresmarpz` account: unauthenticated builds hit the 60 requests per hour limit. Vercel's Git builds carry no token, so they can hit that limit and fall back to the releases link until the next deploy. `just release` redeploys the site with `just web-deploy` (a local, authenticated build), which refreshes the links; a release is not a commit, so a push cannot do it.
+The build reads the repo's releases from the GitHub API (`src/lib/github-build.ts`), so the static HTML already has the newest release that carries `GreyscreenSetup.exe` (or the older `GreyscreenSetup.exe` or `greyscreen.exe`), with its version, date and size. If no release has it, the buttons link to the newest release page, then to `/releases`. The client components `DownloadButton`, `DownloadCard` and the home `Respawn` section refresh the same data in the browser through `useDownloads` (`src/lib/use-downloads.ts`) (sessionStorage, 10 minutes) and never replace good data with worse. The `just web-*` recipes pass a token from `gh` for the `andresmarpz` account: unauthenticated builds hit the 60 requests per hour limit. Vercel's Git builds carry no token, so they can hit that limit and fall back to the releases link until the next deploy. `just release` redeploys the site with `just web-deploy` (a local, authenticated build), which refreshes the links; a release is not a commit, so a push cannot do it.
 
 ## Where things live
 
 - `src/app/`: routes, layout (fonts, metadata, analytics), sitemap and robots.
-- `src/components/site/`: shared pieces from Paper (`Mark`, `Lockup`, `Nav`, `Footer`, `RespawnLabel`, `Callout`, `RecDot`, `XBullet`, `Stage`, `Section`, `TextLink`, `DownloadButton`, `ReleaseInfo`, `GitHubButton`).
+- `src/components/site/`: shared pieces from Paper (`Mark`, `Lockup`, `Nav`, `Footer`, `RespawnLabel`, `Callout`, `RecDot`, `XBullet`, `Stage`, `Section`, `TextLink`, `Arrow`, `DownloadButton`, `GitHubButton`).
 - `src/components/<page>/`: one file per page section (`home`, `download`, `faq`, `changelog`, `privacy`, `notfound`).
 - `src/components/kit/`: the Rune kit port (`Button`, `Badge`, `Keybind`) on the light tokens. `xxl` is a website-only Button size.
 - `src/styles/tokens.css`: every Paper token the site uses, as CSS custom properties. `src/styles/global.css`: base styles and type classes. Fonts come from `next/font/google` in `layout.tsx` (`--font-sans`, `--font-mono`).
-- `src/content/copy.ts`: site metadata, nav and footer links, page copy. `discordUrl` is empty: the Discord links stay hidden until you set it.
+- `src/content/copy.ts`: site metadata, nav and footer links, and the Download, Changelog and 404 copy. The Home copy lives in the components under `src/components/home/`. `discordUrl` is empty: the Discord links stay hidden until you set it.
 - `src/content/faq.ts` and `src/content/privacy.ts`: the `/faq/` and `/privacy/` pages. Keep `privacy.ts` true to the code: update checks, Data Dragon icons, Send feedback payload.
 - `src/content/changelog/<version>.md`: one file per release (`version`, `date`, `title`, then bullets). `just release` and `scripts/release-meta.sh` read these. `src/lib/changelog.ts` loads them at build time.
 - `public/`: favicons, `og.png`, `screens/` (app screens exported from Paper).
@@ -40,14 +40,6 @@ The app's "Learn more" links open `https://greyscreen.app/faq#<anchor>`. Each an
 ## Analytics
 
 `@vercel/analytics` (cookie-less page views) is in `src/app/layout.tsx`. Turn Web Analytics on once in the Vercel project (Analytics tab) or it records nothing.
-
-## Refresh the screenshots
-
-```
-just web-screens
-```
-
-Builds the app and renders the scenes with `greyscreen --snap`. The recipe sets `HOME=/Users/Shared`, so any folder path on screen is neutral and not the real user name. Check each PNG for private paths before committing.
 
 ## Deploy
 
