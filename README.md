@@ -26,7 +26,7 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screens/games.png" alt="The Games screen: every match with its events and player."><br><sub><b>Games.</b> Every match, with its events on the timeline.</sub></td>
+    <td width="50%"><img src="docs/screens/settings.png" alt="The Settings sheet: highlight clip moments, clip window and the save clip hotkey."><br><sub><b>Settings.</b> Pick which moments become clips.</sub></td>
     <td width="50%"><img src="docs/screens/death-review.png" alt="The death review summary: deaths by tag and when you died."><br><sub><b>Death review.</b> See why you die and when.</sub></td>
   </tr>
   <tr>
