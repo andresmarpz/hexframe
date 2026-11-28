@@ -5,6 +5,9 @@ Paper file "Greyscreen App" (fileId `01M8FDXHR3EEGZQPC4QVGZ6E9X`). Website pages
 - `Web — Home` (pageId `p-E-0`): Home desktop 1440 and Home mobile 390.
 - `Web — Download & 404` (pageId `p-F-0`).
 - `Web — Motion` (pageId `p-G-0`): storyboard of the animations.
+- `Web — Components` (pageId `p-I-0`), `Web — FAQ`, `Web — Changelog`, `Web — Privacy`.
+
+The live site (`apps/web`, Next.js) is built 1:1 from these pages. Change Paper first, then the code.
 
 Do not touch any other page. Always pass `pageId` to page-scoped tools (create_artboard, get_basic_info). Andres may be looking at another page.
 
@@ -63,11 +66,12 @@ Brand rules for the mark: never rotate the tile, never add colour, shadow or glo
 **Lockup:** a row with gap 10, align center: Mark 32px + text `greyscreen` in Inter 900, 24px, -0.06em, ink, lowercase.
 
 **Buttons, badges and keycaps come from the Rune Kit** (Paper file "Rune Kit", page Button / Badge / Keybind), with their own look in Rune's light theme: each `--color-X` becomes `--color-light-X`. Never restyle them. The website uses:
-- Primary CTA: Button Contrast, Extra large, leading Windows glyph (fill `--color-light-surface`), "Download for Windows".
-- Secondary CTA: Button Outline, Extra large, "View on GitHub".
+- Primary CTA: Button Contrast, XXL, leading Windows glyph (fill `--color-light-surface`), "Download for Windows".
+- Secondary CTA: Button Outline, XXL, "View on GitHub".
 - Nav: Button Contrast, Large, "Download".
 - Export options: Button Outline, Regular.
 - Version: Badge neutral.
+- XXL is the one website-only kit size: height 48, radius 12, padding 0 24, gap 8, label 15px / 20px weight 500, icon 18. Colours and sheen stay the kit's.
 - Reference instances: page `Web — Components`, section "Website buttons in use". React port: `apps/web/src/components/kit/` (`Button`, `Badge`, `Keybind`).
 
 Windows glyph:
