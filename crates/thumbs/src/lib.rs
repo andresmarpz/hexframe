@@ -18,11 +18,12 @@ use std::fs;
 use std::path::Path;
 
 pub use priority::lower_current_thread_priority;
-pub use shape::{THUMB_HEIGHT, THUMB_WIDTH};
+pub use shape::{HERO_HEIGHT, HERO_WIDTH, THUMB_HEIGHT, THUMB_WIDTH};
 pub use sheet::{Pass, SheetLayout, write_sheets};
 
 const DECODE_WIDTH: u32 = THUMB_WIDTH * 2;
 const JPEG_QUALITY: u8 = 80;
+const HERO_QUALITY: u8 = 85;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ThumbError {
@@ -77,6 +78,13 @@ pub(crate) fn keyframes(
 pub fn write_thumbnail(video: &Path, at_secs: f64, dest: &Path) -> Result<(), ThumbError> {
     let frame = grab(video, at_secs, DECODE_WIDTH)?;
     let bytes = shape::encode_jpeg(&frame, JPEG_QUALITY)?;
+    write_file_atomic(dest, &bytes, true)
+}
+
+pub fn write_hero(video: &Path, at_secs: f64, dest: &Path) -> Result<(), ThumbError> {
+    let frame = grab(video, at_secs, HERO_WIDTH)?;
+    let image = shape::cover_to(&frame, HERO_WIDTH, HERO_HEIGHT)?;
+    let bytes = shape::encode_rgba(&image, HERO_QUALITY)?;
     write_file_atomic(dest, &bytes, true)
 }
 

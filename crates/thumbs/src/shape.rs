@@ -6,6 +6,8 @@ use crate::{Frame, ThumbError};
 
 pub const THUMB_WIDTH: u32 = 400;
 pub const THUMB_HEIGHT: u32 = 225;
+pub const HERO_WIDTH: u32 = 1600;
+pub const HERO_HEIGHT: u32 = 900;
 
 pub(crate) fn encode_jpeg(frame: &Frame, quality: u8) -> Result<Vec<u8>, ThumbError> {
     encode_rgba(&cover(frame)?, quality)

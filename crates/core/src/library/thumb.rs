@@ -1,6 +1,7 @@
 use super::{ClipEntry, RecordingMeta};
 
 pub const GAME_THUMB_FILE: &str = "thumb.jpg";
+pub const GAME_HERO_FILE: &str = "hero.jpg";
 
 const CLIP_MOMENT: f64 = 0.7;
 const GAME_FALLBACK_MOMENT: f64 = 0.4;

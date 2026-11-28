@@ -39,7 +39,7 @@ crates/
   league/   greyscreen-league   Live Client Data API client and poller, champion icon download, GitHub release client for updates, feedback HTTP client. The Windows game-window locator sits behind cfg(windows).
   capture/  greyscreen-capture  Windows only (`#![cfg(windows)]`). D3D11, WGC, video processor, H.264 MFTs (hardware and software) and the encoder check, WASAPI, AAC MFT, capture session, global hotkeys, installer, single-instance event, crash filter, clip export re-encoder (`transcode`), file clipboard (`clipboard`).
   engine/   greyscreen-engine   Threads and I/O. Runs the session machine, fans packets out to the game writer and the clip ring, writes the library, makes thumbnails and seek bar storyboards, recovers crashed recordings, enforces the storage limit and the low disk guard, deletes games, updates, sends feedback, exports clips. Fake media source for the Mac.
-  thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail through the OS decoder, and a keyframe pass that packs many small frames into JPEG sprite sheets (`write_sheets`, used for storyboards). macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
+  thumbs/   greyscreen-thumbs   One MP4 frame to a 16:9 JPEG thumbnail (`write_thumbnail`, 400x225) or a 1600x900 hero frame (`write_hero`) through the OS decoder, and a keyframe pass that packs many small frames into JPEG sprite sheets (`write_sheets`, used for storyboards). macOS through AVFoundation, Windows through Media Foundation; other targets return `Unsupported`. No Greyscreen dependencies. Used by the engine's thumbnail worker, the CLI and the app.
   app/      greyscreen          The Rune UI binary. It also holds the setup window.
   cli/      greyscreen-cli      Console tool: `doctor`, `record`, `fake-league`, `recover`, `thumb`, `storyboard` (builds the seek bar storyboard of a recording folder and prints the time it took), `analyze` (recording health report), `demo` (seeds or clears a fake library), `soak` (repeated recordings through the real engine, or a named `--profile` from `docs/bench/soak.md`, with a memory, handle, thread and GPU memory sample each second; writes a JSON report and exits non-zero on a leak, a missing or unplayable recording or an engine error).
 ```
@@ -182,7 +182,7 @@ media session ─MediaEvent──┤          │
 UI commands ──EngineCmd────┘          └─> UiMsg sink -> AppHandle::update
 ```
 
-Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `storyboards` (seek bar sprite sheets, `UiMsg::Storyboard`, at background priority), `engine-updates`, `engine-feedback`, `engine-export` (one export at a time), and on Windows a global hotkey listener. The library scan, delete, storage cleanup and settings save run on short worker threads.
+Other engine threads: `thumbnails` (game and clip JPEGs, plus the game's `hero.jpg`, `UiMsg::Thumbnail`), `storyboards` (seek bar sprite sheets, `UiMsg::Storyboard`, at background priority), `engine-updates`, `engine-feedback`, `engine-export` (one export at a time), and on Windows a global hotkey listener. The library scan, delete, storage cleanup and settings save run on short worker threads.
 
 - `EngineCmd`: `ApplySettings(Settings)`, `StartTestRecording { secs: u32 }`, `StopRecording`, `Retry`, `RescanLibrary`, `DeleteRecording { id }`, `BuildStoryboard { folder }`, `SaveClipNow`, `GlobalAction(Action)`, `CheckForUpdates`, `InstallUpdate`, `SendFeedback(FeedbackDraft)`, `Export(ExportJob)`, `CancelExport`, `Shutdown`.
 - `UiMsg`: `Status(EngineStatus)`, `Feed(FeedItem)`, `ClipSaved(ClipEntry)`, `RecordingSaved(RecordingEntry)`, `Library(Vec<RecordingEntry>)`, `Notice { level, text }`, `NoticeWithAction { level, text, action }` (`NoticeAction::Reveal(path)` shows Show in folder, `Link(url)` shows Learn more; the toast stays 12 s instead of 4, and an Error notice with an action stays until it is closed), `HotkeyStatus { errors }`, `Update(UpdateState)`, `Feedback(FeedbackResult)`, `Thumbnail(PathBuf)`, `Storyboard(PathBuf)`, `Encoder(EncoderCheck)`, `Export(ExportEvent)`.
@@ -213,7 +213,8 @@ Other engine threads: `thumbnails` (game and clip JPEGs, `UiMsg::Thumbnail`), `s
     game.mp4            (game.mp4.part while recording)
     game.json           library sidecar, the source of truth for the UI
     diagnostics.jsonl   only with Detailed recording diagnostics on, one line per second
-    thumb.jpg           game thumbnail, made in the background
+    thumb.jpg           game thumbnail, 400x225, made in the background
+    hero.jpg            game page frame, 1600x900, same moment as thumb.jpg, made in the background
     storyboard.json     seek bar preview index, written last (see Storyboards)
     storyboard-0.jpg    preview sprite sheets, 10x10 tiles of 160x90 (storyboard-1.jpg, ...)
     clips/
